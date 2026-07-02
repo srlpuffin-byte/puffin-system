@@ -1,0 +1,2 @@
+- [API Client Lib Build](api-client-lib-build.md) — lib types must be built with `pnpm run typecheck:libs` before leaf artifact typechecks resolve hook imports
+- [New API Endpoints Pattern](new-api-pattern.md) — new endpoints beyond OpenAPI spec use direct `apiFetch` in frontend (`src/lib/api.ts`) + Express Router in `src/routes/` + registered in `index.ts`

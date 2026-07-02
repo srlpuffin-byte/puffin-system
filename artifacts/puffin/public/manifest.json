@@ -1,0 +1,21 @@
+{
+  "name": "PUFFIN SRL — Sistema Operativo",
+  "short_name": "PUFFIN SRL",
+  "description": "Plataforma integral de gestión operacional para construcción y maquinaria pesada",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1B2B5E",
+  "theme_color": "#1B2B5E",
+  "orientation": "any",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "scope": "/"
+}

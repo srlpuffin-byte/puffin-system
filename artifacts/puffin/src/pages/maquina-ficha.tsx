@@ -19,7 +19,7 @@ const estadoBadge = (estado: string) => {
 export function MaquinaFicha() {
   const { id } = useParams();
   const maquinaId = parseInt(id || "0", 10);
-  const { data: maquina, isLoading } = useGetMaquina(maquinaId, { query: { enabled: !!maquinaId } });
+  const { data: maquina, isLoading } = useGetMaquina(maquinaId, { query: { enabled: !!maquinaId } as any });
   const [openMant, setOpenMant] = useState(false);
   const [openComb, setOpenComb] = useState(false);
   const [openInc, setOpenInc] = useState(false);

@@ -19,10 +19,23 @@ import { Calendario } from "@/pages/calendario";
 import { Reportes } from "@/pages/reportes";
 import { Incidentes } from "@/pages/incidentes";
 import { Actividad } from "@/pages/actividad";
+import { Usuarios } from "@/pages/usuarios";
+import { Gps } from "@/pages/gps";
+import { Productividad } from "@/pages/productividad";
+import { Ia } from "@/pages/ia";
+import { Americangis } from "@/pages/americangis";
+import { Xpert } from "@/pages/xpert";
 import { useEffect } from "react";
 import { getAuthToken } from "@/hooks/use-auth";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30_000,
+    },
+  },
+});
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType<any> }) {
   const [location, setLocation] = useLocation();
@@ -73,6 +86,12 @@ function Router() {
       <Route path="/reportes"><ProtectedRoute component={Reportes} /></Route>
       <Route path="/incidentes"><ProtectedRoute component={Incidentes} /></Route>
       <Route path="/actividad"><ProtectedRoute component={Actividad} /></Route>
+      <Route path="/usuarios"><ProtectedRoute component={Usuarios} /></Route>
+      <Route path="/gps"><ProtectedRoute component={Gps} /></Route>
+      <Route path="/productividad"><ProtectedRoute component={Productividad} /></Route>
+      <Route path="/ia"><ProtectedRoute component={Ia} /></Route>
+      <Route path="/americangis"><ProtectedRoute component={Americangis} /></Route>
+      <Route path="/xpert"><ProtectedRoute component={Xpert} /></Route>
       <Route component={NotFound} />
     </Switch>
   );

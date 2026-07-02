@@ -13,6 +13,9 @@ import incidentesRouter from "./incidentes";
 import actividadRouter from "./actividad";
 import calendarioRouter from "./calendario";
 import reportesRouter from "./reportes";
+import usuariosRouter from "./usuarios";
+import productividadRouter from "./productividad";
+import iaRouter from "./ia";
 
 const router: IRouter = Router();
 
@@ -30,5 +33,8 @@ router.use("/incidentes", incidentesRouter);
 router.use("/actividad", actividadRouter);
 router.use("/calendario", calendarioRouter);
 router.use("/reportes", reportesRouter);
+router.use("/usuarios", usuariosRouter);
+router.use("/productividad", productividadRouter);
+router.use("/ia", iaRouter);
 
 export default router;

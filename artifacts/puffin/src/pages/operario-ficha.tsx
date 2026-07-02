@@ -13,7 +13,7 @@ export function OperarioFicha() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
   const operarioId = parseInt(id || "0", 10);
-  const { data: operario, isLoading } = useGetEmpleado(operarioId, { query: { enabled: !!operarioId } });
+  const { data: operario, isLoading } = useGetEmpleado(operarioId, { query: { enabled: !!operarioId } as any });
   const [openJornada, setOpenJornada] = useState(false);
   const [openIncidente, setOpenIncidente] = useState(false);
 
