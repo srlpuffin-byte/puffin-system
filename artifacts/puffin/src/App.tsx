@@ -1,0 +1,94 @@
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import NotFound from "@/pages/not-found";
+import { AppLayout } from "@/components/layout/app-layout";
+import { Login } from "@/pages/login";
+import { Panel } from "@/pages/panel";
+import { Maquinas } from "@/pages/maquinas";
+import { MaquinaFicha } from "@/pages/maquina-ficha";
+import { Operarios } from "@/pages/operarios";
+import { OperarioFicha } from "@/pages/operario-ficha";
+import { Jornadas } from "@/pages/jornadas";
+import { Combustible } from "@/pages/combustible";
+import { Mantenimientos } from "@/pages/mantenimientos";
+import { Documentos } from "@/pages/documentos";
+import { Alertas } from "@/pages/alertas";
+import { Calendario } from "@/pages/calendario";
+import { Reportes } from "@/pages/reportes";
+import { Incidentes } from "@/pages/incidentes";
+import { Actividad } from "@/pages/actividad";
+import { useEffect } from "react";
+import { getAuthToken } from "@/hooks/use-auth";
+
+const queryClient = new QueryClient();
+
+function ProtectedRoute({ component: Component }: { component: React.ComponentType<any> }) {
+  const [location, setLocation] = useLocation();
+  const token = getAuthToken();
+
+  useEffect(() => {
+    if (!token) {
+      setLocation("/login");
+    }
+  }, [token, setLocation]);
+
+  if (!token) return null;
+
+  return (
+    <AppLayout>
+      <Component />
+    </AppLayout>
+  );
+}
+
+function Router() {
+  const [location, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (location === "/") {
+      if (getAuthToken()) {
+        setLocation("/panel");
+      } else {
+        setLocation("/login");
+      }
+    }
+  }, [location, setLocation]);
+
+  return (
+    <Switch>
+      <Route path="/login" component={Login} />
+      <Route path="/panel"><ProtectedRoute component={Panel} /></Route>
+      <Route path="/maquinas"><ProtectedRoute component={Maquinas} /></Route>
+      <Route path="/maquinas/:id"><ProtectedRoute component={MaquinaFicha} /></Route>
+      <Route path="/operarios"><ProtectedRoute component={Operarios} /></Route>
+      <Route path="/operarios/:id"><ProtectedRoute component={OperarioFicha} /></Route>
+      <Route path="/jornadas"><ProtectedRoute component={Jornadas} /></Route>
+      <Route path="/combustible"><ProtectedRoute component={Combustible} /></Route>
+      <Route path="/mantenimientos"><ProtectedRoute component={Mantenimientos} /></Route>
+      <Route path="/documentos"><ProtectedRoute component={Documentos} /></Route>
+      <Route path="/alertas"><ProtectedRoute component={Alertas} /></Route>
+      <Route path="/calendario"><ProtectedRoute component={Calendario} /></Route>
+      <Route path="/reportes"><ProtectedRoute component={Reportes} /></Route>
+      <Route path="/incidentes"><ProtectedRoute component={Incidentes} /></Route>
+      <Route path="/actividad"><ProtectedRoute component={Actividad} /></Route>
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <Router />
+        </WouterRouter>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
+
+export default App;

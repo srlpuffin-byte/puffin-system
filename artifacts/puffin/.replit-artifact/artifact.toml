@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "PUFFIN SRL"
+version = "1.0.0"
+id = "artifacts/puffin"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25958
+
+[services.development]
+run = "pnpm --filter @workspace/puffin run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/puffin", "run", "build" ]
+publicDir = "artifacts/puffin/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25958"
+BASE_PATH = "/"

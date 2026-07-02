@@ -1,22 +1,47 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: PUFFIN SRL - Plataforma Integral de Gestión Operativa
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Autenticación
+  - name: dashboard
+    description: Panel principal
+  - name: empleados
+    description: Operarios
+  - name: maquinas
+    description: Maquinaria
+  - name: jornadas
+    description: Jornadas de trabajo
+  - name: combustible
+    description: Registros de combustible
+  - name: mantenimientos
+    description: Mantenimiento
+  - name: documentos
+    description: Documentación
+  - name: alertas
+    description: Alertas del sistema
+  - name: incidentes
+    description: Incidentes
+  - name: actividad
+    description: Centro de actividad
+  - name: calendario
+    description: Calendario automático
+  - name: reportes
+    description: Reportes
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +49,608 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Iniciar sesión
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SesionData"
+        "401":
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Cerrar sesión
+      responses:
+        "200":
+          description: Logout exitoso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Obtener usuario actual
+      responses:
+        "200":
+          description: Usuario actual
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Usuario"
+        "401":
+          description: No autorizado
+
+  /dashboard/resumen:
+    get:
+      operationId: getDashboardResumen
+      tags: [dashboard]
+      summary: Obtener resumen del panel principal
+      responses:
+        "200":
+          description: Resumen del panel
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardResumen"
+
+  /empleados:
+    get:
+      operationId: getEmpleados
+      tags: [empleados]
+      summary: Listar operarios
+      parameters:
+        - name: estado
+          in: query
+          schema:
+            type: string
+            enum: [activo, inactivo]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Lista de operarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Empleado"
+    post:
+      operationId: createEmpleado
+      tags: [empleados]
+      summary: Crear operario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmpleadoInput"
+      responses:
+        "201":
+          description: Operario creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Empleado"
+
+  /empleados/{id}:
+    get:
+      operationId: getEmpleado
+      tags: [empleados]
+      summary: Obtener operario por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Operario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Empleado"
+    put:
+      operationId: updateEmpleado
+      tags: [empleados]
+      summary: Actualizar operario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmpleadoUpdate"
+      responses:
+        "200":
+          description: Operario actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Empleado"
+
+  /maquinas:
+    get:
+      operationId: getMaquinas
+      tags: [maquinas]
+      summary: Listar maquinaria
+      parameters:
+        - name: estado
+          in: query
+          schema:
+            type: string
+            enum: [activa, detenida, mantenimiento, baja]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Lista de maquinaria
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Maquina"
+    post:
+      operationId: createMaquina
+      tags: [maquinas]
+      summary: Registrar maquinaria
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaquinaInput"
+      responses:
+        "201":
+          description: Maquinaria creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Maquina"
+
+  /maquinas/{id}:
+    get:
+      operationId: getMaquina
+      tags: [maquinas]
+      summary: Obtener maquinaria por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Maquinaria
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Maquina"
+    put:
+      operationId: updateMaquina
+      tags: [maquinas]
+      summary: Actualizar maquinaria
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaquinaUpdate"
+      responses:
+        "200":
+          description: Maquinaria actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Maquina"
+
+  /jornadas:
+    get:
+      operationId: getJornadas
+      tags: [jornadas]
+      summary: Listar jornadas
+      parameters:
+        - name: empleado_id
+          in: query
+          schema:
+            type: integer
+        - name: maquina_id
+          in: query
+          schema:
+            type: integer
+        - name: fecha_desde
+          in: query
+          schema:
+            type: string
+        - name: fecha_hasta
+          in: query
+          schema:
+            type: string
+        - name: estado
+          in: query
+          schema:
+            type: string
+            enum: [en_curso, finalizada]
+      responses:
+        "200":
+          description: Lista de jornadas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Jornada"
+
+  /jornadas/iniciar:
+    post:
+      operationId: iniciarJornada
+      tags: [jornadas]
+      summary: Iniciar jornada de trabajo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IniciarJornadaInput"
+      responses:
+        "201":
+          description: Jornada iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Jornada"
+
+  /jornadas/{id}/finalizar:
+    post:
+      operationId: finalizarJornada
+      tags: [jornadas]
+      summary: Finalizar jornada de trabajo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinalizarJornadaInput"
+      responses:
+        "200":
+          description: Jornada finalizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Jornada"
+
+  /combustible:
+    get:
+      operationId: getCombustible
+      tags: [combustible]
+      summary: Listar registros de combustible
+      parameters:
+        - name: maquina_id
+          in: query
+          schema:
+            type: integer
+        - name: empleado_id
+          in: query
+          schema:
+            type: integer
+        - name: fecha_desde
+          in: query
+          schema:
+            type: string
+        - name: fecha_hasta
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Registros de combustible
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RegistroCombustible"
+    post:
+      operationId: createCombustible
+      tags: [combustible]
+      summary: Registrar carga de combustible
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CombustibleInput"
+      responses:
+        "201":
+          description: Registro creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistroCombustible"
+
+  /mantenimientos:
+    get:
+      operationId: getMantenimientos
+      tags: [mantenimientos]
+      summary: Listar mantenimientos
+      parameters:
+        - name: maquina_id
+          in: query
+          schema:
+            type: integer
+        - name: tipo
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Lista de mantenimientos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Mantenimiento"
+    post:
+      operationId: createMantenimiento
+      tags: [mantenimientos]
+      summary: Registrar mantenimiento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MantenimientoInput"
+      responses:
+        "201":
+          description: Mantenimiento registrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mantenimiento"
+
+  /documentos:
+    get:
+      operationId: getDocumentos
+      tags: [documentos]
+      summary: Listar documentos
+      parameters:
+        - name: tipo
+          in: query
+          schema:
+            type: string
+        - name: proximo_vencimiento
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Lista de documentos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Documento"
+    post:
+      operationId: createDocumento
+      tags: [documentos]
+      summary: Registrar documento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentoInput"
+      responses:
+        "201":
+          description: Documento creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Documento"
+
+  /alertas:
+    get:
+      operationId: getAlertas
+      tags: [alertas]
+      summary: Listar alertas
+      parameters:
+        - name: prioridad
+          in: query
+          schema:
+            type: string
+            enum: [roja, amarilla, azul]
+        - name: estado
+          in: query
+          schema:
+            type: string
+            enum: [activa, resuelta]
+      responses:
+        "200":
+          description: Lista de alertas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Alerta"
+
+  /alertas/{id}:
+    put:
+      operationId: updateAlerta
+      tags: [alertas]
+      summary: Actualizar alerta
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertaUpdate"
+      responses:
+        "200":
+          description: Alerta actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alerta"
+
+  /incidentes:
+    get:
+      operationId: getIncidentes
+      tags: [incidentes]
+      summary: Listar incidentes
+      parameters:
+        - name: maquina_id
+          in: query
+          schema:
+            type: integer
+        - name: empleado_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista de incidentes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Incidente"
+    post:
+      operationId: createIncidente
+      tags: [incidentes]
+      summary: Registrar incidente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncidenteInput"
+      responses:
+        "201":
+          description: Incidente registrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incidente"
+
+  /actividad:
+    get:
+      operationId: getActividad
+      tags: [actividad]
+      summary: Centro de actividad reciente
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Eventos de actividad
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventoActividad"
+
+  /calendario/eventos:
+    get:
+      operationId: getCalendarioEventos
+      tags: [calendario]
+      summary: Obtener eventos del calendario automático
+      parameters:
+        - name: mes
+          in: query
+          schema:
+            type: integer
+        - name: anio
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Eventos del calendario
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventoCalendario"
+
+  /reportes/resumen:
+    get:
+      operationId: getReportesResumen
+      tags: [reportes]
+      summary: Resumen de reportes
+      parameters:
+        - name: periodo
+          in: query
+          schema:
+            type: string
+            enum: [semana, mes, trimestre]
+      responses:
+        "200":
+          description: Resumen de reportes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReporteResumen"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +661,641 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    LoginInput:
+      type: object
+      required: [usuario, pin]
+      properties:
+        usuario:
+          type: string
+        pin:
+          type: string
+
+    SesionData:
+      type: object
+      required: [token, usuario]
+      properties:
+        token:
+          type: string
+        refreshToken:
+          type: string
+        usuario:
+          $ref: "#/components/schemas/Usuario"
+
+    Usuario:
+      type: object
+      required: [id, nombre, apellido, usuario, rol]
+      properties:
+        id:
+          type: integer
+        empresa_id:
+          type: integer
+        nombre:
+          type: string
+        apellido:
+          type: string
+        usuario:
+          type: string
+        rol:
+          type: string
+          enum: [administrador, empleado]
+        activo:
+          type: boolean
+
+    DashboardResumen:
+      type: object
+      required: [maquinas_activas, maquinas_detenidas, empleados_activos, alertas_activas, litros_mes, horas_mes, mantenimientos_mes, disponibilidad]
+      properties:
+        maquinas_activas:
+          type: integer
+        maquinas_detenidas:
+          type: integer
+        maquinas_mantenimiento:
+          type: integer
+        empleados_activos:
+          type: integer
+        alertas_activas:
+          type: integer
+        alertas_rojas:
+          type: integer
+        alertas_amarillas:
+          type: integer
+        litros_mes:
+          type: number
+        horas_mes:
+          type: number
+        mantenimientos_mes:
+          type: integer
+        disponibilidad:
+          type: number
+        proximos_vencimientos:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProximoVencimiento"
+        maquinas_resumen:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaquinaResumen"
+
+    ProximoVencimiento:
+      type: object
+      required: [tipo, descripcion, fecha_vencimiento, dias_restantes, prioridad]
+      properties:
+        tipo:
+          type: string
+        descripcion:
+          type: string
+        fecha_vencimiento:
+          type: string
+        dias_restantes:
+          type: integer
+        prioridad:
+          type: string
+          enum: [roja, amarilla, azul]
+
+    MaquinaResumen:
+      type: object
+      required: [id, nombre, estado]
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        tipo:
+          type: string
+        estado:
+          type: string
+        horometro:
+          type: number
+        kilometros:
+          type: number
+
+    Empleado:
+      type: object
+      required: [id, nombre, apellido, estado]
+      properties:
+        id:
+          type: integer
+        empresa_id:
+          type: integer
+        nombre:
+          type: string
+        apellido:
+          type: string
+        dni:
+          type: string
+        telefono:
+          type: ["string", "null"]
+        cargo:
+          type: ["string", "null"]
+        estado:
+          type: string
+          enum: [activo, inactivo, licencia]
+        fecha_ingreso:
+          type: ["string", "null"]
+        jornada_activa:
+          type: boolean
+        alertas_count:
+          type: integer
+
+    EmpleadoInput:
+      type: object
+      required: [nombre, apellido, dni]
+      properties:
+        nombre:
+          type: string
+        apellido:
+          type: string
+        dni:
+          type: string
+        telefono:
+          type: string
+        cargo:
+          type: string
+        fecha_ingreso:
+          type: string
+
+    EmpleadoUpdate:
+      type: object
+      properties:
+        nombre:
+          type: string
+        apellido:
+          type: string
+        telefono:
+          type: string
+        cargo:
+          type: string
+        estado:
+          type: string
+          enum: [activo, inactivo, licencia]
+
+    Maquina:
+      type: object
+      required: [id, nombre, tipo, estado]
+      properties:
+        id:
+          type: integer
+        empresa_id:
+          type: integer
+        codigo:
+          type: ["string", "null"]
+        nombre:
+          type: string
+        tipo:
+          type: string
+        marca:
+          type: ["string", "null"]
+        modelo:
+          type: ["string", "null"]
+        anio:
+          type: ["integer", "null"]
+        patente:
+          type: ["string", "null"]
+        dominio:
+          type: ["string", "null"]
+        chasis:
+          type: ["string", "null"]
+        motor:
+          type: ["string", "null"]
+        horometro:
+          type: number
+        kilometros:
+          type: number
+        estado:
+          type: string
+          enum: [activa, detenida, mantenimiento, baja]
+        ultimo_service:
+          type: ["string", "null"]
+        proximo_service:
+          type: ["string", "null"]
+
+    MaquinaInput:
+      type: object
+      required: [nombre, tipo]
+      properties:
+        codigo:
+          type: string
+        nombre:
+          type: string
+        tipo:
+          type: string
+        marca:
+          type: string
+        modelo:
+          type: string
+        anio:
+          type: integer
+        patente:
+          type: string
+        dominio:
+          type: string
+        chasis:
+          type: string
+        motor:
+          type: string
+        horometro:
+          type: number
+        kilometros:
+          type: number
+
+    MaquinaUpdate:
+      type: object
+      properties:
+        nombre:
+          type: string
+        estado:
+          type: string
+          enum: [activa, detenida, mantenimiento, baja]
+        horometro:
+          type: number
+        kilometros:
+          type: number
+        proximo_service:
+          type: string
+
+    Jornada:
+      type: object
+      required: [id, empleado_id, maquina_id, fecha, estado]
+      properties:
+        id:
+          type: integer
+        empresa_id:
+          type: integer
+        empleado_id:
+          type: integer
+        maquina_id:
+          type: integer
+        empleado_nombre:
+          type: string
+        maquina_nombre:
+          type: string
+        fecha:
+          type: string
+        hora_inicio:
+          type: ["string", "null"]
+        hora_fin:
+          type: ["string", "null"]
+        km_inicio:
+          type: ["number", "null"]
+        km_fin:
+          type: ["number", "null"]
+        horometro_inicio:
+          type: ["number", "null"]
+        horometro_fin:
+          type: ["number", "null"]
+        observaciones:
+          type: ["string", "null"]
+        problemas:
+          type: ["string", "null"]
+        estado:
+          type: string
+          enum: [en_curso, finalizada]
+        horas_trabajadas:
+          type: ["number", "null"]
+
+    IniciarJornadaInput:
+      type: object
+      required: [empleado_id, maquina_id, horometro_inicio]
+      properties:
+        empleado_id:
+          type: integer
+        maquina_id:
+          type: integer
+        horometro_inicio:
+          type: number
+        km_inicio:
+          type: number
+        observaciones:
+          type: string
+
+    FinalizarJornadaInput:
+      type: object
+      required: [horometro_fin]
+      properties:
+        horometro_fin:
+          type: number
+        km_fin:
+          type: number
+        problemas:
+          type: string
+
+    RegistroCombustible:
+      type: object
+      required: [id, maquina_id, empleado_id, fecha, litros]
+      properties:
+        id:
+          type: integer
+        empresa_id:
+          type: integer
+        empleado_id:
+          type: integer
+        maquina_id:
+          type: integer
+        empleado_nombre:
+          type: string
+        maquina_nombre:
+          type: string
+        fecha:
+          type: string
+        litros:
+          type: number
+        precio:
+          type: ["number", "null"]
+        importe:
+          type: ["number", "null"]
+        estacion:
+          type: ["string", "null"]
+        kilometraje:
+          type: ["number", "null"]
+
+    CombustibleInput:
+      type: object
+      required: [maquina_id, empleado_id, litros]
+      properties:
+        maquina_id:
+          type: integer
+        empleado_id:
+          type: integer
+        litros:
+          type: number
+        precio:
+          type: number
+        importe:
+          type: number
+        estacion:
+          type: string
+        kilometraje:
+          type: number
+        ubicacion:
+          type: string
+
+    Mantenimiento:
+      type: object
+      required: [id, maquina_id, fecha, tipo]
+      properties:
+        id:
+          type: integer
+        empresa_id:
+          type: integer
+        maquina_id:
+          type: integer
+        maquina_nombre:
+          type: string
+        fecha:
+          type: string
+        horas:
+          type: ["number", "null"]
+        tipo:
+          type: string
+        descripcion:
+          type: ["string", "null"]
+        proximo_service:
+          type: ["string", "null"]
+        estado:
+          type: string
+          enum: [pendiente, realizado, cancelado]
+
+    MantenimientoInput:
+      type: object
+      required: [maquina_id, tipo]
+      properties:
+        maquina_id:
+          type: integer
+        horas:
+          type: number
+        tipo:
+          type: string
+        descripcion:
+          type: string
+        proximo_service:
+          type: string
+
+    Documento:
+      type: object
+      required: [id, tipo, fecha_vencimiento]
+      properties:
+        id:
+          type: integer
+        empresa_id:
+          type: integer
+        tipo:
+          type: string
+        descripcion:
+          type: ["string", "null"]
+        entidad_tipo:
+          type: ["string", "null"]
+        entidad_id:
+          type: ["integer", "null"]
+        entidad_nombre:
+          type: ["string", "null"]
+        fecha_vencimiento:
+          type: string
+        archivo_url:
+          type: ["string", "null"]
+        estado:
+          type: string
+          enum: [vigente, proximo_vencimiento, vencido]
+        dias_restantes:
+          type: integer
+
+    DocumentoInput:
+      type: object
+      required: [tipo, fecha_vencimiento]
+      properties:
+        tipo:
+          type: string
+        descripcion:
+          type: string
+        entidad_tipo:
+          type: string
+        entidad_id:
+          type: integer
+        fecha_vencimiento:
+          type: string
+
+    Alerta:
+      type: object
+      required: [id, tipo, prioridad, descripcion, estado, fecha]
+      properties:
+        id:
+          type: integer
+        empresa_id:
+          type: integer
+        tipo:
+          type: string
+        prioridad:
+          type: string
+          enum: [roja, amarilla, azul]
+        descripcion:
+          type: string
+        estado:
+          type: string
+          enum: [activa, resuelta, ignorada]
+        fecha:
+          type: string
+        entidad_tipo:
+          type: ["string", "null"]
+        entidad_id:
+          type: ["integer", "null"]
+        entidad_nombre:
+          type: ["string", "null"]
+
+    AlertaUpdate:
+      type: object
+      properties:
+        estado:
+          type: string
+          enum: [activa, resuelta, ignorada]
+
+    Incidente:
+      type: object
+      required: [id, descripcion, fecha]
+      properties:
+        id:
+          type: integer
+        empresa_id:
+          type: integer
+        empleado_id:
+          type: ["integer", "null"]
+        maquina_id:
+          type: ["integer", "null"]
+        empleado_nombre:
+          type: ["string", "null"]
+        maquina_nombre:
+          type: ["string", "null"]
+        tipo:
+          type: string
+          enum: [rotura, golpe, accidente, falla, problema_mecanico, otro]
+        descripcion:
+          type: string
+        foto_url:
+          type: ["string", "null"]
+        fecha:
+          type: string
+        estado:
+          type: string
+          enum: [activo, resuelto]
+
+    IncidenteInput:
+      type: object
+      required: [tipo, descripcion]
+      properties:
+        empleado_id:
+          type: integer
+        maquina_id:
+          type: integer
+        tipo:
+          type: string
+          enum: [rotura, golpe, accidente, falla, problema_mecanico, otro]
+        descripcion:
+          type: string
+
+    EventoActividad:
+      type: object
+      required: [id, tipo, descripcion, fecha]
+      properties:
+        id:
+          type: integer
+        tipo:
+          type: string
+        descripcion:
+          type: string
+        usuario_nombre:
+          type: ["string", "null"]
+        entidad_tipo:
+          type: ["string", "null"]
+        entidad_nombre:
+          type: ["string", "null"]
+        fecha:
+          type: string
+
+    EventoCalendario:
+      type: object
+      required: [id, tipo, titulo, fecha, prioridad]
+      properties:
+        id:
+          type: integer
+        tipo:
+          type: string
+        titulo:
+          type: string
+        descripcion:
+          type: ["string", "null"]
+        fecha:
+          type: string
+        prioridad:
+          type: string
+          enum: [rojo, amarillo, verde]
+        entidad_nombre:
+          type: ["string", "null"]
+
+    ReporteResumen:
+      type: object
+      required: [periodo, maquinaria, operarios, combustible_total, mantenimientos]
+      properties:
+        periodo:
+          type: string
+        maquinaria:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReporteMaquina"
+        operarios:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReporteOperario"
+        combustible_total:
+          type: number
+        costo_total:
+          type: number
+        mantenimientos:
+          type: integer
+
+    ReporteMaquina:
+      type: object
+      required: [id, nombre, horas, kilometros, consumo]
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        horas:
+          type: number
+        kilometros:
+          type: number
+        consumo:
+          type: number
+        disponibilidad:
+          type: number
+
+    ReporteOperario:
+      type: object
+      required: [id, nombre, horas, jornadas]
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        horas:
+          type: number
+        jornadas:
+          type: integer
+        incidentes:
+          type: integer
+        puntaje:
+          type: number
