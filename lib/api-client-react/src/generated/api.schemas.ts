@@ -242,6 +242,14 @@ export interface Jornada {
   /** @nullable */
   horometro_fin?: number | null;
   /** @nullable */
+  checklist_previo?: string | null;
+  /** @nullable */
+  checklist_ok?: string | null;
+  /** @nullable */
+  foto_tablero_inicio?: string | null;
+  /** @nullable */
+  foto_tablero_fin?: string | null;
+  /** @nullable */
   observaciones?: string | null;
   /** @nullable */
   problemas?: string | null;
@@ -255,13 +263,48 @@ export interface IniciarJornadaInput {
   maquina_id: number;
   horometro_inicio: number;
   km_inicio?: number;
+  checklist_previo?: string;
+  estado_equipo_inicio?: string;
+  foto_tablero_inicio?: string;
   observaciones?: string;
 }
 
 export interface FinalizarJornadaInput {
   horometro_fin: number;
   km_fin?: number;
+  estado_equipo_fin?: string;
+  foto_tablero_fin?: string;
   problemas?: string;
+}
+
+export type RegistroAuditoriaValorAnterior = { [key: string]: unknown };
+
+export type RegistroAuditoriaValorNuevo = { [key: string]: unknown };
+
+export interface RegistroAuditoria {
+  id?: number;
+  empresa_id?: number;
+  usuario_id?: number;
+  accion?: string;
+  entidad?: string;
+  entidad_id?: number;
+  valor_anterior?: RegistroAuditoriaValorAnterior;
+  valor_nuevo?: RegistroAuditoriaValorNuevo;
+  ip?: string;
+  dispositivo?: string;
+  created_at?: string;
+}
+
+export interface Backup {
+  id?: number;
+  tipo?: string;
+  frecuencia?: string;
+  archivo_url?: string;
+  tamano_bytes?: number;
+  creado_por?: number;
+  exitoso?: boolean;
+  error_mensaje?: string;
+  created_at?: string;
 }
 
 export interface RegistroCombustible {
@@ -502,6 +545,24 @@ export interface EventoCalendario {
   entidad_nombre?: string | null;
 }
 
+export interface Fotografia {
+  id: number;
+  empresa_id?: number;
+  entidad_tipo: string;
+  entidad_id: number;
+  url: string;
+  descripcion?: string | null;
+  createdAt?: string;
+}
+
+export interface UploadFotografiaInput {
+  entidad_tipo: string;
+  entidad_id: number;
+  filename?: string;
+  base64Data: string;
+  descripcion?: string;
+}
+
 export interface ReporteMaquina {
   id: number;
   nombre: string;
@@ -573,6 +634,11 @@ export const GetJornadasEstado = {
   finalizada: 'finalizada',
 } as const;
 
+export type GetFotografiasParams = {
+entidad_tipo: string;
+entidad_id: number;
+};
+
 export type GetCombustibleParams = {
 maquina_id?: number;
 empleado_id?: number;
@@ -624,6 +690,11 @@ limit?: number;
 export type GetCalendarioEventosParams = {
 mes?: number;
 anio?: number;
+};
+
+export type GetAuditoriaParams = {
+entidad?: string;
+accion?: string;
 };
 
 export type GetReportesResumenParams = {

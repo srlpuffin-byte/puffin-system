@@ -28,14 +28,37 @@ function mesActual(): string {
   return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
 }
 
+import OpenAI from "openai";
+
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+
 router.post("/consulta", async (req, res) => {
   try {
     const { pregunta } = req.body;
     if (!pregunta) return res.status(400).json({ error: "pregunta es requerida" });
 
-    const p = pregunta.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
     let respuesta = "";
+    
+    // Si tenemos OpenAI, lo usamos
+    if (openai) {
+      try {
+        const completion = await openai.chat.completions.create({
+          messages: [
+            { role: "system", content: "Eres un asistente de IA para la plataforma operativa de PUFFIN SRL. Respondes dudas sobre métricas y estados de maquinaria y empleados. Hablas en español de Argentina de forma concisa y profesional." },
+            { role: "user", content: pregunta }
+          ],
+          model: "gpt-4o-mini",
+        });
+        respuesta = completion.choices[0].message.content || "No pude generar una respuesta.";
+        return res.json({ respuesta, pregunta });
+      } catch (error) {
+        req.log.error(error, "Error en OpenAI");
+        // Fallback a lógica hardcodeada si OpenAI falla
+      }
+    }
+
+    // Fallback logic
+    const p = pregunta.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
     if ((p.includes("alerta") || p.includes("alertas")) && (p.includes("empleado") || p.includes("operario"))) {
       const alertas = await db

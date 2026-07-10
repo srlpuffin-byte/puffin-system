@@ -16,6 +16,7 @@ export const combustibleTable = pgTable("combustible", {
   kilometraje: numeric("kilometraje", { precision: 10, scale: 1 }),
   foto_ticket: text("foto_ticket"),
   foto_surtidor: text("foto_surtidor"),
+  estado: text("estado").notNull().default("activo"), // activo, anulado
   createdAt: timestamp("created_at").defaultNow(),
 });
 

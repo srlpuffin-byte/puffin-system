@@ -14,6 +14,12 @@ export const jornadasTable = pgTable("jornadas", {
   km_fin: numeric("km_fin", { precision: 10, scale: 1 }),
   horometro_inicio: numeric("horometro_inicio", { precision: 10, scale: 1 }),
   horometro_fin: numeric("horometro_fin", { precision: 10, scale: 1 }),
+  checklist_previo: text("checklist_previo"), // JSON stringified for checklist items
+  checklist_ok: text("checklist_ok"), // boolean flag for quick filtering if everything was OK
+  estado_equipo_inicio: text("estado_equipo_inicio"), // apto, apto_observaciones, no_apto
+  estado_equipo_fin: text("estado_equipo_fin"), // sin_novedades, con_observaciones, requiere_mantenimiento, fuera_de_servicio
+  foto_tablero_inicio: text("foto_tablero_inicio"),
+  foto_tablero_fin: text("foto_tablero_fin"),
   observaciones: text("observaciones"),
   problemas: text("problemas"),
   estado: text("estado").notNull().default("en_curso"),

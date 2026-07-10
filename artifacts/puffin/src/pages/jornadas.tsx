@@ -8,6 +8,7 @@ import { PlayCircle, Square } from "lucide-react";
 import { format } from "date-fns";
 import { IniciarJornadaDialog } from "@/components/forms/iniciar-jornada-dialog";
 import { FinalizarJornadaDialog } from "@/components/forms/finalizar-jornada-dialog";
+import { ExportButtons } from "@/components/ui/export-buttons";
 
 export function Jornadas() {
   const { data: jornadas, isLoading } = useGetJornadas();
@@ -16,14 +17,34 @@ export function Jornadas() {
     id: number; empleado_nombre?: string; maquina_nombre?: string; horometro_inicio?: number | null;
   } | null>(null);
 
+  const exportColumns = [
+    { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy") : "-" },
+    { header: "Operario", key: "empleado_nombre" },
+    { header: "Máquina", key: "maquina_nombre" },
+    { header: "H. Inicio", key: "horometro_inicio" },
+    { header: "H. Fin", key: "horometro_fin" },
+    { header: "Horas Trabajadas", key: "horas_trabajadas" },
+    { header: "Estado", key: "estado" }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Jornadas Laborales</h1>
-        <Button className="bg-primary" onClick={() => setOpenIniciar(true)}>
-          <PlayCircle className="mr-2 h-4 w-4" />
-          Iniciar Jornada
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {jornadas && (
+            <ExportButtons 
+              data={jornadas} 
+              columns={exportColumns} 
+              filename="Reporte_Jornadas" 
+              title="Reporte de Jornadas Laborales" 
+            />
+          )}
+          <Button className="bg-primary flex-1 sm:flex-none" onClick={() => setOpenIniciar(true)}>
+            <PlayCircle className="mr-2 h-4 w-4" />
+            Iniciar Jornada
+          </Button>
+        </div>
       </div>
 
       <Card>

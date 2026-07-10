@@ -5,6 +5,7 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-reac
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
+import { ExportButtons } from "@/components/ui/export-buttons";
 
 export function Calendario() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -21,11 +22,26 @@ export function Calendario() {
   const monthEnd = endOfMonth(currentDate);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
+  const exportColumns = [
+    { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy") : "-" },
+    { header: "Título", key: "titulo" },
+    { header: "Entidad", key: "entidad_nombre" },
+    { header: "Prioridad", key: "prioridad", formatter: (v: string) => v?.toUpperCase() }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Calendario de Operaciones</h1>
         <div className="flex items-center gap-4">
+          {eventos && (
+            <ExportButtons 
+              data={eventos} 
+              columns={exportColumns} 
+              filename={`Reporte_Calendario_${format(currentDate, "MM_yyyy")}`} 
+              title={`Eventos - ${format(currentDate, "MMMM yyyy", { locale: es })}`} 
+            />
+          )}
           <Button variant="outline" onClick={prevMonth}><ChevronLeft className="h-4 w-4" /></Button>
           <span className="text-lg font-medium w-48 text-center capitalize">
             {format(currentDate, "MMMM yyyy", { locale: es })}

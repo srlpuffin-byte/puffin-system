@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Plus } from "lucide-react";
 import { Link } from "wouter";
 import { NuevaMaquinaDialog } from "@/components/forms/nueva-maquina-dialog";
+import { ExportButtons } from "@/components/ui/export-buttons";
 
 const estadoBadge = (estado: string) => {
   if (estado === "activa") return <Badge className="bg-green-600 hover:bg-green-700">ACTIVA</Badge>;
@@ -21,14 +22,35 @@ export function Maquinas() {
   const [openDialog, setOpenDialog] = useState(false);
   const { data: maquinas, isLoading } = useGetMaquinas({ search: search || undefined });
 
+  const exportColumns = [
+    { header: "Código", key: "codigo" },
+    { header: "Nombre", key: "nombre" },
+    { header: "Tipo", key: "tipo" },
+    { header: "Marca", key: "marca" },
+    { header: "Modelo", key: "modelo" },
+    { header: "Patente/Dominio", key: "patente" },
+    { header: "Horómetro", key: "horometro" },
+    { header: "Estado", key: "estado", formatter: (v: string) => v?.toUpperCase() }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Maquinaria</h1>
-        <Button className="bg-primary" onClick={() => setOpenDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva Máquina
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {maquinas && (
+            <ExportButtons 
+              data={maquinas} 
+              columns={exportColumns} 
+              filename="Reporte_Maquinaria" 
+              title="Reporte de Maquinaria" 
+            />
+          )}
+          <Button className="bg-primary flex-1 sm:flex-none" onClick={() => setOpenDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nueva Máquina
+          </Button>
+        </div>
       </div>
 
       <Card>

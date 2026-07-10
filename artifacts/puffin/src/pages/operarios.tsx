@@ -8,20 +8,39 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Plus } from "lucide-react";
 import { Link } from "wouter";
 import { NuevoOperarioDialog } from "@/components/forms/nuevo-operario-dialog";
+import { ExportButtons } from "@/components/ui/export-buttons";
 
 export function Operarios() {
   const [search, setSearch] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const { data: operarios, isLoading } = useGetEmpleados({ search: search || undefined });
 
+  const exportColumns = [
+    { header: "Apellido", key: "apellido" },
+    { header: "Nombre", key: "nombre" },
+    { header: "DNI", key: "dni" },
+    { header: "Cargo", key: "cargo" },
+    { header: "Estado", key: "estado", formatter: (v: string) => v?.toUpperCase() }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Operarios</h1>
-        <Button className="bg-primary" onClick={() => setOpenDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Operario
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {operarios && (
+            <ExportButtons 
+              data={operarios} 
+              columns={exportColumns} 
+              filename="Reporte_Operarios" 
+              title="Reporte de Operarios" 
+            />
+          )}
+          <Button className="bg-primary flex-1 sm:flex-none" onClick={() => setOpenDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Operario
+          </Button>
+        </div>
       </div>
 
       <Card>

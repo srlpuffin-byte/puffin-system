@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, date, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -12,6 +12,7 @@ export const documentosTable = pgTable("documentos", {
   fecha_vencimiento: date("fecha_vencimiento").notNull(),
   archivo_url: text("archivo_url"),
   estado_doc: text("estado_doc").notNull().default("vigente"),
+  activo: boolean("activo").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

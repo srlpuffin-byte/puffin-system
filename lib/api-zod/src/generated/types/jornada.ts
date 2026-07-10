@@ -28,6 +28,14 @@ export interface Jornada {
   /** @nullable */
   horometro_fin?: number | null;
   /** @nullable */
+  checklist_previo?: string | null;
+  /** @nullable */
+  checklist_ok?: string | null;
+  /** @nullable */
+  foto_tablero_inicio?: string | null;
+  /** @nullable */
+  foto_tablero_fin?: string | null;
+  /** @nullable */
   observaciones?: string | null;
   /** @nullable */
   problemas?: string | null;

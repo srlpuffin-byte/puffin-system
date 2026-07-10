@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { TrendingUp, Users, Truck, Star, AlertTriangle } from "lucide-react";
+import { ExportButtons } from "@/components/ui/export-buttons";
 
 interface OperarioMetric {
   id: number;
@@ -156,10 +157,27 @@ export function Productividad() {
       ) : (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" /> Rendimiento de Operarios
               </CardTitle>
+              {operarios.length > 0 && (
+                <ExportButtons 
+                  data={operarios} 
+                  columns={[
+                    { header: "Operario", key: "nombre" },
+                    { header: "Cargo", key: "cargo" },
+                    { header: "Puntaje", key: "score" },
+                    { header: "Calificación", key: "calificacion" },
+                    { header: "Jornadas", key: "jornadas" },
+                    { header: "Horas", key: "horas" },
+                    { header: "Incidentes", key: "incidentes" },
+                    { header: "Alertas", key: "alertas" }
+                  ]}
+                  filename={`Productividad_Operarios_${periodo}`} 
+                  title={`Productividad de Operarios - ${periodo}`} 
+                />
+              )}
             </CardHeader>
             <CardContent>
               {operarios.length === 0 ? (
@@ -207,10 +225,25 @@ export function Productividad() {
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Truck className="h-5 w-5" /> Rendimiento de Maquinaria
               </CardTitle>
+              {maquinas.length > 0 && (
+                <ExportButtons 
+                  data={maquinas} 
+                  columns={[
+                    { header: "Máquina", key: "nombre" },
+                    { header: "Tipo", key: "tipo", formatter: (v: string) => v?.charAt(0).toUpperCase() + v?.slice(1) },
+                    { header: "Horas", key: "horas" },
+                    { header: "Consumo (L)", key: "consumo" },
+                    { header: "Fallas", key: "fallas" },
+                    { header: "Disponibilidad (%)", key: "disponibilidad" }
+                  ]}
+                  filename={`Productividad_Maquinaria_${periodo}`} 
+                  title={`Productividad de Maquinaria - ${periodo}`} 
+                />
+              )}
             </CardHeader>
             <CardContent>
               {maquinas.length === 0 ? (

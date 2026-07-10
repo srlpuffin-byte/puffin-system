@@ -6,19 +6,41 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus } from "lucide-react";
 import { format } from "date-fns";
 import { RegistrarCargaDialog } from "@/components/forms/registrar-carga-dialog";
+import { ExportButtons } from "@/components/ui/export-buttons";
 
 export function Combustible() {
   const { data: registros, isLoading } = useGetCombustible();
   const [openDialog, setOpenDialog] = useState(false);
 
+  const exportColumns = [
+    { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy") : "-" },
+    { header: "Máquina", key: "maquina_nombre" },
+    { header: "Operario", key: "empleado_nombre" },
+    { header: "Litros", key: "litros" },
+    { header: "Precio/L", key: "precio", formatter: (v: number) => v ? `$${Number(v).toLocaleString()}` : "-" },
+    { header: "Importe", key: "importe", formatter: (v: number) => v ? `$${Number(v).toLocaleString()}` : "-" },
+    { header: "Estación", key: "estacion" },
+    { header: "Km", key: "kilometraje" }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Control de Combustible</h1>
-        <Button className="bg-primary" onClick={() => setOpenDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Registrar Carga
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {registros && (
+            <ExportButtons 
+              data={registros} 
+              columns={exportColumns} 
+              filename="Reporte_Combustible" 
+              title="Reporte de Cargas de Combustible" 
+            />
+          )}
+          <Button className="bg-primary flex-1 sm:flex-none" onClick={() => setOpenDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Registrar Carga
+          </Button>
+        </div>
       </div>
 
       <Card>

@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ExportButtons } from "@/components/ui/export-buttons";
 import {
   BarChart,
   Bar,
@@ -29,20 +30,7 @@ function puntajeColor(p: number) {
   return "bg-red-100 text-red-800";
 }
 
-function exportarCSV(data: any[], filename: string) {
-  if (!data || data.length === 0) return;
-  const keys = Object.keys(data[0]);
-  const header = keys.join(",");
-  const rows = data.map((d) => keys.map((k) => `"${d[k] ?? ""}"`).join(","));
-  const csv = [header, ...rows].join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+// Función eliminada, usando ExportButtons
 
 const COLORS_CHART = ["#1B2B5E", "#4A7A2B", "#2563eb", "#7c3aed", "#dc2626", "#d97706"];
 
@@ -73,16 +61,7 @@ export function Reportes() {
               <SelectItem value="trimestre">Último Trimestre</SelectItem>
             </SelectContent>
           </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              exportarCSV(maquinaria, `reporte-maquinaria-${periodo}.csv`);
-              exportarCSV(operarios, `reporte-operarios-${periodo}.csv`);
-            }}
-          >
-            <Download className="h-4 w-4 mr-1" /> Exportar CSV
-          </Button>
+// Botón general removido, ahora está en cada tabla
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer className="h-4 w-4 mr-1" /> Imprimir
           </Button>
@@ -188,9 +167,18 @@ export function Reportes() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Rendimiento por Máquina</CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => exportarCSV(maquinaria, `maquinaria-${periodo}.csv`)}>
-                  <FileText className="h-4 w-4" />
-                </Button>
+                <ExportButtons 
+                  data={maquinaria} 
+                  columns={[
+                    { header: "Máquina", key: "nombre" },
+                    { header: "Horas", key: "horas" },
+                    { header: "Km", key: "kilometros" },
+                    { header: "Consumo (L)", key: "consumo" },
+                    { header: "Disponibilidad (%)", key: "disponibilidad" }
+                  ]}
+                  filename={`Maquinaria_${periodo}`} 
+                  title={`Rendimiento por Máquina - ${periodo}`} 
+                />
               </CardHeader>
               <CardContent>
                 {maquinaria.length === 0 ? (
@@ -227,9 +215,18 @@ export function Reportes() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Rendimiento de Operarios</CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => exportarCSV(operarios, `operarios-${periodo}.csv`)}>
-                  <FileText className="h-4 w-4" />
-                </Button>
+                <ExportButtons 
+                  data={operarios} 
+                  columns={[
+                    { header: "Operario", key: "nombre" },
+                    { header: "Jornadas", key: "jornadas" },
+                    { header: "Horas", key: "horas" },
+                    { header: "Incidentes", key: "incidentes" },
+                    { header: "Puntaje", key: "puntaje" }
+                  ]}
+                  filename={`Operarios_${periodo}`} 
+                  title={`Rendimiento de Operarios - ${periodo}`} 
+                />
               </CardHeader>
               <CardContent>
                 {operarios.length === 0 ? (

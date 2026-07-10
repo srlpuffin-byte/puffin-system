@@ -11,5 +11,8 @@ export interface IniciarJornadaInput {
   maquina_id: number;
   horometro_inicio: number;
   km_inicio?: number;
+  checklist_previo?: string;
+  estado_equipo_inicio?: string;
+  foto_tablero_inicio?: string;
   observaciones?: string;
 }

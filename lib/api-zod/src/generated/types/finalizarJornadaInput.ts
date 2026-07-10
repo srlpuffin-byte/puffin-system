@@ -9,5 +9,7 @@
 export interface FinalizarJornadaInput {
   horometro_fin: number;
   km_fin?: number;
+  estado_equipo_fin?: string;
+  foto_tablero_fin?: string;
   problemas?: string;
 }

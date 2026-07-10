@@ -24,6 +24,8 @@ import {
   ChevronRight,
   Menu,
   X,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { useLogout, useGetMe } from "@workspace/api-client-react";
 import { removeAuthToken } from "@/hooks/use-auth";
@@ -159,6 +161,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
+  
+  const toggleTheme = () => {
+    if (isDark) {
+      document.documentElement.classList.remove("dark");
+      setIsDark(false);
+    } else {
+      document.documentElement.classList.add("dark");
+      setIsDark(true);
+    }
+  };
+
   const Sidebar = () => (
     <aside className="w-60 bg-sidebar text-sidebar-foreground flex flex-col flex-shrink-0 border-r border-sidebar-border h-full">
       <div className="h-14 flex items-center px-4 font-bold text-lg border-b border-sidebar-border flex-shrink-0">
@@ -175,6 +189,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <p className="text-sm font-semibold">{user?.nombre} {user?.apellido}</p>
           <p className="text-xs text-sidebar-foreground/60 capitalize">{user?.rol}</p>
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent mb-1"
+          onClick={toggleTheme}
+        >
+          {isDark ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+          {isDark ? "Modo Claro" : "Modo Oscuro"}
+        </Button>
         <Button
           variant="ghost"
           size="sm"

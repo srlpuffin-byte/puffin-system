@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
 import { format } from "date-fns";
 import { ReportarIncidenteDialog } from "@/components/forms/reportar-incidente-dialog";
+import { ExportButtons } from "@/components/ui/export-buttons";
 
 const TIPO_LABELS: Record<string, string> = {
   rotura: "Rotura",
@@ -21,14 +22,33 @@ export function Incidentes() {
   const { data: incidentes, isLoading } = useGetIncidentes();
   const [openDialog, setOpenDialog] = useState(false);
 
+  const exportColumns = [
+    { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy HH:mm") : "-" },
+    { header: "Tipo", key: "tipo", formatter: (v: string) => TIPO_LABELS[v] || v },
+    { header: "Máquina", key: "maquina_nombre" },
+    { header: "Operario", key: "empleado_nombre" },
+    { header: "Descripción", key: "descripcion" },
+    { header: "Estado", key: "estado", formatter: (v: string) => v?.toUpperCase() }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Registro de Incidentes</h1>
-        <Button className="bg-destructive hover:bg-destructive/90" onClick={() => setOpenDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Reportar Incidente
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {incidentes && (
+            <ExportButtons 
+              data={incidentes} 
+              columns={exportColumns} 
+              filename="Reporte_Incidentes" 
+              title="Reporte de Incidentes" 
+            />
+          )}
+          <Button className="bg-destructive hover:bg-destructive/90 flex-1 sm:flex-none" onClick={() => setOpenDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Reportar Incidente
+          </Button>
+        </div>
       </div>
 
       <Card>

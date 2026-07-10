@@ -15,6 +15,7 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetAlertasQueryKey } from "@workspace/api-client-react";
+import { ExportButtons } from "@/components/ui/export-buttons";
 
 export function Alertas() {
   const { data: alertas, isLoading } = useGetAlertas({ estado: 'activa' });
@@ -32,10 +33,28 @@ export function Alertas() {
     );
   };
 
+  const exportColumns = [
+    { header: "Prioridad", key: "prioridad", formatter: (v: string) => v?.toUpperCase() },
+    { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy HH:mm") : "-" },
+    { header: "Tipo", key: "tipo", formatter: (v: string) => v?.charAt(0).toUpperCase() + v?.slice(1) },
+    { header: "Entidad", key: "entidad_nombre" },
+    { header: "Descripción", key: "descripcion" }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Centro de Alertas</h1>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {alertas && (
+            <ExportButtons 
+              data={alertas} 
+              columns={exportColumns} 
+              filename="Reporte_Alertas" 
+              title="Reporte de Alertas" 
+            />
+          )}
+        </div>
       </div>
 
       <Card>

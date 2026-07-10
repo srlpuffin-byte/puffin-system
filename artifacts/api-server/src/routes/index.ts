@@ -16,6 +16,10 @@ import reportesRouter from "./reportes";
 import usuariosRouter from "./usuarios";
 import productividadRouter from "./productividad";
 import iaRouter from "./ia";
+import { auditoriaRouter } from "./auditoria";
+import { backupsRouter } from "./backups";
+import { integrationsRouter } from "./integrations";
+import fotografiasRouter from "./fotografias";
 
 const router: IRouter = Router();
 
@@ -36,5 +40,9 @@ router.use("/reportes", reportesRouter);
 router.use("/usuarios", usuariosRouter);
 router.use("/productividad", productividadRouter);
 router.use("/ia", iaRouter);
+router.use("/auditoria", auditoriaRouter);
+router.use("/backups", backupsRouter);
+router.use("/integrations", integrationsRouter);
+router.use("/fotografias", fotografiasRouter);
 
 export default router;

@@ -35,6 +35,8 @@ tags:
     description: Calendario automático
   - name: reportes
     description: Reportes
+  - name: fotografias
+    description: Fotografías y archivos adjuntos
 
 paths:
   /healthz:
@@ -365,6 +367,49 @@ paths:
               schema:
                 $ref: "#/components/schemas/Jornada"
 
+  /fotografias:
+    get:
+      operationId: getFotografias
+      tags: [fotografias]
+      summary: Obtener fotografías de una entidad
+      parameters:
+        - name: entidad_tipo
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: entidad_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista de fotografías
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Fotografia"
+    post:
+      operationId: uploadFotografia
+      tags: [fotografias]
+      summary: Subir una fotografía
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadFotografiaInput"
+      responses:
+        "201":
+          description: Fotografía subida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fotografia"
+
   /combustible:
     get:
       operationId: getCombustible
@@ -631,6 +676,56 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/EventoCalendario"
+
+  /auditoria:
+    get:
+      operationId: getAuditoria
+      tags: [auditoria]
+      summary: Historial de auditoría
+      parameters:
+        - name: entidad
+          in: query
+          schema:
+            type: string
+        - name: accion
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Registro de auditoría
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RegistroAuditoria"
+
+  /backups:
+    get:
+      operationId: getBackups
+      tags: [backups]
+      summary: Listar backups
+      responses:
+        "200":
+          description: Lista de backups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Backup"
+    post:
+      operationId: createBackup
+      tags: [backups]
+      summary: Generar backup manual
+      responses:
+        "201":
+          description: Backup generado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Backup"
 
   /reportes/resumen:
     get:
@@ -959,6 +1054,14 @@ components:
           type: ["number", "null"]
         horometro_fin:
           type: ["number", "null"]
+        checklist_previo:
+          type: ["string", "null"]
+        checklist_ok:
+          type: ["string", "null"]
+        foto_tablero_inicio:
+          type: ["string", "null"]
+        foto_tablero_fin:
+          type: ["string", "null"]
         observaciones:
           type: ["string", "null"]
         problemas:
@@ -981,6 +1084,12 @@ components:
           type: number
         km_inicio:
           type: number
+        checklist_previo:
+          type: string
+        estado_equipo_inicio:
+          type: string
+        foto_tablero_inicio:
+          type: string
         observaciones:
           type: string
 
@@ -992,7 +1101,59 @@ components:
           type: number
         km_fin:
           type: number
+        estado_equipo_fin:
+          type: string
+        foto_tablero_fin:
+          type: string
         problemas:
+          type: string
+
+    RegistroAuditoria:
+      type: object
+      properties:
+        id:
+          type: integer
+        empresa_id:
+          type: integer
+        usuario_id:
+          type: integer
+        accion:
+          type: string
+        entidad:
+          type: string
+        entidad_id:
+          type: integer
+        valor_anterior:
+          type: object
+        valor_nuevo:
+          type: object
+        ip:
+          type: string
+        dispositivo:
+          type: string
+        created_at:
+          type: string
+
+    Backup:
+      type: object
+      properties:
+        id:
+          type: integer
+        tipo:
+          type: string
+        frecuencia:
+          type: string
+        archivo_url:
+          type: string
+        tamano_bytes:
+          type: integer
+        creado_por:
+          type: integer
+        exitoso:
+          type: boolean
+        error_mensaje:
+          type: string
+        created_at:
           type: string
 
     RegistroCombustible:
@@ -1244,6 +1405,46 @@ components:
           enum: [rojo, amarillo, verde]
         entidad_nombre:
           type: ["string", "null"]
+
+    Fotografia:
+      type: object
+      properties:
+        id:
+          type: integer
+        empresa_id:
+          type: integer
+        entidad_tipo:
+          type: string
+        entidad_id:
+          type: integer
+        url:
+          type: string
+        descripcion:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - entidad_tipo
+        - entidad_id
+        - url
+
+    UploadFotografiaInput:
+      type: object
+      required: [entidad_tipo, entidad_id, base64Data]
+      properties:
+        entidad_tipo:
+          type: string
+        entidad_id:
+          type: integer
+        filename:
+          type: string
+        base64Data:
+          type: string
+        descripcion:
+          type: string
 
     ReporteResumen:
       type: object

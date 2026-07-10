@@ -7,19 +7,39 @@ import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
 import { format } from "date-fns";
 import { AñadirDocumentoDialog } from "@/components/forms/aniadir-documento-dialog";
+import { ExportButtons } from "@/components/ui/export-buttons";
 
 export function Documentos() {
   const { data: documentos, isLoading } = useGetDocumentos();
   const [openDialog, setOpenDialog] = useState(false);
 
+  const exportColumns = [
+    { header: "Tipo", key: "tipo", formatter: (v: string) => v?.charAt(0).toUpperCase() + v?.slice(1) },
+    { header: "Entidad", key: "entidad_nombre" },
+    { header: "Descripción", key: "descripcion" },
+    { header: "Vencimiento", key: "fecha_vencimiento", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy") : "-" },
+    { header: "Días Restantes", key: "dias_restantes" },
+    { header: "Estado", key: "estado", formatter: (v: string) => v?.toUpperCase().replace("_", " ") }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Documentación</h1>
-        <Button className="bg-primary" onClick={() => setOpenDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Añadir Documento
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {documentos && (
+            <ExportButtons 
+              data={documentos} 
+              columns={exportColumns} 
+              filename="Reporte_Documentacion" 
+              title="Reporte de Documentación" 
+            />
+          )}
+          <Button className="bg-primary flex-1 sm:flex-none" onClick={() => setOpenDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Añadir Documento
+          </Button>
+        </div>
       </div>
 
       <Card>

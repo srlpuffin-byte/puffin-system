@@ -9,3 +9,6 @@ export * from "./documentos";
 export * from "./alertas";
 export * from "./incidentes";
 export * from "./actividad";
+export * from "./auditoria";
+export * from "./backups";
+export * from "./fotografias";

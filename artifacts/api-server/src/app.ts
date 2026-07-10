@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import path from "path";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
@@ -28,6 +29,10 @@ app.use(
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Servir archivos subidos de forma estática
+const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
+app.use("/uploads", express.static(UPLOADS_DIR));
 
 app.use("/api", router);
 

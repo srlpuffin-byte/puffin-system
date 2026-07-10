@@ -42,7 +42,7 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/iniciar", async (req, res) => {
-  const { empleado_id, maquina_id, horometro_inicio, km_inicio, observaciones } = req.body;
+  const { empleado_id, maquina_id, horometro_inicio, km_inicio, observaciones, checklist_previo, checklist_ok, estado_equipo_inicio, foto_tablero_inicio } = req.body;
   if (!empleado_id || !maquina_id || horometro_inicio === undefined) {
     return res.status(400).json({ error: "Campos requeridos faltantes" });
   }
@@ -57,6 +57,10 @@ router.post("/iniciar", async (req, res) => {
     horometro_inicio: horometro_inicio.toString(),
     km_inicio: km_inicio?.toString(),
     observaciones,
+    checklist_previo,
+    checklist_ok,
+    estado_equipo_inicio,
+    foto_tablero_inicio,
     estado: "en_curso"
   }).returning();
 
@@ -67,19 +71,37 @@ router.post("/iniciar", async (req, res) => {
     entidad_id: jornada.id,
   });
 
+  // Generar alerta si el equipo no está apto
+  if (estado_equipo_inicio === "no_apto") {
+    const [maquina] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, maquina_id)).limit(1);
+    const [empleado] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable).where(eq(empleadosTable.id, empleado_id)).limit(1);
+    
+    await db.insert(alertasTable).values({
+      tipo: "maquina",
+      prioridad: "roja",
+      descripcion: `El operario ${empleado?.nombre} ${empleado?.apellido} reportó que el equipo ${maquina?.nombre} NO ESTÁ APTO para trabajar durante el checklist preoperacional. Observaciones: ${observaciones || "Sin observaciones adicionales."}`,
+      entidad_tipo: "maquina",
+      entidad_id: maquina_id,
+      entidad_nombre: maquina?.nombre
+    });
+    
+    // Cambiar estado de la máquina a detenida automáticamente
+    await db.update(maquinasTable).set({ estado: "detenida" }).where(eq(maquinasTable.id, maquina_id));
+  }
+
   return res.status(201).json(await enrichJornada(jornada));
 });
 
 router.post("/:id/finalizar", async (req, res) => {
   const id = parseInt(req.params.id);
-  const { horometro_fin, km_fin, problemas } = req.body;
+  const { horometro_fin, km_fin, problemas, estado_equipo_fin, foto_tablero_fin } = req.body;
   if (horometro_fin === undefined) return res.status(400).json({ error: "Horómetro final requerido" });
 
   const horaFin = new Date().toTimeString().slice(0, 5);
 
   const [jornada] = await db
     .update(jornadasTable)
-    .set({ horometro_fin: horometro_fin.toString(), km_fin: km_fin?.toString(), problemas, hora_fin: horaFin, estado: "finalizada", updatedAt: new Date() })
+    .set({ horometro_fin: horometro_fin.toString(), km_fin: km_fin?.toString(), problemas, estado_equipo_fin, foto_tablero_fin, hora_fin: horaFin, estado: "finalizada", updatedAt: new Date() })
     .where(eq(jornadasTable.id, id))
     .returning();
 
@@ -91,6 +113,25 @@ router.post("/:id/finalizar", async (req, res) => {
     entidad_tipo: "jornada",
     entidad_id: jornada.id,
   });
+
+  // Generar alerta y cambiar estado de máquina si requiere mantenimiento o está fuera de servicio
+  if (estado_equipo_fin === "requiere_mantenimiento" || estado_equipo_fin === "fuera_de_servicio") {
+    const [maquina] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, jornada.maquina_id)).limit(1);
+    
+    const prioridad = estado_equipo_fin === "fuera_de_servicio" ? "roja" : "amarilla";
+    const nuevoEstado = estado_equipo_fin === "fuera_de_servicio" ? "detenida" : "mantenimiento";
+    
+    await db.insert(alertasTable).values({
+      tipo: "maquina",
+      prioridad,
+      descripcion: `Checklist de cierre: El equipo ${maquina?.nombre} se reportó como ${estado_equipo_fin.replace(/_/g, ' ')}. Novedades: ${problemas || "Sin detalles."}`,
+      entidad_tipo: "maquina",
+      entidad_id: jornada.maquina_id,
+      entidad_nombre: maquina?.nombre
+    });
+    
+    await db.update(maquinasTable).set({ estado: nuevoEstado }).where(eq(maquinasTable.id, jornada.maquina_id));
+  }
 
   return res.json(await enrichJornada(jornada));
 });

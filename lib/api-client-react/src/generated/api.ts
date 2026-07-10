@@ -22,6 +22,7 @@ import type {
 import type {
   Alerta,
   AlertaUpdate,
+  Backup,
   CombustibleInput,
   DashboardResumen,
   Documento,
@@ -33,12 +34,15 @@ import type {
   EventoActividad,
   EventoCalendario,
   FinalizarJornadaInput,
+  Fotografia,
   GetActividadParams,
   GetAlertasParams,
+  GetAuditoriaParams,
   GetCalendarioEventosParams,
   GetCombustibleParams,
   GetDocumentosParams,
   GetEmpleadosParams,
+  GetFotografiasParams,
   GetIncidentesParams,
   GetJornadasParams,
   GetMantenimientosParams,
@@ -55,10 +59,12 @@ import type {
   Maquina,
   MaquinaInput,
   MaquinaUpdate,
+  RegistroAuditoria,
   RegistroCombustible,
   ReporteResumen,
   SesionData,
   SuccessResponse,
+  UploadFotografiaInput,
   Usuario
 } from './api.schemas';
 
@@ -1289,6 +1295,160 @@ export const useFinalizarJornada = <TError = ErrorType<unknown>,
       return useMutation(getFinalizarJornadaMutationOptions(options));
     }
 
+export const getGetFotografiasUrl = (params: GetFotografiasParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/fotografias?${stringifiedParams}` : `/api/fotografias`
+}
+
+/**
+ * @summary Obtener fotografías de una entidad
+ */
+export const getFotografias = async (params: GetFotografiasParams, options?: RequestInit): Promise<Fotografia[]> => {
+
+  return customFetch<Fotografia[]>(getGetFotografiasUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFotografiasQueryKey = (params?: GetFotografiasParams,) => {
+    return [
+    `/api/fotografias`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetFotografiasQueryOptions = <TData = Awaited<ReturnType<typeof getFotografias>>, TError = ErrorType<unknown>>(params: GetFotografiasParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFotografias>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFotografiasQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFotografias>>> = ({ signal }) => getFotografias(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFotografias>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFotografiasQueryResult = NonNullable<Awaited<ReturnType<typeof getFotografias>>>
+export type GetFotografiasQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Obtener fotografías de una entidad
+ */
+
+export function useGetFotografias<TData = Awaited<ReturnType<typeof getFotografias>>, TError = ErrorType<unknown>>(
+ params: GetFotografiasParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFotografias>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFotografiasQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUploadFotografiaUrl = () => {
+
+
+
+
+  return `/api/fotografias`
+}
+
+/**
+ * @summary Subir una fotografía
+ */
+export const uploadFotografia = async (uploadFotografiaInput: UploadFotografiaInput, options?: RequestInit): Promise<Fotografia> => {
+
+  return customFetch<Fotografia>(getUploadFotografiaUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(uploadFotografiaInput)
+  }
+);}
+
+
+
+
+export const getUploadFotografiaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFotografia>>, TError,{data: BodyType<UploadFotografiaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadFotografia>>, TError,{data: BodyType<UploadFotografiaInput>}, TContext> => {
+
+const mutationKey = ['uploadFotografia'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadFotografia>>, {data: BodyType<UploadFotografiaInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadFotografia(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadFotografiaMutationResult = NonNullable<Awaited<ReturnType<typeof uploadFotografia>>>
+    export type UploadFotografiaMutationBody = BodyType<UploadFotografiaInput>
+    export type UploadFotografiaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Subir una fotografía
+ */
+export const useUploadFotografia = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFotografia>>, TError,{data: BodyType<UploadFotografiaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadFotografia>>,
+        TError,
+        {data: BodyType<UploadFotografiaInput>},
+        TContext
+      > => {
+      return useMutation(getUploadFotografiaMutationOptions(options));
+    }
+
 export const getGetCombustibleUrl = (params?: GetCombustibleParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -2227,6 +2387,237 @@ export function useGetCalendarioEventos<TData = Awaited<ReturnType<typeof getCal
 
 
 
+
+export const getGetAuditoriaUrl = (params?: GetAuditoriaParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/auditoria?${stringifiedParams}` : `/api/auditoria`
+}
+
+/**
+ * @summary Historial de auditoría
+ */
+export const getAuditoria = async (params?: GetAuditoriaParams, options?: RequestInit): Promise<RegistroAuditoria[]> => {
+
+  return customFetch<RegistroAuditoria[]>(getGetAuditoriaUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAuditoriaQueryKey = (params?: GetAuditoriaParams,) => {
+    return [
+    `/api/auditoria`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAuditoriaQueryOptions = <TData = Awaited<ReturnType<typeof getAuditoria>>, TError = ErrorType<unknown>>(params?: GetAuditoriaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditoria>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAuditoriaQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuditoria>>> = ({ signal }) => getAuditoria(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuditoria>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuditoriaQueryResult = NonNullable<Awaited<ReturnType<typeof getAuditoria>>>
+export type GetAuditoriaQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Historial de auditoría
+ */
+
+export function useGetAuditoria<TData = Awaited<ReturnType<typeof getAuditoria>>, TError = ErrorType<unknown>>(
+ params?: GetAuditoriaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditoria>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuditoriaQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetBackupsUrl = () => {
+
+
+
+
+  return `/api/backups`
+}
+
+/**
+ * @summary Listar backups
+ */
+export const getBackups = async ( options?: RequestInit): Promise<Backup[]> => {
+
+  return customFetch<Backup[]>(getGetBackupsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBackupsQueryKey = () => {
+    return [
+    `/api/backups`
+    ] as const;
+    }
+
+
+export const getGetBackupsQueryOptions = <TData = Awaited<ReturnType<typeof getBackups>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBackups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBackupsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBackups>>> = ({ signal }) => getBackups({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBackups>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBackupsQueryResult = NonNullable<Awaited<ReturnType<typeof getBackups>>>
+export type GetBackupsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Listar backups
+ */
+
+export function useGetBackups<TData = Awaited<ReturnType<typeof getBackups>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBackups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBackupsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateBackupUrl = () => {
+
+
+
+
+  return `/api/backups`
+}
+
+/**
+ * @summary Generar backup manual
+ */
+export const createBackup = async ( options?: RequestInit): Promise<Backup> => {
+
+  return customFetch<Backup>(getCreateBackupUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCreateBackupMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBackup>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createBackup>>, TError,void, TContext> => {
+
+const mutationKey = ['createBackup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBackup>>, void> = () => {
+
+
+          return  createBackup(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateBackupMutationResult = NonNullable<Awaited<ReturnType<typeof createBackup>>>
+
+    export type CreateBackupMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Generar backup manual
+ */
+export const useCreateBackup = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBackup>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createBackup>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCreateBackupMutationOptions(options));
+    }
 
 export const getGetReportesResumenUrl = (params?: GetReportesResumenParams,) => {
   const normalizedParams = new URLSearchParams();

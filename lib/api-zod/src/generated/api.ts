@@ -355,6 +355,10 @@ export const GetJornadasResponseItem = zod.object({
   "km_fin": zod.number().nullish(),
   "horometro_inicio": zod.number().nullish(),
   "horometro_fin": zod.number().nullish(),
+  "checklist_previo": zod.string().nullish(),
+  "checklist_ok": zod.string().nullish(),
+  "foto_tablero_inicio": zod.string().nullish(),
+  "foto_tablero_fin": zod.string().nullish(),
   "observaciones": zod.string().nullish(),
   "problemas": zod.string().nullish(),
   "estado": zod.enum(['en_curso', 'finalizada']),
@@ -371,6 +375,9 @@ export const IniciarJornadaBody = zod.object({
   "maquina_id": zod.number(),
   "horometro_inicio": zod.number(),
   "km_inicio": zod.number().optional(),
+  "checklist_previo": zod.string().optional(),
+  "estado_equipo_inicio": zod.string().optional(),
+  "foto_tablero_inicio": zod.string().optional(),
   "observaciones": zod.string().optional()
 })
 
@@ -388,6 +395,10 @@ export const IniciarJornadaResponse = zod.object({
   "km_fin": zod.number().nullish(),
   "horometro_inicio": zod.number().nullish(),
   "horometro_fin": zod.number().nullish(),
+  "checklist_previo": zod.string().nullish(),
+  "checklist_ok": zod.string().nullish(),
+  "foto_tablero_inicio": zod.string().nullish(),
+  "foto_tablero_fin": zod.string().nullish(),
   "observaciones": zod.string().nullish(),
   "problemas": zod.string().nullish(),
   "estado": zod.enum(['en_curso', 'finalizada']),
@@ -405,6 +416,8 @@ export const FinalizarJornadaParams = zod.object({
 export const FinalizarJornadaBody = zod.object({
   "horometro_fin": zod.number(),
   "km_fin": zod.number().optional(),
+  "estado_equipo_fin": zod.string().optional(),
+  "foto_tablero_fin": zod.string().optional(),
   "problemas": zod.string().optional()
 })
 
@@ -422,10 +435,56 @@ export const FinalizarJornadaResponse = zod.object({
   "km_fin": zod.number().nullish(),
   "horometro_inicio": zod.number().nullish(),
   "horometro_fin": zod.number().nullish(),
+  "checklist_previo": zod.string().nullish(),
+  "checklist_ok": zod.string().nullish(),
+  "foto_tablero_inicio": zod.string().nullish(),
+  "foto_tablero_fin": zod.string().nullish(),
   "observaciones": zod.string().nullish(),
   "problemas": zod.string().nullish(),
   "estado": zod.enum(['en_curso', 'finalizada']),
   "horas_trabajadas": zod.number().nullish()
+})
+
+
+/**
+ * @summary Obtener fotografías de una entidad
+ */
+export const GetFotografiasQueryParams = zod.object({
+  "entidad_tipo": zod.coerce.string(),
+  "entidad_id": zod.coerce.number()
+})
+
+export const GetFotografiasResponseItem = zod.object({
+  "id": zod.number(),
+  "empresa_id": zod.number().optional(),
+  "entidad_tipo": zod.string(),
+  "entidad_id": zod.number(),
+  "url": zod.string(),
+  "descripcion": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional()
+})
+export const GetFotografiasResponse = zod.array(GetFotografiasResponseItem)
+
+
+/**
+ * @summary Subir una fotografía
+ */
+export const UploadFotografiaBody = zod.object({
+  "entidad_tipo": zod.string(),
+  "entidad_id": zod.number(),
+  "filename": zod.string().optional(),
+  "base64Data": zod.string(),
+  "descripcion": zod.string().optional()
+})
+
+export const UploadFotografiaResponse = zod.object({
+  "id": zod.number(),
+  "empresa_id": zod.number().optional(),
+  "entidad_tipo": zod.string(),
+  "entidad_id": zod.number(),
+  "url": zod.string(),
+  "descripcion": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional()
 })
 
 
@@ -718,6 +777,67 @@ export const GetCalendarioEventosResponseItem = zod.object({
   "entidad_nombre": zod.string().nullish()
 })
 export const GetCalendarioEventosResponse = zod.array(GetCalendarioEventosResponseItem)
+
+
+/**
+ * @summary Historial de auditoría
+ */
+export const GetAuditoriaQueryParams = zod.object({
+  "entidad": zod.coerce.string().optional(),
+  "accion": zod.coerce.string().optional()
+})
+
+export const GetAuditoriaResponseItem = zod.object({
+  "id": zod.number().optional(),
+  "empresa_id": zod.number().optional(),
+  "usuario_id": zod.number().optional(),
+  "accion": zod.string().optional(),
+  "entidad": zod.string().optional(),
+  "entidad_id": zod.number().optional(),
+  "valor_anterior": zod.object({
+
+}).passthrough().optional(),
+  "valor_nuevo": zod.object({
+
+}).passthrough().optional(),
+  "ip": zod.string().optional(),
+  "dispositivo": zod.string().optional(),
+  "created_at": zod.string().optional()
+})
+export const GetAuditoriaResponse = zod.array(GetAuditoriaResponseItem)
+
+
+/**
+ * @summary Listar backups
+ */
+export const GetBackupsResponseItem = zod.object({
+  "id": zod.number().optional(),
+  "tipo": zod.string().optional(),
+  "frecuencia": zod.string().optional(),
+  "archivo_url": zod.string().optional(),
+  "tamano_bytes": zod.number().optional(),
+  "creado_por": zod.number().optional(),
+  "exitoso": zod.boolean().optional(),
+  "error_mensaje": zod.string().optional(),
+  "created_at": zod.string().optional()
+})
+export const GetBackupsResponse = zod.array(GetBackupsResponseItem)
+
+
+/**
+ * @summary Generar backup manual
+ */
+export const CreateBackupResponse = zod.object({
+  "id": zod.number().optional(),
+  "tipo": zod.string().optional(),
+  "frecuencia": zod.string().optional(),
+  "archivo_url": zod.string().optional(),
+  "tamano_bytes": zod.number().optional(),
+  "creado_por": zod.number().optional(),
+  "exitoso": zod.boolean().optional(),
+  "error_mensaje": zod.string().optional(),
+  "created_at": zod.string().optional()
+})
 
 
 /**
