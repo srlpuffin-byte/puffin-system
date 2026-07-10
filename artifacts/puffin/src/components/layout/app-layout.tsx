@@ -26,11 +26,14 @@ import {
   X,
   Moon,
   Sun,
+  Search,
 } from "lucide-react";
 import { useLogout, useGetMe } from "@workspace/api-client-react";
 import { removeAuthToken } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import logoUrl from "@assets/logo_puffin_1782946440101.jpeg";
+import { BusquedaGlobalDialog } from "@/components/ui/busqueda-global-dialog";
+import { useEffect } from "react";
 
 interface NavItem {
   icon: React.ElementType;
@@ -151,6 +154,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: user } = useGetMe();
   const logoutMut = useLogout();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSearchOpen((open) => !open);
+      }
+    };
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, []);
 
   const handleLogout = () => {
     logoutMut.mutate(undefined, {
@@ -175,9 +190,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const Sidebar = () => (
     <aside className="w-60 bg-sidebar text-sidebar-foreground flex flex-col flex-shrink-0 border-r border-sidebar-border h-full">
-      <div className="h-14 flex items-center px-4 font-bold text-lg border-b border-sidebar-border flex-shrink-0">
-        <img src={logoUrl} alt="PUFFIN SRL" className="h-7 w-auto mr-2 object-contain" />
-        <span className="tracking-wide">PUFFIN SRL</span>
+      <div className="h-14 flex items-center justify-between px-4 border-b border-sidebar-border flex-shrink-0">
+        <div className="flex items-center font-bold text-lg">
+          <img src={logoUrl} alt="PUFFIN SRL" className="h-7 w-auto mr-2 object-contain" />
+          <span className="tracking-wide">PUFFIN SRL</span>
+        </div>
+        <Button variant="ghost" size="icon" className="h-8 w-8 ml-2 text-muted-foreground" onClick={() => setSearchOpen(true)} title="Buscar (Ctrl+K)">
+          <Search className="h-4 w-4" />
+        </Button>
       </div>
       <nav className="flex-1 overflow-y-auto py-3 px-2">
         {NAV_GROUPS.map((group) => (
@@ -227,17 +247,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       )}
 
       <main className="flex-1 overflow-auto bg-slate-50 flex flex-col">
-        <div className="lg:hidden h-14 bg-white border-b flex items-center px-4 flex-shrink-0">
-          <Button variant="ghost" size="sm" onClick={() => setMobileOpen(true)}>
-            <Menu className="h-5 w-5" />
+        <div className="lg:hidden h-14 bg-white border-b flex items-center justify-between px-4 flex-shrink-0">
+          <div className="flex items-center">
+            <Button variant="ghost" size="sm" onClick={() => setMobileOpen(true)} className="mr-2">
+              <Menu className="h-5 w-5" />
+            </Button>
+            <img src={logoUrl} alt="PUFFIN SRL" className="h-7 w-auto mx-1 object-contain" />
+            <span className="font-bold text-primary ml-1">PUFFIN</span>
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setSearchOpen(true)}>
+            <Search className="h-5 w-5" />
           </Button>
-          <img src={logoUrl} alt="PUFFIN SRL" className="h-7 w-auto mx-3 object-contain" />
-          <span className="font-bold text-primary">PUFFIN SRL</span>
         </div>
         <div className="flex-1 p-4 lg:p-8">
           {children}
         </div>
       </main>
+
+      <BusquedaGlobalDialog open={searchOpen} onOpenChange={setSearchOpen} />
     </div>
   );
 }

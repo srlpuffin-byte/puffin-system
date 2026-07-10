@@ -1,14 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useGetMaquinas } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus } from "lucide-react";
-import { Link } from "wouter";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, Plus, X } from "lucide-react";
+import { Link, useSearch } from "wouter";
 import { NuevaMaquinaDialog } from "@/components/forms/nueva-maquina-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
+
+const TIPOS_MAQUINA = ["Retroexcavadora", "Niveladora", "Compactadora", "Camión", "Camión Cisterna", "Grúa", "Pala Cargadora", "Minicargadora", "Bulldozer", "Motoniveladora", "Otro"];
 
 const estadoBadge = (estado: string) => {
   if (estado === "activa") return <Badge className="bg-green-600 hover:bg-green-700">ACTIVA</Badge>;
@@ -18,9 +21,22 @@ const estadoBadge = (estado: string) => {
 };
 
 export function Maquinas() {
+  const searchStr = useSearch();
+  const urlParams = new URLSearchParams(searchStr);
   const [search, setSearch] = useState("");
+  const [filterEstado, setFilterEstado] = useState(urlParams.get("estado") || "todos");
+  const [filterTipo, setFilterTipo] = useState("todos");
   const [openDialog, setOpenDialog] = useState(false);
-  const { data: maquinas, isLoading } = useGetMaquinas({ search: search || undefined });
+  const { data: maquinasRaw, isLoading } = useGetMaquinas({ search: search || undefined });
+
+  const maquinas = (maquinasRaw || []).filter(m => {
+    if (filterEstado !== "todos" && m.estado !== filterEstado) return false;
+    if (filterTipo !== "todos" && m.tipo !== filterTipo) return false;
+    return true;
+  });
+
+  const hasFilters = search || filterEstado !== "todos" || filterTipo !== "todos";
+  const clearFilters = () => { setSearch(""); setFilterEstado("todos"); setFilterTipo("todos"); };
 
   const exportColumns = [
     { header: "Código", key: "codigo" },
@@ -55,17 +71,39 @@ export function Maquinas() {
 
       <Card>
         <CardContent className="p-4">
-          <div className="flex gap-4 mb-6">
-            <div className="relative flex-1 max-w-sm">
+          <div className="flex flex-wrap gap-3 mb-6">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Buscar por código, nombre o patente..."
+                placeholder="Nombre, código, motor, chasis..."
                 className="pl-8"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+            <Select value={filterEstado} onValueChange={setFilterEstado}>
+              <SelectTrigger className="w-[160px]"><SelectValue placeholder="Estado" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los estados</SelectItem>
+                <SelectItem value="activa">Activa</SelectItem>
+                <SelectItem value="detenida">Detenida</SelectItem>
+                <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
+                <SelectItem value="baja">Baja</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterTipo} onValueChange={setFilterTipo}>
+              <SelectTrigger className="w-[180px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los tipos</SelectItem>
+                {TIPOS_MAQUINA.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                <X className="h-4 w-4 mr-1" /> Limpiar
+              </Button>
+            )}
           </div>
 
           <div className="rounded-md border">
