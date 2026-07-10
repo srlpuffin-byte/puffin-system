@@ -77,7 +77,8 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Control",
     defaultOpen: true,
     items: [
-      { icon: Bell, label: "Alertas e Incidentes", href: "/alertas" },
+      { icon: Bell, label: "Alertas", href: "/alertas" },
+      { icon: AlertTriangle, label: "Incidentes", href: "/incidentes" },
       { icon: Calendar, label: "Calendario", href: "/calendario" },
     ],
   },
@@ -198,19 +199,25 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <nav className="flex-1 overflow-y-auto py-3 px-2">
         {NAV_GROUPS.filter(group => {
           if (user?.rol === "empleado") {
-            // Empleados solo ven Panel y Operación básica
+            // Empleados solo ven Panel, Operación y Control (Incidentes)
             if (group.label === "Principal") return true;
             if (group.label === "Operación") return true;
+            if (group.label === "Control") return true;
             return false;
           }
           return true;
         }).map((group) => {
           let filteredItems = group.items;
-          if (user?.rol === "empleado" && group.label === "Operación") {
-            // Empleados no ven Operarios ni Maquinaria en el menú
-            filteredItems = group.items.filter(item => 
-              item.href !== "/operarios" && item.href !== "/maquinas"
-            );
+          if (user?.rol === "empleado") {
+            if (group.label === "Operación") {
+              filteredItems = group.items.filter(item => 
+                item.href !== "/operarios" && item.href !== "/maquinas"
+              );
+            } else if (group.label === "Control") {
+              filteredItems = group.items.filter(item => 
+                item.href === "/incidentes"
+              );
+            }
           }
           return (
             <NavGroupComponent

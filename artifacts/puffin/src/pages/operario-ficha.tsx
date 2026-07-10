@@ -8,6 +8,9 @@ import { ChevronLeft, User, Phone, FileText, PlayCircle } from "lucide-react";
 import { format } from "date-fns";
 import { IniciarJornadaDialog } from "@/components/forms/iniciar-jornada-dialog";
 import { ReportarIncidenteDialog } from "@/components/forms/reportar-incidente-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useGetJornadas } from "@workspace/api-client-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function OperarioFicha() {
   const { id } = useParams();
@@ -43,8 +46,15 @@ export function OperarioFicha() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2">
+      <Tabs defaultValue="resumen" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="resumen">Resumen</TabsTrigger>
+          <TabsTrigger value="balance">Balance de Jornadas</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="resumen" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
@@ -119,11 +129,24 @@ export function OperarioFicha() {
             >
               Ver Documentación
             </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="balance">
+        <Card>
+          <CardHeader>
+            <CardTitle>Historial de Jornadas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BalanceOperario operarioId={operarioId} />
           </CardContent>
         </Card>
-      </div>
+      </TabsContent>
+    </Tabs>
 
-      <IniciarJornadaDialog
+    <IniciarJornadaDialog
         open={openJornada}
         onOpenChange={setOpenJornada}
         empleadoIdFijo={operarioId}
@@ -133,6 +156,46 @@ export function OperarioFicha() {
         onOpenChange={setOpenIncidente}
         empleadoIdFijo={operarioId}
       />
+    </div>
+  );
+}
+
+function BalanceOperario({ operarioId }: { operarioId: number }) {
+  const { data: jornadas, isLoading } = useGetJornadas({ empleado_id: String(operarioId) } as any);
+
+  if (isLoading) return <div className="p-4 text-center">Cargando jornadas...</div>;
+  if (!jornadas || jornadas.length === 0) return <div className="p-4 text-center text-muted-foreground">No hay jornadas registradas para este operario.</div>;
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Fecha</TableHead>
+            <TableHead>Máquina</TableHead>
+            <TableHead>Horómetro Inicio</TableHead>
+            <TableHead>Horómetro Fin</TableHead>
+            <TableHead>Horas Trab.</TableHead>
+            <TableHead>Estado</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {jornadas.map((j) => (
+            <TableRow key={j.id}>
+              <TableCell className="font-medium">{format(new Date(j.fecha), "dd/MM/yyyy")}</TableCell>
+              <TableCell>{(j as any).maquina_nombre || "-"}</TableCell>
+              <TableCell>{j.horometro_inicio || "-"}</TableCell>
+              <TableCell>{j.horometro_fin || "-"}</TableCell>
+              <TableCell>{(j as any).horas_trabajadas?.toFixed(1) || "-"}</TableCell>
+              <TableCell>
+                <Badge variant={j.estado === "finalizada" ? "default" : "secondary"}>
+                  {j.estado}
+                </Badge>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
