@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { egresosTable } from "@workspace/db/src/schema/egresos";
+import { egresosTable } from "@workspace/db/schema";
 import { eq, and, or, ilike, desc } from "drizzle-orm";
 import { appendToSheet } from "../services/sheets.js";
 
