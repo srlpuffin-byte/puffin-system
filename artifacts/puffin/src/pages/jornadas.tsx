@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlayCircle, Square } from "lucide-react";
+import { PlayCircle, Square, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { IniciarJornadaDialog } from "@/components/forms/iniciar-jornada-dialog";
 import { FinalizarJornadaDialog } from "@/components/forms/finalizar-jornada-dialog";
@@ -21,6 +21,8 @@ export function Jornadas() {
     { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy") : "-" },
     { header: "Operario", key: "empleado_nombre" },
     { header: "Máquina", key: "maquina_nombre" },
+    { header: "Ubicación", key: "ubicacion" },
+    { header: "Tipo de Trabajo", key: "tipo_trabajo" },
     { header: "H. Inicio", key: "horometro_inicio" },
     { header: "H. Fin", key: "horometro_fin" },
     { header: "Horas Trabajadas", key: "horas_trabajadas" },
@@ -60,7 +62,7 @@ export function Jornadas() {
                   <TableHead>Fin</TableHead>
                   <TableHead>Horas</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead className="text-right">Acciones / Tarea</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -69,7 +71,7 @@ export function Jornadas() {
                 ) : jornadas?.length === 0 ? (
                   <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay jornadas registradas.</TableCell></TableRow>
                 ) : (
-                  jornadas?.map((jor) => (
+                  jornadas?.map((jor: any) => (
                     <TableRow key={jor.id}>
                       <TableCell className="font-medium">
                         {jor.fecha ? format(new Date(jor.fecha), "dd/MM/yyyy") : "-"}
@@ -88,21 +90,31 @@ export function Jornadas() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        {jor.estado === "en_curso" && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => setJornadaAFinalizar({
-                              id: jor.id,
-                              empleado_nombre: jor.empleado_nombre,
-                              maquina_nombre: jor.maquina_nombre,
-                              horometro_inicio: jor.horometro_inicio,
-                            })}
-                          >
-                            <Square className="mr-2 h-4 w-4" />
-                            Finalizar
-                          </Button>
-                        )}
+                        <div className="flex flex-col items-end gap-2">
+                          {(jor.ubicacion || jor.tipo_trabajo) && (
+                            <div className="flex items-center text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md max-w-[180px] text-right justify-end border border-muted">
+                              <MapPin className="w-3 h-3 mr-1 inline-block opacity-70" />
+                              <span className="truncate">
+                                {jor.ubicacion || "-"} {jor.ubicacion && jor.tipo_trabajo ? "•" : ""} {jor.tipo_trabajo || ""}
+                              </span>
+                            </div>
+                          )}
+                          {jor.estado === "en_curso" && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => setJornadaAFinalizar({
+                                id: jor.id,
+                                empleado_nombre: jor.empleado_nombre,
+                                maquina_nombre: jor.maquina_nombre,
+                                horometro_inicio: jor.horometro_inicio,
+                              })}
+                            >
+                              <Square className="mr-2 h-4 w-4" />
+                              Finalizar
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
