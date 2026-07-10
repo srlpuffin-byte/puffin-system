@@ -9,11 +9,31 @@ import { Search, Plus } from "lucide-react";
 import { Link } from "wouter";
 import { NuevoOperarioDialog } from "@/components/forms/nuevo-operario-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { useQueryClient } from "@tanstack/react-query";
+import { Trash2, AlertTriangle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export function Operarios() {
   const [search, setSearch] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const { data: operarios, isLoading } = useGetEmpleados({ search: search || undefined });
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("¿Estás seguro de eliminar este operario?")) return;
+    try {
+      const res = await fetch(`/api/empleados/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
+      });
+      if (!res.ok) throw new Error("Error al eliminar");
+      queryClient.invalidateQueries({ queryKey: ["getEmpleados"] });
+      toast({ title: "Operario eliminado" });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error al eliminar el operario" });
+    }
+  };
 
   const exportColumns = [
     { header: "Apellido", key: "apellido" },
@@ -93,9 +113,19 @@ export function Operarios() {
                           : <span className="text-muted-foreground text-sm">Sin jornada</span>}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/operarios/${op.id}`} className="text-primary hover:underline font-medium text-sm">
-                          Ver perfil
-                        </Link>
+                        <div className="flex items-center justify-end gap-3">
+                          {op.alertas_count > 0 && (
+                            <Badge variant="destructive" className="flex items-center gap-1 text-xs">
+                              <AlertTriangle className="w-3 h-3" /> Faltan datos
+                            </Badge>
+                          )}
+                          <Link href={`/operarios/${op.id}`} className="text-primary hover:underline font-medium text-sm">
+                            Ver perfil
+                          </Link>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(op.id)} className="h-8 w-8 text-destructive hover:bg-destructive/10">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

@@ -73,4 +73,15 @@ router.put("/:id", async (req, res) => {
   return res.json({ ...empleado, jornada_activa: false, alertas_count: 0 });
 });
 
+router.delete("/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [deleted] = await db.delete(empleadosTable).where(eq(empleadosTable.id, id)).returning();
+    if (!deleted) return res.status(404).json({ error: "Operario no encontrado" });
+    return res.json({ message: "Operario eliminado correctamente" });
+  } catch (err) {
+    return res.status(500).json({ error: "Error al eliminar operario. Puede que tenga datos asociados." });
+  }
+});
+
 export default router;
