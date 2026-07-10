@@ -84,6 +84,7 @@ function Router() {
       <Route path="/documentos"><ProtectedRoute component={Documentos} /></Route>
       <Route path="/alertas"><ProtectedRoute component={Alertas} /></Route>
       <Route path="/calendario"><ProtectedRoute component={Calendario} /></Route>
+      <Route path="/egresos"><ProtectedRoute component={Egresos} /></Route>
       <Route path="/reportes"><ProtectedRoute component={Reportes} /></Route>
       <Route path="/incidentes"><ProtectedRoute component={Incidentes} /></Route>
       <Route path="/actividad"><ProtectedRoute component={Actividad} /></Route>
