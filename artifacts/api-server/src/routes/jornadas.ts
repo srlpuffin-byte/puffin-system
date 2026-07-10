@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { jornadasTable, empleadosTable, maquinasTable, actividadTable, alertasTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { appendToSheet } from "../services/sheets.js";
 
 const router = Router();
 
@@ -135,7 +136,24 @@ router.post("/:id/finalizar", async (req, res) => {
     await db.update(maquinasTable).set({ estado: nuevoEstado }).where(eq(maquinasTable.id, jornada.maquina_id));
   }
 
-  return res.json(await enrichJornada(jornada));
+  const enriched = await enrichJornada(jornada);
+
+  // Async append to Google Sheets
+  appendToSheet("Jornadas", [
+    jornada.fecha,
+    enriched.maquina_nombre,
+    enriched.empleado_nombre,
+    jornada.hora_inicio,
+    jornada.hora_fin,
+    jornada.horometro_inicio,
+    jornada.horometro_fin,
+    enriched.horas_trabajadas || "",
+    jornada.ubicacion || "",
+    jornada.tipo_trabajo || "",
+    estado_equipo_fin || "",
+  ]);
+
+  return res.json(enriched);
 });
 
 export default router;

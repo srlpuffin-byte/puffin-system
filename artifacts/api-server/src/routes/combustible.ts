@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { combustibleTable, empleadosTable, maquinasTable, actividadTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { appendToSheet } from "../services/sheets.js";
 
 const router = Router();
 
@@ -56,6 +57,23 @@ router.post("/", async (req, res) => {
     entidad_tipo: "combustible",
     entidad_id: registro.id,
   });
+
+  const [maquina] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, maquina_id)).limit(1);
+  const [empleado] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable).where(eq(empleadosTable.id, empleado_id)).limit(1);
+
+  // Async append to Google Sheets
+  appendToSheet("Combustible", [
+    today,
+    new Date().toLocaleTimeString("es-AR"),
+    maquina?.nombre || maquina_id,
+    `${empleado?.nombre} ${empleado?.apellido}`,
+    litros,
+    precio || "",
+    importe || "",
+    estacion || "",
+    ubicacion || "",
+    kilometraje || "",
+  ]);
 
   return res.status(201).json({ ...registro, litros: Number(registro.litros) });
 });
