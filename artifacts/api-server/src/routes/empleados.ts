@@ -43,12 +43,13 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { nombre, apellido, dni, telefono, cargo, fecha_ingreso } = req.body;
+  const { nombre, apellido, dni, telefono, cargo, fecha_ingreso, contacto_familiar_nombre, contacto_familiar_telefono } = req.body;
   if (!nombre || !apellido || !dni) {
     return res.status(400).json({ error: "Nombre, apellido y DNI son requeridos" });
   }
   const [empleado] = await db.insert(empleadosTable).values({
-    nombre, apellido, dni, telefono, cargo, fecha_ingreso, estado: "activo"
+    nombre, apellido, dni, telefono, cargo, fecha_ingreso, estado: "activo",
+    contacto_familiar_nombre, contacto_familiar_telefono,
   }).returning();
   return res.status(201).json({ ...empleado, jornada_activa: false, alertas_count: 0 });
 });
@@ -62,10 +63,10 @@ router.get("/:id", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  const { nombre, apellido, telefono, cargo, estado } = req.body;
+  const { nombre, apellido, telefono, cargo, estado, contacto_familiar_nombre, contacto_familiar_telefono } = req.body;
   const [empleado] = await db
     .update(empleadosTable)
-    .set({ nombre, apellido, telefono, cargo, estado, updatedAt: new Date() })
+    .set({ nombre, apellido, telefono, cargo, estado, contacto_familiar_nombre, contacto_familiar_telefono, updatedAt: new Date() })
     .where(eq(empleadosTable.id, id))
     .returning();
   if (!empleado) return res.status(404).json({ error: "Operario no encontrado" });

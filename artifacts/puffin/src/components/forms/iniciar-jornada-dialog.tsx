@@ -36,7 +36,9 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
     horometro_inicio: "",
     km_inicio: "",
     observaciones: "",
-    estado_equipo: "", // apto, apto_observaciones, no_apto
+    estado_equipo: "",
+    ubicacion: "",
+    tipo_trabajo: "",
   });
 
   const [checklist, setChecklist] = useState({
@@ -83,7 +85,8 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
           observaciones: form.observaciones || undefined,
           checklist_previo: JSON.stringify(checklist),
           estado_equipo_inicio: form.estado_equipo,
-          // foto_tablero_inicio se maneja ahora a través del nuevo sistema de fotos polimórfico
+          ubicacion: form.ubicacion || undefined,
+          tipo_trabajo: form.tipo_trabajo || undefined,
         },
       });
 
@@ -115,7 +118,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
   };
 
   const resetForm = () => {
-    setForm({ empleado_id: empleadoIdFijo?.toString() || "", maquina_id: maquinaIdFija?.toString() || "", horometro_inicio: "", km_inicio: "", observaciones: "", estado_equipo: "" });
+    setForm({ empleado_id: empleadoIdFijo?.toString() || "", maquina_id: maquinaIdFija?.toString() || "", horometro_inicio: "", km_inicio: "", observaciones: "", estado_equipo: "", ubicacion: "", tipo_trabajo: "" });
     setChecklist({ cinturon: false, bocina: false, luces_delanteras: false, luces_traseras: false, balizas: false, espejos: false, matafuego: false, nivel_aceite: false, nivel_combustible: false, nivel_refrigerante: false, perdidas: false, neumaticos: false, luces_advertencia: false });
     setImages([]);
     setCurrentTab("general");
@@ -186,6 +189,28 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
                 <div className="space-y-1">
                   <Label>Km inicial (si aplica)</Label>
                   <Input type="number" placeholder="89500" value={form.km_inicio} onChange={e => set("km_inicio", e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Ubicación / Zona de trabajo</Label>
+                  <Input placeholder="Ej. Romedal, Ruta 7 km 45" value={form.ubicacion} onChange={e => set("ubicacion", e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Tipo de trabajo</Label>
+                  <Select value={form.tipo_trabajo} onValueChange={v => set("tipo_trabajo", v)}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="desmonte">Desmonte</SelectItem>
+                      <SelectItem value="movimiento_suelo">Movimiento de suelo</SelectItem>
+                      <SelectItem value="transporte">Transporte</SelectItem>
+                      <SelectItem value="compactacion">Compactación</SelectItem>
+                      <SelectItem value="nivelacion">Nivelación</SelectItem>
+                      <SelectItem value="excavacion">Excavación</SelectItem>
+                      <SelectItem value="mantenimiento_vial">Mantenimiento vial</SelectItem>
+                      <SelectItem value="otro">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div className="flex justify-end pt-4">

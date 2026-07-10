@@ -11,6 +11,8 @@ export interface EmpleadoInput {
   apellido: string;
   dni: string;
   telefono?: string;
+  contacto_familiar_nombre?: string;
+  contacto_familiar_telefono?: string;
   cargo?: string;
   fecha_ingreso?: string;
 }

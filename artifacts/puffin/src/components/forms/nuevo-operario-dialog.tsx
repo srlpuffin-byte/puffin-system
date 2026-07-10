@@ -20,6 +20,7 @@ export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
   const createMut = useCreateEmpleado();
   const [form, setForm] = useState({
     nombre: "", apellido: "", dni: "", telefono: "", cargo: "", fecha_ingreso: "",
+    contacto_familiar_nombre: "", contacto_familiar_telefono: "",
   });
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
@@ -39,6 +40,8 @@ export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
           telefono: form.telefono || undefined,
           cargo: form.cargo || undefined,
           fecha_ingreso: form.fecha_ingreso || undefined,
+          contacto_familiar_nombre: form.contacto_familiar_nombre || undefined,
+          contacto_familiar_telefono: form.contacto_familiar_telefono || undefined,
         },
       },
       {
@@ -46,7 +49,7 @@ export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
           toast.success("Operario creado correctamente");
           queryClient.invalidateQueries({ queryKey: getGetEmpleadosQueryKey() });
           onOpenChange(false);
-          setForm({ nombre: "", apellido: "", dni: "", telefono: "", cargo: "", fecha_ingreso: "" });
+          setForm({ nombre: "", apellido: "", dni: "", telefono: "", cargo: "", fecha_ingreso: "", contacto_familiar_nombre: "", contacto_familiar_telefono: "" });
         },
         onError: () => toast.error("Error al crear el operario"),
       }
@@ -92,6 +95,19 @@ export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
           <div className="space-y-1">
             <Label>Fecha de ingreso</Label>
             <Input type="date" value={form.fecha_ingreso} onChange={e => set("fecha_ingreso", e.target.value)} />
+          </div>
+          <div className="pt-2 border-t">
+            <p className="text-sm font-medium text-muted-foreground mb-2">Contacto de emergencia</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Nombre familiar</Label>
+                <Input placeholder="Ej. María García" value={form.contacto_familiar_nombre} onChange={e => set("contacto_familiar_nombre", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Teléfono familiar</Label>
+                <Input placeholder="11-9876-5432" value={form.contacto_familiar_telefono} onChange={e => set("contacto_familiar_telefono", e.target.value)} />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>

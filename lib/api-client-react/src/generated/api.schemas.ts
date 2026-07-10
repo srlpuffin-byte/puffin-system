@@ -119,6 +119,8 @@ export interface EmpleadoInput {
   apellido: string;
   dni: string;
   telefono?: string;
+  contacto_familiar_nombre?: string;
+  contacto_familiar_telefono?: string;
   cargo?: string;
   fecha_ingreso?: string;
 }
@@ -136,6 +138,8 @@ export interface EmpleadoUpdate {
   nombre?: string;
   apellido?: string;
   telefono?: string;
+  contacto_familiar_nombre?: string;
+  contacto_familiar_telefono?: string;
   cargo?: string;
   estado?: EmpleadoUpdateEstado;
 }
@@ -267,6 +271,8 @@ export interface IniciarJornadaInput {
   estado_equipo_inicio?: string;
   foto_tablero_inicio?: string;
   observaciones?: string;
+  ubicacion?: string;
+  tipo_trabajo?: string;
 }
 
 export interface FinalizarJornadaInput {

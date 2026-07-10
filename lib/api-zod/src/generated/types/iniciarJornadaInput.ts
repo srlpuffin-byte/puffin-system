@@ -15,4 +15,6 @@ export interface IniciarJornadaInput {
   estado_equipo_inicio?: string;
   foto_tablero_inicio?: string;
   observaciones?: string;
+  ubicacion?: string;
+  tipo_trabajo?: string;
 }

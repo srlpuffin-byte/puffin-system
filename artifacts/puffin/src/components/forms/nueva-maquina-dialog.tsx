@@ -22,6 +22,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange }: Props) {
   const [form, setForm] = useState({
     codigo: "", nombre: "", tipo: "", marca: "", modelo: "",
     anio: "", patente: "", dominio: "", horometro: "", kilometros: "",
+    motor: "", chasis: "",
   });
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
@@ -45,6 +46,8 @@ export function NuevaMaquinaDialog({ open, onOpenChange }: Props) {
           dominio: form.dominio || undefined,
           horometro: form.horometro ? parseFloat(form.horometro) : undefined,
           kilometros: form.kilometros ? parseFloat(form.kilometros) : undefined,
+          motor: form.motor || undefined,
+          chasis: form.chasis || undefined,
         },
       },
       {
@@ -52,7 +55,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange }: Props) {
           toast.success("Máquina creada correctamente");
           queryClient.invalidateQueries({ queryKey: getGetMaquinasQueryKey() });
           onOpenChange(false);
-          setForm({ codigo: "", nombre: "", tipo: "", marca: "", modelo: "", anio: "", patente: "", dominio: "", horometro: "", kilometros: "" });
+          setForm({ codigo: "", nombre: "", tipo: "", marca: "", modelo: "", anio: "", patente: "", dominio: "", horometro: "", kilometros: "", motor: "", chasis: "" });
         },
         onError: () => toast.error("Error al crear la máquina"),
       }
@@ -118,6 +121,16 @@ export function NuevaMaquinaDialog({ open, onOpenChange }: Props) {
           <div className="space-y-1">
             <Label>Kilometraje inicial (km)</Label>
             <Input type="number" placeholder="0" value={form.kilometros} onChange={e => set("kilometros", e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Número de motor</Label>
+              <Input placeholder="Ej. 4HK1-123456" value={form.motor} onChange={e => set("motor", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Número de chasis</Label>
+              <Input placeholder="Ej. JALE6LX1..." value={form.chasis} onChange={e => set("chasis", e.target.value)} />
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>

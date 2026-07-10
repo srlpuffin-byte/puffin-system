@@ -9,6 +9,8 @@ export const empleadosTable = pgTable("empleados", {
   apellido: text("apellido").notNull(),
   dni: text("dni").notNull(),
   telefono: text("telefono"),
+  contacto_familiar_nombre: text("contacto_familiar_nombre"),
+  contacto_familiar_telefono: text("contacto_familiar_telefono"),
   cargo: text("cargo"),
   estado: text("estado").notNull().default("activo"),
   fecha_ingreso: date("fecha_ingreso"),

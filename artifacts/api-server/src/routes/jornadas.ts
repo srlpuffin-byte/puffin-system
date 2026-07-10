@@ -42,7 +42,7 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/iniciar", async (req, res) => {
-  const { empleado_id, maquina_id, horometro_inicio, km_inicio, observaciones, checklist_previo, checklist_ok, estado_equipo_inicio, foto_tablero_inicio } = req.body;
+  const { empleado_id, maquina_id, horometro_inicio, km_inicio, observaciones, checklist_previo, checklist_ok, estado_equipo_inicio, foto_tablero_inicio, ubicacion, tipo_trabajo } = req.body;
   if (!empleado_id || !maquina_id || horometro_inicio === undefined) {
     return res.status(400).json({ error: "Campos requeridos faltantes" });
   }
@@ -61,6 +61,8 @@ router.post("/iniciar", async (req, res) => {
     checklist_ok,
     estado_equipo_inicio,
     foto_tablero_inicio,
+    ubicacion,
+    tipo_trabajo,
     estado: "en_curso"
   }).returning();
 

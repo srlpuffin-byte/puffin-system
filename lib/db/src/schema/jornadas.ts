@@ -8,6 +8,8 @@ export const jornadasTable = pgTable("jornadas", {
   empleado_id: integer("empleado_id").notNull(),
   maquina_id: integer("maquina_id").notNull(),
   fecha: date("fecha").notNull(),
+  ubicacion: text("ubicacion"),
+  tipo_trabajo: text("tipo_trabajo"),
   hora_inicio: text("hora_inicio"),
   hora_fin: text("hora_fin"),
   km_inicio: numeric("km_inicio", { precision: 10, scale: 1 }),
