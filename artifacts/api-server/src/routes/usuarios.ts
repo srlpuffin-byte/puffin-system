@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usuariosTable } from "@workspace/db";
+import { usuariosTable, empleadosTable, alertasTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -62,6 +62,26 @@ router.post("/", async (req, res) => {
         activo: usuariosTable.activo,
         bloqueado: usuariosTable.bloqueado,
       });
+
+    // Si el rol es empleado, crear su ficha automáticamente y generar alerta
+    if (created.rol === "empleado") {
+      const [empleado] = await db.insert(empleadosTable).values({
+        nombre,
+        apellido,
+        dni: "COMPLETAR",
+        estado: "activo",
+      }).returning();
+
+      await db.insert(alertasTable).values({
+        tipo: "sistema",
+        prioridad: "roja",
+        descripcion: `El operario ${nombre} ${apellido} fue creado en el sistema. Falta completar su DNI, teléfono y cargar su Documentación.`,
+        entidad_tipo: "empleado",
+        entidad_id: empleado.id,
+        entidad_nombre: `${nombre} ${apellido}`,
+      });
+    }
+
     return res.status(201).json(created);
   } catch (err: any) {
     req.log.error(err);

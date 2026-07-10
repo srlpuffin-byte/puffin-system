@@ -20,29 +20,35 @@ import { auditoriaRouter } from "./auditoria";
 import { backupsRouter } from "./backups";
 import { integrationsRouter } from "./integrations";
 import fotografiasRouter from "./fotografias";
+import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use("/auth", authRouter);
-router.use("/dashboard", dashboardRouter);
-router.use("/empleados", empleadosRouter);
-router.use("/maquinas", maquinasRouter);
-router.use("/jornadas", jornadasRouter);
-router.use("/combustible", combustibleRouter);
-router.use("/mantenimientos", mantenimientosRouter);
-router.use("/documentos", documentosRouter);
-router.use("/alertas", alertasRouter);
-router.use("/incidentes", incidentesRouter);
-router.use("/actividad", actividadRouter);
-router.use("/calendario", calendarioRouter);
-router.use("/reportes", reportesRouter);
-router.use("/usuarios", usuariosRouter);
-router.use("/productividad", productividadRouter);
-router.use("/ia", iaRouter);
-router.use("/auditoria", auditoriaRouter);
-router.use("/backups", backupsRouter);
-router.use("/integrations", integrationsRouter);
-router.use("/fotografias", fotografiasRouter);
+// Integraciones can sometimes be called by webhooks, but we should secure it if it's internal.
+// For now, let's leave it without requireAuth if it acts as a webhook receiver, or with it if it's UI driven.
+// Assuming it's UI driven:
+router.use("/integrations", requireAuth, integrationsRouter);
+
+// Protected routes
+router.use("/dashboard", requireAuth, dashboardRouter);
+router.use("/empleados", requireAuth, empleadosRouter);
+router.use("/maquinas", requireAuth, maquinasRouter);
+router.use("/jornadas", requireAuth, jornadasRouter);
+router.use("/combustible", requireAuth, combustibleRouter);
+router.use("/mantenimientos", requireAuth, mantenimientosRouter);
+router.use("/documentos", requireAuth, documentosRouter);
+router.use("/alertas", requireAuth, alertasRouter);
+router.use("/incidentes", requireAuth, incidentesRouter);
+router.use("/actividad", requireAuth, actividadRouter);
+router.use("/calendario", requireAuth, calendarioRouter);
+router.use("/reportes", requireAuth, reportesRouter);
+router.use("/usuarios", requireAuth, usuariosRouter);
+router.use("/productividad", requireAuth, productividadRouter);
+router.use("/ia", requireAuth, iaRouter);
+router.use("/auditoria", requireAuth, auditoriaRouter);
+router.use("/backups", requireAuth, backupsRouter);
+router.use("/fotografias", requireAuth, fotografiasRouter);
 
 export default router;

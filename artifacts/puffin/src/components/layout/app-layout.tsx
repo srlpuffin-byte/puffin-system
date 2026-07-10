@@ -63,7 +63,6 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: Truck, label: "Maquinaria", href: "/maquinas" },
       { icon: Clock, label: "Jornadas", href: "/jornadas" },
       { icon: Droplets, label: "Combustible", href: "/combustible" },
-      { icon: MapPin, label: "GPS y Rastreo", href: "/gps" },
     ],
   },
   {
@@ -78,27 +77,24 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Control",
     defaultOpen: true,
     items: [
-      { icon: Bell, label: "Alertas", href: "/alertas" },
-      { icon: AlertTriangle, label: "Incidentes", href: "/incidentes" },
+      { icon: Bell, label: "Alertas e Incidentes", href: "/alertas" },
       { icon: Calendar, label: "Calendario", href: "/calendario" },
     ],
   },
   {
-    label: "Análisis",
+    label: "Análisis y Reportes",
     defaultOpen: false,
     items: [
       { icon: TrendingUp, label: "Productividad", href: "/productividad" },
-      { icon: BarChart3, label: "Reportes", href: "/reportes" },
-      { icon: Activity, label: "Actividad", href: "/actividad" },
+      { icon: BarChart3, label: "Reportes Financieros", href: "/reportes" },
     ],
   },
   {
     label: "Integraciones",
     defaultOpen: false,
     items: [
-      { icon: Map, label: "AmericanGIS", href: "/americangis" },
       { icon: Satellite, label: "Xpert Satcom", href: "/xpert" },
-      { icon: Bot, label: "Inteligencia Artificial", href: "/ia" },
+      { icon: Bot, label: "Puffin AI", href: "/ia" },
     ],
   },
   {
@@ -200,9 +196,30 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </Button>
       </div>
       <nav className="flex-1 overflow-y-auto py-3 px-2">
-        {NAV_GROUPS.map((group) => (
-          <NavGroupComponent key={group.label} group={group} location={location} />
-        ))}
+        {NAV_GROUPS.filter(group => {
+          if (user?.rol === "empleado") {
+            // Empleados solo ven Panel y Operación básica
+            if (group.label === "Principal") return true;
+            if (group.label === "Operación") return true;
+            return false;
+          }
+          return true;
+        }).map((group) => {
+          let filteredItems = group.items;
+          if (user?.rol === "empleado" && group.label === "Operación") {
+            // Empleados no ven Operarios ni Maquinaria en el menú
+            filteredItems = group.items.filter(item => 
+              item.href !== "/operarios" && item.href !== "/maquinas"
+            );
+          }
+          return (
+            <NavGroupComponent
+              key={group.label}
+              group={{ ...group, items: filteredItems }}
+              location={location}
+            />
+          );
+        })}
       </nav>
       <div className="p-3 border-t border-sidebar-border flex-shrink-0">
         <div className="mb-3 px-2">
