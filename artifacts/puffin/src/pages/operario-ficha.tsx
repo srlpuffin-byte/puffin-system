@@ -11,6 +11,8 @@ import { ReportarIncidenteDialog } from "@/components/forms/reportar-incidente-d
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetJornadas } from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EditarOperarioDialog } from "@/components/forms/editar-operario-dialog";
+import { Edit } from "lucide-react";
 
 export function OperarioFicha() {
   const { id } = useParams();
@@ -19,6 +21,7 @@ export function OperarioFicha() {
   const { data: operario, isLoading } = useGetEmpleado(operarioId, { query: { enabled: !!operarioId } as any });
   const [openJornada, setOpenJornada] = useState(false);
   const [openIncidente, setOpenIncidente] = useState(false);
+  const [openEdit, setOpenEdit] = useState(false);
 
   if (isLoading) return <div className="p-8 text-center">Cargando perfil de operario...</div>;
   if (!operario) return <div className="p-8 text-center text-red-500">Operario no encontrado</div>;
@@ -41,8 +44,11 @@ export function OperarioFicha() {
             {operario.jornada_activa && (
               <Badge variant="outline" className="text-blue-600 border-blue-600">EN JORNADA</Badge>
             )}
+            <Button variant="ghost" size="sm" className="ml-2 h-7 px-2 border" onClick={() => setOpenEdit(true)}>
+              <Edit className="w-3 h-3 mr-1" /> Editar
+            </Button>
           </h1>
-          <p className="text-muted-foreground">{operario.cargo || "Operario"} • DNI: {operario.dni}</p>
+          <p className="text-muted-foreground">{operario.cargo || "Operario"} • DNI: {operario.dni === "COMPLETAR" ? <span className="text-red-500 font-bold">FALTA DNI</span> : operario.dni}</p>
         </div>
       </div>
 
@@ -146,7 +152,7 @@ export function OperarioFicha() {
       </TabsContent>
     </Tabs>
 
-    <IniciarJornadaDialog
+      <IniciarJornadaDialog
         open={openJornada}
         onOpenChange={setOpenJornada}
         empleadoIdFijo={operarioId}
@@ -155,6 +161,11 @@ export function OperarioFicha() {
         open={openIncidente}
         onOpenChange={setOpenIncidente}
         empleadoIdFijo={operarioId}
+      />
+      <EditarOperarioDialog
+        open={openEdit}
+        onOpenChange={setOpenEdit}
+        operario={operario}
       />
     </div>
   );

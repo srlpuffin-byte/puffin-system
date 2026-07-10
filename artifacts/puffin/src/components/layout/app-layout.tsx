@@ -39,6 +39,7 @@ interface NavItem {
   icon: React.ElementType;
   label: string;
   href: string;
+  badge?: boolean;
 }
 
 interface NavGroup {
@@ -128,14 +129,19 @@ function NavGroupComponent({ group, location }: { group: NavGroup; location: str
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                  className={`flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
                     active
                       ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
                       : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/80"
                   }`}
                 >
-                  <item.icon className="h-4 w-4 flex-shrink-0" />
-                  {item.label}
+                  <div className="flex items-center gap-3">
+                    <item.icon className="h-4 w-4 flex-shrink-0" />
+                    {item.label}
+                  </div>
+                  {item.badge && (
+                    <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" title="Falta información"></div>
+                  )}
                 </Link>
               </li>
             );
@@ -146,12 +152,17 @@ function NavGroupComponent({ group, location }: { group: NavGroup; location: str
   );
 }
 
+import { useGetEmpleados } from "@workspace/api-client-react";
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { data: user } = useGetMe();
   const logoutMut = useLogout();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  
+  const { data: empleados } = useGetEmpleados();
+  const hasIncompleteOperarios = empleados?.some(e => e.dni === "COMPLETAR" || (e as any).alertas_count > 0) || false;
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -222,7 +233,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           return (
             <NavGroupComponent
               key={group.label}
-              group={{ ...group, items: filteredItems }}
+              group={{ 
+                ...group, 
+                items: filteredItems.map(item => 
+                  item.href === "/operarios" ? { ...item, badge: hasIncompleteOperarios } : item
+                ) 
+              }}
               location={location}
             />
           );
