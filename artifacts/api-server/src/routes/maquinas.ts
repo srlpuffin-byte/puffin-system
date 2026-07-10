@@ -44,13 +44,26 @@ router.get("/:id", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  const { nombre, estado, horometro, kilometros, proximo_service } = req.body;
+  const { 
+    nombre, estado, horometro, kilometros, proximo_service,
+    codigo, tipo, marca, modelo, anio, patente, dominio, chasis, motor
+  } = req.body;
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
   if (nombre !== undefined) updateData.nombre = nombre;
   if (estado !== undefined) updateData.estado = estado;
   if (horometro !== undefined) updateData.horometro = horometro.toString();
   if (kilometros !== undefined) updateData.kilometros = kilometros.toString();
   if (proximo_service !== undefined) updateData.proximo_service = proximo_service;
+  
+  if (codigo !== undefined) updateData.codigo = codigo;
+  if (tipo !== undefined) updateData.tipo = tipo;
+  if (marca !== undefined) updateData.marca = marca;
+  if (modelo !== undefined) updateData.modelo = modelo;
+  if (anio !== undefined) updateData.anio = anio;
+  if (patente !== undefined) updateData.patente = patente;
+  if (dominio !== undefined) updateData.dominio = dominio;
+  if (chasis !== undefined) updateData.chasis = chasis;
+  if (motor !== undefined) updateData.motor = motor;
 
   const [maquina] = await db.update(maquinasTable).set(updateData).where(eq(maquinasTable.id, id)).returning();
   if (!maquina) return res.status(404).json({ error: "Maquinaria no encontrada" });

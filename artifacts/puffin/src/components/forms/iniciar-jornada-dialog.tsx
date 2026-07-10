@@ -157,7 +157,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
                   <Select value={form.empleado_id} onValueChange={v => set("empleado_id", v)}>
                     <SelectTrigger><SelectValue placeholder="Seleccionar operario" /></SelectTrigger>
                     <SelectContent>
-                      {empleados?.map(e => (
+                      {(Array.isArray(empleados) ? empleados : [])?.map(e => (
                         <SelectItem key={e.id} value={e.id.toString()}>
                           {e.apellido}, {e.nombre}
                         </SelectItem>
@@ -172,7 +172,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
                   <Select value={form.maquina_id} onValueChange={v => set("maquina_id", v)}>
                     <SelectTrigger><SelectValue placeholder="Seleccionar máquina" /></SelectTrigger>
                     <SelectContent>
-                      {maquinas?.map(m => (
+                      {(Array.isArray(maquinas) ? maquinas : [])?.map(m => (
                         <SelectItem key={m.id} value={m.id.toString()}>
                           {m.nombre} ({m.codigo})
                         </SelectItem>

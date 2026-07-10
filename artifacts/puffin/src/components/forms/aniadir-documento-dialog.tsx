@@ -96,7 +96,7 @@ export function AñadirDocumentoDialog({ open, onOpenChange }: Props) {
               <Select value={form.entidad_id} onValueChange={v => set("entidad_id", v)}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar máquina" /></SelectTrigger>
                 <SelectContent>
-                  {maquinas?.map(m => <SelectItem key={m.id} value={m.id.toString()}>{m.nombre}</SelectItem>)}
+                  {(Array.isArray(maquinas) ? maquinas : [])?.map(m => <SelectItem key={m.id} value={m.id.toString()}>{m.nombre}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -107,7 +107,7 @@ export function AñadirDocumentoDialog({ open, onOpenChange }: Props) {
               <Select value={form.entidad_id} onValueChange={v => set("entidad_id", v)}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar operario" /></SelectTrigger>
                 <SelectContent>
-                  {empleados?.map(e => <SelectItem key={e.id} value={e.id.toString()}>{e.apellido}, {e.nombre}</SelectItem>)}
+                  {(Array.isArray(empleados) ? empleados : [])?.map(e => <SelectItem key={e.id} value={e.id.toString()}>{e.apellido}, {e.nombre}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

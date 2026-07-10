@@ -4,10 +4,11 @@ import { useGetMaquina } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, Truck, Settings, Wrench, Droplets } from "lucide-react";
+import { ChevronLeft, Truck, Settings, Wrench, Droplets, Edit } from "lucide-react";
 import { RegistrarMantenimientoDialog } from "@/components/forms/registrar-mantenimiento-dialog";
 import { RegistrarCargaDialog } from "@/components/forms/registrar-carga-dialog";
 import { ReportarIncidenteDialog } from "@/components/forms/reportar-incidente-dialog";
+import { EditarMaquinaDialog } from "@/components/forms/editar-maquina-dialog";
 
 const estadoBadge = (estado: string) => {
   if (estado === "activa") return <Badge className="bg-green-600 hover:bg-green-700">ACTIVA</Badge>;
@@ -23,6 +24,7 @@ export function MaquinaFicha() {
   const [openMant, setOpenMant] = useState(false);
   const [openComb, setOpenComb] = useState(false);
   const [openInc, setOpenInc] = useState(false);
+  const [openEdit, setOpenEdit] = useState(false);
 
   if (isLoading) return <div className="p-8 text-center">Cargando ficha de máquina...</div>;
   if (!maquina) return <div className="p-8 text-center text-red-500">Máquina no encontrada</div>;
@@ -37,6 +39,9 @@ export function MaquinaFicha() {
           <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
             {maquina.nombre}
             {estadoBadge(maquina.estado)}
+            <Button variant="ghost" size="sm" className="ml-2 h-7 px-2 border" onClick={() => setOpenEdit(true)}>
+              <Edit className="w-3 h-3 mr-1" /> Editar
+            </Button>
           </h1>
           <p className="text-muted-foreground">{maquina.codigo} • {maquina.tipo.toUpperCase()}</p>
         </div>
@@ -130,6 +135,7 @@ export function MaquinaFicha() {
       <RegistrarMantenimientoDialog open={openMant} onOpenChange={setOpenMant} maquinaIdFija={maquinaId} />
       <RegistrarCargaDialog open={openComb} onOpenChange={setOpenComb} maquinaIdFija={maquinaId} />
       <ReportarIncidenteDialog open={openInc} onOpenChange={setOpenInc} maquinaIdFija={maquinaId} />
+      <EditarMaquinaDialog open={openEdit} onOpenChange={setOpenEdit} maquina={maquina} />
     </div>
   );
 }

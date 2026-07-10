@@ -88,7 +88,7 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
               <Select value={form.empleado_id} onValueChange={v => set("empleado_id", v)}>
                 <SelectTrigger><SelectValue placeholder="(Opcional)" /></SelectTrigger>
                 <SelectContent>
-                  {empleados?.map(e => <SelectItem key={e.id} value={e.id.toString()}>{e.apellido}, {e.nombre}</SelectItem>)}
+                  {(Array.isArray(empleados) ? empleados : [])?.map(e => <SelectItem key={e.id} value={e.id.toString()}>{e.apellido}, {e.nombre}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -99,7 +99,7 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
               <Select value={form.maquina_id} onValueChange={v => set("maquina_id", v)}>
                 <SelectTrigger><SelectValue placeholder="(Opcional)" /></SelectTrigger>
                 <SelectContent>
-                  {maquinas?.map(m => <SelectItem key={m.id} value={m.id.toString()}>{m.nombre}</SelectItem>)}
+                  {(Array.isArray(maquinas) ? maquinas : [])?.map(m => <SelectItem key={m.id} value={m.id.toString()}>{m.nombre}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

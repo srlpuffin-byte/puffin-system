@@ -73,7 +73,7 @@ export function RegistrarMantenimientoDialog({ open, onOpenChange, maquinaIdFija
               <Select value={form.maquina_id} onValueChange={v => set("maquina_id", v)}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar máquina" /></SelectTrigger>
                 <SelectContent>
-                  {maquinas?.map(m => <SelectItem key={m.id} value={m.id.toString()}>{m.nombre}</SelectItem>)}
+                  {(Array.isArray(maquinas) ? maquinas : [])?.map(m => <SelectItem key={m.id} value={m.id.toString()}>{m.nombre}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
