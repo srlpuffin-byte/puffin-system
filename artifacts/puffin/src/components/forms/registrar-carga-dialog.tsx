@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Camera } from "lucide-react";
 
@@ -98,23 +97,29 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
           {!empleadoIdFijo && (
             <div className="space-y-1">
               <Label>Operario *</Label>
-              <Select value={form.empleado_id} onValueChange={v => set("empleado_id", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar operario" /></SelectTrigger>
-                <SelectContent>
-                  {Array.isArray(empleados) ? empleados.map(e => <SelectItem key={e.id} value={e.id.toString()}>{e.apellido}, {e.nombre}</SelectItem>) : null}
-                </SelectContent>
-              </Select>
+              <select
+                value={form.empleado_id}
+                onChange={e => set("empleado_id", e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                required
+              >
+                <option value="" disabled>Seleccionar operario</option>
+                {Array.isArray(empleados) ? empleados.map(e => <option key={e.id} value={e.id.toString()}>{e.apellido}, {e.nombre}</option>) : null}
+              </select>
             </div>
           )}
           {!maquinaIdFija && (
             <div className="space-y-1">
               <Label>Máquina *</Label>
-              <Select value={form.maquina_id} onValueChange={v => set("maquina_id", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar máquina" /></SelectTrigger>
-                <SelectContent>
-                  {Array.isArray(maquinas) ? maquinas.map(m => <SelectItem key={m.id} value={m.id.toString()}>{m.nombre}</SelectItem>) : null}
-                </SelectContent>
-              </Select>
+              <select
+                value={form.maquina_id}
+                onChange={e => set("maquina_id", e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                required
+              >
+                <option value="" disabled>Seleccionar máquina</option>
+                {Array.isArray(maquinas) ? maquinas.map(m => <option key={m.id} value={m.id.toString()}>{m.nombre}</option>) : null}
+              </select>
             </div>
           )}
           <div className="grid grid-cols-3 gap-4">
