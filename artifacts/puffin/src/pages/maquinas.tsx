@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Plus, X } from "lucide-react";
 import { Link, useSearch } from "wouter";
-import { NuevaMaquinaDialog } from "@/components/forms/nueva-maquina-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { NuevaMaquinaDialog } from "@/components/forms/nueva-maquina-dialog";
+import { AlertTriangle } from "lucide-react";
 
 const TIPOS_MAQUINA = ["Retroexcavadora", "Niveladora", "Compactadora", "Camión", "Camión Cisterna", "Grúa", "Pala Cargadora", "Minicargadora", "Bulldozer", "Motoniveladora", "Otro"];
 
@@ -136,9 +137,16 @@ export function Maquinas() {
                       </TableCell>
                       <TableCell>{estadoBadge(maq.estado)}</TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/maquinas/${maq.id}`} className="text-primary hover:underline font-medium text-sm">
-                          Ver ficha
-                        </Link>
+                        <div className="flex items-center justify-end gap-3">
+                          {(!maq.marca || !maq.modelo || !maq.anio || (!maq.patente && !maq.dominio) || !maq.motor || !maq.chasis || !maq.filtro_tipo || !maq.filtro_codigo) && (
+                            <Badge variant="destructive" className="flex items-center gap-1 text-xs">
+                              <AlertTriangle className="w-3 h-3" /> Faltan datos
+                            </Badge>
+                          )}
+                          <Link href={`/maquinas/${maq.id}`} className="text-primary hover:underline font-medium text-sm">
+                            Ver ficha
+                          </Link>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

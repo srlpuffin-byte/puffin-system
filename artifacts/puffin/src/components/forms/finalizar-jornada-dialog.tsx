@@ -30,7 +30,10 @@ export function FinalizarJornadaDialog({ open, onOpenChange, jornadaId, empleado
     horometro_fin: "", 
     km_fin: "", 
     problemas: "",
-    estado_equipo_fin: ""
+    estado_equipo_fin: "",
+    combustible_nivel: "",
+    aceite_estado: "",
+    danos_choques: ""
   });
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
@@ -53,7 +56,10 @@ export function FinalizarJornadaDialog({ open, onOpenChange, jornadaId, empleado
           horometro_fin: parseFloat(form.horometro_fin),
           km_fin: form.km_fin ? parseFloat(form.km_fin) : undefined,
           problemas: form.problemas || undefined,
-          estado_equipo_fin: form.estado_equipo_fin
+          estado_equipo_fin: form.estado_equipo_fin,
+          combustible_nivel: form.combustible_nivel || undefined,
+          aceite_estado: form.aceite_estado || undefined,
+          danos_choques: form.danos_choques || undefined
         },
       });
 
@@ -84,7 +90,7 @@ export function FinalizarJornadaDialog({ open, onOpenChange, jornadaId, empleado
   };
 
   const resetForm = () => {
-    setForm({ horometro_fin: "", km_fin: "", problemas: "", estado_equipo_fin: "" });
+    setForm({ horometro_fin: "", km_fin: "", problemas: "", estado_equipo_fin: "", combustible_nivel: "", aceite_estado: "", danos_choques: "" });
     setImages([]);
   };
 
@@ -112,6 +118,38 @@ export function FinalizarJornadaDialog({ open, onOpenChange, jornadaId, empleado
             </div>
           </div>
           
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Nivel de Combustible al finalizar</Label>
+              <Select value={form.combustible_nivel} onValueChange={v => set("combustible_nivel", v)}>
+                <SelectTrigger><SelectValue placeholder="Ej. Lleno, 3/4, Medio..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="lleno">Lleno (100%)</SelectItem>
+                  <SelectItem value="tres_cuartos">3/4</SelectItem>
+                  <SelectItem value="medio">Medio (50%)</SelectItem>
+                  <SelectItem value="un_cuarto">1/4</SelectItem>
+                  <SelectItem value="reserva">En Reserva</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Estado del Aceite</Label>
+              <Select value={form.aceite_estado} onValueChange={v => set("aceite_estado", v)}>
+                <SelectTrigger><SelectValue placeholder="Ej. Normal, Bajo..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="bajo">Bajo (Requiere relleno)</SelectItem>
+                  <SelectItem value="quemado">Muy degradado / Quemado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div className="space-y-1">
+            <Label>Daños o Choques detectados</Label>
+            <Input placeholder="Describa si el equipo sufrió algún daño estructural o choque..." value={form.danos_choques} onChange={e => set("danos_choques", e.target.value)} />
+          </div>
+
           <div className="space-y-1">
             <Label>Estado del equipo al finalizar *</Label>
             <Select value={form.estado_equipo_fin} onValueChange={v => set("estado_equipo_fin", v)} required>

@@ -11,6 +11,7 @@ export const empleadosTable = pgTable("empleados", {
   telefono: text("telefono"),
   contacto_familiar_nombre: text("contacto_familiar_nombre"),
   contacto_familiar_telefono: text("contacto_familiar_telefono"),
+  contacto_familiar_relacion: text("contacto_familiar_relacion"),
   cargo: text("cargo"),
   estado: text("estado").notNull().default("activo"),
   fecha_ingreso: date("fecha_ingreso"),
@@ -21,3 +22,4 @@ export const empleadosTable = pgTable("empleados", {
 export const insertEmpleadoSchema = createInsertSchema(empleadosTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertEmpleado = z.infer<typeof insertEmpleadoSchema>;
 export type Empleado = typeof empleadosTable.$inferSelect;
+

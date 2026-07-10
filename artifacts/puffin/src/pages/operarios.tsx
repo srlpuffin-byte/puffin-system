@@ -114,7 +114,7 @@ export function Operarios() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-3">
-                          {op.alertas_count > 0 && (
+                          {(!op.dni || op.dni === "COMPLETAR" || !op.telefono || !op.fecha_ingreso || !op.contacto_familiar_nombre || !op.contacto_familiar_telefono || !(op as any).contacto_familiar_relacion) && (
                             <Badge variant="destructive" className="flex items-center gap-1 text-xs">
                               <AlertTriangle className="w-3 h-3" /> Faltan datos
                             </Badge>

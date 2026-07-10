@@ -9,6 +9,9 @@ import { RegistrarMantenimientoDialog } from "@/components/forms/registrar-mante
 import { RegistrarCargaDialog } from "@/components/forms/registrar-carga-dialog";
 import { ReportarIncidenteDialog } from "@/components/forms/reportar-incidente-dialog";
 import { EditarMaquinaDialog } from "@/components/forms/editar-maquina-dialog";
+import { HistorialMaquinaDialog } from "@/components/forms/historial-maquina-dialog";
+import { History, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const estadoBadge = (estado: string) => {
   if (estado === "activa") return <Badge className="bg-green-600 hover:bg-green-700">ACTIVA</Badge>;
@@ -25,9 +28,20 @@ export function MaquinaFicha() {
   const [openComb, setOpenComb] = useState(false);
   const [openInc, setOpenInc] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
+  const [openHistorial, setOpenHistorial] = useState(false);
 
   if (isLoading) return <div className="p-8 text-center">Cargando ficha de máquina...</div>;
   if (!maquina) return <div className="p-8 text-center text-red-500">Máquina no encontrada</div>;
+
+  const missingInfo: string[] = [];
+  if (!maquina.marca) missingInfo.push("Marca");
+  if (!maquina.modelo) missingInfo.push("Modelo");
+  if (!maquina.anio) missingInfo.push("Año");
+  if (!maquina.patente && !maquina.dominio) missingInfo.push("Patente / Dominio");
+  if (!maquina.motor) missingInfo.push("N° Motor");
+  if (!maquina.chasis) missingInfo.push("N° Chasis");
+  if (!maquina.filtro_tipo) missingInfo.push("Tipo de filtro");
+  if (!maquina.filtro_codigo) missingInfo.push("Código de filtro");
 
   return (
     <div className="space-y-6">
@@ -46,6 +60,17 @@ export function MaquinaFicha() {
           <p className="text-muted-foreground">{maquina.codigo} • {maquina.tipo.toUpperCase()}</p>
         </div>
       </div>
+
+      {missingInfo.length > 0 && (
+        <Alert variant="destructive" className="bg-red-50 border-red-200">
+          <AlertTriangle className="h-4 w-4 text-red-600" />
+          <AlertTitle className="text-red-800 font-bold">Información Faltante</AlertTitle>
+          <AlertDescription className="text-red-700">
+            Faltan completar los siguientes datos de la máquina: <strong>{missingInfo.join(", ")}</strong>. 
+            Por favor, haz clic en "Editar" para completarlos.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="md:col-span-2">
@@ -127,6 +152,10 @@ export function MaquinaFicha() {
               <Button variant="outline" className="w-full text-destructive hover:bg-destructive/10" onClick={() => setOpenInc(true)}>
                 Reportar Incidente
               </Button>
+              <Button variant="outline" className="w-full" onClick={() => setOpenHistorial(true)}>
+                <History className="mr-2 h-4 w-4" />
+                Ver Historial
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -136,6 +165,7 @@ export function MaquinaFicha() {
       <RegistrarCargaDialog open={openComb} onOpenChange={setOpenComb} maquinaIdFija={maquinaId} />
       <ReportarIncidenteDialog open={openInc} onOpenChange={setOpenInc} maquinaIdFija={maquinaId} />
       <EditarMaquinaDialog open={openEdit} onOpenChange={setOpenEdit} maquina={maquina} />
+      <HistorialMaquinaDialog open={openHistorial} onOpenChange={setOpenHistorial} maquina={maquina} />
     </div>
   );
 }

@@ -43,7 +43,7 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/iniciar", async (req, res) => {
-  const { empleado_id, maquina_id, horometro_inicio, km_inicio, observaciones, checklist_previo, checklist_ok, estado_equipo_inicio, foto_tablero_inicio, ubicacion, tipo_trabajo } = req.body;
+  const { empleado_id, maquina_id, horometro_inicio, km_inicio, observaciones, checklist_previo, checklist_ok, estado_equipo_inicio, foto_tablero_inicio, ubicacion, tipo_trabajo, nombre_obra, descripcion_trabajo } = req.body;
   if (!empleado_id || !maquina_id || horometro_inicio === undefined) {
     return res.status(400).json({ error: "Campos requeridos faltantes" });
   }
@@ -64,6 +64,8 @@ router.post("/iniciar", async (req, res) => {
     foto_tablero_inicio,
     ubicacion,
     tipo_trabajo,
+    nombre_obra,
+    descripcion_trabajo,
     estado: "en_curso"
   }).returning();
 
@@ -97,14 +99,14 @@ router.post("/iniciar", async (req, res) => {
 
 router.post("/:id/finalizar", async (req, res) => {
   const id = parseInt(req.params.id);
-  const { horometro_fin, km_fin, problemas, estado_equipo_fin, foto_tablero_fin } = req.body;
+  const { horometro_fin, km_fin, problemas, estado_equipo_fin, foto_tablero_fin, combustible_nivel, aceite_estado, danos_choques } = req.body;
   if (horometro_fin === undefined) return res.status(400).json({ error: "Horómetro final requerido" });
 
   const horaFin = new Date().toTimeString().slice(0, 5);
 
   const [jornada] = await db
     .update(jornadasTable)
-    .set({ horometro_fin: horometro_fin.toString(), km_fin: km_fin?.toString(), problemas, estado_equipo_fin, foto_tablero_fin, hora_fin: horaFin, estado: "finalizada", updatedAt: new Date() })
+    .set({ horometro_fin: horometro_fin.toString(), km_fin: km_fin?.toString(), problemas, estado_equipo_fin, foto_tablero_fin, combustible_nivel, aceite_estado, danos_choques, hora_fin: horaFin, estado: "finalizada", updatedAt: new Date() })
     .where(eq(jornadasTable.id, id))
     .returning();
 

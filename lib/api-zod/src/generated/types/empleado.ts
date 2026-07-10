@@ -22,4 +22,6 @@ export interface Empleado {
   fecha_ingreso?: string | null;
   jornada_activa?: boolean;
   alertas_count?: number;
+  /** @nullable */
+  contacto_familiar_relacion?: string | null;
 }

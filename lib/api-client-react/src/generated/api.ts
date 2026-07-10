@@ -27,6 +27,8 @@ import type {
   DashboardResumen,
   Documento,
   DocumentoInput,
+  Egreso,
+  EgresoInput,
   Empleado,
   EmpleadoInput,
   EmpleadoUpdate,
@@ -41,6 +43,7 @@ import type {
   GetCalendarioEventosParams,
   GetCombustibleParams,
   GetDocumentosParams,
+  GetEgresosParams,
   GetEmpleadosParams,
   GetFotografiasParams,
   GetIncidentesParams,
@@ -48,6 +51,7 @@ import type {
   GetMantenimientosParams,
   GetMaquinasParams,
   GetReportesResumenParams,
+  GlobalSearchParams,
   HealthStatus,
   Incidente,
   IncidenteInput,
@@ -62,8 +66,10 @@ import type {
   RegistroAuditoria,
   RegistroCombustible,
   ReporteResumen,
+  SearchResults,
   SesionData,
   SuccessResponse,
+  UpdateMantenimientoEstadoInput,
   UploadFotografiaInput,
   Usuario
 } from './api.schemas';
@@ -2691,6 +2697,315 @@ export function useGetReportesResumen<TData = Awaited<ReturnType<typeof getRepor
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetReportesResumenQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateMantenimientoEstadoUrl = (id: number,) => {
+
+
+
+
+  return `/api/mantenimientos/${id}/estado`
+}
+
+/**
+ * @summary Actualizar estado de mantenimiento
+ */
+export const updateMantenimientoEstado = async (id: number,
+    updateMantenimientoEstadoInput: UpdateMantenimientoEstadoInput, options?: RequestInit): Promise<Mantenimiento> => {
+
+  return customFetch<Mantenimiento>(getUpdateMantenimientoEstadoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateMantenimientoEstadoInput)
+  }
+);}
+
+
+
+
+export const getUpdateMantenimientoEstadoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMantenimientoEstado>>, TError,{id: number;data: BodyType<UpdateMantenimientoEstadoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMantenimientoEstado>>, TError,{id: number;data: BodyType<UpdateMantenimientoEstadoInput>}, TContext> => {
+
+const mutationKey = ['updateMantenimientoEstado'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMantenimientoEstado>>, {id: number;data: BodyType<UpdateMantenimientoEstadoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateMantenimientoEstado(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMantenimientoEstadoMutationResult = NonNullable<Awaited<ReturnType<typeof updateMantenimientoEstado>>>
+    export type UpdateMantenimientoEstadoMutationBody = BodyType<UpdateMantenimientoEstadoInput>
+    export type UpdateMantenimientoEstadoMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Actualizar estado de mantenimiento
+ */
+export const useUpdateMantenimientoEstado = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMantenimientoEstado>>, TError,{id: number;data: BodyType<UpdateMantenimientoEstadoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMantenimientoEstado>>,
+        TError,
+        {id: number;data: BodyType<UpdateMantenimientoEstadoInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateMantenimientoEstadoMutationOptions(options));
+    }
+
+export const getGetEgresosUrl = (params?: GetEgresosParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/egresos?${stringifiedParams}` : `/api/egresos`
+}
+
+/**
+ * @summary Listar egresos
+ */
+export const getEgresos = async (params?: GetEgresosParams, options?: RequestInit): Promise<Egreso[]> => {
+
+  return customFetch<Egreso[]>(getGetEgresosUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEgresosQueryKey = (params?: GetEgresosParams,) => {
+    return [
+    `/api/egresos`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetEgresosQueryOptions = <TData = Awaited<ReturnType<typeof getEgresos>>, TError = ErrorType<unknown>>(params?: GetEgresosParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEgresos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEgresosQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEgresos>>> = ({ signal }) => getEgresos(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEgresos>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEgresosQueryResult = NonNullable<Awaited<ReturnType<typeof getEgresos>>>
+export type GetEgresosQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Listar egresos
+ */
+
+export function useGetEgresos<TData = Awaited<ReturnType<typeof getEgresos>>, TError = ErrorType<unknown>>(
+ params?: GetEgresosParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEgresos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEgresosQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateEgresoUrl = () => {
+
+
+
+
+  return `/api/egresos`
+}
+
+/**
+ * @summary Registrar egreso
+ */
+export const createEgreso = async (egresoInput: EgresoInput, options?: RequestInit): Promise<Egreso> => {
+
+  return customFetch<Egreso>(getCreateEgresoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(egresoInput)
+  }
+);}
+
+
+
+
+export const getCreateEgresoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEgreso>>, TError,{data: BodyType<EgresoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createEgreso>>, TError,{data: BodyType<EgresoInput>}, TContext> => {
+
+const mutationKey = ['createEgreso'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createEgreso>>, {data: BodyType<EgresoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createEgreso(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateEgresoMutationResult = NonNullable<Awaited<ReturnType<typeof createEgreso>>>
+    export type CreateEgresoMutationBody = BodyType<EgresoInput>
+    export type CreateEgresoMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Registrar egreso
+ */
+export const useCreateEgreso = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEgreso>>, TError,{data: BodyType<EgresoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createEgreso>>,
+        TError,
+        {data: BodyType<EgresoInput>},
+        TContext
+      > => {
+      return useMutation(getCreateEgresoMutationOptions(options));
+    }
+
+export const getGlobalSearchUrl = (params?: GlobalSearchParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/search?${stringifiedParams}` : `/api/search`
+}
+
+/**
+ * @summary Búsqueda global
+ */
+export const globalSearch = async (params?: GlobalSearchParams, options?: RequestInit): Promise<SearchResults> => {
+
+  return customFetch<SearchResults>(getGlobalSearchUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGlobalSearchQueryKey = (params?: GlobalSearchParams,) => {
+    return [
+    `/api/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGlobalSearchQueryOptions = <TData = Awaited<ReturnType<typeof globalSearch>>, TError = ErrorType<unknown>>(params?: GlobalSearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof globalSearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGlobalSearchQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof globalSearch>>> = ({ signal }) => globalSearch(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof globalSearch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GlobalSearchQueryResult = NonNullable<Awaited<ReturnType<typeof globalSearch>>>
+export type GlobalSearchQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Búsqueda global
+ */
+
+export function useGlobalSearch<TData = Awaited<ReturnType<typeof globalSearch>>, TError = ErrorType<unknown>>(
+ params?: GlobalSearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof globalSearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGlobalSearchQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -20,6 +20,8 @@ import { auditoriaRouter } from "./auditoria";
 import { backupsRouter } from "./backups";
 import { integrationsRouter } from "./integrations";
 import fotografiasRouter from "./fotografias";
+import egresosRouter from "./egresos";
+import searchRouter from "./search";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
@@ -50,5 +52,7 @@ router.use("/ia", requireAuth, iaRouter);
 router.use("/auditoria", requireAuth, auditoriaRouter);
 router.use("/backups", requireAuth, backupsRouter);
 router.use("/fotografias", requireAuth, fotografiasRouter);
+router.use("/egresos", requireAuth, egresosRouter);
+router.use("/search", requireAuth, searchRouter);
 
 export default router;

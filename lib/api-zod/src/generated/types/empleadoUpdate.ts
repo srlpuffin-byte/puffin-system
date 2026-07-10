@@ -13,4 +13,5 @@ export interface EmpleadoUpdate {
   telefono?: string;
   cargo?: string;
   estado?: EmpleadoUpdateEstado;
+  contacto_familiar_relacion?: string;
 }

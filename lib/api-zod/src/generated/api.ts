@@ -113,7 +113,8 @@ export const GetEmpleadosResponseItem = zod.object({
   "estado": zod.enum(['activo', 'inactivo', 'licencia']),
   "fecha_ingreso": zod.string().nullish(),
   "jornada_activa": zod.boolean().optional(),
-  "alertas_count": zod.number().optional()
+  "alertas_count": zod.number().optional(),
+  "contacto_familiar_relacion": zod.string().nullish()
 })
 export const GetEmpleadosResponse = zod.array(GetEmpleadosResponseItem)
 
@@ -127,7 +128,8 @@ export const CreateEmpleadoBody = zod.object({
   "dni": zod.string(),
   "telefono": zod.string().optional(),
   "cargo": zod.string().optional(),
-  "fecha_ingreso": zod.string().optional()
+  "fecha_ingreso": zod.string().optional(),
+  "contacto_familiar_relacion": zod.string().optional()
 })
 
 export const CreateEmpleadoResponse = zod.object({
@@ -141,7 +143,8 @@ export const CreateEmpleadoResponse = zod.object({
   "estado": zod.enum(['activo', 'inactivo', 'licencia']),
   "fecha_ingreso": zod.string().nullish(),
   "jornada_activa": zod.boolean().optional(),
-  "alertas_count": zod.number().optional()
+  "alertas_count": zod.number().optional(),
+  "contacto_familiar_relacion": zod.string().nullish()
 })
 
 
@@ -163,7 +166,8 @@ export const GetEmpleadoResponse = zod.object({
   "estado": zod.enum(['activo', 'inactivo', 'licencia']),
   "fecha_ingreso": zod.string().nullish(),
   "jornada_activa": zod.boolean().optional(),
-  "alertas_count": zod.number().optional()
+  "alertas_count": zod.number().optional(),
+  "contacto_familiar_relacion": zod.string().nullish()
 })
 
 
@@ -179,7 +183,8 @@ export const UpdateEmpleadoBody = zod.object({
   "apellido": zod.string().optional(),
   "telefono": zod.string().optional(),
   "cargo": zod.string().optional(),
-  "estado": zod.enum(['activo', 'inactivo', 'licencia']).optional()
+  "estado": zod.enum(['activo', 'inactivo', 'licencia']).optional(),
+  "contacto_familiar_relacion": zod.string().optional()
 })
 
 export const UpdateEmpleadoResponse = zod.object({
@@ -193,7 +198,8 @@ export const UpdateEmpleadoResponse = zod.object({
   "estado": zod.enum(['activo', 'inactivo', 'licencia']),
   "fecha_ingreso": zod.string().nullish(),
   "jornada_activa": zod.boolean().optional(),
-  "alertas_count": zod.number().optional()
+  "alertas_count": zod.number().optional(),
+  "contacto_familiar_relacion": zod.string().nullish()
 })
 
 
@@ -222,7 +228,11 @@ export const GetMaquinasResponseItem = zod.object({
   "kilometros": zod.number().optional(),
   "estado": zod.enum(['activa', 'detenida', 'mantenimiento', 'baja']),
   "ultimo_service": zod.string().nullish(),
-  "proximo_service": zod.string().nullish()
+  "proximo_service": zod.string().nullish(),
+  "filtro_tipo": zod.string().nullish(),
+  "filtro_codigo": zod.string().nullish(),
+  "filtro_fecha_cambio": zod.string().nullish(),
+  "filtro_proximo_cambio": zod.string().nullish()
 })
 export const GetMaquinasResponse = zod.array(GetMaquinasResponseItem)
 
@@ -242,7 +252,11 @@ export const CreateMaquinaBody = zod.object({
   "chasis": zod.string().optional(),
   "motor": zod.string().optional(),
   "horometro": zod.number().optional(),
-  "kilometros": zod.number().optional()
+  "kilometros": zod.number().optional(),
+  "filtro_tipo": zod.string().optional(),
+  "filtro_codigo": zod.string().optional(),
+  "filtro_fecha_cambio": zod.string().optional(),
+  "filtro_proximo_cambio": zod.string().optional()
 })
 
 export const CreateMaquinaResponse = zod.object({
@@ -262,7 +276,11 @@ export const CreateMaquinaResponse = zod.object({
   "kilometros": zod.number().optional(),
   "estado": zod.enum(['activa', 'detenida', 'mantenimiento', 'baja']),
   "ultimo_service": zod.string().nullish(),
-  "proximo_service": zod.string().nullish()
+  "proximo_service": zod.string().nullish(),
+  "filtro_tipo": zod.string().nullish(),
+  "filtro_codigo": zod.string().nullish(),
+  "filtro_fecha_cambio": zod.string().nullish(),
+  "filtro_proximo_cambio": zod.string().nullish()
 })
 
 
@@ -290,7 +308,11 @@ export const GetMaquinaResponse = zod.object({
   "kilometros": zod.number().optional(),
   "estado": zod.enum(['activa', 'detenida', 'mantenimiento', 'baja']),
   "ultimo_service": zod.string().nullish(),
-  "proximo_service": zod.string().nullish()
+  "proximo_service": zod.string().nullish(),
+  "filtro_tipo": zod.string().nullish(),
+  "filtro_codigo": zod.string().nullish(),
+  "filtro_fecha_cambio": zod.string().nullish(),
+  "filtro_proximo_cambio": zod.string().nullish()
 })
 
 
@@ -306,7 +328,11 @@ export const UpdateMaquinaBody = zod.object({
   "estado": zod.enum(['activa', 'detenida', 'mantenimiento', 'baja']).optional(),
   "horometro": zod.number().optional(),
   "kilometros": zod.number().optional(),
-  "proximo_service": zod.string().optional()
+  "proximo_service": zod.string().optional(),
+  "filtro_tipo": zod.string().optional(),
+  "filtro_codigo": zod.string().optional(),
+  "filtro_fecha_cambio": zod.string().optional(),
+  "filtro_proximo_cambio": zod.string().optional()
 })
 
 export const UpdateMaquinaResponse = zod.object({
@@ -326,7 +352,11 @@ export const UpdateMaquinaResponse = zod.object({
   "kilometros": zod.number().optional(),
   "estado": zod.enum(['activa', 'detenida', 'mantenimiento', 'baja']),
   "ultimo_service": zod.string().nullish(),
-  "proximo_service": zod.string().nullish()
+  "proximo_service": zod.string().nullish(),
+  "filtro_tipo": zod.string().nullish(),
+  "filtro_codigo": zod.string().nullish(),
+  "filtro_fecha_cambio": zod.string().nullish(),
+  "filtro_proximo_cambio": zod.string().nullish()
 })
 
 
@@ -362,7 +392,12 @@ export const GetJornadasResponseItem = zod.object({
   "observaciones": zod.string().nullish(),
   "problemas": zod.string().nullish(),
   "estado": zod.enum(['en_curso', 'finalizada']),
-  "horas_trabajadas": zod.number().nullish()
+  "horas_trabajadas": zod.number().nullish(),
+  "nombre_obra": zod.string().nullish(),
+  "descripcion_trabajo": zod.string().nullish(),
+  "combustible_nivel": zod.string().nullish(),
+  "aceite_estado": zod.string().nullish(),
+  "danos_choques": zod.string().nullish()
 })
 export const GetJornadasResponse = zod.array(GetJornadasResponseItem)
 
@@ -378,7 +413,9 @@ export const IniciarJornadaBody = zod.object({
   "checklist_previo": zod.string().optional(),
   "estado_equipo_inicio": zod.string().optional(),
   "foto_tablero_inicio": zod.string().optional(),
-  "observaciones": zod.string().optional()
+  "observaciones": zod.string().optional(),
+  "nombre_obra": zod.string().optional(),
+  "descripcion_trabajo": zod.string().optional()
 })
 
 export const IniciarJornadaResponse = zod.object({
@@ -402,7 +439,12 @@ export const IniciarJornadaResponse = zod.object({
   "observaciones": zod.string().nullish(),
   "problemas": zod.string().nullish(),
   "estado": zod.enum(['en_curso', 'finalizada']),
-  "horas_trabajadas": zod.number().nullish()
+  "horas_trabajadas": zod.number().nullish(),
+  "nombre_obra": zod.string().nullish(),
+  "descripcion_trabajo": zod.string().nullish(),
+  "combustible_nivel": zod.string().nullish(),
+  "aceite_estado": zod.string().nullish(),
+  "danos_choques": zod.string().nullish()
 })
 
 
@@ -418,7 +460,10 @@ export const FinalizarJornadaBody = zod.object({
   "km_fin": zod.number().optional(),
   "estado_equipo_fin": zod.string().optional(),
   "foto_tablero_fin": zod.string().optional(),
-  "problemas": zod.string().optional()
+  "problemas": zod.string().optional(),
+  "combustible_nivel": zod.string().optional(),
+  "aceite_estado": zod.string().optional(),
+  "danos_choques": zod.string().optional()
 })
 
 export const FinalizarJornadaResponse = zod.object({
@@ -442,7 +487,12 @@ export const FinalizarJornadaResponse = zod.object({
   "observaciones": zod.string().nullish(),
   "problemas": zod.string().nullish(),
   "estado": zod.enum(['en_curso', 'finalizada']),
-  "horas_trabajadas": zod.number().nullish()
+  "horas_trabajadas": zod.number().nullish(),
+  "nombre_obra": zod.string().nullish(),
+  "descripcion_trabajo": zod.string().nullish(),
+  "combustible_nivel": zod.string().nullish(),
+  "aceite_estado": zod.string().nullish(),
+  "danos_choques": zod.string().nullish()
 })
 
 
@@ -868,6 +918,188 @@ export const GetReportesResumenResponse = zod.object({
   "combustible_total": zod.number(),
   "costo_total": zod.number().optional(),
   "mantenimientos": zod.number()
+})
+
+
+/**
+ * @summary Actualizar estado de mantenimiento
+ */
+export const UpdateMantenimientoEstadoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateMantenimientoEstadoBody = zod.object({
+  "estado": zod.enum(['pendiente', 'realizado', 'cancelado']).optional()
+})
+
+export const UpdateMantenimientoEstadoResponse = zod.object({
+  "id": zod.number(),
+  "empresa_id": zod.number().optional(),
+  "maquina_id": zod.number(),
+  "maquina_nombre": zod.string().optional(),
+  "fecha": zod.string(),
+  "horas": zod.number().nullish(),
+  "tipo": zod.string(),
+  "descripcion": zod.string().nullish(),
+  "proximo_service": zod.string().nullish(),
+  "estado": zod.enum(['pendiente', 'realizado', 'cancelado']).optional()
+})
+
+
+/**
+ * @summary Listar egresos
+ */
+export const GetEgresosQueryParams = zod.object({
+  "categoria": zod.coerce.string().optional(),
+  "centro_costos": zod.coerce.string().optional(),
+  "proveedor": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional()
+})
+
+export const GetEgresosResponseItem = zod.object({
+  "id": zod.number(),
+  "empresa_id": zod.number().optional(),
+  "fecha": zod.string(),
+  "categoria": zod.string(),
+  "concepto": zod.string(),
+  "proveedor": zod.string().nullish(),
+  "monto": zod.number(),
+  "metodo_pago": zod.string().nullish(),
+  "comprobante": zod.boolean().optional(),
+  "centro_costos": zod.string().nullish(),
+  "observaciones": zod.string().nullish()
+})
+export const GetEgresosResponse = zod.array(GetEgresosResponseItem)
+
+
+/**
+ * @summary Registrar egreso
+ */
+export const CreateEgresoBody = zod.object({
+  "fecha": zod.string(),
+  "categoria": zod.string(),
+  "concepto": zod.string(),
+  "proveedor": zod.string().optional(),
+  "monto": zod.number(),
+  "metodo_pago": zod.string().optional(),
+  "comprobante": zod.boolean().optional(),
+  "centro_costos": zod.string().optional(),
+  "observaciones": zod.string().optional()
+})
+
+export const CreateEgresoResponse = zod.object({
+  "id": zod.number(),
+  "empresa_id": zod.number().optional(),
+  "fecha": zod.string(),
+  "categoria": zod.string(),
+  "concepto": zod.string(),
+  "proveedor": zod.string().nullish(),
+  "monto": zod.number(),
+  "metodo_pago": zod.string().nullish(),
+  "comprobante": zod.boolean().optional(),
+  "centro_costos": zod.string().nullish(),
+  "observaciones": zod.string().nullish()
+})
+
+
+/**
+ * @summary Búsqueda global
+ */
+export const GlobalSearchQueryParams = zod.object({
+  "q": zod.coerce.string().optional()
+})
+
+export const GlobalSearchResponse = zod.object({
+  "jornadas": zod.array(zod.object({
+  "id": zod.number(),
+  "empresa_id": zod.number().optional(),
+  "empleado_id": zod.number(),
+  "maquina_id": zod.number(),
+  "empleado_nombre": zod.string().optional(),
+  "maquina_nombre": zod.string().optional(),
+  "fecha": zod.string(),
+  "hora_inicio": zod.string().nullish(),
+  "hora_fin": zod.string().nullish(),
+  "km_inicio": zod.number().nullish(),
+  "km_fin": zod.number().nullish(),
+  "horometro_inicio": zod.number().nullish(),
+  "horometro_fin": zod.number().nullish(),
+  "checklist_previo": zod.string().nullish(),
+  "checklist_ok": zod.string().nullish(),
+  "foto_tablero_inicio": zod.string().nullish(),
+  "foto_tablero_fin": zod.string().nullish(),
+  "observaciones": zod.string().nullish(),
+  "problemas": zod.string().nullish(),
+  "estado": zod.enum(['en_curso', 'finalizada']),
+  "horas_trabajadas": zod.number().nullish(),
+  "nombre_obra": zod.string().nullish(),
+  "descripcion_trabajo": zod.string().nullish(),
+  "combustible_nivel": zod.string().nullish(),
+  "aceite_estado": zod.string().nullish(),
+  "danos_choques": zod.string().nullish()
+})).optional(),
+  "maquinas": zod.array(zod.object({
+  "id": zod.number(),
+  "empresa_id": zod.number().optional(),
+  "codigo": zod.string().nullish(),
+  "nombre": zod.string(),
+  "tipo": zod.string(),
+  "marca": zod.string().nullish(),
+  "modelo": zod.string().nullish(),
+  "anio": zod.number().nullish(),
+  "patente": zod.string().nullish(),
+  "dominio": zod.string().nullish(),
+  "chasis": zod.string().nullish(),
+  "motor": zod.string().nullish(),
+  "horometro": zod.number().optional(),
+  "kilometros": zod.number().optional(),
+  "estado": zod.enum(['activa', 'detenida', 'mantenimiento', 'baja']),
+  "ultimo_service": zod.string().nullish(),
+  "proximo_service": zod.string().nullish(),
+  "filtro_tipo": zod.string().nullish(),
+  "filtro_codigo": zod.string().nullish(),
+  "filtro_fecha_cambio": zod.string().nullish(),
+  "filtro_proximo_cambio": zod.string().nullish()
+})).optional(),
+  "empleados": zod.array(zod.object({
+  "id": zod.number(),
+  "empresa_id": zod.number().optional(),
+  "nombre": zod.string(),
+  "apellido": zod.string(),
+  "dni": zod.string().optional(),
+  "telefono": zod.string().nullish(),
+  "cargo": zod.string().nullish(),
+  "estado": zod.enum(['activo', 'inactivo', 'licencia']),
+  "fecha_ingreso": zod.string().nullish(),
+  "jornada_activa": zod.boolean().optional(),
+  "alertas_count": zod.number().optional(),
+  "contacto_familiar_relacion": zod.string().nullish()
+})).optional(),
+  "mantenimientos": zod.array(zod.object({
+  "id": zod.number(),
+  "empresa_id": zod.number().optional(),
+  "maquina_id": zod.number(),
+  "maquina_nombre": zod.string().optional(),
+  "fecha": zod.string(),
+  "horas": zod.number().nullish(),
+  "tipo": zod.string(),
+  "descripcion": zod.string().nullish(),
+  "proximo_service": zod.string().nullish(),
+  "estado": zod.enum(['pendiente', 'realizado', 'cancelado']).optional()
+})).optional(),
+  "incidentes": zod.array(zod.object({
+  "id": zod.number(),
+  "empresa_id": zod.number().optional(),
+  "empleado_id": zod.number().nullish(),
+  "maquina_id": zod.number().nullish(),
+  "empleado_nombre": zod.string().nullish(),
+  "maquina_nombre": zod.string().nullish(),
+  "tipo": zod.enum(['rotura', 'golpe', 'accidente', 'falla', 'problema_mecanico', 'otro']).optional(),
+  "descripcion": zod.string(),
+  "foto_url": zod.string().nullish(),
+  "fecha": zod.string(),
+  "estado": zod.enum(['activo', 'resuelto']).optional()
+})).optional()
 })
 
 

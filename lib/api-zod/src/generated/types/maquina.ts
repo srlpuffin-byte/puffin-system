@@ -35,4 +35,12 @@ export interface Maquina {
   ultimo_service?: string | null;
   /** @nullable */
   proximo_service?: string | null;
+  /** @nullable */
+  filtro_tipo?: string | null;
+  /** @nullable */
+  filtro_codigo?: string | null;
+  /** @nullable */
+  filtro_fecha_cambio?: string | null;
+  /** @nullable */
+  filtro_proximo_cambio?: string | null;
 }

@@ -12,7 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetJornadas } from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EditarOperarioDialog } from "@/components/forms/editar-operario-dialog";
-import { Edit } from "lucide-react";
+import { Edit, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export function OperarioFicha() {
   const { id } = useParams();
@@ -25,6 +26,14 @@ export function OperarioFicha() {
 
   if (isLoading) return <div className="p-8 text-center">Cargando perfil de operario...</div>;
   if (!operario) return <div className="p-8 text-center text-red-500">Operario no encontrado</div>;
+
+  const missingInfo: string[] = [];
+  if (!operario.dni || operario.dni === "COMPLETAR") missingInfo.push("DNI");
+  if (!operario.telefono) missingInfo.push("Teléfono personal");
+  if (!operario.fecha_ingreso) missingInfo.push("Fecha de ingreso");
+  if (!operario.contacto_familiar_nombre) missingInfo.push("Nombre de contacto de emergencia");
+  if (!operario.contacto_familiar_telefono) missingInfo.push("Teléfono de contacto de emergencia");
+  if (!(operario as any).contacto_familiar_relacion) missingInfo.push("Relación de contacto de emergencia");
 
   return (
     <div className="space-y-6">
@@ -59,6 +68,17 @@ export function OperarioFicha() {
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-6">
+          {missingInfo.length > 0 && (
+            <Alert variant="destructive" className="bg-red-50 border-red-200">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+              <AlertTitle className="text-red-800 font-bold">Información Faltante</AlertTitle>
+              <AlertDescription className="text-red-700">
+                Faltan completar los siguientes datos del operario: <strong>{missingInfo.join(", ")}</strong>. 
+                Por favor, haz clic en "Editar" para completarlos.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="md:col-span-2">
           <CardHeader>

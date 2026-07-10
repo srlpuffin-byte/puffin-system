@@ -12,4 +12,7 @@ export interface FinalizarJornadaInput {
   estado_equipo_fin?: string;
   foto_tablero_fin?: string;
   problemas?: string;
+  combustible_nivel?: string;
+  aceite_estado?: string;
+  danos_choques?: string;
 }

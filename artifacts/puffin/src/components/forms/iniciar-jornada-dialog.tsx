@@ -39,6 +39,8 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
     estado_equipo: "",
     ubicacion: "",
     tipo_trabajo: "",
+    nombre_obra: "",
+    descripcion_trabajo: "",
   });
 
   const [checklist, setChecklist] = useState({
@@ -87,6 +89,8 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
           estado_equipo_inicio: form.estado_equipo,
           ubicacion: form.ubicacion || undefined,
           tipo_trabajo: form.tipo_trabajo || undefined,
+          nombre_obra: form.nombre_obra || undefined,
+          descripcion_trabajo: form.descripcion_trabajo || undefined,
         },
       });
 
@@ -118,7 +122,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
   };
 
   const resetForm = () => {
-    setForm({ empleado_id: empleadoIdFijo?.toString() || "", maquina_id: maquinaIdFija?.toString() || "", horometro_inicio: "", km_inicio: "", observaciones: "", estado_equipo: "", ubicacion: "", tipo_trabajo: "" });
+    setForm({ empleado_id: empleadoIdFijo?.toString() || "", maquina_id: maquinaIdFija?.toString() || "", horometro_inicio: "", km_inicio: "", observaciones: "", estado_equipo: "", ubicacion: "", tipo_trabajo: "", nombre_obra: "", descripcion_trabajo: "" });
     setChecklist({ cinturon: false, bocina: false, luces_delanteras: false, luces_traseras: false, balizas: false, espejos: false, matafuego: false, nivel_aceite: false, nivel_combustible: false, nivel_refrigerante: false, perdidas: false, neumaticos: false, luces_advertencia: false });
     setImages([]);
     setCurrentTab("general");
@@ -193,9 +197,19 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label>Ubicación / Zona de trabajo</Label>
-                  <Input placeholder="Ej. Romedal, Ruta 7 km 45" value={form.ubicacion} onChange={e => set("ubicacion", e.target.value)} />
+                  <Label>Nombre de la Obra</Label>
+                  <Input placeholder="Ej. El Romedal" value={form.nombre_obra} onChange={e => set("nombre_obra", e.target.value)} required />
                 </div>
+                <div className="space-y-1">
+                  <Label>Ubicación / Zona de trabajo</Label>
+                  <Input placeholder="Ej. Ruta 7 km 45" value={form.ubicacion} onChange={e => set("ubicacion", e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Descripción del Trabajo</Label>
+                <Textarea placeholder="Describa brevemente el trabajo a realizar..." value={form.descripcion_trabajo} onChange={e => set("descripcion_trabajo", e.target.value)} rows={2} required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label>Tipo de trabajo</Label>
                   <Select value={form.tipo_trabajo} onValueChange={v => set("tipo_trabajo", v)}>

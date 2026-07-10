@@ -24,10 +24,11 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { codigo, nombre, tipo, marca, modelo, anio, patente, dominio, chasis, motor, horometro, kilometros } = req.body;
+  const { codigo, nombre, tipo, marca, modelo, anio, patente, dominio, chasis, motor, horometro, kilometros, filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio } = req.body;
   if (!nombre || !tipo) return res.status(400).json({ error: "Nombre y tipo son requeridos" });
   const [maquina] = await db.insert(maquinasTable).values({
     codigo, nombre, tipo, marca, modelo, anio, patente, dominio, chasis, motor,
+    filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio,
     horometro: horometro?.toString() || "0",
     kilometros: kilometros?.toString() || "0",
     estado: "activa"
@@ -46,7 +47,8 @@ router.put("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const { 
     nombre, estado, horometro, kilometros, proximo_service,
-    codigo, tipo, marca, modelo, anio, patente, dominio, chasis, motor
+    codigo, tipo, marca, modelo, anio, patente, dominio, chasis, motor,
+    filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio
   } = req.body;
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
   if (nombre !== undefined) updateData.nombre = nombre;
@@ -64,6 +66,11 @@ router.put("/:id", async (req, res) => {
   if (dominio !== undefined) updateData.dominio = dominio;
   if (chasis !== undefined) updateData.chasis = chasis;
   if (motor !== undefined) updateData.motor = motor;
+  
+  if (filtro_tipo !== undefined) updateData.filtro_tipo = filtro_tipo;
+  if (filtro_codigo !== undefined) updateData.filtro_codigo = filtro_codigo;
+  if (filtro_fecha_cambio !== undefined) updateData.filtro_fecha_cambio = filtro_fecha_cambio;
+  if (filtro_proximo_cambio !== undefined) updateData.filtro_proximo_cambio = filtro_proximo_cambio;
 
   const [maquina] = await db.update(maquinasTable).set(updateData).where(eq(maquinasTable.id, id)).returning();
   if (!maquina) return res.status(404).json({ error: "Maquinaria no encontrada" });

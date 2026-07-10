@@ -78,7 +78,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Control",
     defaultOpen: true,
     items: [
-      { icon: Bell, label: "Alertas", href: "/alertas" },
+      { icon: Bell, label: "Notificaciones", href: "/alertas" },
       { icon: AlertTriangle, label: "Incidentes", href: "/incidentes" },
       { icon: Calendar, label: "Calendario", href: "/calendario" },
     ],
@@ -87,6 +87,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Análisis y Reportes",
     defaultOpen: false,
     items: [
+      { icon: FileText, label: "Egresos", href: "/egresos" },
       { icon: TrendingUp, label: "Productividad", href: "/productividad" },
       { icon: BarChart3, label: "Reportes Financieros", href: "/reportes" },
     ],
@@ -160,12 +161,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const logoutMut = useLogout();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  
   const { data: empleados } = useGetEmpleados();
-  const hasIncompleteOperarios = Array.isArray(empleados) ? empleados.some(e => e?.dni === "COMPLETAR" || (e as any)?.alertas_count > 0) : false;
+  const hasIncompleteOperarios = Array.isArray(empleados) ? empleados.some(e => 
+    !e.dni || e.dni === "COMPLETAR" || !e.telefono || !e.fecha_ingreso || 
+    !e.contacto_familiar_nombre || !e.contacto_familiar_telefono || !(e as any).contacto_familiar_relacion
+  ) : false;
 
   const { data: maquinas } = useGetMaquinas();
-  const hasIncompleteMaquinas = Array.isArray(maquinas) ? maquinas.some(m => !m.patente || !m.chasis || !m.motor || !m.marca || !m.modelo) : false;
+  const hasIncompleteMaquinas = Array.isArray(maquinas) ? maquinas.some(m => 
+    !m.marca || !m.modelo || !m.anio || (!m.patente && !m.dominio) || 
+    !m.motor || !m.chasis || !m.filtro_tipo || !m.filtro_codigo
+  ) : false;
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {

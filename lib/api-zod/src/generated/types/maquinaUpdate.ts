@@ -13,4 +13,8 @@ export interface MaquinaUpdate {
   horometro?: number;
   kilometros?: number;
   proximo_service?: string;
+  filtro_tipo?: string;
+  filtro_codigo?: string;
+  filtro_fecha_cambio?: string;
+  filtro_proximo_cambio?: string;
 }

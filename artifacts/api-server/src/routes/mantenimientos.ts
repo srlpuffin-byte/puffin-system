@@ -48,4 +48,20 @@ router.post("/", async (req, res) => {
   return res.status(201).json({ ...mantenimiento, maquina_nombre: "Maquinaria", horas: mantenimiento.horas ? Number(mantenimiento.horas) : null });
 });
 
+router.patch("/:id/estado", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { estado } = req.body;
+  if (!estado) return res.status(400).json({ error: "Estado es requerido" });
+
+  const [mantenimiento] = await db
+    .update(mantenimientosTable)
+    .set({ estado, updatedAt: new Date() })
+    .where(eq(mantenimientosTable.id, id))
+    .returning();
+
+  if (!mantenimiento) return res.status(404).json({ error: "Mantenimiento no encontrado" });
+
+  return res.json({ ...mantenimiento, horas: mantenimiento.horas ? Number(mantenimiento.horas) : null });
+});
+
 export default router;

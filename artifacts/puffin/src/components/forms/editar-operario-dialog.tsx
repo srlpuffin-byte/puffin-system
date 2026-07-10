@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useUploadFotografia } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Empleado } from "@workspace/api-client-react";
+import { MultiImageUpload, UploadedImage } from "../ui/multi-image-upload";
 
 const CARGOS = ["Operador de Retroexcavadora", "Operador de Niveladora", "Operador de Compactadora", "Chofer", "Ayudante", "Capataz", "Operario General", "Mecánico", "Administrativo"];
 
@@ -19,10 +21,13 @@ interface Props {
 export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
   const queryClient = useQueryClient();
   const [isPending, setIsPending] = useState(false);
+  const uploadMut = useUploadFotografia();
+  const [fotoPerfil, setFotoPerfil] = useState<UploadedImage[]>([]);
+  const [fotoCarnet, setFotoCarnet] = useState<UploadedImage[]>([]);
   
   const [form, setForm] = useState({
     nombre: "", apellido: "", dni: "", telefono: "", cargo: "", fecha_ingreso: "",
-    contacto_familiar_nombre: "", contacto_familiar_telefono: "", estado: ""
+    contacto_familiar_nombre: "", contacto_familiar_telefono: "", contacto_familiar_relacion: "", estado: ""
   });
 
   useEffect(() => {
@@ -36,8 +41,11 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
         fecha_ingreso: operario.fecha_ingreso ? new Date(operario.fecha_ingreso).toISOString().split('T')[0] : "",
         contacto_familiar_nombre: operario.contacto_familiar_nombre || "",
         contacto_familiar_telefono: operario.contacto_familiar_telefono || "",
+        contacto_familiar_relacion: (operario as any).contacto_familiar_relacion || "",
         estado: operario.estado || "activo"
       });
+      setFotoPerfil([]);
+      setFotoCarnet([]);
     }
   }, [operario, open]);
 
@@ -70,10 +78,34 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
       
       if (!res.ok) throw new Error("Error al actualizar");
       
+      if (fotoPerfil.length > 0 || fotoCarnet.length > 0) {
+        toast.loading("Subiendo fotografías...", { id: "uploading-photos-emp-edit" });
+        try {
+          const uploads = [];
+          if (fotoPerfil.length > 0) {
+            uploads.push(uploadMut.mutateAsync({
+              data: { entidad_tipo: "empleado", entidad_id: operario.id, base64Data: fotoPerfil[0].base64, filename: fotoPerfil[0].file.name, descripcion: "Foto de perfil" }
+            }));
+          }
+          if (fotoCarnet.length > 0) {
+            uploads.push(uploadMut.mutateAsync({
+              data: { entidad_tipo: "empleado", entidad_id: operario.id, base64Data: fotoCarnet[0].base64, filename: fotoCarnet[0].file.name, descripcion: "Carnet de conducir" }
+            }));
+          }
+          await Promise.all(uploads);
+          toast.dismiss("uploading-photos-emp-edit");
+        } catch (error) {
+          toast.dismiss("uploading-photos-emp-edit");
+          toast.error("Error al subir las fotografías");
+        }
+      }
+
       toast.success("Operario actualizado correctamente");
       queryClient.invalidateQueries({ queryKey: ["getEmpleado", operario.id] });
       queryClient.invalidateQueries({ queryKey: ["getEmpleados"] });
       onOpenChange(false);
+      setFotoPerfil([]);
+      setFotoCarnet([]);
     } catch (err) {
       toast.error("Error al actualizar operario");
     } finally {
@@ -140,6 +172,20 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
                 <Label>Teléfono familiar</Label>
                 <Input value={form.contacto_familiar_telefono} onChange={e => set("contacto_familiar_telefono", e.target.value)} />
               </div>
+            </div>
+            <div className="space-y-1 mt-4">
+              <Label>Relación</Label>
+              <Input placeholder="Ej. Esposa, Hermano" value={form.contacto_familiar_relacion} onChange={e => set("contacto_familiar_relacion", e.target.value)} />
+            </div>
+          </div>
+          <div className="pt-2 border-t grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Actualizar Foto Perfil</Label>
+              <MultiImageUpload images={fotoPerfil} onChange={setFotoPerfil} maxImages={1} />
+            </div>
+            <div className="space-y-1">
+              <Label>Actualizar Carnet</Label>
+              <MultiImageUpload images={fotoCarnet} onChange={setFotoCarnet} maxImages={1} />
             </div>
           </div>
           <DialogFooter>

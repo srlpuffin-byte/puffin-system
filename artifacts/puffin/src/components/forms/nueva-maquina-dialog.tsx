@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useCreateMaquina, useGetMaquinas } from "@workspace/api-client-react";
+import { useCreateMaquina, useGetMaquinas, useUploadFotografia } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetMaquinasQueryKey } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { MultiImageUpload, UploadedImage } from "../ui/multi-image-upload";
 
 const TIPOS_MAQUINA = ["Retroexcavadora", "Niveladora", "Compactadora", "Camión", "Camión Cisterna", "Grúa", "Pala Cargadora", "Minicargadora", "Bulldozer", "Motoniveladora", "Otro"];
 
@@ -19,10 +20,13 @@ interface Props {
 export function NuevaMaquinaDialog({ open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
   const createMut = useCreateMaquina();
+  const uploadMut = useUploadFotografia();
+  const [images, setImages] = useState<UploadedImage[]>([]);
   const [form, setForm] = useState({
     codigo: "", nombre: "", tipo: "", marca: "", modelo: "",
     anio: "", patente: "", dominio: "", horometro: "", kilometros: "",
     motor: "", chasis: "",
+    filtro_tipo: "", filtro_codigo: "", filtro_fecha_cambio: "", filtro_proximo_cambio: ""
   });
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
@@ -48,14 +52,39 @@ export function NuevaMaquinaDialog({ open, onOpenChange }: Props) {
           kilometros: form.kilometros ? parseFloat(form.kilometros) : undefined,
           motor: form.motor || undefined,
           chasis: form.chasis || undefined,
+          filtro_tipo: form.filtro_tipo || undefined,
+          filtro_codigo: form.filtro_codigo || undefined,
+          filtro_fecha_cambio: form.filtro_fecha_cambio || undefined,
+          filtro_proximo_cambio: form.filtro_proximo_cambio || undefined,
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: async (maquina) => {
+          if (images.length > 0 && maquina.id) {
+            toast.loading("Subiendo fotografía...", { id: "uploading-photos-maquina" });
+            try {
+              await Promise.all(images.map(img => 
+                uploadMut.mutateAsync({
+                  data: {
+                    entidad_tipo: "maquina",
+                    entidad_id: maquina.id,
+                    base64Data: img.base64,
+                    filename: img.file.name,
+                    descripcion: "Foto de la máquina"
+                  }
+                })
+              ));
+              toast.dismiss("uploading-photos-maquina");
+            } catch (err) {
+              toast.dismiss("uploading-photos-maquina");
+              toast.error("Error al subir fotografía");
+            }
+          }
           toast.success("Máquina creada correctamente");
           queryClient.invalidateQueries({ queryKey: getGetMaquinasQueryKey() });
           onOpenChange(false);
-          setForm({ codigo: "", nombre: "", tipo: "", marca: "", modelo: "", anio: "", patente: "", dominio: "", horometro: "", kilometros: "", motor: "", chasis: "" });
+          setForm({ codigo: "", nombre: "", tipo: "", marca: "", modelo: "", anio: "", patente: "", dominio: "", horometro: "", kilometros: "", motor: "", chasis: "", filtro_tipo: "", filtro_codigo: "", filtro_fecha_cambio: "", filtro_proximo_cambio: "" });
+          setImages([]);
         },
         onError: () => toast.error("Error al crear la máquina"),
       }
@@ -131,6 +160,30 @@ export function NuevaMaquinaDialog({ open, onOpenChange }: Props) {
               <Label>Número de chasis</Label>
               <Input placeholder="Ej. JALE6LX1..." value={form.chasis} onChange={e => set("chasis", e.target.value)} />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Tipo de filtro</Label>
+              <Input placeholder="Ej. Aceite / Aire" value={form.filtro_tipo} onChange={e => set("filtro_tipo", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Código de filtro</Label>
+              <Input placeholder="Ej. LF3349" value={form.filtro_codigo} onChange={e => set("filtro_codigo", e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Fecha cambio filtro</Label>
+              <Input type="date" value={form.filtro_fecha_cambio} onChange={e => set("filtro_fecha_cambio", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Próximo cambio filtro</Label>
+              <Input type="date" value={form.filtro_proximo_cambio} onChange={e => set("filtro_proximo_cambio", e.target.value)} />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label>Fotografía de la Máquina</Label>
+            <MultiImageUpload images={images} onChange={setImages} maxImages={1} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>

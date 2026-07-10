@@ -42,4 +42,14 @@ export interface Jornada {
   estado: JornadaEstado;
   /** @nullable */
   horas_trabajadas?: number | null;
+  /** @nullable */
+  nombre_obra?: string | null;
+  /** @nullable */
+  descripcion_trabajo?: string | null;
+  /** @nullable */
+  combustible_nivel?: string | null;
+  /** @nullable */
+  aceite_estado?: string | null;
+  /** @nullable */
+  danos_choques?: string | null;
 }

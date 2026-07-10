@@ -24,6 +24,7 @@ import { Gps } from "@/pages/gps";
 import { Productividad } from "@/pages/productividad";
 import { Ia } from "@/pages/ia";
 import { Americangis } from "@/pages/americangis";
+import { Egresos } from "@/pages/egresos";
 import { Xpert } from "@/pages/xpert";
 import { useEffect } from "react";
 import { getAuthToken } from "@/hooks/use-auth";

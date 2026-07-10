@@ -112,6 +112,8 @@ export interface Empleado {
   fecha_ingreso?: string | null;
   jornada_activa?: boolean;
   alertas_count?: number;
+  /** @nullable */
+  contacto_familiar_relacion?: string | null;
 }
 
 export interface EmpleadoInput {
@@ -119,10 +121,9 @@ export interface EmpleadoInput {
   apellido: string;
   dni: string;
   telefono?: string;
-  contacto_familiar_nombre?: string;
-  contacto_familiar_telefono?: string;
   cargo?: string;
   fecha_ingreso?: string;
+  contacto_familiar_relacion?: string;
 }
 
 export type EmpleadoUpdateEstado = typeof EmpleadoUpdateEstado[keyof typeof EmpleadoUpdateEstado];
@@ -138,10 +139,9 @@ export interface EmpleadoUpdate {
   nombre?: string;
   apellido?: string;
   telefono?: string;
-  contacto_familiar_nombre?: string;
-  contacto_familiar_telefono?: string;
   cargo?: string;
   estado?: EmpleadoUpdateEstado;
+  contacto_familiar_relacion?: string;
 }
 
 export type MaquinaEstado = typeof MaquinaEstado[keyof typeof MaquinaEstado];
@@ -182,6 +182,14 @@ export interface Maquina {
   ultimo_service?: string | null;
   /** @nullable */
   proximo_service?: string | null;
+  /** @nullable */
+  filtro_tipo?: string | null;
+  /** @nullable */
+  filtro_codigo?: string | null;
+  /** @nullable */
+  filtro_fecha_cambio?: string | null;
+  /** @nullable */
+  filtro_proximo_cambio?: string | null;
 }
 
 export interface MaquinaInput {
@@ -197,6 +205,10 @@ export interface MaquinaInput {
   motor?: string;
   horometro?: number;
   kilometros?: number;
+  filtro_tipo?: string;
+  filtro_codigo?: string;
+  filtro_fecha_cambio?: string;
+  filtro_proximo_cambio?: string;
 }
 
 export type MaquinaUpdateEstado = typeof MaquinaUpdateEstado[keyof typeof MaquinaUpdateEstado];
@@ -215,6 +227,10 @@ export interface MaquinaUpdate {
   horometro?: number;
   kilometros?: number;
   proximo_service?: string;
+  filtro_tipo?: string;
+  filtro_codigo?: string;
+  filtro_fecha_cambio?: string;
+  filtro_proximo_cambio?: string;
 }
 
 export type JornadaEstado = typeof JornadaEstado[keyof typeof JornadaEstado];
@@ -260,6 +276,16 @@ export interface Jornada {
   estado: JornadaEstado;
   /** @nullable */
   horas_trabajadas?: number | null;
+  /** @nullable */
+  nombre_obra?: string | null;
+  /** @nullable */
+  descripcion_trabajo?: string | null;
+  /** @nullable */
+  combustible_nivel?: string | null;
+  /** @nullable */
+  aceite_estado?: string | null;
+  /** @nullable */
+  danos_choques?: string | null;
 }
 
 export interface IniciarJornadaInput {
@@ -271,8 +297,8 @@ export interface IniciarJornadaInput {
   estado_equipo_inicio?: string;
   foto_tablero_inicio?: string;
   observaciones?: string;
-  ubicacion?: string;
-  tipo_trabajo?: string;
+  nombre_obra?: string;
+  descripcion_trabajo?: string;
 }
 
 export interface FinalizarJornadaInput {
@@ -281,6 +307,9 @@ export interface FinalizarJornadaInput {
   estado_equipo_fin?: string;
   foto_tablero_fin?: string;
   problemas?: string;
+  combustible_nivel?: string;
+  aceite_estado?: string;
+  danos_choques?: string;
 }
 
 export type RegistroAuditoriaValorAnterior = { [key: string]: unknown };
@@ -596,6 +625,57 @@ export interface ReporteResumen {
   mantenimientos: number;
 }
 
+export interface Egreso {
+  id: number;
+  empresa_id?: number;
+  fecha: string;
+  categoria: string;
+  concepto: string;
+  /** @nullable */
+  proveedor?: string | null;
+  monto: number;
+  /** @nullable */
+  metodo_pago?: string | null;
+  comprobante?: boolean;
+  /** @nullable */
+  centro_costos?: string | null;
+  /** @nullable */
+  observaciones?: string | null;
+}
+
+export interface EgresoInput {
+  fecha: string;
+  categoria: string;
+  concepto: string;
+  proveedor?: string;
+  monto: number;
+  metodo_pago?: string;
+  comprobante?: boolean;
+  centro_costos?: string;
+  observaciones?: string;
+}
+
+export interface SearchResults {
+  jornadas?: Jornada[];
+  maquinas?: Maquina[];
+  empleados?: Empleado[];
+  mantenimientos?: Mantenimiento[];
+  incidentes?: Incidente[];
+}
+
+export type UpdateMantenimientoEstadoInputEstado = typeof UpdateMantenimientoEstadoInputEstado[keyof typeof UpdateMantenimientoEstadoInputEstado];
+
+
+export const UpdateMantenimientoEstadoInputEstado = {
+  pendiente: 'pendiente',
+  realizado: 'realizado',
+  cancelado: 'cancelado',
+} as const;
+
+export interface UpdateMantenimientoEstadoInput {
+  estado?: UpdateMantenimientoEstadoInputEstado;
+}
+
 export type GetEmpleadosParams = {
 estado?: GetEmpleadosEstado;
 search?: string;
@@ -715,4 +795,15 @@ export const GetReportesResumenPeriodo = {
   mes: 'mes',
   trimestre: 'trimestre',
 } as const;
+
+export type GetEgresosParams = {
+categoria?: string;
+centro_costos?: string;
+proveedor?: string;
+search?: string;
+};
+
+export type GlobalSearchParams = {
+q?: string;
+};
 

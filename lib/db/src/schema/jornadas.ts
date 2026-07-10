@@ -9,13 +9,18 @@ export const jornadasTable = pgTable("jornadas", {
   maquina_id: integer("maquina_id").notNull(),
   fecha: date("fecha").notNull(),
   ubicacion: text("ubicacion"),
+  nombre_obra: text("nombre_obra"),
   tipo_trabajo: text("tipo_trabajo"),
+  descripcion_trabajo: text("descripcion_trabajo"),
   hora_inicio: text("hora_inicio"),
   hora_fin: text("hora_fin"),
   km_inicio: numeric("km_inicio", { precision: 10, scale: 1 }),
   km_fin: numeric("km_fin", { precision: 10, scale: 1 }),
   horometro_inicio: numeric("horometro_inicio", { precision: 10, scale: 1 }),
   horometro_fin: numeric("horometro_fin", { precision: 10, scale: 1 }),
+  combustible_nivel: text("combustible_nivel"),
+  aceite_estado: text("aceite_estado"),
+  danos_choques: text("danos_choques"),
   checklist_previo: text("checklist_previo"), // JSON stringified for checklist items
   checklist_ok: text("checklist_ok"), // boolean flag for quick filtering if everything was OK
   estado_equipo_inicio: text("estado_equipo_inicio"), // apto, apto_observaciones, no_apto
@@ -32,3 +37,4 @@ export const jornadasTable = pgTable("jornadas", {
 export const insertJornadaSchema = createInsertSchema(jornadasTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertJornada = z.infer<typeof insertJornadaSchema>;
 export type Jornada = typeof jornadasTable.$inferSelect;
+

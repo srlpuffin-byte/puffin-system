@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useCreateEmpleado, getGetEmpleadosQueryKey } from "@workspace/api-client-react";
+import { useCreateEmpleado, getGetEmpleadosQueryKey, useUploadFotografia, useCreateDocumento } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { MultiImageUpload, UploadedImage } from "../ui/multi-image-upload";
 
 const CARGOS = ["Operador de Retroexcavadora", "Operador de Niveladora", "Operador de Compactadora", "Chofer", "Ayudante", "Capataz", "Operario General", "Mecánico", "Administrativo"];
 
@@ -18,9 +19,14 @@ interface Props {
 export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
   const createMut = useCreateEmpleado();
+  const uploadMut = useUploadFotografia();
+  const [fotoPerfil, setFotoPerfil] = useState<UploadedImage[]>([]);
+  const [fotoCarnet, setFotoCarnet] = useState<UploadedImage[]>([]);
+  const createDocMut = useCreateDocumento();
   const [form, setForm] = useState({
     nombre: "", apellido: "", dni: "", telefono: "", cargo: "", fecha_ingreso: "",
-    contacto_familiar_nombre: "", contacto_familiar_telefono: "",
+    contacto_familiar_nombre: "", contacto_familiar_telefono: "", contacto_familiar_relacion: "",
+    fecha_vencimiento_carnet: "",
   });
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
@@ -41,15 +47,60 @@ export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
           cargo: form.cargo || undefined,
           fecha_ingreso: form.fecha_ingreso || undefined,
           contacto_familiar_nombre: form.contacto_familiar_nombre || undefined,
-          contacto_familiar_telefono: form.contacto_familiar_telefono || undefined,
+          contacto_familiar_relacion: form.contacto_familiar_relacion || undefined,
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: async (empleado) => {
+          if (empleado.id) {
+            // Auto-create Carnet Document if date is provided
+            if (form.fecha_vencimiento_carnet) {
+              try {
+                await createDocMut.mutateAsync({
+                  data: {
+                    tipo: "Carnet",
+                    descripcion: "Carnet de conducir del operario",
+                    entidad_tipo: "empleado",
+                    entidad_id: empleado.id,
+                    fecha_vencimiento: form.fecha_vencimiento_carnet
+                  }
+                });
+              } catch (e) {
+                toast.error("El operario se creó, pero falló la creación del Carnet en Documentación.");
+              }
+            }
+          }
+          if (empleado.id && (fotoPerfil.length > 0 || fotoCarnet.length > 0)) {
+            toast.loading("Subiendo fotografías...", { id: "uploading-photos-emp" });
+            try {
+              const uploads = [];
+              if (fotoPerfil.length > 0) {
+                uploads.push(uploadMut.mutateAsync({
+                  data: {
+                    entidad_tipo: "empleado", entidad_id: empleado.id, base64Data: fotoPerfil[0].base64, filename: fotoPerfil[0].file.name, descripcion: "Foto de perfil"
+                  }
+                }));
+              }
+              if (fotoCarnet.length > 0) {
+                uploads.push(uploadMut.mutateAsync({
+                  data: {
+                    entidad_tipo: "empleado", entidad_id: empleado.id, base64Data: fotoCarnet[0].base64, filename: fotoCarnet[0].file.name, descripcion: "Carnet de conducir"
+                  }
+                }));
+              }
+              await Promise.all(uploads);
+              toast.dismiss("uploading-photos-emp");
+            } catch (error) {
+              toast.dismiss("uploading-photos-emp");
+              toast.error("Error al subir las fotografías");
+            }
+          }
           toast.success("Operario creado correctamente");
           queryClient.invalidateQueries({ queryKey: getGetEmpleadosQueryKey() });
           onOpenChange(false);
-          setForm({ nombre: "", apellido: "", dni: "", telefono: "", cargo: "", fecha_ingreso: "", contacto_familiar_nombre: "", contacto_familiar_telefono: "" });
+          setForm({ nombre: "", apellido: "", dni: "", telefono: "", cargo: "", fecha_ingreso: "", contacto_familiar_nombre: "", contacto_familiar_telefono: "", contacto_familiar_relacion: "", fecha_vencimiento_carnet: "" });
+          setFotoPerfil([]);
+          setFotoCarnet([]);
         },
         onError: () => toast.error("Error al crear el operario"),
       }
@@ -106,6 +157,26 @@ export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
               <div className="space-y-1">
                 <Label>Teléfono familiar</Label>
                 <Input placeholder="11-9876-5432" value={form.contacto_familiar_telefono} onChange={e => set("contacto_familiar_telefono", e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1 mt-4">
+              <Label>Relación</Label>
+              <Input placeholder="Ej. Esposa, Hermano" value={form.contacto_familiar_relacion} onChange={e => set("contacto_familiar_relacion", e.target.value)} />
+            </div>
+          </div>
+          <div className="pt-2 border-t grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Foto de Perfil</Label>
+              <MultiImageUpload images={fotoPerfil} onChange={setFotoPerfil} maxImages={1} />
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label>Foto Carnet de Conducir</Label>
+                <MultiImageUpload images={fotoCarnet} onChange={setFotoCarnet} maxImages={1} />
+              </div>
+              <div className="space-y-1">
+                <Label>Vencimiento del Carnet</Label>
+                <Input type="date" value={form.fecha_vencimiento_carnet} onChange={e => set("fecha_vencimiento_carnet", e.target.value)} />
               </div>
             </div>
           </div>
