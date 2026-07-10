@@ -76,9 +76,9 @@ export function HistorialMaquinaDialog({ open, onOpenChange, maquina }: Props) {
                             {j.km_inicio && j.km_fin ? (j.km_fin - j.km_inicio).toFixed(1) + " km" : "-"}
                           </td>
                           <td className="p-3 text-center">
-                            <span className={\`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium \${
-                              j.estado === 'finalizada' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                            }\`}>
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              j.estado === "finalizada" ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"
+                            }`}>
                               {j.estado === 'finalizada' ? 'Finalizada' : 'En Curso'}
                             </span>
                           </td>
@@ -115,10 +115,9 @@ export function HistorialMaquinaDialog({ open, onOpenChange, maquina }: Props) {
                           <td className="p-3">{m.descripcion}</td>
                           <td className="p-3">{m.proveedor || "-"}</td>
                           <td className="p-3 text-center">
-                            <span className={\`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium \${
-                              m.estado === 'realizado' ? 'bg-green-100 text-green-700' : 
-                              m.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                            }\`}>
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              m.estado === "realizado" ? "bg-green-100 text-green-800" : m.estado === "cancelado" ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"
+                            }`}>
                               {m.estado}
                             </span>
                           </td>

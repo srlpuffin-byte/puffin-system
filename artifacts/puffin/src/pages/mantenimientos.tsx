@@ -19,16 +19,16 @@ export function Mantenimientos() {
   const [openDialog, setOpenDialog] = useState(false);
 
   const handleEstadoChange = (id: number, nuevoEstado: string) => {
-    toast.loading("Actualizando estado...", { id: \`update-\${id}\` });
+    toast.loading("Actualizando estado...", { id: `update-${id}` });
     updateEstadoMut.mutate(
       { id, data: { estado: nuevoEstado } },
       {
         onSuccess: () => {
-          toast.success("Estado actualizado", { id: \`update-\${id}\` });
+          toast.success("Estado actualizado", { id: `update-${id}` });
           queryClient.invalidateQueries({ queryKey: getGetMantenimientosQueryKey() });
         },
         onError: () => {
-          toast.error("Error al actualizar", { id: \`update-\${id}\` });
+          toast.error("Error al actualizar", { id: `update-${id}` });
         }
       }
     );
@@ -103,7 +103,7 @@ export function Mantenimientos() {
                           onValueChange={(v) => handleEstadoChange(mant.id, v)}
                           disabled={updateEstadoMut.isPending}
                         >
-                          <SelectTrigger className={\`w-[130px] h-8 text-xs font-semibold \${mant.estado === "realizado" ? "border-green-500 text-green-700 bg-green-50" : mant.estado === "cancelado" ? "border-red-500 text-red-700 bg-red-50" : ""}\`}>
+                          <SelectTrigger className={`w-[130px] h-8 text-xs font-semibold ${mant.estado === "realizado" ? "border-green-500 text-green-700 bg-green-50" : mant.estado === "cancelado" ? "border-red-500 text-red-700 bg-red-50" : ""}`}>
                             <SelectValue placeholder="Estado" />
                           </SelectTrigger>
                           <SelectContent>
