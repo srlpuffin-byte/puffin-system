@@ -27,8 +27,8 @@ export function Egresos() {
     concepto: "",
     categoria: "Otros",
     monto: "",
-    estado: "pagado",
-    referencia: ""
+    metodo_pago: "Efectivo",
+    observaciones: ""
   });
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
@@ -46,8 +46,8 @@ export function Egresos() {
           concepto: form.concepto,
           categoria: form.categoria,
           monto: parseFloat(form.monto),
-          estado: form.estado,
-          referencia: form.referencia || undefined
+          metodo_pago: form.metodo_pago,
+          observaciones: form.observaciones || undefined
         } as any
       },
       {
@@ -55,7 +55,7 @@ export function Egresos() {
           toast.success("Egreso registrado y sincronizado con Google Sheets");
           queryClient.invalidateQueries({ queryKey: ["getEgresos"] });
           setOpenDialog(false);
-          setForm({ fecha: new Date().toISOString().split("T")[0], concepto: "", categoria: "Otros", monto: "", estado: "pagado", referencia: "" });
+          setForm({ fecha: new Date().toISOString().split("T")[0], concepto: "", categoria: "Otros", monto: "", metodo_pago: "Efectivo", observaciones: "" });
         },
         onError: () => {
           toast.error("Error al registrar egreso");
@@ -98,9 +98,9 @@ export function Egresos() {
                   <TableHead>Fecha</TableHead>
                   <TableHead>Categoría</TableHead>
                   <TableHead>Concepto</TableHead>
-                  <TableHead>Referencia</TableHead>
+                  <TableHead>Método</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead>Comprobante</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -118,13 +118,13 @@ export function Egresos() {
                         <Badge variant="outline">{eg.categoria}</Badge>
                       </TableCell>
                       <TableCell>{eg.concepto}</TableCell>
-                      <TableCell>{eg.referencia || "-"}</TableCell>
+                      <TableCell>{eg.metodo_pago || "-"}</TableCell>
                       <TableCell className="text-right font-semibold text-red-600">
                         ${eg.monto.toLocaleString("es-AR")}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={eg.estado === "pagado" ? "default" : "secondary"} className={eg.estado === "pagado" ? "bg-green-600" : ""}>
-                          {eg.estado.toUpperCase()}
+                        <Badge variant={eg.comprobante ? "default" : "secondary"}>
+                          {eg.comprobante ? "SI" : "NO"}
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -167,16 +167,17 @@ export function Egresos() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label>Nº Comprobante / Ref</Label>
-                <Input placeholder="0001-00002341" value={form.referencia} onChange={e => set("referencia", e.target.value)} />
+                <Label>Observaciones / Ref</Label>
+                <Input placeholder="Ticket Nro..." value={form.observaciones} onChange={e => set("observaciones", e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Estado</Label>
-                <Select value={form.estado} onValueChange={v => set("estado", v)}>
+                <Label>Método de Pago</Label>
+                <Select value={form.metodo_pago} onValueChange={v => set("metodo_pago", v)}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pagado">Pagado</SelectItem>
-                    <SelectItem value="pendiente">Pendiente</SelectItem>
+                    <SelectItem value="Efectivo">Efectivo</SelectItem>
+                    <SelectItem value="Transferencia">Transferencia</SelectItem>
+                    <SelectItem value="Tarjeta">Tarjeta</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
