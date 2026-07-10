@@ -16,10 +16,11 @@ declare global {
   }
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "No autorizado" });
+    res.status(401).json({ error: "No autorizado" });
+    return;
   }
 
   try {
@@ -28,13 +29,15 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     req.user = { id: payload.userId, rol: payload.rol };
     next();
   } catch {
-    return res.status(401).json({ error: "Token inválido" });
+    res.status(401).json({ error: "Token inválido" });
+    return;
   }
 }
 
-export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   if (!req.user || req.user.rol !== "admin") {
-    return res.status(403).json({ error: "Se requieren permisos de administrador" });
+    res.status(403).json({ error: "Se requieren permisos de administrador" });
+    return;
   }
   next();
 }

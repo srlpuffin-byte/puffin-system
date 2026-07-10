@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useGetAlertas, useUpdateAlerta } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,16 +11,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetAlertasQueryKey } from "@workspace/api-client-react";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { CrearAlertaDialog } from "@/components/forms/crear-alerta-dialog";
 
 export function Alertas() {
   const { data: alertas, isLoading } = useGetAlertas({ estado: 'activa' });
   const updateMut = useUpdateAlerta();
   const queryClient = useQueryClient();
+  const [openDialog, setOpenDialog] = useState(false);
 
   const handleResolver = (id: number) => {
     updateMut.mutate(
@@ -54,6 +56,10 @@ export function Alertas() {
               title="Reporte de Alertas" 
             />
           )}
+          <Button onClick={() => setOpenDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nueva Alerta
+          </Button>
         </div>
       </div>
 
@@ -122,6 +128,7 @@ export function Alertas() {
           </div>
         </CardContent>
       </Card>
+      <CrearAlertaDialog open={openDialog} onOpenChange={setOpenDialog} />
     </div>
   );
 }

@@ -31,4 +31,30 @@ router.put("/:id", async (req, res) => {
   return res.json({ ...alerta, fecha: alerta.fecha?.toISOString() || new Date().toISOString() });
 });
 
+router.post("/", async (req, res) => {
+  const { tipo, prioridad, descripcion, entidad_tipo, entidad_id, entidad_nombre } = req.body;
+  if (!tipo || !descripcion) {
+    return res.status(400).json({ error: "Tipo y descripción son requeridos" });
+  }
+
+  const [alerta] = await db
+    .insert(alertasTable)
+    .values({
+      tipo,
+      prioridad: prioridad || "azul",
+      descripcion,
+      estado: "activa",
+      entidad_tipo,
+      entidad_id,
+      entidad_nombre,
+      fecha: new Date(),
+    })
+    .returning();
+
+  return res.status(201).json({
+    ...alerta,
+    fecha: alerta.fecha?.toISOString() || new Date().toISOString()
+  });
+});
+
 export default router;

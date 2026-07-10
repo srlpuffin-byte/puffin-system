@@ -50,4 +50,27 @@ router.post("/", async (req, res) => {
   return res.status(201).json({ ...incidente, empleado_nombre: null, maquina_nombre: null });
 });
 
+router.put("/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { estado } = req.body;
+  if (!estado) return res.status(400).json({ error: "Estado es requerido" });
+
+  const [incidente] = await db
+    .update(incidentesTable)
+    .set({ estado, updatedAt: new Date() })
+    .where(eq(incidentesTable.id, id))
+    .returning();
+
+  if (!incidente) return res.status(404).json({ error: "Incidente no encontrado" });
+
+  await db.insert(actividadTable).values({
+    tipo: "incidente",
+    descripcion: `Incidente marcado como ${estado}: ${incidente.tipo}`,
+    entidad_tipo: "incidente",
+    entidad_id: incidente.id,
+  });
+
+  return res.json(incidente);
+});
+
 export default router;

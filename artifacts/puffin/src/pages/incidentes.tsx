@@ -1,10 +1,12 @@
 import React, { useState } from "react";
-import { useGetIncidentes } from "@workspace/api-client-react";
+import { useGetIncidentes, getGetIncidentesQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus } from "lucide-react";
+import { Plus, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { ReportarIncidenteDialog } from "@/components/forms/reportar-incidente-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
@@ -21,6 +23,23 @@ const TIPO_LABELS: Record<string, string> = {
 export function Incidentes() {
   const { data: incidentes, isLoading } = useGetIncidentes();
   const [openDialog, setOpenDialog] = useState(false);
+  const [resolvingId, setResolvingId] = useState<number | null>(null);
+  const queryClient = useQueryClient();
+
+  const handleResolver = async (id: number) => {
+    try {
+      setResolvingId(id);
+      await apiFetch(`/incidentes/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ estado: "resuelto" }),
+      });
+      queryClient.invalidateQueries({ queryKey: getGetIncidentesQueryKey() });
+    } catch (err) {
+      console.error("Error resolving incident:", err);
+    } finally {
+      setResolvingId(null);
+    }
+  };
 
   const exportColumns = [
     { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy HH:mm") : "-" },
@@ -63,13 +82,14 @@ export function Incidentes() {
                   <TableHead>Operario</TableHead>
                   <TableHead>Descripción</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8">Cargando incidentes...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-8">Cargando incidentes...</TableCell></TableRow>
                 ) : incidentes?.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No hay incidentes registrados.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No hay incidentes registrados.</TableCell></TableRow>
                 ) : (
                   incidentes?.map((inc) => (
                     <TableRow key={inc.id}>
@@ -91,6 +111,19 @@ export function Incidentes() {
                         >
                           {inc.estado?.toUpperCase()}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {inc.estado !== "resuelto" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleResolver(inc.id)}
+                            disabled={resolvingId === inc.id}
+                          >
+                            <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
+                            Resolver
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
