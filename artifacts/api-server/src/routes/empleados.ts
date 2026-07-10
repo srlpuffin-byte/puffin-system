@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { empleadosTable, jornadasTable, alertasTable } from "@workspace/db";
+import { empleadosTable, jornadasTable, alertasTable, documentosTable } from "@workspace/db";
 import { eq, and, or, ilike, sql } from "drizzle-orm";
 
 const router = Router();
@@ -51,6 +51,16 @@ router.post("/", async (req, res) => {
     nombre, apellido, dni, telefono, cargo, fecha_ingreso, estado: "activo",
     contacto_familiar_nombre, contacto_familiar_telefono,
   }).returning();
+  
+  await db.insert(documentosTable).values({
+    tipo: "Carnet",
+    descripcion: "Carnet de operario (Falta cargar)",
+    entidad_tipo: "empleado",
+    entidad_id: empleado.id,
+    fecha_vencimiento: "2000-01-01",
+    estado_doc: "vencido"
+  });
+  
   return res.status(201).json({ ...empleado, jornada_activa: false, alertas_count: 0 });
 });
 

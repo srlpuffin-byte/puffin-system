@@ -152,7 +152,7 @@ function NavGroupComponent({ group, location }: { group: NavGroup; location: str
   );
 }
 
-import { useGetEmpleados } from "@workspace/api-client-react";
+import { useGetEmpleados, useGetMaquinas } from "@workspace/api-client-react";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -162,7 +162,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [searchOpen, setSearchOpen] = useState(false);
   
   const { data: empleados } = useGetEmpleados();
-  const hasIncompleteOperarios = empleados?.some(e => e.dni === "COMPLETAR" || (e as any).alertas_count > 0) || false;
+  const hasIncompleteOperarios = Array.isArray(empleados) ? empleados.some(e => e?.dni === "COMPLETAR" || (e as any)?.alertas_count > 0) : false;
+
+  const { data: maquinas } = useGetMaquinas();
+  const hasIncompleteMaquinas = Array.isArray(maquinas) ? maquinas.some(m => !m.patente || !m.chasis || !m.motor || !m.marca || !m.modelo) : false;
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -235,9 +238,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               key={group.label}
               group={{ 
                 ...group, 
-                items: filteredItems.map(item => 
-                  item.href === "/operarios" ? { ...item, badge: hasIncompleteOperarios } : item
-                ) 
+                items: filteredItems.map(item => {
+                  if (item.href === "/operarios") return { ...item, badge: hasIncompleteOperarios };
+                  if (item.href === "/maquinas") return { ...item, badge: hasIncompleteMaquinas };
+                  return item;
+                }) 
               }}
               location={location}
             />

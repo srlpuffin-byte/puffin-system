@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usuariosTable, empleadosTable, alertasTable } from "@workspace/db";
+import { usuariosTable, empleadosTable, alertasTable, documentosTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -71,6 +71,15 @@ router.post("/", async (req, res) => {
         dni: "COMPLETAR",
         estado: "activo",
       }).returning();
+
+      await db.insert(documentosTable).values({
+        tipo: "Carnet",
+        descripcion: "Carnet de operario (Falta cargar)",
+        entidad_tipo: "empleado",
+        entidad_id: empleado.id,
+        fecha_vencimiento: "2000-01-01",
+        estado_doc: "vencido"
+      });
 
       await db.insert(alertasTable).values({
         tipo: "sistema",
