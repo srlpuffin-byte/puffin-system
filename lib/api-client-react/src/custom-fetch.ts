@@ -363,6 +363,11 @@ export async function customFetch<T = unknown>(
   const response = await fetch(input, { ...init, method, headers });
 
   if (!response.ok) {
+    // Auto-logout on 401 (token expirado o inválido)
+    if (response.status === 401 && typeof window !== "undefined") {
+      localStorage.removeItem("puffin_token");
+      window.location.href = "/login";
+    }
     const errorData = await parseErrorBody(response, method);
     throw new ApiError(response, errorData, requestInfo);
   }
