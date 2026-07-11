@@ -113,12 +113,12 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg flex flex-col" style={{ maxHeight: "90vh" }}>
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle>Editar Operario</DialogTitle>
-        </DialogHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+          <DialogHeader className="flex-shrink-0 mb-4">
+            <DialogTitle>Editar Operario</DialogTitle>
+          </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto pr-1">
-          <form id="editar-operario-form" onSubmit={handleSubmit} className="space-y-3 py-1">
+          <div className="flex-1 overflow-y-auto pr-1 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Nombre *</Label>
@@ -179,7 +179,7 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
               </div>
             </div>
 
-            <div className="border-t pt-2 grid grid-cols-2 gap-3">
+            <div className="border-t pt-2 grid grid-cols-2 gap-3 pb-2">
               <div className="space-y-1">
                 <Label className="text-xs">Foto Perfil</Label>
                 <MultiImageUpload images={fotoPerfil} onChange={setFotoPerfil} maxImages={1} />
@@ -189,17 +189,17 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
                 <MultiImageUpload images={fotoCarnet} onChange={setFotoCarnet} maxImages={1} />
               </div>
             </div>
-          </form>
-        </div>
+          </div>
 
-        <DialogFooter className="flex-shrink-0 border-t pt-3 mt-1">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="editar-operario-form" className="bg-primary" disabled={isPending}>
-            {isPending ? "Guardando..." : "Guardar Cambios"}
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="flex-shrink-0 border-t pt-3 mt-1">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+              Cancelar
+            </Button>
+            <Button type="submit" className="bg-primary" disabled={isPending}>
+              {isPending ? "Guardando..." : "Guardar Cambios"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
