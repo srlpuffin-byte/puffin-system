@@ -88,7 +88,6 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
           checklist_previo: JSON.stringify(checklist),
           estado_equipo_inicio: form.estado_equipo,
           ubicacion: form.ubicacion || undefined,
-          tipo_trabajo: form.tipo_trabajo || undefined,
           nombre_obra: form.nombre_obra || undefined,
           descripcion_trabajo: form.descripcion_trabajo || undefined,
         },

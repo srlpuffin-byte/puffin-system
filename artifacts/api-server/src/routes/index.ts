@@ -22,6 +22,7 @@ import { integrationsRouter } from "./integrations";
 import fotografiasRouter from "./fotografias";
 import egresosRouter from "./egresos";
 import searchRouter from "./search";
+import cierresRouter from "./cierres";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
@@ -54,5 +55,6 @@ router.use("/backups", requireAuth, backupsRouter);
 router.use("/fotografias", requireAuth, fotografiasRouter);
 router.use("/egresos", requireAuth, egresosRouter);
 router.use("/search", requireAuth, searchRouter);
+router.use("/cierres", requireAuth, cierresRouter);
 
 export default router;

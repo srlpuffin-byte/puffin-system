@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useGetJornadas, useGetMantenimientos } from "@workspace/api-client-react";
+import { useGetJornadas, useGetMantenimientos, getGetJornadasQueryKey, getGetMantenimientosQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -15,12 +15,12 @@ export function HistorialMaquinaDialog({ open, onOpenChange, maquina }: Props) {
   const [tab, setTab] = useState("jornadas");
   const { data: jornadas, isLoading: loadingJornadas } = useGetJornadas(
     { maquina_id: maquina?.id }, 
-    { query: { enabled: !!maquina && open } }
+    { query: { enabled: !!maquina && open, queryKey: getGetJornadasQueryKey({ maquina_id: maquina?.id }) } }
   );
   
   const { data: mantenimientos, isLoading: loadingMantenimientos } = useGetMantenimientos(
     { maquina_id: maquina?.id },
-    { query: { enabled: !!maquina && open } }
+    { query: { enabled: !!maquina && open, queryKey: getGetMantenimientosQueryKey({ maquina_id: maquina?.id }) } }
   );
 
   return (
@@ -110,7 +110,7 @@ export function HistorialMaquinaDialog({ open, onOpenChange, maquina }: Props) {
                     <tbody className="divide-y">
                       {mantenimientos?.map((m) => (
                         <tr key={m.id} className="hover:bg-muted/50">
-                          <td className="p-3">{format(new Date(m.fecha_programada), 'dd/MM/yyyy', { locale: es })}</td>
+                          <td className="p-3">{m.fecha_programada ? format(new Date(m.fecha_programada), 'dd/MM/yyyy', { locale: es }) : "-"}</td>
                           <td className="p-3 capitalize">{m.tipo}</td>
                           <td className="p-3">{m.descripcion}</td>
                           <td className="p-3">{m.proveedor || "-"}</td>

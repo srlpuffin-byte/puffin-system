@@ -19,6 +19,7 @@ export * from './documentoEstado';
 export * from './documentoInput';
 export * from './egreso';
 export * from './egresoInput';
+export * from './ejecutarCierreMensual200';
 export * from './empleado';
 export * from './empleadoEstado';
 export * from './empleadoInput';

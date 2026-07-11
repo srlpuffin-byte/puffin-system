@@ -29,6 +29,7 @@ import type {
   DocumentoInput,
   Egreso,
   EgresoInput,
+  EjecutarCierreMensual200,
   Empleado,
   EmpleadoInput,
   EmpleadoUpdate,
@@ -100,6 +101,76 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getEjecutarCierreMensualUrl = () => {
+
+
+
+
+  return `/api/cierres/mensual`
+}
+
+/**
+ * @summary Ejecutar el cierre mensual enviando cortes al excel
+ */
+export const ejecutarCierreMensual = async ( options?: RequestInit): Promise<EjecutarCierreMensual200> => {
+
+  return customFetch<EjecutarCierreMensual200>(getEjecutarCierreMensualUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getEjecutarCierreMensualMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ejecutarCierreMensual>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof ejecutarCierreMensual>>, TError,void, TContext> => {
+
+const mutationKey = ['ejecutarCierreMensual'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof ejecutarCierreMensual>>, void> = () => {
+
+
+          return  ejecutarCierreMensual(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EjecutarCierreMensualMutationResult = NonNullable<Awaited<ReturnType<typeof ejecutarCierreMensual>>>
+
+    export type EjecutarCierreMensualMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Ejecutar el cierre mensual enviando cortes al excel
+ */
+export const useEjecutarCierreMensual = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ejecutarCierreMensual>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof ejecutarCierreMensual>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getEjecutarCierreMensualMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

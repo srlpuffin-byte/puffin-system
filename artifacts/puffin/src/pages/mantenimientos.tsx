@@ -21,7 +21,7 @@ export function Mantenimientos() {
   const handleEstadoChange = (id: number, nuevoEstado: string) => {
     toast.loading("Actualizando estado...", { id: `update-${id}` });
     updateEstadoMut.mutate(
-      { id, data: { estado: nuevoEstado } },
+      { id, data: { estado: nuevoEstado as any } },
       {
         onSuccess: () => {
           toast.success("Estado actualizado", { id: `update-${id}` });

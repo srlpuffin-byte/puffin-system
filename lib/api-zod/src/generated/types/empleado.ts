@@ -23,5 +23,9 @@ export interface Empleado {
   jornada_activa?: boolean;
   alertas_count?: number;
   /** @nullable */
+  contacto_familiar_nombre?: string | null;
+  /** @nullable */
+  contacto_familiar_telefono?: string | null;
+  /** @nullable */
   contacto_familiar_relacion?: string | null;
 }

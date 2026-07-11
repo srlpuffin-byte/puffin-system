@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useUpdateMaquina, getGetMaquinaQueryKey, getGetMaquinasQueryKey, useUploadFotografia } from "@workspace/api-client-react";
+import { useUpdateMaquina, getGetMaquinaQueryKey, getGetMaquinasQueryKey, useUploadFotografia, MaquinaUpdateEstado } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -78,7 +78,7 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
           kilometros: form.kilometros ? parseFloat(form.kilometros) : undefined,
           motor: form.motor || undefined,
           chasis: form.chasis || undefined,
-          estado: form.estado || undefined,
+          estado: form.estado as MaquinaUpdateEstado || undefined,
           filtro_tipo: form.filtro_tipo || undefined,
           filtro_codigo: form.filtro_codigo || undefined,
           filtro_fecha_cambio: form.filtro_fecha_cambio || undefined,

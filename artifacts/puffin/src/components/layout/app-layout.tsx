@@ -90,6 +90,7 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: FileText, label: "Egresos", href: "/egresos" },
       { icon: TrendingUp, label: "Productividad", href: "/productividad" },
       { icon: BarChart3, label: "Reportes Financieros", href: "/reportes" },
+      { icon: Calendar, label: "Cierre Mensual", href: "/cierres" },
     ],
   },
   {

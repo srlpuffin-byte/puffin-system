@@ -12,4 +12,6 @@ export interface MantenimientoInput {
   tipo: string;
   descripcion?: string;
   proximo_service?: string;
+  fecha_programada?: string;
+  proveedor?: string;
 }

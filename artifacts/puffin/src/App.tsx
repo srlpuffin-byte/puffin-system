@@ -26,6 +26,7 @@ import { Ia } from "@/pages/ia";
 import { Americangis } from "@/pages/americangis";
 import { Egresos } from "@/pages/egresos";
 import { Xpert } from "@/pages/xpert";
+import { Cierres } from "@/pages/cierres";
 import { useEffect } from "react";
 import { getAuthToken } from "@/hooks/use-auth";
 
@@ -85,6 +86,7 @@ function Router() {
       <Route path="/alertas"><ProtectedRoute component={Alertas} /></Route>
       <Route path="/calendario"><ProtectedRoute component={Calendario} /></Route>
       <Route path="/egresos"><ProtectedRoute component={Egresos} /></Route>
+      <Route path="/cierres"><ProtectedRoute component={Cierres} /></Route>
       <Route path="/reportes"><ProtectedRoute component={Reportes} /></Route>
       <Route path="/incidentes"><ProtectedRoute component={Incidentes} /></Route>
       <Route path="/actividad"><ProtectedRoute component={Actividad} /></Route>

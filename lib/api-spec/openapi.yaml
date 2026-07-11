@@ -38,7 +38,25 @@ tags:
   - name: fotografias
     description: Fotografías y archivos adjuntos
 
+  - name: cierres
+    description: Cierre de Mes
+
 paths:
+  /cierres/mensual:
+    post:
+      operationId: ejecutarCierreMensual
+      tags: [cierres]
+      summary: Ejecutar el cierre mensual enviando cortes al excel
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
   /healthz:
     get:
       operationId: healthCheck
@@ -1000,6 +1018,10 @@ components:
           type: boolean
         alertas_count:
           type: integer
+        contacto_familiar_nombre:
+          type: ["string", "null"]
+        contacto_familiar_telefono:
+          type: ["string", "null"]
         contacto_familiar_relacion:
           type: ["string", "null"]
 
@@ -1019,6 +1041,10 @@ components:
           type: string
         fecha_ingreso:
           type: string
+        contacto_familiar_nombre:
+          type: string
+        contacto_familiar_telefono:
+          type: string
         contacto_familiar_relacion:
           type: string
 
@@ -1036,6 +1062,10 @@ components:
         estado:
           type: string
           enum: [activo, inactivo, licencia]
+        contacto_familiar_nombre:
+          type: string
+        contacto_familiar_telefono:
+          type: string
         contacto_familiar_relacion:
           type: string
 
@@ -1127,7 +1157,29 @@ components:
     MaquinaUpdate:
       type: object
       properties:
+        codigo:
+          type: string
         nombre:
+          type: string
+        marca:
+          type: string
+        modelo:
+          type: string
+        anio:
+          type: integer
+        patente:
+          type: string
+        dominio:
+          type: string
+
+        motor:
+          type: string
+        chasis:
+          type: string
+
+        horometro_actual:
+          type: number
+        tipo:
           type: string
         estado:
           type: string
@@ -1226,6 +1278,8 @@ components:
         observaciones:
           type: string
         nombre_obra:
+          type: string
+        ubicacion:
           type: string
         descripcion_trabajo:
           type: string
@@ -1374,6 +1428,10 @@ components:
         estado:
           type: string
           enum: [pendiente, realizado, cancelado]
+        fecha_programada:
+          type: ["string", "null"]
+        proveedor:
+          type: ["string", "null"]
 
     MantenimientoInput:
       type: object
@@ -1388,6 +1446,10 @@ components:
         descripcion:
           type: string
         proximo_service:
+          type: string
+        fecha_programada:
+          type: string
+        proveedor:
           type: string
 
     Documento:

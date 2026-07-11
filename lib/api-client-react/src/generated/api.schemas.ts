@@ -113,6 +113,10 @@ export interface Empleado {
   jornada_activa?: boolean;
   alertas_count?: number;
   /** @nullable */
+  contacto_familiar_nombre?: string | null;
+  /** @nullable */
+  contacto_familiar_telefono?: string | null;
+  /** @nullable */
   contacto_familiar_relacion?: string | null;
 }
 
@@ -123,6 +127,8 @@ export interface EmpleadoInput {
   telefono?: string;
   cargo?: string;
   fecha_ingreso?: string;
+  contacto_familiar_nombre?: string;
+  contacto_familiar_telefono?: string;
   contacto_familiar_relacion?: string;
 }
 
@@ -141,6 +147,8 @@ export interface EmpleadoUpdate {
   telefono?: string;
   cargo?: string;
   estado?: EmpleadoUpdateEstado;
+  contacto_familiar_nombre?: string;
+  contacto_familiar_telefono?: string;
   contacto_familiar_relacion?: string;
 }
 
@@ -222,7 +230,17 @@ export const MaquinaUpdateEstado = {
 } as const;
 
 export interface MaquinaUpdate {
+  codigo?: string;
   nombre?: string;
+  marca?: string;
+  modelo?: string;
+  anio?: number;
+  patente?: string;
+  dominio?: string;
+  motor?: string;
+  chasis?: string;
+  horometro_actual?: number;
+  tipo?: string;
   estado?: MaquinaUpdateEstado;
   horometro?: number;
   kilometros?: number;
@@ -298,6 +316,7 @@ export interface IniciarJornadaInput {
   foto_tablero_inicio?: string;
   observaciones?: string;
   nombre_obra?: string;
+  ubicacion?: string;
   descripcion_trabajo?: string;
 }
 
@@ -395,6 +414,10 @@ export interface Mantenimiento {
   /** @nullable */
   proximo_service?: string | null;
   estado?: MantenimientoEstado;
+  /** @nullable */
+  fecha_programada?: string | null;
+  /** @nullable */
+  proveedor?: string | null;
 }
 
 export interface MantenimientoInput {
@@ -403,6 +426,8 @@ export interface MantenimientoInput {
   tipo: string;
   descripcion?: string;
   proximo_service?: string;
+  fecha_programada?: string;
+  proveedor?: string;
 }
 
 export type DocumentoEstado = typeof DocumentoEstado[keyof typeof DocumentoEstado];
@@ -675,6 +700,10 @@ export const UpdateMantenimientoEstadoInputEstado = {
 export interface UpdateMantenimientoEstadoInput {
   estado?: UpdateMantenimientoEstadoInputEstado;
 }
+
+export type EjecutarCierreMensual200 = {
+  message?: string;
+};
 
 export type GetEmpleadosParams = {
 estado?: GetEmpleadosEstado;

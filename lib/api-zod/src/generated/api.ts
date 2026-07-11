@@ -9,6 +9,14 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Ejecutar el cierre mensual enviando cortes al excel
+ */
+export const EjecutarCierreMensualResponse = zod.object({
+  "message": zod.string().optional()
+})
+
+
+/**
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -114,6 +122,8 @@ export const GetEmpleadosResponseItem = zod.object({
   "fecha_ingreso": zod.string().nullish(),
   "jornada_activa": zod.boolean().optional(),
   "alertas_count": zod.number().optional(),
+  "contacto_familiar_nombre": zod.string().nullish(),
+  "contacto_familiar_telefono": zod.string().nullish(),
   "contacto_familiar_relacion": zod.string().nullish()
 })
 export const GetEmpleadosResponse = zod.array(GetEmpleadosResponseItem)
@@ -129,6 +139,8 @@ export const CreateEmpleadoBody = zod.object({
   "telefono": zod.string().optional(),
   "cargo": zod.string().optional(),
   "fecha_ingreso": zod.string().optional(),
+  "contacto_familiar_nombre": zod.string().optional(),
+  "contacto_familiar_telefono": zod.string().optional(),
   "contacto_familiar_relacion": zod.string().optional()
 })
 
@@ -144,6 +156,8 @@ export const CreateEmpleadoResponse = zod.object({
   "fecha_ingreso": zod.string().nullish(),
   "jornada_activa": zod.boolean().optional(),
   "alertas_count": zod.number().optional(),
+  "contacto_familiar_nombre": zod.string().nullish(),
+  "contacto_familiar_telefono": zod.string().nullish(),
   "contacto_familiar_relacion": zod.string().nullish()
 })
 
@@ -167,6 +181,8 @@ export const GetEmpleadoResponse = zod.object({
   "fecha_ingreso": zod.string().nullish(),
   "jornada_activa": zod.boolean().optional(),
   "alertas_count": zod.number().optional(),
+  "contacto_familiar_nombre": zod.string().nullish(),
+  "contacto_familiar_telefono": zod.string().nullish(),
   "contacto_familiar_relacion": zod.string().nullish()
 })
 
@@ -184,6 +200,8 @@ export const UpdateEmpleadoBody = zod.object({
   "telefono": zod.string().optional(),
   "cargo": zod.string().optional(),
   "estado": zod.enum(['activo', 'inactivo', 'licencia']).optional(),
+  "contacto_familiar_nombre": zod.string().optional(),
+  "contacto_familiar_telefono": zod.string().optional(),
   "contacto_familiar_relacion": zod.string().optional()
 })
 
@@ -199,6 +217,8 @@ export const UpdateEmpleadoResponse = zod.object({
   "fecha_ingreso": zod.string().nullish(),
   "jornada_activa": zod.boolean().optional(),
   "alertas_count": zod.number().optional(),
+  "contacto_familiar_nombre": zod.string().nullish(),
+  "contacto_familiar_telefono": zod.string().nullish(),
   "contacto_familiar_relacion": zod.string().nullish()
 })
 
@@ -324,7 +344,17 @@ export const UpdateMaquinaParams = zod.object({
 })
 
 export const UpdateMaquinaBody = zod.object({
+  "codigo": zod.string().optional(),
   "nombre": zod.string().optional(),
+  "marca": zod.string().optional(),
+  "modelo": zod.string().optional(),
+  "anio": zod.number().optional(),
+  "patente": zod.string().optional(),
+  "dominio": zod.string().optional(),
+  "motor": zod.string().optional(),
+  "chasis": zod.string().optional(),
+  "horometro_actual": zod.number().optional(),
+  "tipo": zod.string().optional(),
   "estado": zod.enum(['activa', 'detenida', 'mantenimiento', 'baja']).optional(),
   "horometro": zod.number().optional(),
   "kilometros": zod.number().optional(),
@@ -415,6 +445,7 @@ export const IniciarJornadaBody = zod.object({
   "foto_tablero_inicio": zod.string().optional(),
   "observaciones": zod.string().optional(),
   "nombre_obra": zod.string().optional(),
+  "ubicacion": zod.string().optional(),
   "descripcion_trabajo": zod.string().optional()
 })
 
@@ -613,7 +644,9 @@ export const GetMantenimientosResponseItem = zod.object({
   "tipo": zod.string(),
   "descripcion": zod.string().nullish(),
   "proximo_service": zod.string().nullish(),
-  "estado": zod.enum(['pendiente', 'realizado', 'cancelado']).optional()
+  "estado": zod.enum(['pendiente', 'realizado', 'cancelado']).optional(),
+  "fecha_programada": zod.string().nullish(),
+  "proveedor": zod.string().nullish()
 })
 export const GetMantenimientosResponse = zod.array(GetMantenimientosResponseItem)
 
@@ -626,7 +659,9 @@ export const CreateMantenimientoBody = zod.object({
   "horas": zod.number().optional(),
   "tipo": zod.string(),
   "descripcion": zod.string().optional(),
-  "proximo_service": zod.string().optional()
+  "proximo_service": zod.string().optional(),
+  "fecha_programada": zod.string().optional(),
+  "proveedor": zod.string().optional()
 })
 
 export const CreateMantenimientoResponse = zod.object({
@@ -639,7 +674,9 @@ export const CreateMantenimientoResponse = zod.object({
   "tipo": zod.string(),
   "descripcion": zod.string().nullish(),
   "proximo_service": zod.string().nullish(),
-  "estado": zod.enum(['pendiente', 'realizado', 'cancelado']).optional()
+  "estado": zod.enum(['pendiente', 'realizado', 'cancelado']).optional(),
+  "fecha_programada": zod.string().nullish(),
+  "proveedor": zod.string().nullish()
 })
 
 
@@ -942,7 +979,9 @@ export const UpdateMantenimientoEstadoResponse = zod.object({
   "tipo": zod.string(),
   "descripcion": zod.string().nullish(),
   "proximo_service": zod.string().nullish(),
-  "estado": zod.enum(['pendiente', 'realizado', 'cancelado']).optional()
+  "estado": zod.enum(['pendiente', 'realizado', 'cancelado']).optional(),
+  "fecha_programada": zod.string().nullish(),
+  "proveedor": zod.string().nullish()
 })
 
 
@@ -1073,6 +1112,8 @@ export const GlobalSearchResponse = zod.object({
   "fecha_ingreso": zod.string().nullish(),
   "jornada_activa": zod.boolean().optional(),
   "alertas_count": zod.number().optional(),
+  "contacto_familiar_nombre": zod.string().nullish(),
+  "contacto_familiar_telefono": zod.string().nullish(),
   "contacto_familiar_relacion": zod.string().nullish()
 })).optional(),
   "mantenimientos": zod.array(zod.object({
@@ -1085,7 +1126,9 @@ export const GlobalSearchResponse = zod.object({
   "tipo": zod.string(),
   "descripcion": zod.string().nullish(),
   "proximo_service": zod.string().nullish(),
-  "estado": zod.enum(['pendiente', 'realizado', 'cancelado']).optional()
+  "estado": zod.enum(['pendiente', 'realizado', 'cancelado']).optional(),
+  "fecha_programada": zod.string().nullish(),
+  "proveedor": zod.string().nullish()
 })).optional(),
   "incidentes": zod.array(zod.object({
   "id": zod.number(),

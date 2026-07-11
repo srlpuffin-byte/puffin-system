@@ -8,7 +8,17 @@
 import type { MaquinaUpdateEstado } from './maquinaUpdateEstado';
 
 export interface MaquinaUpdate {
+  codigo?: string;
   nombre?: string;
+  marca?: string;
+  modelo?: string;
+  anio?: number;
+  patente?: string;
+  dominio?: string;
+  motor?: string;
+  chasis?: string;
+  horometro_actual?: number;
+  tipo?: string;
   estado?: MaquinaUpdateEstado;
   horometro?: number;
   kilometros?: number;

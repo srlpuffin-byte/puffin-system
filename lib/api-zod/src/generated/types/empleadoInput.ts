@@ -13,5 +13,7 @@ export interface EmpleadoInput {
   telefono?: string;
   cargo?: string;
   fecha_ingreso?: string;
+  contacto_familiar_nombre?: string;
+  contacto_familiar_telefono?: string;
   contacto_familiar_relacion?: string;
 }

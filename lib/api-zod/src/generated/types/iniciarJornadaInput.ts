@@ -16,5 +16,6 @@ export interface IniciarJornadaInput {
   foto_tablero_inicio?: string;
   observaciones?: string;
   nombre_obra?: string;
+  ubicacion?: string;
   descripcion_trabajo?: string;
 }

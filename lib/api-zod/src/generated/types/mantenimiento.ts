@@ -21,4 +21,8 @@ export interface Mantenimiento {
   /** @nullable */
   proximo_service?: string | null;
   estado?: MantenimientoEstado;
+  /** @nullable */
+  fecha_programada?: string | null;
+  /** @nullable */
+  proveedor?: string | null;
 }

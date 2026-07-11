@@ -46,8 +46,8 @@ router.get("/", async (req, res) => {
   // 5. Incidentes (for the matched machines)
   const incidentes = await db.select().from(incidentesTable);
   const matchedIncidentes = incidentes.filter(i => 
-    (i.entidad_tipo === 'maquina' && maquinaIds.has(i.entidad_id!)) ||
-    (i.entidad_tipo === 'empleado' && empleadoIds.has(i.entidad_id!))
+    (i.maquina_id && maquinaIds.has(i.maquina_id)) ||
+    (i.empleado_id && empleadoIds.has(i.empleado_id))
   );
 
   return res.json({
