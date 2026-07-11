@@ -43,119 +43,130 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/iniciar", async (req, res) => {
-  const { empleado_id, maquina_id, horometro_inicio, km_inicio, observaciones, checklist_previo, checklist_ok, estado_equipo_inicio, foto_tablero_inicio, ubicacion, tipo_trabajo, nombre_obra, descripcion_trabajo } = req.body;
-  if (!empleado_id || !maquina_id || horometro_inicio === undefined) {
-    return res.status(400).json({ error: "Campos requeridos faltantes" });
-  }
+  try {
+    const { empleado_id, maquina_id, horometro_inicio, km_inicio, observaciones, checklist_previo, checklist_ok, estado_equipo_inicio, foto_tablero_inicio, ubicacion, tipo_trabajo, nombre_obra, descripcion_trabajo } = req.body;
+    if (!empleado_id || !maquina_id || horometro_inicio === undefined) {
+      return res.status(400).json({ error: "Campos requeridos faltantes" });
+    }
 
-  const today = new Date().toISOString().split("T")[0];
-  const horaInicio = new Date().toTimeString().slice(0, 5);
+    const today = new Date().toISOString().split("T")[0];
+    const horaInicio = new Date().toTimeString().slice(0, 5);
 
-  const [jornada] = await db.insert(jornadasTable).values({
-    empleado_id, maquina_id,
-    fecha: today,
-    hora_inicio: horaInicio,
-    horometro_inicio: horometro_inicio.toString(),
-    km_inicio: km_inicio?.toString(),
-    observaciones,
-    checklist_previo,
-    checklist_ok,
-    estado_equipo_inicio,
-    foto_tablero_inicio,
-    ubicacion,
-    tipo_trabajo,
-    nombre_obra,
-    descripcion_trabajo,
-    estado: "en_curso"
-  }).returning();
+    const [jornada] = await db.insert(jornadasTable).values({
+      empleado_id, maquina_id,
+      fecha: today,
+      hora_inicio: horaInicio,
+      horometro_inicio: horometro_inicio.toString(),
+      km_inicio: km_inicio?.toString(),
+      observaciones,
+      checklist_previo,
+      checklist_ok,
+      estado_equipo_inicio,
+      foto_tablero_inicio,
+      ubicacion,
+      tipo_trabajo,
+      nombre_obra,
+      descripcion_trabajo,
+      estado: "en_curso"
+    }).returning();
 
-  await db.insert(actividadTable).values({
-    tipo: "jornada",
-    descripcion: `Jornada iniciada por operario ID ${empleado_id} en máquina ID ${maquina_id}`,
-    entidad_tipo: "jornada",
-    entidad_id: jornada.id,
-  });
-
-  // Generar alerta si el equipo no está apto
-  if (estado_equipo_inicio === "no_apto") {
-    const [maquina] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, maquina_id)).limit(1);
-    const [empleado] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable).where(eq(empleadosTable.id, empleado_id)).limit(1);
-    
-    await db.insert(alertasTable).values({
-      tipo: "maquina",
-      prioridad: "roja",
-      descripcion: `El operario ${empleado?.nombre} ${empleado?.apellido} reportó que el equipo ${maquina?.nombre} NO ESTÁ APTO para trabajar durante el checklist preoperacional. Observaciones: ${observaciones || "Sin observaciones adicionales."}`,
-      entidad_tipo: "maquina",
-      entidad_id: maquina_id,
-      entidad_nombre: maquina?.nombre
+    await db.insert(actividadTable).values({
+      tipo: "jornada",
+      descripcion: `Jornada iniciada por operario ID ${empleado_id} en máquina ID ${maquina_id}`,
+      entidad_tipo: "jornada",
+      entidad_id: jornada.id,
     });
-    
-    // Cambiar estado de la máquina a detenida automáticamente
-    await db.update(maquinasTable).set({ estado: "detenida" }).where(eq(maquinasTable.id, maquina_id));
-  }
 
-  return res.status(201).json(await enrichJornada(jornada));
+    // Generar alerta si el equipo no está apto
+    if (estado_equipo_inicio === "no_apto") {
+      const [maquina] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, maquina_id)).limit(1);
+      const [empleado] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable).where(eq(empleadosTable.id, empleado_id)).limit(1);
+      
+      await db.insert(alertasTable).values({
+        tipo: "maquina",
+        prioridad: "roja",
+        descripcion: `El operario ${empleado?.nombre} ${empleado?.apellido} reportó que el equipo ${maquina?.nombre} NO ESTÁ APTO para trabajar durante el checklist preoperacional. Observaciones: ${observaciones || "Sin observaciones adicionales."}`,
+        entidad_tipo: "maquina",
+        entidad_id: maquina_id,
+        entidad_nombre: maquina?.nombre
+      });
+      
+      // Cambiar estado de la máquina a detenida automáticamente
+      await db.update(maquinasTable).set({ estado: "detenida" }).where(eq(maquinasTable.id, maquina_id));
+    }
+
+    return res.status(201).json(await enrichJornada(jornada));
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al iniciar jornada: " + (err?.message || "Error interno") });
+  }
 });
 
 router.post("/:id/finalizar", async (req, res) => {
-  const id = parseInt(req.params.id);
-  const { horometro_fin, km_fin, problemas, estado_equipo_fin, foto_tablero_fin, combustible_nivel, aceite_estado, danos_choques } = req.body;
-  if (horometro_fin === undefined) return res.status(400).json({ error: "Horómetro final requerido" });
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+    const { horometro_fin, km_fin, problemas, estado_equipo_fin, foto_tablero_fin, combustible_nivel, aceite_estado, danos_choques } = req.body;
+    if (horometro_fin === undefined) return res.status(400).json({ error: "Horómetro final requerido" });
 
-  const horaFin = new Date().toTimeString().slice(0, 5);
+    const horaFin = new Date().toTimeString().slice(0, 5);
 
-  const [jornada] = await db
-    .update(jornadasTable)
-    .set({ horometro_fin: horometro_fin.toString(), km_fin: km_fin?.toString(), problemas, estado_equipo_fin, foto_tablero_fin, combustible_nivel, aceite_estado, danos_choques, hora_fin: horaFin, estado: "finalizada", updatedAt: new Date() })
-    .where(eq(jornadasTable.id, id))
-    .returning();
+    const [jornada] = await db
+      .update(jornadasTable)
+      .set({ horometro_fin: horometro_fin.toString(), km_fin: km_fin?.toString(), problemas, estado_equipo_fin, foto_tablero_fin, combustible_nivel, aceite_estado, danos_choques, hora_fin: horaFin, estado: "finalizada" })
+      .where(eq(jornadasTable.id, id))
+      .returning();
 
-  if (!jornada) return res.status(404).json({ error: "Jornada no encontrada" });
+    if (!jornada) return res.status(404).json({ error: "Jornada no encontrada" });
 
-  await db.insert(actividadTable).values({
-    tipo: "jornada",
-    descripcion: `Jornada finalizada (ID ${id})`,
-    entidad_tipo: "jornada",
-    entidad_id: jornada.id,
-  });
-
-  // Generar alerta y cambiar estado de máquina si requiere mantenimiento o está fuera de servicio
-  if (estado_equipo_fin === "requiere_mantenimiento" || estado_equipo_fin === "fuera_de_servicio") {
-    const [maquina] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, jornada.maquina_id)).limit(1);
-    
-    const prioridad = estado_equipo_fin === "fuera_de_servicio" ? "roja" : "amarilla";
-    const nuevoEstado = estado_equipo_fin === "fuera_de_servicio" ? "detenida" : "mantenimiento";
-    
-    await db.insert(alertasTable).values({
-      tipo: "maquina",
-      prioridad,
-      descripcion: `Checklist de cierre: El equipo ${maquina?.nombre} se reportó como ${estado_equipo_fin.replace(/_/g, ' ')}. Novedades: ${problemas || "Sin detalles."}`,
-      entidad_tipo: "maquina",
-      entidad_id: jornada.maquina_id,
-      entidad_nombre: maquina?.nombre
+    await db.insert(actividadTable).values({
+      tipo: "jornada",
+      descripcion: `Jornada finalizada (ID ${id})`,
+      entidad_tipo: "jornada",
+      entidad_id: jornada.id,
     });
-    
-    await db.update(maquinasTable).set({ estado: nuevoEstado }).where(eq(maquinasTable.id, jornada.maquina_id));
+
+    // Generar alerta y cambiar estado de máquina si requiere mantenimiento o está fuera de servicio
+    if (estado_equipo_fin === "requiere_mantenimiento" || estado_equipo_fin === "fuera_de_servicio") {
+      const [maquina] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, jornada.maquina_id)).limit(1);
+      
+      const prioridad = estado_equipo_fin === "fuera_de_servicio" ? "roja" : "amarilla";
+      const nuevoEstado = estado_equipo_fin === "fuera_de_servicio" ? "detenida" : "mantenimiento";
+      
+      await db.insert(alertasTable).values({
+        tipo: "maquina",
+        prioridad,
+        descripcion: `Checklist de cierre: El equipo ${maquina?.nombre} se reportó como ${estado_equipo_fin.replace(/_/g, ' ')}. Novedades: ${problemas || "Sin detalles."}`,
+        entidad_tipo: "maquina",
+        entidad_id: jornada.maquina_id,
+        entidad_nombre: maquina?.nombre
+      });
+      
+      await db.update(maquinasTable).set({ estado: nuevoEstado }).where(eq(maquinasTable.id, jornada.maquina_id));
+    }
+
+    const enriched = await enrichJornada(jornada);
+
+    // Async append to Google Sheets
+    appendToSheet("Jornadas", [
+      jornada.fecha,
+      enriched.maquina_nombre,
+      enriched.empleado_nombre,
+      jornada.hora_inicio,
+      jornada.hora_fin,
+      jornada.horometro_inicio,
+      jornada.horometro_fin,
+      enriched.horas_trabajadas || "",
+      jornada.ubicacion || "",
+      jornada.tipo_trabajo || "",
+      estado_equipo_fin || "",
+    ]);
+
+    return res.json(enriched);
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al finalizar jornada: " + (err?.message || "Error interno") });
   }
-
-  const enriched = await enrichJornada(jornada);
-
-  // Async append to Google Sheets
-  appendToSheet("Jornadas", [
-    jornada.fecha,
-    enriched.maquina_nombre,
-    enriched.empleado_nombre,
-    jornada.hora_inicio,
-    jornada.hora_fin,
-    jornada.horometro_inicio,
-    jornada.horometro_fin,
-    enriched.horas_trabajadas || "",
-    jornada.ubicacion || "",
-    jornada.tipo_trabajo || "",
-    estado_equipo_fin || "",
-  ]);
-
-  return res.json(enriched);
 });
 
 export default router;

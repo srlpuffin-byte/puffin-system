@@ -27,41 +27,52 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { maquina_id, horas, tipo, descripcion, proximo_service } = req.body;
-  if (!maquina_id || !tipo) return res.status(400).json({ error: "Máquina y tipo son requeridos" });
+  try {
+    const { maquina_id, horas, tipo, descripcion, proximo_service } = req.body;
+    if (!maquina_id || !tipo) return res.status(400).json({ error: "Máquina y tipo son requeridos" });
 
-  const today = new Date().toISOString().split("T")[0];
-  const [mantenimiento] = await db.insert(mantenimientosTable).values({
-    maquina_id, fecha: today,
-    horas: horas?.toString(),
-    tipo, descripcion, proximo_service,
-    estado: "realizado"
-  }).returning();
+    const today = new Date().toISOString().split("T")[0];
+    const [mantenimiento] = await db.insert(mantenimientosTable).values({
+      maquina_id, fecha: today,
+      horas: horas?.toString(),
+      tipo, descripcion, proximo_service,
+      estado: "realizado"
+    }).returning();
 
-  await db.insert(actividadTable).values({
-    tipo: "mantenimiento",
-    descripcion: `Mantenimiento registrado: ${tipo} en máquina ID ${maquina_id}`,
-    entidad_tipo: "mantenimiento",
-    entidad_id: mantenimiento.id,
-  });
+    await db.insert(actividadTable).values({
+      tipo: "mantenimiento",
+      descripcion: `Mantenimiento registrado: ${tipo} en máquina ID ${maquina_id}`,
+      entidad_tipo: "mantenimiento",
+      entidad_id: mantenimiento.id,
+    });
 
-  return res.status(201).json({ ...mantenimiento, maquina_nombre: "Maquinaria", horas: mantenimiento.horas ? Number(mantenimiento.horas) : null });
+    return res.status(201).json({ ...mantenimiento, maquina_nombre: "Maquinaria", horas: mantenimiento.horas ? Number(mantenimiento.horas) : null });
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al registrar mantenimiento: " + (err?.message || "Error interno") });
+  }
 });
 
 router.patch("/:id/estado", async (req, res) => {
-  const id = parseInt(req.params.id);
-  const { estado } = req.body;
-  if (!estado) return res.status(400).json({ error: "Estado es requerido" });
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+    const { estado } = req.body;
+    if (!estado) return res.status(400).json({ error: "Estado es requerido" });
 
-  const [mantenimiento] = await db
-    .update(mantenimientosTable)
-    .set({ estado, updatedAt: new Date() })
-    .where(eq(mantenimientosTable.id, id))
-    .returning();
+    const [mantenimiento] = await db
+      .update(mantenimientosTable)
+      .set({ estado })
+      .where(eq(mantenimientosTable.id, id))
+      .returning();
 
-  if (!mantenimiento) return res.status(404).json({ error: "Mantenimiento no encontrado" });
+    if (!mantenimiento) return res.status(404).json({ error: "Mantenimiento no encontrado" });
 
-  return res.json({ ...mantenimiento, horas: mantenimiento.horas ? Number(mantenimiento.horas) : null });
+    return res.json({ ...mantenimiento, horas: mantenimiento.horas ? Number(mantenimiento.horas) : null });
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al actualizar estado: " + (err?.message || "Error interno") });
+  }
 });
 
 export default router;

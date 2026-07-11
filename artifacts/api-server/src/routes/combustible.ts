@@ -34,48 +34,53 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { maquina_id, empleado_id, litros, precio, importe, estacion, kilometraje, ubicacion } = req.body;
-  if (!maquina_id || !empleado_id || litros === undefined) {
-    return res.status(400).json({ error: "Campos requeridos faltantes" });
+  try {
+    const { maquina_id, empleado_id, litros, precio, importe, estacion, kilometraje, ubicacion } = req.body;
+    if (!maquina_id || !empleado_id || litros === undefined) {
+      return res.status(400).json({ error: "Campos requeridos faltantes" });
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+
+    const [registro] = await db.insert(combustibleTable).values({
+      maquina_id, empleado_id,
+      fecha: today,
+      litros: litros.toString(),
+      precio: precio?.toString(),
+      importe: importe?.toString(),
+      estacion, ubicacion,
+      kilometraje: kilometraje?.toString(),
+    }).returning();
+
+    await db.insert(actividadTable).values({
+      tipo: "combustible",
+      descripcion: `Carga de combustible: ${litros}L en máquina ID ${maquina_id}`,
+      entidad_tipo: "combustible",
+      entidad_id: registro.id,
+    });
+
+    const [maquina] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, maquina_id)).limit(1);
+    const [empleado] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable).where(eq(empleadosTable.id, empleado_id)).limit(1);
+
+    // Async append to Google Sheets
+    appendToSheet("Combustible", [
+      today,
+      new Date().toLocaleTimeString("es-AR"),
+      maquina?.nombre || maquina_id,
+      `${empleado?.nombre} ${empleado?.apellido}`,
+      litros,
+      precio || "",
+      importe || "",
+      estacion || "",
+      ubicacion || "",
+      kilometraje || "",
+    ]);
+
+    return res.status(201).json({ ...registro, litros: Number(registro.litros) });
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al registrar combustible: " + (err?.message || "Error interno") });
   }
-
-  const today = new Date().toISOString().split("T")[0];
-
-  const [registro] = await db.insert(combustibleTable).values({
-    maquina_id, empleado_id,
-    fecha: today,
-    litros: litros.toString(),
-    precio: precio?.toString(),
-    importe: importe?.toString(),
-    estacion, ubicacion,
-    kilometraje: kilometraje?.toString(),
-  }).returning();
-
-  await db.insert(actividadTable).values({
-    tipo: "combustible",
-    descripcion: `Carga de combustible: ${litros}L en máquina ID ${maquina_id}`,
-    entidad_tipo: "combustible",
-    entidad_id: registro.id,
-  });
-
-  const [maquina] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, maquina_id)).limit(1);
-  const [empleado] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable).where(eq(empleadosTable.id, empleado_id)).limit(1);
-
-  // Async append to Google Sheets
-  appendToSheet("Combustible", [
-    today,
-    new Date().toLocaleTimeString("es-AR"),
-    maquina?.nombre || maquina_id,
-    `${empleado?.nombre} ${empleado?.apellido}`,
-    litros,
-    precio || "",
-    importe || "",
-    estacion || "",
-    ubicacion || "",
-    kilometraje || "",
-  ]);
-
-  return res.status(201).json({ ...registro, litros: Number(registro.litros) });
 });
 
 export default router;

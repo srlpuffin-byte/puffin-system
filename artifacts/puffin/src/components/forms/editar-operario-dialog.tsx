@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Empleado } from "@workspace/api-client-react";
 import { MultiImageUpload, UploadedImage } from "../ui/multi-image-upload";
+import { apiFetch } from "@/lib/api";
 
 const CARGOS = ["Operador de Retroexcavadora", "Operador de Niveladora", "Operador de Compactadora", "Chofer", "Ayudante", "Capataz", "Operario General", "Mecánico", "Administrativo"];
 
@@ -24,7 +25,7 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
   const uploadMut = useUploadFotografia();
   const [fotoPerfil, setFotoPerfil] = useState<UploadedImage[]>([]);
   const [fotoCarnet, setFotoCarnet] = useState<UploadedImage[]>([]);
-  
+
   const [form, setForm] = useState({
     nombre: "", apellido: "", dni: "", telefono: "", cargo: "", fecha_ingreso: "",
     contacto_familiar_nombre: "", contacto_familiar_telefono: "", contacto_familiar_relacion: "", estado: ""
@@ -57,37 +58,26 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
       toast.error("Nombre, apellido y DNI son obligatorios");
       return;
     }
-    
+
     setIsPending(true);
     try {
-      const token = localStorage.getItem("puffin_token");
-      const res = await fetch(`/api/empleados/${operario.id}`, {
+      await apiFetch(`/empleados/${operario.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
         body: JSON.stringify({
-          ...form,
+          nombre: form.nombre,
+          apellido: form.apellido,
+          dni: form.dni,
           telefono: form.telefono || null,
           cargo: form.cargo || null,
+          estado: form.estado,
           fecha_ingreso: form.fecha_ingreso || null,
           contacto_familiar_nombre: form.contacto_familiar_nombre || null,
           contacto_familiar_telefono: form.contacto_familiar_telefono || null,
-          contacto_familiar_relacion: form.contacto_familiar_relacion || null
-        })
+          contacto_familiar_relacion: form.contacto_familiar_relacion || null,
+        }),
       });
-      
-      if (res.status === 401) {
-        localStorage.removeItem("puffin_token");
-        window.location.href = "/login";
-        return;
-      }
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Error al actualizar" }));
-        throw new Error(err.error || "Error al actualizar");
-      }
-      
+
+      // Subir fotos si hay
       if (fotoPerfil.length > 0 || fotoCarnet.length > 0) {
         try {
           const uploads = [];
@@ -103,7 +93,7 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
           }
           await Promise.all(uploads);
         } catch {
-          toast.error("Error al subir las fotografías");
+          toast.error("Datos guardados, pero hubo un error al subir las fotos");
         }
       }
 
@@ -127,7 +117,6 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
           <DialogTitle>Editar Operario</DialogTitle>
         </DialogHeader>
 
-        {/* Área scrollable */}
         <div className="flex-1 overflow-y-auto pr-1">
           <form id="editar-operario-form" onSubmit={handleSubmit} className="space-y-3 py-1">
             <div className="grid grid-cols-2 gap-3">
@@ -171,6 +160,7 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
                 </Select>
               </div>
             </div>
+
             <div className="border-t pt-2">
               <p className="text-xs font-medium text-muted-foreground mb-2">Contacto de emergencia</p>
               <div className="grid grid-cols-2 gap-3">
@@ -188,6 +178,7 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
                 <Input placeholder="Ej. Esposa, Hermano" value={form.contacto_familiar_relacion} onChange={e => set("contacto_familiar_relacion", e.target.value)} />
               </div>
             </div>
+
             <div className="border-t pt-2 grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Foto Perfil</Label>
@@ -201,9 +192,10 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
           </form>
         </div>
 
-        {/* Footer siempre visible */}
         <DialogFooter className="flex-shrink-0 border-t pt-3 mt-1">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+            Cancelar
+          </Button>
           <Button type="submit" form="editar-operario-form" className="bg-primary" disabled={isPending}>
             {isPending ? "Guardando..." : "Guardar Cambios"}
           </Button>

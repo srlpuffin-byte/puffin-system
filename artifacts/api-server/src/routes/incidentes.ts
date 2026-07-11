@@ -32,45 +32,56 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { empleado_id, maquina_id, tipo, descripcion } = req.body;
-  if (!tipo || !descripcion) return res.status(400).json({ error: "Tipo y descripción son requeridos" });
+  try {
+    const { empleado_id, maquina_id, tipo, descripcion } = req.body;
+    if (!tipo || !descripcion) return res.status(400).json({ error: "Tipo y descripción son requeridos" });
 
-  const today = new Date().toISOString().split("T")[0];
-  const [incidente] = await db.insert(incidentesTable).values({
-    empleado_id, maquina_id, tipo, descripcion, fecha: today, estado: "activo"
-  }).returning();
+    const today = new Date().toISOString().split("T")[0];
+    const [incidente] = await db.insert(incidentesTable).values({
+      empleado_id, maquina_id, tipo, descripcion, fecha: today, estado: "activo"
+    }).returning();
 
-  await db.insert(actividadTable).values({
-    tipo: "incidente",
-    descripcion: `Incidente registrado: ${tipo} - ${descripcion.slice(0, 50)}`,
-    entidad_tipo: "incidente",
-    entidad_id: incidente.id,
-  });
+    await db.insert(actividadTable).values({
+      tipo: "incidente",
+      descripcion: `Incidente registrado: ${tipo} - ${descripcion.slice(0, 50)}`,
+      entidad_tipo: "incidente",
+      entidad_id: incidente.id,
+    });
 
-  return res.status(201).json({ ...incidente, empleado_nombre: null, maquina_nombre: null });
+    return res.status(201).json({ ...incidente, empleado_nombre: null, maquina_nombre: null });
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al registrar incidente: " + (err?.message || "Error interno") });
+  }
 });
 
 router.put("/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
-  const { estado } = req.body;
-  if (!estado) return res.status(400).json({ error: "Estado es requerido" });
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+    const { estado } = req.body;
+    if (!estado) return res.status(400).json({ error: "Estado es requerido" });
 
-  const [incidente] = await db
-    .update(incidentesTable)
-    .set({ estado, updatedAt: new Date() })
-    .where(eq(incidentesTable.id, id))
-    .returning();
+    const [incidente] = await db
+      .update(incidentesTable)
+      .set({ estado })
+      .where(eq(incidentesTable.id, id))
+      .returning();
 
-  if (!incidente) return res.status(404).json({ error: "Incidente no encontrado" });
+    if (!incidente) return res.status(404).json({ error: "Incidente no encontrado" });
 
-  await db.insert(actividadTable).values({
-    tipo: "incidente",
-    descripcion: `Incidente marcado como ${estado}: ${incidente.tipo}`,
-    entidad_tipo: "incidente",
-    entidad_id: incidente.id,
-  });
+    await db.insert(actividadTable).values({
+      tipo: "incidente",
+      descripcion: `Incidente marcado como ${estado}: ${incidente.tipo}`,
+      entidad_tipo: "incidente",
+      entidad_id: incidente.id,
+    });
 
-  return res.json(incidente);
+    return res.json(incidente);
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al actualizar incidente: " + (err?.message || "Error interno") });
+  }
 });
 
 export default router;

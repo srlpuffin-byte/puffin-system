@@ -44,37 +44,44 @@ router.get("/:id", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
-  const { 
-    nombre, estado, horometro, kilometros, proximo_service,
-    codigo, tipo, marca, modelo, anio, patente, dominio, chasis, motor,
-    filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio
-  } = req.body;
-  const updateData: Record<string, unknown> = { updatedAt: new Date() };
-  if (nombre !== undefined) updateData.nombre = nombre;
-  if (estado !== undefined) updateData.estado = estado;
-  if (horometro !== undefined) updateData.horometro = horometro.toString();
-  if (kilometros !== undefined) updateData.kilometros = kilometros.toString();
-  if (proximo_service !== undefined) updateData.proximo_service = proximo_service;
-  
-  if (codigo !== undefined) updateData.codigo = codigo;
-  if (tipo !== undefined) updateData.tipo = tipo;
-  if (marca !== undefined) updateData.marca = marca;
-  if (modelo !== undefined) updateData.modelo = modelo;
-  if (anio !== undefined) updateData.anio = anio;
-  if (patente !== undefined) updateData.patente = patente;
-  if (dominio !== undefined) updateData.dominio = dominio;
-  if (chasis !== undefined) updateData.chasis = chasis;
-  if (motor !== undefined) updateData.motor = motor;
-  
-  if (filtro_tipo !== undefined) updateData.filtro_tipo = filtro_tipo;
-  if (filtro_codigo !== undefined) updateData.filtro_codigo = filtro_codigo;
-  if (filtro_fecha_cambio !== undefined) updateData.filtro_fecha_cambio = filtro_fecha_cambio;
-  if (filtro_proximo_cambio !== undefined) updateData.filtro_proximo_cambio = filtro_proximo_cambio;
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+    const { 
+      nombre, estado, horometro, kilometros, proximo_service,
+      codigo, tipo, marca, modelo, anio, patente, dominio, chasis, motor,
+      filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio
+    } = req.body;
+    
+    const updateData: Record<string, unknown> = {};
+    if (nombre !== undefined) updateData.nombre = nombre;
+    if (estado !== undefined) updateData.estado = estado;
+    if (horometro !== undefined) updateData.horometro = horometro.toString();
+    if (kilometros !== undefined) updateData.kilometros = kilometros.toString();
+    if (proximo_service !== undefined) updateData.proximo_service = proximo_service;
+    
+    if (codigo !== undefined) updateData.codigo = codigo;
+    if (tipo !== undefined) updateData.tipo = tipo;
+    if (marca !== undefined) updateData.marca = marca;
+    if (modelo !== undefined) updateData.modelo = modelo;
+    if (anio !== undefined) updateData.anio = anio;
+    if (patente !== undefined) updateData.patente = patente;
+    if (dominio !== undefined) updateData.dominio = dominio;
+    if (chasis !== undefined) updateData.chasis = chasis;
+    if (motor !== undefined) updateData.motor = motor;
+    
+    if (filtro_tipo !== undefined) updateData.filtro_tipo = filtro_tipo;
+    if (filtro_codigo !== undefined) updateData.filtro_codigo = filtro_codigo;
+    if (filtro_fecha_cambio !== undefined) updateData.filtro_fecha_cambio = filtro_fecha_cambio;
+    if (filtro_proximo_cambio !== undefined) updateData.filtro_proximo_cambio = filtro_proximo_cambio;
 
-  const [maquina] = await db.update(maquinasTable).set(updateData).where(eq(maquinasTable.id, id)).returning();
-  if (!maquina) return res.status(404).json({ error: "Maquinaria no encontrada" });
-  return res.json({ ...maquina, horometro: Number(maquina.horometro), kilometros: Number(maquina.kilometros) });
+    const [maquina] = await db.update(maquinasTable).set(updateData).where(eq(maquinasTable.id, id)).returning();
+    if (!maquina) return res.status(404).json({ error: "Maquinaria no encontrada" });
+    return res.json({ ...maquina, horometro: Number(maquina.horometro), kilometros: Number(maquina.kilometros) });
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al actualizar máquina: " + (err?.message || "Error interno") });
+  }
 });
 
 export default router;

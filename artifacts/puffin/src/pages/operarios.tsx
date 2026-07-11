@@ -12,6 +12,7 @@ import { ExportButtons } from "@/components/ui/export-buttons";
 import { useQueryClient } from "@tanstack/react-query";
 import { Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiFetch } from "@/lib/api";
 
 export function Operarios() {
   const [search, setSearch] = useState("");
@@ -23,15 +24,11 @@ export function Operarios() {
   const handleDelete = async (id: number) => {
     if (!confirm("¿Estás seguro de eliminar este operario?")) return;
     try {
-      const res = await fetch(`/api/empleados/${id}`, {
-        method: "DELETE",
-        headers: { "Authorization": `Bearer ${localStorage.getItem("puffin_token")}` }
-      });
-      if (!res.ok) throw new Error("Error al eliminar");
+      await apiFetch(`/empleados/${id}`, { method: "DELETE" });
       queryClient.invalidateQueries({ queryKey: ["getEmpleados"] });
       toast({ title: "Operario eliminado" });
-    } catch (err) {
-      toast({ variant: "destructive", title: "Error al eliminar el operario" });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: err?.message || "Error al eliminar el operario" });
     }
   };
 
