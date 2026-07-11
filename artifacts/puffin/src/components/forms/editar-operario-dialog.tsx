@@ -60,11 +60,12 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
     
     setIsPending(true);
     try {
+      const token = localStorage.getItem("puffin_token");
       const res = await fetch(`/api/empleados/${operario.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("puffin_token")}`
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
           ...form,
@@ -72,14 +73,22 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
           cargo: form.cargo || null,
           fecha_ingreso: form.fecha_ingreso || null,
           contacto_familiar_nombre: form.contacto_familiar_nombre || null,
-          contacto_familiar_telefono: form.contacto_familiar_telefono || null
+          contacto_familiar_telefono: form.contacto_familiar_telefono || null,
+          contacto_familiar_relacion: form.contacto_familiar_relacion || null
         })
       });
       
-      if (!res.ok) throw new Error("Error al actualizar");
+      if (res.status === 401) {
+        localStorage.removeItem("puffin_token");
+        window.location.href = "/login";
+        return;
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Error al actualizar" }));
+        throw new Error(err.error || "Error al actualizar");
+      }
       
       if (fotoPerfil.length > 0 || fotoCarnet.length > 0) {
-        toast.loading("Subiendo fotografías...", { id: "uploading-photos-emp-edit" });
         try {
           const uploads = [];
           if (fotoPerfil.length > 0) {
@@ -93,9 +102,7 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
             }));
           }
           await Promise.all(uploads);
-          toast.dismiss("uploading-photos-emp-edit");
-        } catch (error) {
-          toast.dismiss("uploading-photos-emp-edit");
+        } catch {
           toast.error("Error al subir las fotografías");
         }
       }
@@ -106,8 +113,8 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
       onOpenChange(false);
       setFotoPerfil([]);
       setFotoCarnet([]);
-    } catch (err) {
-      toast.error("Error al actualizar operario");
+    } catch (err: any) {
+      toast.error(err?.message || "Error al actualizar operario");
     } finally {
       setIsPending(false);
     }
@@ -115,86 +122,92 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="max-w-lg flex flex-col" style={{ maxHeight: "90vh" }}>
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Editar Operario</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 py-2">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label>Nombre *</Label>
-              <Input value={form.nombre} onChange={e => set("nombre", e.target.value)} required />
-            </div>
-            <div className="space-y-1">
-              <Label>Apellido *</Label>
-              <Input value={form.apellido} onChange={e => set("apellido", e.target.value)} required />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label>DNI *</Label>
-              <Input value={form.dni} onChange={e => set("dni", e.target.value)} required />
-            </div>
-            <div className="space-y-1">
-              <Label>Teléfono</Label>
-              <Input value={form.telefono} onChange={e => set("telefono", e.target.value)} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label>Cargo</Label>
-              <Select value={form.cargo} onValueChange={v => set("cargo", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                <SelectContent>
-                  {CARGOS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Estado</Label>
-              <Select value={form.estado} onValueChange={v => set("estado", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="activo">Activo</SelectItem>
-                  <SelectItem value="inactivo">Inactivo</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="pt-2 border-t">
-            <p className="text-sm font-medium text-muted-foreground mb-2">Contacto de emergencia</p>
-            <div className="grid grid-cols-2 gap-4">
+
+        {/* Área scrollable */}
+        <div className="flex-1 overflow-y-auto pr-1">
+          <form id="editar-operario-form" onSubmit={handleSubmit} className="space-y-3 py-1">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Nombre familiar</Label>
-                <Input value={form.contacto_familiar_nombre} onChange={e => set("contacto_familiar_nombre", e.target.value)} />
+                <Label className="text-xs">Nombre *</Label>
+                <Input value={form.nombre} onChange={e => set("nombre", e.target.value)} required />
               </div>
               <div className="space-y-1">
-                <Label>Teléfono familiar</Label>
-                <Input value={form.contacto_familiar_telefono} onChange={e => set("contacto_familiar_telefono", e.target.value)} />
+                <Label className="text-xs">Apellido *</Label>
+                <Input value={form.apellido} onChange={e => set("apellido", e.target.value)} required />
               </div>
             </div>
-            <div className="space-y-1 mt-4">
-              <Label>Relación</Label>
-              <Input placeholder="Ej. Esposa, Hermano" value={form.contacto_familiar_relacion} onChange={e => set("contacto_familiar_relacion", e.target.value)} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">DNI *</Label>
+                <Input value={form.dni} onChange={e => set("dni", e.target.value)} required />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Teléfono</Label>
+                <Input value={form.telefono} onChange={e => set("telefono", e.target.value)} />
+              </div>
             </div>
-          </div>
-          <div className="pt-2 border-t grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label>Actualizar Foto Perfil</Label>
-              <MultiImageUpload images={fotoPerfil} onChange={setFotoPerfil} maxImages={1} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Cargo</Label>
+                <Select value={form.cargo} onValueChange={v => set("cargo", v)}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectContent>
+                    {CARGOS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Estado</Label>
+                <Select value={form.estado} onValueChange={v => set("estado", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="activo">Activo</SelectItem>
+                    <SelectItem value="inactivo">Inactivo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label>Actualizar Carnet</Label>
-              <MultiImageUpload images={fotoCarnet} onChange={setFotoCarnet} maxImages={1} />
+            <div className="border-t pt-2">
+              <p className="text-xs font-medium text-muted-foreground mb-2">Contacto de emergencia</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Nombre familiar</Label>
+                  <Input value={form.contacto_familiar_nombre} onChange={e => set("contacto_familiar_nombre", e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Teléfono familiar</Label>
+                  <Input value={form.contacto_familiar_telefono} onChange={e => set("contacto_familiar_telefono", e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-1 mt-2">
+                <Label className="text-xs">Relación</Label>
+                <Input placeholder="Ej. Esposa, Hermano" value={form.contacto_familiar_relacion} onChange={e => set("contacto_familiar_relacion", e.target.value)} />
+              </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" className="bg-primary" disabled={isPending}>
-              {isPending ? "Guardando..." : "Guardar Cambios"}
-            </Button>
-          </DialogFooter>
-        </form>
+            <div className="border-t pt-2 grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Foto Perfil</Label>
+                <MultiImageUpload images={fotoPerfil} onChange={setFotoPerfil} maxImages={1} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Carnet</Label>
+                <MultiImageUpload images={fotoCarnet} onChange={setFotoCarnet} maxImages={1} />
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {/* Footer siempre visible */}
+        <DialogFooter className="flex-shrink-0 border-t pt-3 mt-1">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button type="submit" form="editar-operario-form" className="bg-primary" disabled={isPending}>
+            {isPending ? "Guardando..." : "Guardar Cambios"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
