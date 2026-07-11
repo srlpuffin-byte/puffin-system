@@ -25,7 +25,7 @@ export function Operarios() {
     try {
       const res = await fetch(`/api/empleados/${id}`, {
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
+        headers: { "Authorization": `Bearer ${localStorage.getItem("puffin_token")}` }
       });
       if (!res.ok) throw new Error("Error al eliminar");
       queryClient.invalidateQueries({ queryKey: ["getEmpleados"] });

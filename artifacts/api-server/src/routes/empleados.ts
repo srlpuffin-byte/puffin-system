@@ -73,10 +73,10 @@ router.get("/:id", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  const { nombre, apellido, telefono, cargo, estado, contacto_familiar_nombre, contacto_familiar_telefono, contacto_familiar_relacion } = req.body;
+  const { nombre, apellido, dni, telefono, cargo, estado, fecha_ingreso, contacto_familiar_nombre, contacto_familiar_telefono, contacto_familiar_relacion } = req.body;
   const [empleado] = await db
     .update(empleadosTable)
-    .set({ nombre, apellido, telefono, cargo, estado, contacto_familiar_nombre, contacto_familiar_telefono, contacto_familiar_relacion, updatedAt: new Date() })
+    .set({ nombre, apellido, dni, telefono, cargo, estado, fecha_ingreso, contacto_familiar_nombre, contacto_familiar_telefono, contacto_familiar_relacion, updatedAt: new Date() })
     .where(eq(empleadosTable.id, id))
     .returning();
   if (!empleado) return res.status(404).json({ error: "Operario no encontrado" });

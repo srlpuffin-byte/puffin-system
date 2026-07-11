@@ -8,6 +8,14 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
       ...(options.headers as Record<string, string> || {}),
     },
   });
+
+  // Si el servidor responde 401 (token expirado o inválido), limpiar sesión y redirigir al login
+  if (resp.status === 401) {
+    localStorage.removeItem("puffin_token");
+    window.location.href = "/login";
+    throw new Error("Sesión expirada. Por favor, inicia sesión nuevamente.");
+  }
+
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ error: `Error ${resp.status}` }));
     throw new Error(err.error || `Error ${resp.status}`);
