@@ -72,15 +72,34 @@ router.get("/:id", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
-  const { nombre, apellido, dni, telefono, cargo, estado, fecha_ingreso, contacto_familiar_nombre, contacto_familiar_telefono, contacto_familiar_relacion } = req.body;
-  const [empleado] = await db
-    .update(empleadosTable)
-    .set({ nombre, apellido, dni, telefono, cargo, estado, fecha_ingreso, contacto_familiar_nombre, contacto_familiar_telefono, contacto_familiar_relacion, updatedAt: new Date() })
-    .where(eq(empleadosTable.id, id))
-    .returning();
-  if (!empleado) return res.status(404).json({ error: "Operario no encontrado" });
-  return res.json({ ...empleado, jornada_activa: false, alertas_count: 0 });
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+    const { nombre, apellido, dni, telefono, cargo, estado, fecha_ingreso, contacto_familiar_nombre, contacto_familiar_telefono, contacto_familiar_relacion } = req.body;
+    
+    const updateData: Record<string, any> = {};
+    if (nombre !== undefined) updateData.nombre = nombre;
+    if (apellido !== undefined) updateData.apellido = apellido;
+    if (dni !== undefined) updateData.dni = dni;
+    if (telefono !== undefined) updateData.telefono = telefono || null;
+    if (cargo !== undefined) updateData.cargo = cargo || null;
+    if (estado !== undefined) updateData.estado = estado;
+    if (fecha_ingreso !== undefined) updateData.fecha_ingreso = fecha_ingreso || null;
+    if (contacto_familiar_nombre !== undefined) updateData.contacto_familiar_nombre = contacto_familiar_nombre || null;
+    if (contacto_familiar_telefono !== undefined) updateData.contacto_familiar_telefono = contacto_familiar_telefono || null;
+    if (contacto_familiar_relacion !== undefined) updateData.contacto_familiar_relacion = contacto_familiar_relacion || null;
+
+    const [empleado] = await db
+      .update(empleadosTable)
+      .set(updateData)
+      .where(eq(empleadosTable.id, id))
+      .returning();
+    if (!empleado) return res.status(404).json({ error: "Operario no encontrado" });
+    return res.json({ ...empleado, jornada_activa: false, alertas_count: 0 });
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al actualizar operario: " + (err?.message || "Error interno") });
+  }
 });
 
 router.delete("/:id", async (req, res) => {
