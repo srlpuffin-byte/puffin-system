@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { empleadosTable, jornadasTable, alertasTable, documentosTable } from "@workspace/db";
 import { eq, and, or, ilike, sql } from "drizzle-orm";
+import { updateOrAppendToSheet } from "../services/sheets";
 
 const router = Router();
 
@@ -61,6 +62,19 @@ router.post("/", async (req, res) => {
     estado_doc: "vencido"
   });
   
+  // Sincronizar con Google Sheets
+  await updateOrAppendToSheet("Empleados", [
+    empleado.nombre,
+    empleado.apellido,
+    empleado.dni,
+    empleado.telefono || "",
+    empleado.cargo || "",
+    empleado.fecha_ingreso || "",
+    empleado.contacto_familiar_nombre || "",
+    empleado.contacto_familiar_telefono || "",
+    empleado.id // Columna I
+  ], 8, empleado.id); // index 8 is column I
+  
   return res.status(201).json({ ...empleado, jornada_activa: false, alertas_count: 0 });
 });
 
@@ -95,6 +109,20 @@ router.put("/:id", async (req, res) => {
       .where(eq(empleadosTable.id, id))
       .returning();
     if (!empleado) return res.status(404).json({ error: "Operario no encontrado" });
+
+    // Sincronizar con Google Sheets
+    await updateOrAppendToSheet("Empleados", [
+      empleado.nombre,
+      empleado.apellido,
+      empleado.dni,
+      empleado.telefono || "",
+      empleado.cargo || "",
+      empleado.fecha_ingreso || "",
+      empleado.contacto_familiar_nombre || "",
+      empleado.contacto_familiar_telefono || "",
+      empleado.id // Columna I
+    ], 8, empleado.id);
+
     return res.json({ ...empleado, jornada_activa: false, alertas_count: 0 });
   } catch (err: any) {
     req.log?.error(err);
