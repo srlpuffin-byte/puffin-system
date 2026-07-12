@@ -28,13 +28,40 @@ async function enrichJornada(j: typeof jornadasTable.$inferSelect) {
   };
 }
 
+import { usuariosTable } from "@workspace/db";
+import { ilike } from "drizzle-orm";
+
 router.get("/", async (req, res) => {
   const { empleado_id, maquina_id, estado } = req.query as Record<string, string>;
   let query = db.select().from(jornadasTable).$dynamic();
   const conditions = [];
+  
   if (empleado_id) conditions.push(eq(jornadasTable.empleado_id, parseInt(empleado_id)));
   if (maquina_id) conditions.push(eq(jornadasTable.maquina_id, parseInt(maquina_id)));
   if (estado) conditions.push(eq(jornadasTable.estado, estado));
+
+  // Role-Based Access Control: Empleados solo ven sus propias jornadas
+  if (req.user?.rol?.toLowerCase() === "empleado") {
+    const [usuario] = await db.select().from(usuariosTable).where(eq(usuariosTable.id, req.user.id)).limit(1);
+    if (usuario) {
+      const [empleado] = await db.select().from(empleadosTable)
+        .where(
+          and(
+            ilike(empleadosTable.nombre, usuario.nombre),
+            ilike(empleadosTable.apellido, usuario.apellido)
+          )
+        ).limit(1);
+      
+      if (empleado) {
+        conditions.push(eq(jornadasTable.empleado_id, empleado.id));
+      } else {
+        conditions.push(eq(jornadasTable.empleado_id, -1)); // Fuerza a no devolver nada si no hace match
+      }
+    } else {
+      conditions.push(eq(jornadasTable.empleado_id, -1));
+    }
+  }
+
   if (conditions.length) query = query.where(and(...conditions));
 
   const jornadas = await query.orderBy(jornadasTable.createdAt);

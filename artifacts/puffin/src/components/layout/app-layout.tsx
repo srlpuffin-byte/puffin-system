@@ -219,8 +219,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
       <nav className="flex-1 overflow-y-auto py-3 px-2">
         {NAV_GROUPS.filter(group => {
-          if (user?.rol === "empleado") {
-            // Empleados solo ven Panel, Operación y Control (Incidentes)
+          if (user?.rol?.toLowerCase() === "empleado") {
+            // Empleados solo ven Principal, Operación y Control
             if (group.label === "Principal") return true;
             if (group.label === "Operación") return true;
             if (group.label === "Control") return true;
@@ -229,7 +229,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           return true;
         }).map((group) => {
           let filteredItems = group.items;
-          if (user?.rol === "empleado") {
+          if (user?.rol?.toLowerCase() === "empleado") {
             if (group.label === "Operación") {
               filteredItems = group.items.filter(item => 
                 item.href !== "/operarios" && item.href !== "/maquinas"
