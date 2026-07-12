@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
-import { useGetEmpleado } from "@workspace/api-client-react";
+import { useGetEmpleado, useGetFotografias } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ export function OperarioFicha() {
   const [, setLocation] = useLocation();
   const operarioId = parseInt(id || "0", 10);
   const { data: operario, isLoading } = useGetEmpleado(operarioId, { query: { enabled: !!operarioId } as any });
+  const { data: fotografias } = useGetFotografias({ entidad_tipo: "empleado", entidad_id: operarioId }, { query: { enabled: !!operarioId } as any });
   const [openJornada, setOpenJornada] = useState(false);
   const [openIncidente, setOpenIncidente] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
@@ -35,12 +36,22 @@ export function OperarioFicha() {
   if (!operario.contacto_familiar_telefono) missingInfo.push("Teléfono de contacto de emergencia");
   if (!(operario as any).contacto_familiar_relacion) missingInfo.push("Relación de contacto de emergencia");
 
+  const fotoPerfil = fotografias?.find(f => f.descripcion === "Foto de perfil" || f.descripcion?.toLowerCase().includes("perfil"));
+  const fotoCarnet = fotografias?.find(f => f.descripcion === "Carnet de conducir" || f.descripcion?.toLowerCase().includes("carnet"));
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Link href="/operarios">
           <Button variant="outline" size="icon"><ChevronLeft className="h-4 w-4" /></Button>
         </Link>
+        {fotoPerfil ? (
+          <img src={fotoPerfil.url} alt="Perfil" className="w-16 h-16 rounded-full object-cover border-2 border-primary/20 shadow-sm" />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/20">
+            <User className="h-8 w-8 text-primary" />
+          </div>
+        )}
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
             {operario.nombre} {operario.apellido}
@@ -81,52 +92,62 @@ export function OperarioFicha() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Datos Personales
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                <Phone className="h-3 w-3" /> Teléfono
-              </p>
-              <p className="font-medium">{operario.telefono || "-"}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                <FileText className="h-3 w-3" /> Fecha Ingreso
-              </p>
-              <p className="font-medium">
-                {operario.fecha_ingreso ? format(new Date(operario.fecha_ingreso), "dd/MM/yyyy") : "-"}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Cargo</p>
-              <p className="font-medium">{operario.cargo || "No asignado"}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Estado</p>
-              <p className="font-medium capitalize">{operario.estado}</p>
-            </div>
-            {operario.alertas_count ? (
-              <div className="col-span-2 mt-2 p-3 bg-red-50 border border-red-200 rounded-md text-red-800 flex items-center justify-between">
-                <span className="font-medium">
-                  {operario.alertas_count} incidente(s) / alerta(s) registrada(s)
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="bg-white text-red-600 hover:text-red-700"
-                  onClick={() => setLocation("/incidentes")}
-                >
-                  Ver historial
-                </Button>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Datos Personales
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Phone className="h-3 w-3" /> Teléfono
+                    </p>
+                    <p className="font-medium">{operario.telefono || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      <FileText className="h-3 w-3" /> Fecha Ingreso
+                    </p>
+                    <p className="font-medium">
+                      {operario.fecha_ingreso ? format(new Date(operario.fecha_ingreso), "dd/MM/yyyy") : "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Cargo</p>
+                    <p className="font-medium">{operario.cargo || "No asignado"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Estado</p>
+                    <p className="font-medium capitalize">{operario.estado}</p>
+                  </div>
+                </div>
+                
+                {fotoCarnet && (
+                  <div className="mt-6 pt-6 border-t">
+                    <p className="text-sm font-semibold mb-3">Carnet de Conducir</p>
+                    <img src={fotoCarnet.url} alt="Carnet" className="max-w-full md:max-w-[300px] h-auto rounded-lg shadow-sm border border-border/50 object-cover" />
+                  </div>
+                )}
+
+                {operario.alertas_count ? (
+                  <div className="mt-6 p-3 bg-red-50 border border-red-200 rounded-md text-red-800 flex items-center justify-between">
+                    <span className="font-medium">
+                      {operario.alertas_count} incidente(s) / alerta(s) registrada(s)
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-white text-red-600 hover:text-red-700"
+                      onClick={() => setLocation("/incidentes")}
+                    >
+                      Ver historial
+                    </Button>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
 
         <Card>
           <CardHeader>
