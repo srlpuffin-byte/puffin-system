@@ -238,8 +238,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               filteredItems = group.items.filter(item => 
                 item.href === "/incidentes"
               );
+            } else if (group.label === "Principal") {
+              filteredItems = [
+                ...group.items,
+                { icon: UserCog, label: "Mis Datos", href: "/mis-datos" }
+              ];
             }
           }
+          
           return (
             <NavGroupComponent
               key={group.label}
@@ -248,6 +254,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 items: filteredItems.map(item => {
                   if (item.href === "/operarios") return { ...item, badge: hasIncompleteOperarios };
                   if (item.href === "/maquinas") return { ...item, badge: hasIncompleteMaquinas };
+                  
+                  // For the employee themselves
+                  if (item.href === "/mis-datos") {
+                    const isFaltante = empleados?.find(e => e.id === Number(user?.empleado_id) || (e.nombre === user?.nombre && e.apellido === user?.apellido));
+                    let badge = false;
+                    if (isFaltante) {
+                      badge = !isFaltante.dni || isFaltante.dni === "COMPLETAR" || !isFaltante.telefono || !isFaltante.contacto_familiar_telefono;
+                    }
+                    return { ...item, badge };
+                  }
+
                   return item;
                 }) 
               }}

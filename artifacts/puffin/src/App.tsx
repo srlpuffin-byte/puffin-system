@@ -27,6 +27,7 @@ import { Americangis } from "@/pages/americangis";
 import { Egresos } from "@/pages/egresos";
 import { Xpert } from "@/pages/xpert";
 import { Cierres } from "@/pages/cierres";
+import { MisDatos } from "@/pages/mis-datos";
 import { useEffect } from "react";
 import { getAuthToken } from "@/hooks/use-auth";
 
@@ -75,6 +76,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/panel"><ProtectedRoute component={Panel} /></Route>
+      <Route path="/mis-datos"><ProtectedRoute component={MisDatos} /></Route>
       <Route path="/maquinas"><ProtectedRoute component={Maquinas} /></Route>
       <Route path="/maquinas/:id"><ProtectedRoute component={MaquinaFicha} /></Route>
       <Route path="/operarios"><ProtectedRoute component={Operarios} /></Route>

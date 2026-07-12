@@ -78,6 +78,21 @@ router.post("/", async (req, res) => {
   return res.status(201).json({ ...empleado, jornada_activa: false, alertas_count: 0 });
 });
 
+import { getEmpleadoIdForUser } from "../lib/auth-helpers";
+
+router.get("/me", async (req, res) => {
+  if (req.user?.rol?.toLowerCase() !== "empleado") {
+    return res.status(403).json({ error: "No eres un empleado" });
+  }
+  const empleadoId = await getEmpleadoIdForUser(req.user.id);
+  if (empleadoId === -1) {
+    return res.status(404).json({ error: "Ficha de operario no encontrada" });
+  }
+  const [empleado] = await db.select().from(empleadosTable).where(eq(empleadosTable.id, empleadoId)).limit(1);
+  if (!empleado) return res.status(404).json({ error: "Operario no encontrado" });
+  return res.json({ ...empleado, jornada_activa: false, alertas_count: 0 });
+});
+
 router.get("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const [empleado] = await db.select().from(empleadosTable).where(eq(empleadosTable.id, id)).limit(1);
@@ -89,6 +104,15 @@ router.put("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+    
+    // RBAC check: Empleados can only update themselves
+    if (req.user?.rol?.toLowerCase() === "empleado") {
+      const userEmpleadoId = await getEmpleadoIdForUser(req.user.id);
+      if (userEmpleadoId !== id) {
+        return res.status(403).json({ error: "No tienes permiso para modificar a otro empleado" });
+      }
+    }
+
     const { nombre, apellido, dni, telefono, cargo, estado, fecha_ingreso, contacto_familiar_nombre, contacto_familiar_telefono, contacto_familiar_relacion } = req.body;
     
     const updateData: Record<string, any> = {};
