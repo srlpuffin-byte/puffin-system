@@ -6,12 +6,22 @@ import { appendToSheet } from "../services/sheets.js";
 
 const router = Router();
 
+import { getEmpleadoIdForUser } from "../lib/auth-helpers";
+
 router.get("/", async (req, res) => {
   const { maquina_id, empleado_id } = req.query as Record<string, string>;
   let query = db.select().from(combustibleTable).$dynamic();
   const conditions = [];
+  
   if (maquina_id) conditions.push(eq(combustibleTable.maquina_id, parseInt(maquina_id)));
   if (empleado_id) conditions.push(eq(combustibleTable.empleado_id, parseInt(empleado_id)));
+
+  // Role-Based Access Control: Empleados solo ven sus propios reportes de combustible
+  if (req.user?.rol?.toLowerCase() === "empleado") {
+    const userEmpleadoId = await getEmpleadoIdForUser(req.user.id);
+    conditions.push(eq(combustibleTable.empleado_id, userEmpleadoId));
+  }
+
   if (conditions.length) query = query.where(and(...conditions));
 
   const registros = await query.orderBy(combustibleTable.fecha);

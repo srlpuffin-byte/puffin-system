@@ -10,6 +10,7 @@ import {
   documentosTable,
 } from "@workspace/db";
 import { eq, sql, and, gte } from "drizzle-orm";
+import { getEmpleadoIdForUser } from "../lib/auth-helpers";
 
 const router = Router();
 
@@ -49,18 +50,32 @@ router.get("/resumen", async (_req, res) => {
     .from(alertasTable)
     .where(and(eq(alertasTable.estado, "activa"), eq(alertasTable.prioridad, "amarilla")));
 
+  const isEmpleado = req.user?.rol?.toLowerCase() === "empleado";
+  let userEmpleadoId = -1;
+  if (isEmpleado) {
+    userEmpleadoId = await getEmpleadoIdForUser(req.user.id);
+  }
+
   const now = new Date();
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
 
   const [combustibleMes] = await db
     .select({ total: sql<number>`coalesce(sum(litros::numeric), 0)` })
     .from(combustibleTable)
-    .where(gte(combustibleTable.fecha, firstDayOfMonth));
+    .where(
+      isEmpleado 
+      ? and(gte(combustibleTable.fecha, firstDayOfMonth), eq(combustibleTable.empleado_id, userEmpleadoId))
+      : gte(combustibleTable.fecha, firstDayOfMonth)
+    );
 
   const jornadasMes = await db
     .select({ horometro_inicio: jornadasTable.horometro_inicio, horometro_fin: jornadasTable.horometro_fin })
     .from(jornadasTable)
-    .where(and(gte(jornadasTable.fecha, firstDayOfMonth), eq(jornadasTable.estado, "finalizada")));
+    .where(
+      isEmpleado
+      ? and(gte(jornadasTable.fecha, firstDayOfMonth), eq(jornadasTable.estado, "finalizada"), eq(jornadasTable.empleado_id, userEmpleadoId))
+      : and(gte(jornadasTable.fecha, firstDayOfMonth), eq(jornadasTable.estado, "finalizada"))
+    );
 
   const horasMes = jornadasMes.reduce((acc, j) => {
     if (j.horometro_inicio && j.horometro_fin) {

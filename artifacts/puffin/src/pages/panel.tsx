@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "wouter";
-import { useGetDashboardResumen, useGetAlertas, useGetActividad } from "@workspace/api-client-react";
+import { useGetDashboardResumen, useGetAlertas, useGetActividad, useGetMe } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
   Calendar,
   Wrench,
   MapPin,
+  User,
 } from "lucide-react";
 
 function prioridadColor(p: string) {
@@ -53,6 +54,9 @@ function formatFechaCorta(iso: string) {
 }
 
 export function Panel() {
+  const { data: user } = useGetMe();
+  const isEmpleado = user?.rol?.toLowerCase() === "empleado";
+
   const { data: resumen, isLoading } = useGetDashboardResumen();
   const { data: alertasData } = useGetAlertas({ estado: "activa" });
   const { data: actividadData } = useGetActividad({ limit: 8 });
@@ -79,73 +83,89 @@ export function Panel() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Link href="/maquinas?estado=activa">
-          <Card className="border-l-4 border-l-green-600 cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Máquinas activas</p>
-                  <div className="text-2xl font-bold text-green-600">{resumen?.maquinas_activas ?? 0}</div>
+      {!isEmpleado && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <Link href="/maquinas?estado=activa">
+            <Card className="border-l-4 border-l-green-600 cursor-pointer hover:shadow-md transition-shadow">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Máquinas activas</p>
+                    <div className="text-2xl font-bold text-green-600">{resumen?.maquinas_activas ?? 0}</div>
+                  </div>
+                  <Truck className="h-7 w-7 text-green-600 opacity-70" />
                 </div>
-                <Truck className="h-7 w-7 text-green-600 opacity-70" />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/maquinas?estado=detenida">
-          <Card className="border-l-4 border-l-yellow-600 cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Detenidas</p>
-                  <div className="text-2xl font-bold text-yellow-600">{resumen?.maquinas_detenidas ?? 0}</div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/maquinas?estado=detenida">
+            <Card className="border-l-4 border-l-yellow-600 cursor-pointer hover:shadow-md transition-shadow">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Detenidas</p>
+                    <div className="text-2xl font-bold text-yellow-600">{resumen?.maquinas_detenidas ?? 0}</div>
+                  </div>
+                  <Settings className="h-7 w-7 text-yellow-600 opacity-70" />
                 </div>
-                <Settings className="h-7 w-7 text-yellow-600 opacity-70" />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/maquinas?estado=mantenimiento">
-          <Card className="border-l-4 border-l-orange-500 cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Mantenimiento</p>
-                  <div className="text-2xl font-bold text-orange-500">{resumen?.maquinas_mantenimiento ?? 0}</div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/maquinas?estado=mantenimiento">
+            <Card className="border-l-4 border-l-orange-500 cursor-pointer hover:shadow-md transition-shadow">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Mantenimiento</p>
+                    <div className="text-2xl font-bold text-orange-500">{resumen?.maquinas_mantenimiento ?? 0}</div>
+                  </div>
+                  <Wrench className="h-7 w-7 text-orange-500 opacity-70" />
                 </div>
-                <Wrench className="h-7 w-7 text-orange-500 opacity-70" />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/operarios">
-          <Card className="border-l-4 border-l-primary cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Operarios activos</p>
-                  <div className="text-2xl font-bold text-primary">{resumen?.empleados_activos ?? 0}</div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/operarios">
+            <Card className="border-l-4 border-l-primary cursor-pointer hover:shadow-md transition-shadow">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Operarios activos</p>
+                    <div className="text-2xl font-bold text-primary">{resumen?.empleados_activos ?? 0}</div>
+                  </div>
+                  <HardHat className="h-7 w-7 text-primary opacity-70" />
                 </div>
-                <HardHat className="h-7 w-7 text-primary opacity-70" />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/alertas">
-          <Card className="border-l-4 border-l-red-600 cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Alertas activas</p>
-                  <div className="text-2xl font-bold text-red-600">{resumen?.alertas_activas ?? 0}</div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/alertas">
+            <Card className="border-l-4 border-l-red-600 cursor-pointer hover:shadow-md transition-shadow">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Alertas activas</p>
+                    <div className="text-2xl font-bold text-red-600">{resumen?.alertas_activas ?? 0}</div>
+                  </div>
+                  <AlertCircle className="h-7 w-7 text-red-600 opacity-70" />
                 </div>
-                <AlertCircle className="h-7 w-7 text-red-600 opacity-70" />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+      )}
+
+      {isEmpleado && (
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="pt-6 pb-6 flex items-center gap-4">
+            <div className="bg-primary/10 p-4 rounded-full">
+              <User className="h-8 w-8 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-primary">¡Hola, {user?.nombre}!</h2>
+              <p className="text-sm text-muted-foreground mt-1">Este es tu panel personal. Aquí verás el resumen de tu actividad, horas trabajadas y combustible registrado este mes.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Card>
@@ -162,71 +182,77 @@ export function Panel() {
             <p className="text-xs text-muted-foreground mt-1">Horas trabajadas</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-5 pb-5 text-center">
-            <Settings className="h-7 w-7 text-slate-500 mx-auto mb-1" />
-            <div className="text-2xl font-bold">{resumen?.mantenimientos_mes ?? 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">Mantenimientos</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-5 pb-5 text-center">
-            <CheckCircle2 className="h-7 w-7 text-green-500 mx-auto mb-1" />
-            <div className="text-2xl font-bold">{resumen?.disponibilidad ?? 0}%</div>
-            <p className="text-xs text-muted-foreground mt-1">Disponibilidad</p>
-          </CardContent>
-        </Card>
+        {!isEmpleado && (
+          <>
+            <Card>
+              <CardContent className="pt-5 pb-5 text-center">
+                <Settings className="h-7 w-7 text-slate-500 mx-auto mb-1" />
+                <div className="text-2xl font-bold">{resumen?.mantenimientos_mes ?? 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">Mantenimientos</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-5 pb-5 text-center">
+                <CheckCircle2 className="h-7 w-7 text-green-500 mx-auto mb-1" />
+                <div className="text-2xl font-bold">{resumen?.disponibilidad ?? 0}%</div>
+                <p className="text-xs text-muted-foreground mt-1">Disponibilidad</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="xl:col-span-2 space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Truck className="h-4 w-4" /> Estado de la Flota
-              </CardTitle>
-              <Link href="/maquinas">
-                <Button variant="ghost" size="sm" className="text-xs gap-1">
-                  Ver todas <ArrowRight className="h-3 w-3" />
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {maquinasResumen.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4 text-sm">No hay maquinaria registrada</p>
-              ) : (
-                <div className="space-y-2">
-                  {maquinasResumen.slice(0, 6).map((maq: any) => (
-                    <div key={maq.id} className="flex items-center justify-between p-2 rounded-lg border bg-card hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-2">
-                        <div className={`h-2 w-2 rounded-full flex-shrink-0 ${
-                          maq.estado === "activa" ? "bg-green-500" :
-                          maq.estado === "mantenimiento" ? "bg-yellow-500" : "bg-red-500"
-                        }`} />
-                        <div>
-                          <p className="text-sm font-medium">{maq.nombre}</p>
-                          <p className="text-xs text-muted-foreground">{maq.tipo}</p>
+          {!isEmpleado && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Truck className="h-4 w-4" /> Estado de la Flota
+                </CardTitle>
+                <Link href="/maquinas">
+                  <Button variant="ghost" size="sm" className="text-xs gap-1">
+                    Ver todas <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </Link>
+              </CardHeader>
+              <CardContent>
+                {maquinasResumen.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4 text-sm">No hay maquinaria registrada</p>
+                ) : (
+                  <div className="space-y-2">
+                    {maquinasResumen.slice(0, 6).map((maq: any) => (
+                      <div key={maq.id} className="flex items-center justify-between p-2 rounded-lg border bg-card hover:bg-slate-50 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <div className={`h-2 w-2 rounded-full flex-shrink-0 ${
+                            maq.estado === "activa" ? "bg-green-500" :
+                            maq.estado === "mantenimiento" ? "bg-yellow-500" : "bg-red-500"
+                          }`} />
+                          <div>
+                            <p className="text-sm font-medium">{maq.nombre}</p>
+                            <p className="text-xs text-muted-foreground">{maq.tipo}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span>{Number(maq.horometro).toFixed(0)} h</span>
+                          <span>{Number(maq.kilometros).toFixed(0)} km</span>
+                          <Badge
+                            className={`text-xs ${
+                              maq.estado === "activa" ? "bg-green-600 text-white" :
+                              maq.estado === "mantenimiento" ? "bg-yellow-600 text-white" :
+                              "bg-red-600 text-white"
+                            }`}
+                          >
+                            {maq.estado === "activa" ? "Activa" : maq.estado === "mantenimiento" ? "Mantenimiento" : "Detenida"}
+                          </Badge>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span>{Number(maq.horometro).toFixed(0)} h</span>
-                        <span>{Number(maq.kilometros).toFixed(0)} km</span>
-                        <Badge
-                          className={`text-xs ${
-                            maq.estado === "activa" ? "bg-green-600 text-white" :
-                            maq.estado === "mantenimiento" ? "bg-yellow-600 text-white" :
-                            "bg-red-600 text-white"
-                          }`}
-                        >
-                          {maq.estado === "activa" ? "Activa" : maq.estado === "mantenimiento" ? "Mantenimiento" : "Detenida"}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-3">
