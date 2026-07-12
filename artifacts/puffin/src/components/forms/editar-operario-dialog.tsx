@@ -98,8 +98,8 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
       }
 
       toast.success("Operario actualizado correctamente");
-      queryClient.invalidateQueries({ queryKey: ["getEmpleado", operario.id] });
-      queryClient.invalidateQueries({ queryKey: ["getEmpleados"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/empleados/${operario.id}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/empleados`] });
       onOpenChange(false);
       setFotoPerfil([]);
       setFotoCarnet([]);
@@ -159,6 +159,10 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Fecha de Ingreso</Label>
+              <Input type="date" value={form.fecha_ingreso} onChange={e => set("fecha_ingreso", e.target.value)} />
             </div>
 
             <div className="border-t pt-2">
