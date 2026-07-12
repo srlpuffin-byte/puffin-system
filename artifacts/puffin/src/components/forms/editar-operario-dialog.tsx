@@ -112,13 +112,13 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg flex flex-col" style={{ maxHeight: "90vh" }}>
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+      <DialogContent className="max-w-lg flex flex-col overflow-hidden" style={{ maxHeight: "90vh" }}>
+        <form onSubmit={handleSubmit} className="flex flex-col overflow-hidden">
           <DialogHeader className="flex-shrink-0 mb-4">
             <DialogTitle>Editar Operario</DialogTitle>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+          <div className="overflow-y-auto pr-1 space-y-3" style={{ maxHeight: "calc(90vh - 140px)" }}>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Nombre *</Label>
