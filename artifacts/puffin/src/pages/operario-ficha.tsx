@@ -124,10 +124,23 @@ export function OperarioFicha() {
                   </div>
                 </div>
                 
-                {fotoCarnet && (
+                {(fotoCarnet || fotoPerfil) && (
                   <div className="mt-6 pt-6 border-t">
-                    <p className="text-sm font-semibold mb-3">Carnet de Conducir</p>
-                    <img src={fotoCarnet.url} alt="Carnet" className="max-w-full md:max-w-[300px] h-auto rounded-lg shadow-sm border border-border/50 object-cover" />
+                    <p className="text-sm font-semibold mb-3">Documentación Fotográfica</p>
+                    <div className="flex flex-wrap gap-4">
+                      {fotoPerfil && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Foto de Perfil</p>
+                          <img src={fotoPerfil.url} alt="Perfil" className="w-32 h-32 md:w-48 md:h-48 rounded-lg shadow-sm border border-border/50 object-cover" />
+                        </div>
+                      )}
+                      {fotoCarnet && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Carnet de Conducir</p>
+                          <img src={fotoCarnet.url} alt="Carnet" className="max-w-full md:max-w-[300px] h-auto rounded-lg shadow-sm border border-border/50 object-cover" />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
