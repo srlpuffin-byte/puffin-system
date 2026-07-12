@@ -85,7 +85,7 @@
   --secondary-foreground: 0 0% 100%;
   
   --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  --muted-foreground: 215.4 20% 30%; /* Darker for better contrast */
   
   --accent: 210 40% 96.1%;
   --accent-foreground: 222.2 47.4% 11.2%;
@@ -116,6 +116,9 @@
 }
 
 @layer base {
+  html {
+    font-size: 17px; /* Aumentar ligeramente la escala base de Tailwind (1rem = 17px en lugar de 16px) */
+  }
   * {
     @apply border-border;
   }

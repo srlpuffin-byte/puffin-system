@@ -118,7 +118,7 @@ function NavGroupComponent({ group, location, onNavigate }: { group: NavGroup; l
     <div className="mb-1">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50 hover:text-sidebar-foreground/80 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider text-sidebar-foreground/60 hover:text-sidebar-foreground/90 transition-colors"
       >
         {group.label}
         {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
@@ -131,15 +131,15 @@ function NavGroupComponent({ group, location, onNavigate }: { group: NavGroup; l
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className={`flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
+                  className={`flex items-center justify-between px-3 py-3 rounded-md text-sm font-medium transition-colors ${
                     active
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
-                      : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/80"
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
+                      : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/90"
                   }`}
                   onClick={() => onNavigate?.()}
                 >
                   <div className="flex items-center gap-3">
-                    <item.icon className="h-4 w-4 flex-shrink-0" />
+                    <item.icon className="h-5 w-5 flex-shrink-0" />
                     {item.label}
                   </div>
                   {item.badge && (
