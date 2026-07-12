@@ -303,7 +303,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex bg-background" style={{height: '100dvh', overflow: 'hidden'}}>
       <div className="hidden lg:flex flex-shrink-0">
         <Sidebar />
       </div>
@@ -317,7 +317,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <main className="flex-1 overflow-auto bg-slate-50 flex flex-col">
+      <main className="flex-1 bg-slate-50 flex flex-col min-w-0" style={{overflowY: 'auto', WebkitOverflowScrolling: 'touch'}}>
         <div className="lg:hidden h-14 bg-white border-b flex items-center justify-between px-4 flex-shrink-0">
           <div className="flex items-center">
             <Button variant="ghost" size="sm" onClick={() => setMobileOpen(true)} className="mr-2">
