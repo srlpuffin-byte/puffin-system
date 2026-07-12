@@ -100,6 +100,7 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
       toast.success("Operario actualizado correctamente");
       queryClient.invalidateQueries({ queryKey: [`/api/empleados/${operario.id}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/empleados`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/fotografias`] });
       onOpenChange(false);
       setFotoPerfil([]);
       setFotoCarnet([]);
