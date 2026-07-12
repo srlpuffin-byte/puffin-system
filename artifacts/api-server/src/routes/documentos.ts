@@ -16,28 +16,38 @@ function calcEstado(fechaVenc: string): { estado: string; dias_restantes: number
 }
 
 router.get("/", async (req, res) => {
-  const { tipo } = req.query as Record<string, string>;
-  let query = db.select().from(documentosTable).$dynamic();
-  if (tipo) query = query.where(eq(documentosTable.tipo, tipo));
+  try {
+    const { tipo, entidad_id, entidad_tipo } = req.query as Record<string, string>;
+    let query = db.select().from(documentosTable).$dynamic();
+    
+    const conditions = [];
+    if (tipo) conditions.push(eq(documentosTable.tipo, tipo));
+    if (entidad_id) conditions.push(eq(documentosTable.entidad_id, parseInt(entidad_id)));
+    if (entidad_tipo) conditions.push(eq(documentosTable.entidad_tipo, entidad_tipo));
+    if (conditions.length) query = query.where(and(...conditions));
 
-  const docs = await query.orderBy(documentosTable.fecha_vencimiento);
+    const docs = await query.orderBy(documentosTable.fecha_vencimiento);
 
-  const enriched = await Promise.all(docs.map(async d => {
-    let entidad_nombre: string | null = null;
-    if (d.entidad_tipo === "empleado" && d.entidad_id) {
-      const [e] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
-        .from(empleadosTable).where(eq(empleadosTable.id, d.entidad_id)).limit(1);
-      if (e) entidad_nombre = `${e.nombre} ${e.apellido}`;
-    } else if (d.entidad_tipo === "maquina" && d.entidad_id) {
-      const [m] = await db.select({ nombre: maquinasTable.nombre })
-        .from(maquinasTable).where(eq(maquinasTable.id, d.entidad_id)).limit(1);
-      if (m) entidad_nombre = m.nombre;
-    }
-    const { estado, dias_restantes } = calcEstado(d.fecha_vencimiento);
-    return { ...d, entidad_nombre, estado, dias_restantes };
-  }));
+    const enriched = await Promise.all(docs.map(async d => {
+      let entidad_nombre: string | null = null;
+      if (d.entidad_tipo === "empleado" && d.entidad_id) {
+        const [e] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
+          .from(empleadosTable).where(eq(empleadosTable.id, d.entidad_id)).limit(1);
+        if (e) entidad_nombre = `${e.nombre} ${e.apellido}`;
+      } else if (d.entidad_tipo === "maquina" && d.entidad_id) {
+        const [m] = await db.select({ nombre: maquinasTable.nombre })
+          .from(maquinasTable).where(eq(maquinasTable.id, d.entidad_id)).limit(1);
+        if (m) entidad_nombre = m.nombre;
+      }
+      const { estado, dias_restantes } = calcEstado(d.fecha_vencimiento);
+      return { ...d, entidad_nombre, estado, dias_restantes };
+    }));
 
-  return res.json(enriched);
+    return res.json(enriched);
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al obtener documentos: " + (err?.message || "Error interno") });
+  }
 });
 
 router.post("/", async (req, res) => {

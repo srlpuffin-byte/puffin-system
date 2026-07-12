@@ -4,14 +4,28 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { format } from "date-fns";
 import { AñadirDocumentoDialog } from "@/components/forms/aniadir-documento-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { useLocation } from "wouter";
 
 export function Documentos() {
-  const { data: documentos, isLoading } = useGetDocumentos();
+  const [location] = useLocation();
+
+  // Parse query params from the hash-based router (wouter uses hash or path)
+  const searchParams = new URLSearchParams(
+    typeof window !== "undefined" ? window.location.search : ""
+  );
+  const empleadoIdParam = searchParams.get("empleado_id");
+  const empleadoNombreParam = searchParams.get("nombre");
+  const empleadoId = empleadoIdParam ? parseInt(empleadoIdParam) : undefined;
+
+  const { data: documentos, isLoading } = useGetDocumentos(
+    empleadoId ? ({ entidad_id: empleadoId, entidad_tipo: "empleado" } as any) : undefined
+  );
   const [openDialog, setOpenDialog] = useState(false);
+  const [, navigate] = useLocation();
 
   const exportColumns = [
     { header: "Tipo", key: "tipo", formatter: (v: string) => v?.charAt(0).toUpperCase() + v?.slice(1) },
@@ -25,7 +39,24 @@ export function Documentos() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight text-primary">Documentación</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-primary">Documentación</h1>
+          {empleadoId && empleadoNombreParam && (
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="outline" className="text-sm">
+                Filtrando por: {decodeURIComponent(empleadoNombreParam)}
+              </Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-muted-foreground"
+                onClick={() => navigate("/documentos")}
+              >
+                <X className="h-3 w-3 mr-1" /> Ver todos
+              </Button>
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           {documentos && (
             <ExportButtons 
@@ -60,7 +91,9 @@ export function Documentos() {
                 {isLoading ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-8">Cargando documentos...</TableCell></TableRow>
                 ) : documentos?.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No hay documentos registrados.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    {empleadoId ? "Este operario no tiene documentos registrados." : "No hay documentos registrados."}
+                  </TableCell></TableRow>
                 ) : (
                   documentos?.map((doc) => (
                     <TableRow key={doc.id}>

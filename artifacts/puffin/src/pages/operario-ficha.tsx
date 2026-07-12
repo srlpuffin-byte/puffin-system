@@ -172,7 +172,10 @@ export function OperarioFicha() {
             <Button
               variant="outline"
               className="w-full"
-              onClick={() => setLocation("/documentos")}
+              onClick={() => {
+                const nombre = encodeURIComponent(`${operario.nombre} ${operario.apellido}`);
+                window.location.href = `/documentos?empleado_id=${operario.id}&nombre=${nombre}`;
+              }}
             >
               Ver Documentación
             </Button>
