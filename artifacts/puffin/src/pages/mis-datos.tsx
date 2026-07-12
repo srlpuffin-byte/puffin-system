@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useUploadFotografia } from "@workspace/api-client-react";
+import { useUploadFotografia, useGetFotografias } from "@workspace/api-client-react";
 import { useGetEmpleadosMe } from "@/hooks/use-get-empleados-me";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,14 @@ export function MisDatos() {
   const [isPending, setIsPending] = useState(false);
   const uploadMut = useUploadFotografia();
   const { data: operario, isLoading } = useGetEmpleadosMe();
+  
+  const { data: fotografias } = useGetFotografias(
+    { entidad_tipo: "empleado", entidad_id: operario?.id ?? 0 }, 
+    { query: { enabled: !!operario?.id } as any }
+  );
+
+  const fotoPerfilExistente = fotografias?.find(f => f.descripcion === "Foto de perfil" || f.descripcion?.toLowerCase().includes("perfil"));
+  const fotoCarnetExistente = fotografias?.find(f => f.descripcion === "Carnet de conducir" || f.descripcion?.toLowerCase().includes("carnet"));
 
   const [fotoPerfil, setFotoPerfil] = useState<UploadedImage[]>([]);
   const [fotoCarnet, setFotoCarnet] = useState<UploadedImage[]>([]);
@@ -189,11 +197,30 @@ export function MisDatos() {
                 <div className="space-y-2 bg-slate-50 p-4 rounded-lg border border-slate-100">
                   <Label className="font-semibold text-primary">Foto de Perfil</Label>
                   <p className="text-xs text-muted-foreground mb-2">Sube una foto clara de tu rostro.</p>
+                  
+                  {fotoPerfilExistente && fotoPerfil.length === 0 && (
+                    <div className="mb-4">
+                      <p className="text-xs font-medium text-green-700 mb-2 flex items-center">✓ Foto actual guardada</p>
+                      <img src={fotoPerfilExistente.url} alt="Foto de perfil actual" className="w-32 h-32 object-cover rounded-lg border border-slate-200" />
+                      <p className="text-xs text-muted-foreground mt-2">Sube una nueva imagen abajo si deseas reemplazarla.</p>
+                    </div>
+                  )}
+                  
                   <MultiImageUpload images={fotoPerfil} onChange={setFotoPerfil} maxImages={1} />
                 </div>
+                
                 <div className="space-y-2 bg-slate-50 p-4 rounded-lg border border-slate-100">
                   <Label className="font-semibold text-primary">Carnet de Conducir / Operador</Label>
                   <p className="text-xs text-muted-foreground mb-2">Sube una foto legible de tu carnet.</p>
+
+                  {fotoCarnetExistente && fotoCarnet.length === 0 && (
+                    <div className="mb-4">
+                      <p className="text-xs font-medium text-green-700 mb-2 flex items-center">✓ Carnet actual guardado</p>
+                      <img src={fotoCarnetExistente.url} alt="Carnet actual" className="max-w-full h-auto max-h-40 object-cover rounded-lg border border-slate-200" />
+                      <p className="text-xs text-muted-foreground mt-2">Sube una nueva imagen abajo si deseas reemplazarla.</p>
+                    </div>
+                  )}
+
                   <MultiImageUpload images={fotoCarnet} onChange={setFotoCarnet} maxImages={1} />
                 </div>
               </div>
