@@ -110,7 +110,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-function NavGroupComponent({ group, location }: { group: NavGroup; location: string }) {
+function NavGroupComponent({ group, location, onNavigate }: { group: NavGroup; location: string, onNavigate?: () => void }) {
   const isActive = group.items.some((i) => location.startsWith(i.href));
   const [open, setOpen] = useState(group.defaultOpen ?? isActive);
 
@@ -136,6 +136,7 @@ function NavGroupComponent({ group, location }: { group: NavGroup; location: str
                       ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
                       : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/80"
                   }`}
+                  onClick={() => onNavigate?.()}
                 >
                   <div className="flex items-center gap-3">
                     <item.icon className="h-4 w-4 flex-shrink-0" />
@@ -206,7 +207,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const Sidebar = () => (
+  const Sidebar = ({ onNavigate }: { onNavigate?: () => void }) => (
     <aside className="w-60 bg-sidebar text-sidebar-foreground flex flex-col flex-shrink-0 border-r border-sidebar-border h-full">
       <div className="h-14 flex items-center justify-between px-4 border-b border-sidebar-border flex-shrink-0">
         <div className="flex items-center font-bold text-lg">
@@ -269,6 +270,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 }) 
               }}
               location={location}
+              onNavigate={onNavigate}
             />
           );
         })}
@@ -310,7 +312,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
           <div className="absolute left-0 top-0 h-full w-60">
-            <Sidebar />
+            <Sidebar onNavigate={() => setMobileOpen(false)} />
           </div>
         </div>
       )}
@@ -328,7 +330,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <Search className="h-5 w-5" />
           </Button>
         </div>
-        <div className="flex-1 p-4 lg:p-8">
+        <div className="flex-1 p-2 md:p-4 lg:p-8">
           {children}
         </div>
       </main>
