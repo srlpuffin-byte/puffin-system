@@ -40,15 +40,32 @@ const queryClient = new QueryClient({
   },
 });
 
+import { useGetMe } from "@workspace/api-client-react";
+import { useGetEmpleadosMe } from "@/hooks/use-get-empleados-me";
+
 function ProtectedRoute({ component: Component }: { component: React.ComponentType<any> }) {
   const [location, setLocation] = useLocation();
   const token = getAuthToken();
+  const { data: user } = useGetMe();
+  
+  const isEmpleado = user?.rol?.toLowerCase() === "empleado";
+  const { data: operario } = useGetEmpleadosMe({
+    enabled: isEmpleado
+  });
 
   useEffect(() => {
     if (!token) {
       setLocation("/login");
+      return;
     }
-  }, [token, setLocation]);
+
+    if (isEmpleado && operario) {
+      const isFaltante = !operario.dni || operario.dni === "COMPLETAR" || !operario.telefono || !operario.contacto_familiar_telefono;
+      if (isFaltante && location !== "/mis-datos") {
+        setLocation("/mis-datos");
+      }
+    }
+  }, [token, location, setLocation, isEmpleado, operario]);
 
   if (!token) return null;
 
