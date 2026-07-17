@@ -145,6 +145,60 @@ export function NuevaMaquinaDialog({ open, onOpenChange, defaultCategoria = "maq
             )}
           </div>
 
+          {defaultCategoria === "maquinaria" && (
+            <>
+              <div className="border rounded-md p-4 space-y-3 bg-slate-50">
+                <h4 className="text-sm font-semibold text-slate-700">Estado Inicial</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Horómetro Inicial (hs)</Label>
+                    <Input type="number" step="0.1" value={form.horometro} onChange={e => set("horometro", e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Kilometraje Inicial (km)</Label>
+                    <Input type="number" step="0.1" value={form.kilometros} onChange={e => set("kilometros", e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="border rounded-md p-4 space-y-3 bg-slate-50">
+                <h4 className="text-sm font-semibold text-slate-700">Identificación Física</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Nº de Motor</Label>
+                    <Input value={form.motor} onChange={e => set("motor", e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Nº de Chasis</Label>
+                    <Input value={form.chasis} onChange={e => set("chasis", e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="border rounded-md p-4 space-y-3 bg-slate-50">
+                <h4 className="text-sm font-semibold text-slate-700">Filtros y Mantenimiento</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2 space-y-1">
+                    <Label>Tipo de Filtro (Primario / Secundario)</Label>
+                    <Input placeholder="Ej. Filtro de aire primario" value={form.filtro_tipo} onChange={e => set("filtro_tipo", e.target.value)} />
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    <Label>Código del Filtro</Label>
+                    <Input placeholder="Ej. P812160 / AF25270" value={form.filtro_codigo} onChange={e => set("filtro_codigo", e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Fecha cambio filtro</Label>
+                    <Input type="date" value={form.filtro_fecha_cambio} onChange={e => set("filtro_fecha_cambio", e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Próximo cambio filtro</Label>
+                    <Input type="date" value={form.filtro_proximo_cambio} onChange={e => set("filtro_proximo_cambio", e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
           <div className="space-y-1">
             <Label>Fotografía de la Máquina</Label>
             <MultiImageUpload images={images} onChange={setImages} maxImages={1} />
@@ -152,7 +206,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, defaultCategoria = "maq
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button type="submit" className="bg-primary" disabled={createMut.isPending}>
-              {createMut.isPending ? "Guardando..." : "Crear Máquina"}
+              {createMut.isPending ? "Guardando..." : (defaultCategoria === "maquinaria" ? "Crear Máquina" : "Crear Ítem")}
             </Button>
           </DialogFooter>
         </form>
