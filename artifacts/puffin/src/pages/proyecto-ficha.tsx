@@ -92,7 +92,7 @@ export function ProyectoFicha() {
                       <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group">
                         <div className="flex flex-col">
                           <span className="font-medium">{e.nombre} {e.apellido}</span>
-                          <span className="text-xs text-muted-foreground">{e.rol || 'Empleado'}</span>
+                          <span className="text-xs text-muted-foreground">Empleado</span>
                         </div>
                         <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>

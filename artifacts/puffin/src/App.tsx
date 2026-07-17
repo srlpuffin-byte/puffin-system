@@ -30,6 +30,7 @@ import { Cierres } from "@/pages/cierres";
 import { MisDatos } from "@/pages/mis-datos";
 import { Proyectos } from "@/pages/proyectos";
 import { ProyectoFicha } from "@/pages/proyecto-ficha";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { useEffect } from "react";
 import { getAuthToken } from "@/hooks/use-auth";
 
