@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useGetEgresos, useCreateEgreso } from "@workspace/api-client-react";
+import { useGetProyectos } from "@/hooks/use-proyectos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,7 @@ const CATEGORIAS = ["Combustible", "Mantenimiento", "Sueldos", "Repuestos", "Ser
 
 export function Egresos() {
   const { data: egresos, isLoading } = useGetEgresos();
+  const { data: proyectos } = useGetProyectos();
   const [openDialog, setOpenDialog] = useState(false);
   const queryClient = useQueryClient();
   const createMut = useCreateEgreso();
@@ -32,6 +34,7 @@ export function Egresos() {
     categoria: "Otros",
     monto: "",
     metodo_pago: "Efectivo",
+    centro_costos: "General",
     observaciones: ""
   });
 
@@ -45,6 +48,7 @@ export function Egresos() {
       categoria: egreso.categoria || "Otros",
       monto: egreso.monto?.toString() || "",
       metodo_pago: egreso.metodo_pago || "Efectivo",
+      centro_costos: egreso.centro_costos || "General",
       observaciones: egreso.observaciones || ""
     });
     setOpenDialog(true);
@@ -52,7 +56,7 @@ export function Egresos() {
 
   const resetForm = () => {
     setEditingId(null);
-    setForm({ fecha: new Date().toISOString().split("T")[0], concepto: "", categoria: "Otros", monto: "", metodo_pago: "Efectivo", observaciones: "" });
+    setForm({ fecha: new Date().toISOString().split("T")[0], concepto: "", categoria: "Otros", monto: "", metodo_pago: "Efectivo", centro_costos: "General", observaciones: "" });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -68,6 +72,7 @@ export function Egresos() {
       categoria: form.categoria,
       monto: parseFloat(form.monto),
       metodo_pago: form.metodo_pago,
+      centro_costos: form.centro_costos === "General" ? undefined : form.centro_costos,
       observaciones: form.observaciones || undefined
     };
 
@@ -133,6 +138,7 @@ export function Egresos() {
                   <TableHead>Fecha</TableHead>
                   <TableHead>Categoría</TableHead>
                   <TableHead>Concepto</TableHead>
+                  <TableHead>Proyecto</TableHead>
                   <TableHead>Método</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
                   <TableHead>Comprobante</TableHead>
@@ -141,9 +147,9 @@ export function Egresos() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-8">Cargando egresos...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando egresos...</TableCell></TableRow>
                 ) : egresos?.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No hay egresos registrados.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay egresos registrados.</TableCell></TableRow>
                 ) : (
                   egresos?.map((eg: any) => (
                     <TableRow key={eg.id}>
@@ -154,6 +160,13 @@ export function Egresos() {
                         <Badge variant="outline">{eg.categoria}</Badge>
                       </TableCell>
                       <TableCell>{eg.concepto}</TableCell>
+                      <TableCell>
+                        {eg.centro_costos ? (
+                          <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{eg.centro_costos}</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>{eg.metodo_pago || "-"}</TableCell>
                       <TableCell className="text-right font-semibold text-red-600">
                         ${eg.monto.toLocaleString("es-AR")}
@@ -208,6 +221,20 @@ export function Egresos() {
             <div className="space-y-1">
               <Label>Concepto *</Label>
               <Input placeholder="Ej. Compra de repuestos" value={form.concepto} onChange={e => set("concepto", e.target.value)} required />
+            </div>
+            <div className="space-y-1">
+              <Label>Proyecto / Lugar del Gasto</Label>
+              <Select value={form.centro_costos} onValueChange={v => set("centro_costos", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar proyecto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="General">General (sin proyecto específico)</SelectItem>
+                  {proyectos?.map(p => (
+                    <SelectItem key={p.id} value={p.lugar}>{p.lugar}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
