@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Download } from "lucide-react";
+import { Plus, Download, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -106,14 +106,68 @@ export function Egresos() {
 
   const total = egresos?.reduce((acc, curr) => acc + curr.monto, 0) || 0;
 
+  const handleSyncSheets = async () => {
+    try {
+      toast.info("Sincronizando con Google Sheets...");
+      const res = await fetch("/api/egresos/sync-sheet", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("puffin_token")}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Google Sheets actualizado con ${data.rowsCount} registros`);
+      } else {
+        toast.error(data.error || "Error al sincronizar");
+      }
+    } catch {
+      toast.error("Error de conexión al sincronizar");
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (!egresos || egresos.length === 0) { toast.error("No hay egresos para exportar"); return; }
+    const headers = ["ID", "Fecha", "Categoría", "Concepto", "Proveedor", "Monto", "Método de Pago", "Comprobante", "Proyecto", "Observaciones"];
+    const rows = egresos.map(e => [
+      e.id,
+      format(new Date(e.fecha), "dd/MM/yyyy", { locale: es }),
+      e.categoria,
+      `"${e.concepto}"`,
+      e.proveedor || "",
+      e.monto,
+      e.metodo_pago || "",
+      e.comprobante ? "SI" : "NO",
+      e.centro_costos || "",
+      `"${e.observaciones || ""}"`
+    ]);
+    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Egresos_${format(new Date(), "yyyy-MM-dd")}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Excel descargado");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Gastos / Egresos</h1>
-        <Button className="bg-primary" onClick={() => setOpenDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Registrar Egreso
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50" onClick={handleSyncSheets}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Sincronizar Sheets
+          </Button>
+          <Button variant="outline" className="border-green-600 text-green-700 hover:bg-green-50" onClick={handleExportCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            Descargar Excel
+          </Button>
+          <Button className="bg-primary" onClick={() => setOpenDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Registrar Egreso
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
