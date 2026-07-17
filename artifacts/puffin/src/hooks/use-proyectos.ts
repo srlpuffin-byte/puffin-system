@@ -25,6 +25,17 @@ export function useGetProyectos() {
   });
 }
 
+export function useGetProyecto(id: number) {
+  return useQuery({
+    queryKey: [`/api/proyectos/${id}`],
+    queryFn: async () => {
+      const res = await apiFetch(`/proyectos/${id}`);
+      return res as Proyecto;
+    },
+    enabled: !!id,
+  });
+}
+
 export function useCreateProyecto() {
   const queryClient = useQueryClient();
   return useMutation({

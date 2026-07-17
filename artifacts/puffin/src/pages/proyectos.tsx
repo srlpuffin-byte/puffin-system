@@ -5,7 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Trash2, MapPin, Users, Tractor, DollarSign, Activity, Pencil, Download } from "lucide-react";
+import { Download, Plus, MapPin, Activity, DollarSign, Users, Tractor, Pencil, Trash2, Eye, Search } from "lucide-react";
+import { Link } from "wouter";
 import { Input } from "@/components/ui/input";
 import { NuevoProyectoDialog } from "@/components/forms/nuevo-proyecto-dialog";
 import { EditarProyectoDialog } from "@/components/forms/editar-proyecto-dialog";
@@ -189,6 +190,16 @@ export function Proyectos() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <Link href={`/proyectos/${p.id}`}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-slate-600 hover:bg-slate-100"
+                              title="Ver detalles del proyecto"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </Link>
                           <Button
                             variant="ghost"
                             size="icon"

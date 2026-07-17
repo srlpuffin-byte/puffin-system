@@ -29,6 +29,7 @@ import { Xpert } from "@/pages/xpert";
 import { Cierres } from "@/pages/cierres";
 import { MisDatos } from "@/pages/mis-datos";
 import { Proyectos } from "@/pages/proyectos";
+import { ProyectoFicha } from "@/pages/proyecto-ficha";
 import { useEffect } from "react";
 import { getAuthToken } from "@/hooks/use-auth";
 
@@ -118,6 +119,7 @@ function Router() {
       <Route path="/americangis"><ProtectedRoute component={Americangis} /></Route>
       <Route path="/xpert"><ProtectedRoute component={Xpert} /></Route>
       <Route path="/proyectos"><ProtectedRoute component={Proyectos} /></Route>
+      <Route path="/proyectos/:id"><ProtectedRoute component={ProyectoFicha} /></Route>
       <Route component={NotFound} />
     </Switch>
   );
