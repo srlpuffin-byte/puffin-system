@@ -118,6 +118,17 @@ export function MaquinaFicha() {
           </CardContent>
         </Card>
 
+        {maquina.descripcion && (
+          <Card className="md:col-span-2 mt-6">
+            <CardHeader>
+              <CardTitle>Descripción / Observaciones</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground whitespace-pre-wrap">{maquina.descripcion}</p>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="space-y-4">
           <Card>
             <CardHeader>

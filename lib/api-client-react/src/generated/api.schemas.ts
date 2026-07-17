@@ -198,6 +198,8 @@ export interface Maquina {
   filtro_fecha_cambio?: string | null;
   /** @nullable */
   filtro_proximo_cambio?: string | null;
+  /** @nullable */
+  descripcion?: string | null;
   categoria?: string;
 }
 
@@ -218,6 +220,7 @@ export interface MaquinaInput {
   filtro_codigo?: string;
   filtro_fecha_cambio?: string;
   filtro_proximo_cambio?: string;
+  descripcion?: string;
   categoria?: string;
 }
 
@@ -251,6 +254,7 @@ export interface MaquinaUpdate {
   filtro_codigo?: string;
   filtro_fecha_cambio?: string;
   filtro_proximo_cambio?: string;
+  descripcion?: string;
   categoria?: string;
 }
 

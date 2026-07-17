@@ -25,6 +25,7 @@ export const maquinasTable = pgTable("maquinas", {
   filtro_codigo: text("filtro_codigo"),
   filtro_fecha_cambio: date("filtro_fecha_cambio"),
   filtro_proximo_cambio: date("filtro_proximo_cambio"),
+  descripcion: text("descripcion"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

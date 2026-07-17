@@ -26,7 +26,8 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
     codigo: "", nombre: "", tipo: "", marca: "", modelo: "",
     anio: "", patente: "", dominio: "", horometro: "", kilometros: "",
     motor: "", chasis: "", estado: "",
-    filtro_tipo: "", filtro_codigo: "", filtro_fecha_cambio: "", filtro_proximo_cambio: ""
+    filtro_tipo: "", filtro_codigo: "", filtro_fecha_cambio: "", filtro_proximo_cambio: "",
+    descripcion: ""
   });
 
   const categoria = maquina?.categoria || "maquinaria";
@@ -51,6 +52,7 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
         filtro_codigo: maquina.filtro_codigo || "",
         filtro_fecha_cambio: maquina.filtro_fecha_cambio || "",
         filtro_proximo_cambio: maquina.filtro_proximo_cambio || "",
+        descripcion: maquina.descripcion || "",
       });
       setImages([]);
     }
@@ -85,6 +87,7 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
           filtro_codigo: form.filtro_codigo || undefined,
           filtro_fecha_cambio: form.filtro_fecha_cambio || undefined,
           filtro_proximo_cambio: form.filtro_proximo_cambio || undefined,
+          descripcion: form.descripcion || undefined,
         },
       },
       {
@@ -229,6 +232,16 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
               </div>
             </>
           )}
+
+          <div className="space-y-1">
+            <Label>Descripción / Observaciones</Label>
+            <textarea
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[80px] resize-y"
+              placeholder="Ej. Casilla con 4 camas, baño y cocina. Estado general bueno."
+              value={form.descripcion}
+              onChange={e => set("descripcion", e.target.value)}
+            />
+          </div>
 
           <div className="space-y-1">
             <Label>Actualizar Fotografía (Opcional)</Label>

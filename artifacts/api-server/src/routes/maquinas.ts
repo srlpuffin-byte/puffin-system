@@ -26,11 +26,11 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { codigo, categoria, nombre, tipo, marca, modelo, anio, patente, dominio, chasis, motor, horometro, kilometros, filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio } = req.body;
+  const { codigo, categoria, nombre, tipo, marca, modelo, anio, patente, dominio, chasis, motor, horometro, kilometros, filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio, descripcion } = req.body;
   if (!nombre || !tipo) return res.status(400).json({ error: "Nombre y tipo son requeridos" });
   const [maquina] = await db.insert(maquinasTable).values({
     codigo, categoria: categoria || "maquinaria", nombre, tipo, marca, modelo, anio, patente, dominio, chasis, motor,
-    filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio,
+    filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio, descripcion,
     horometro: horometro?.toString() || "0",
     kilometros: kilometros?.toString() || "0",
     estado: "activa"
@@ -65,7 +65,7 @@ router.put("/:id", async (req, res) => {
     const { 
       nombre, estado, horometro, kilometros, proximo_service,
       codigo, tipo, marca, modelo, anio, patente, dominio, chasis, motor,
-      filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio
+      filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio, descripcion
     } = req.body;
     
     const updateData: Record<string, unknown> = {};
@@ -89,6 +89,7 @@ router.put("/:id", async (req, res) => {
     if (filtro_codigo !== undefined) updateData.filtro_codigo = filtro_codigo;
     if (filtro_fecha_cambio !== undefined) updateData.filtro_fecha_cambio = filtro_fecha_cambio;
     if (filtro_proximo_cambio !== undefined) updateData.filtro_proximo_cambio = filtro_proximo_cambio;
+    if (descripcion !== undefined) updateData.descripcion = descripcion;
 
     const [maquina] = await db.update(maquinasTable).set(updateData).where(eq(maquinasTable.id, id)).returning();
     if (!maquina) return res.status(404).json({ error: "Maquinaria no encontrada" });
