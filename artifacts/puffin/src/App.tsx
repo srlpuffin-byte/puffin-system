@@ -28,6 +28,7 @@ import { Egresos } from "@/pages/egresos";
 import { Xpert } from "@/pages/xpert";
 import { Cierres } from "@/pages/cierres";
 import { MisDatos } from "@/pages/mis-datos";
+import { Proyectos } from "@/pages/proyectos";
 import { useEffect } from "react";
 import { getAuthToken } from "@/hooks/use-auth";
 
@@ -116,10 +117,13 @@ function Router() {
       <Route path="/ia"><ProtectedRoute component={Ia} /></Route>
       <Route path="/americangis"><ProtectedRoute component={Americangis} /></Route>
       <Route path="/xpert"><ProtectedRoute component={Xpert} /></Route>
+      <Route path="/proyectos"><ProtectedRoute component={Proyectos} /></Route>
       <Route component={NotFound} />
     </Switch>
   );
 }
+
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 
 function App() {
   return (
@@ -129,6 +133,7 @@ function App() {
           <Router />
         </WouterRouter>
         <Toaster />
+        <SonnerToaster />
       </TooltipProvider>
     </QueryClientProvider>
   );

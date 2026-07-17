@@ -154,11 +154,11 @@ export function MisDatos() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Nombre *</Label>
-                <Input value={form.nombre} onChange={e => set("nombre", e.target.value)} required />
+                <Input value={form.nombre} onChange={e => set("nombre", e.target.value)} required disabled className="bg-slate-100" />
               </div>
               <div className="space-y-2">
                 <Label>Apellido *</Label>
-                <Input value={form.apellido} onChange={e => set("apellido", e.target.value)} required />
+                <Input value={form.apellido} onChange={e => set("apellido", e.target.value)} required disabled className="bg-slate-100" />
               </div>
             </div>
 

@@ -14,7 +14,7 @@ import { getEmpleadoIdForUser } from "../lib/auth-helpers";
 
 const router = Router();
 
-router.get("/resumen", async (_req, res) => {
+router.get("/resumen", async (req, res) => {
   const [maquinasActivas] = await db
     .select({ count: sql<number>`count(*)` })
     .from(maquinasTable)
@@ -52,7 +52,7 @@ router.get("/resumen", async (_req, res) => {
 
   const isEmpleado = req.user?.rol?.toLowerCase() === "empleado";
   let userEmpleadoId = -1;
-  if (isEmpleado) {
+  if (isEmpleado && req.user) {
     userEmpleadoId = await getEmpleadoIdForUser(req.user.id);
   }
 

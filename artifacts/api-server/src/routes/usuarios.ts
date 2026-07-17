@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { usuariosTable, empleadosTable, alertasTable, documentosTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, and, ilike } from "drizzle-orm";
 import crypto from "crypto";
 
 const router = Router();
@@ -126,7 +126,12 @@ router.get("/:id", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
   try {
+    const userId = Number(req.params.id);
     const { nombre, apellido, rol, activo, bloqueado } = req.body;
+    
+    const [oldUsuario] = await db.select().from(usuariosTable).where(eq(usuariosTable.id, userId)).limit(1);
+    if (!oldUsuario) return res.status(404).json({ error: "Usuario no encontrado" });
+
     const updateData: Record<string, any> = {};
     if (nombre !== undefined) updateData.nombre = nombre;
     if (apellido !== undefined) updateData.apellido = apellido;
@@ -139,7 +144,7 @@ router.put("/:id", async (req, res) => {
     const [updated] = await db
       .update(usuariosTable)
       .set(updateData)
-      .where(eq(usuariosTable.id, Number(req.params.id)))
+      .where(eq(usuariosTable.id, userId))
       .returning({
         id: usuariosTable.id,
         nombre: usuariosTable.nombre,
@@ -150,6 +155,22 @@ router.put("/:id", async (req, res) => {
         bloqueado: usuariosTable.bloqueado,
       });
     if (!updated) return res.status(404).json({ error: "Usuario no encontrado" });
+
+    // Sync with empleadosTable
+    if ((nombre !== undefined && nombre !== oldUsuario.nombre) || (apellido !== undefined && apellido !== oldUsuario.apellido)) {
+      await db.update(empleadosTable)
+        .set({
+          nombre: nombre ?? oldUsuario.nombre,
+          apellido: apellido ?? oldUsuario.apellido
+        })
+        .where(
+          and(
+            ilike(empleadosTable.nombre, oldUsuario.nombre),
+            ilike(empleadosTable.apellido, oldUsuario.apellido)
+          )
+        );
+    }
+
     return res.json(updated);
   } catch (err) {
     req.log.error(err);

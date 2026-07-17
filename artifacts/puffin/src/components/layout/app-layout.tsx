@@ -60,6 +60,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Operación",
     defaultOpen: true,
     items: [
+      { icon: Map, label: "Proyectos", href: "/proyectos" },
       { icon: Users, label: "Operarios", href: "/operarios" },
       { icon: Truck, label: "Maquinaria", href: "/maquinas" },
       { icon: Clock, label: "Jornadas", href: "/jornadas" },
@@ -258,7 +259,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   
                   // For the employee themselves
                   if (item.href === "/mis-datos") {
-                    const isFaltante = empleados?.find(e => e.id === Number(user?.empleado_id) || (e.nombre === user?.nombre && e.apellido === user?.apellido));
+                    const isFaltante = empleados?.find(e => e.nombre === user?.nombre && e.apellido === user?.apellido);
                     let badge = false;
                     if (isFaltante) {
                       badge = !isFaltante.dni || isFaltante.dni === "COMPLETAR" || !isFaltante.telefono || !isFaltante.contacto_familiar_telefono;

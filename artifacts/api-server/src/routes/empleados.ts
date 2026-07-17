@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { empleadosTable, jornadasTable, alertasTable, documentosTable } from "@workspace/db";
+import { empleadosTable, jornadasTable, alertasTable, documentosTable, usuariosTable } from "@workspace/db";
 import { eq, and, or, ilike, sql } from "drizzle-orm";
 import { updateOrAppendToSheet } from "../services/sheets";
 
@@ -113,6 +113,9 @@ router.put("/:id", async (req, res) => {
       }
     }
 
+    const [oldEmpleado] = await db.select().from(empleadosTable).where(eq(empleadosTable.id, id)).limit(1);
+    if (!oldEmpleado) return res.status(404).json({ error: "Operario no encontrado" });
+
     const { nombre, apellido, dni, telefono, cargo, estado, fecha_ingreso, contacto_familiar_nombre, contacto_familiar_telefono, contacto_familiar_relacion } = req.body;
     
     const updateData: Record<string, any> = {};
@@ -133,6 +136,21 @@ router.put("/:id", async (req, res) => {
       .where(eq(empleadosTable.id, id))
       .returning();
     if (!empleado) return res.status(404).json({ error: "Operario no encontrado" });
+
+    // Sync with usuariosTable
+    if ((nombre !== undefined && nombre !== oldEmpleado.nombre) || (apellido !== undefined && apellido !== oldEmpleado.apellido)) {
+      await db.update(usuariosTable)
+        .set({
+          nombre: nombre ?? oldEmpleado.nombre,
+          apellido: apellido ?? oldEmpleado.apellido
+        })
+        .where(
+          and(
+            ilike(usuariosTable.nombre, oldEmpleado.nombre),
+            ilike(usuariosTable.apellido, oldEmpleado.apellido)
+          )
+        );
+    }
 
     // Sincronizar con Google Sheets
     await updateOrAppendToSheet("Empleados", [
