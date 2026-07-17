@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { MultiImageUpload, UploadedImage } from "../ui/multi-image-upload";
 
 const TIPOS_MAQUINA = ["Retroexcavadora", "Niveladora", "Compactadora", "Camión", "Camión Cisterna", "Grúa", "Pala Cargadora", "Minicargadora", "Bulldozer", "Motoniveladora", "Otro"];
-
+const TIPOS_INVENTARIO = ["Casilla Rodante", "Tanque de Combustible", "Carro Herramientas", "Generador", "Compresor", "Bomba de Agua", "Torre de Iluminación", "Herramienta Menor", "Otro"];
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -28,6 +28,8 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
     motor: "", chasis: "", estado: "",
     filtro_tipo: "", filtro_codigo: "", filtro_fecha_cambio: "", filtro_proximo_cambio: ""
   });
+
+  const categoria = maquina?.categoria || "maquinaria";
 
   useEffect(() => {
     if (maquina && open) {
@@ -122,7 +124,7 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Editar Máquina</DialogTitle>
+          <DialogTitle>Editar {categoria === "maquinaria" ? "Máquina" : "Ítem de Inventario"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
           <div className="grid grid-cols-2 gap-4">
@@ -141,7 +143,7 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
               <Select value={form.tipo} onValueChange={v => set("tipo", v)}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
                 <SelectContent>
-                  {TIPOS_MAQUINA.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {(categoria === "maquinaria" ? TIPOS_MAQUINA : TIPOS_INVENTARIO).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -168,60 +170,66 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
               <Input placeholder="Ej. 320D" value={form.modelo} onChange={e => set("modelo", e.target.value)} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label>Año</Label>
-              <Input type="number" placeholder="Ej. 2020" value={form.anio} onChange={e => set("anio", e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Patente (vehículos)</Label>
-              <Input placeholder="Ej. AB 123 CD" value={form.patente} onChange={e => set("patente", e.target.value)} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label>Dominio / Identificador</Label>
-              <Input placeholder="Ej. RX-012" value={form.dominio} onChange={e => set("dominio", e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Horómetro (h)</Label>
-              <Input type="number" step="0.1" placeholder="0" value={form.horometro} onChange={e => set("horometro", e.target.value)} />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label>Kilometraje (km)</Label>
-            <Input type="number" placeholder="0" value={form.kilometros} onChange={e => set("kilometros", e.target.value)} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label>Número de motor</Label>
-              <Input placeholder="Ej. 4HK1-123456" value={form.motor} onChange={e => set("motor", e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Número de chasis</Label>
-              <Input placeholder="Ej. JALE6LX1..." value={form.chasis} onChange={e => set("chasis", e.target.value)} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label>Tipo de filtro</Label>
-              <Input placeholder="Ej. Aceite / Aire" value={form.filtro_tipo} onChange={e => set("filtro_tipo", e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Código de filtro</Label>
-              <Input placeholder="Ej. LF3349" value={form.filtro_codigo} onChange={e => set("filtro_codigo", e.target.value)} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label>Fecha cambio filtro</Label>
-              <Input type="date" value={form.filtro_fecha_cambio} onChange={e => set("filtro_fecha_cambio", e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Próximo cambio filtro</Label>
-              <Input type="date" value={form.filtro_proximo_cambio} onChange={e => set("filtro_proximo_cambio", e.target.value)} />
-            </div>
-          </div>
+
+          {categoria === "maquinaria" && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Año</Label>
+                  <Input type="number" placeholder="Ej. 2020" value={form.anio} onChange={e => set("anio", e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Patente (vehículos)</Label>
+                  <Input placeholder="Ej. AB 123 CD" value={form.patente} onChange={e => set("patente", e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Dominio / Identificador</Label>
+                  <Input placeholder="Ej. RX-012" value={form.dominio} onChange={e => set("dominio", e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Horómetro (h)</Label>
+                  <Input type="number" step="0.1" placeholder="0" value={form.horometro} onChange={e => set("horometro", e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Kilometraje (km)</Label>
+                <Input type="number" placeholder="0" value={form.kilometros} onChange={e => set("kilometros", e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Número de motor</Label>
+                  <Input placeholder="Ej. 4HK1-123456" value={form.motor} onChange={e => set("motor", e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Número de chasis</Label>
+                  <Input placeholder="Ej. JALE6LX1..." value={form.chasis} onChange={e => set("chasis", e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Tipo de filtro</Label>
+                  <Input placeholder="Ej. Aceite / Aire" value={form.filtro_tipo} onChange={e => set("filtro_tipo", e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Código de filtro</Label>
+                  <Input placeholder="Ej. LF3349" value={form.filtro_codigo} onChange={e => set("filtro_codigo", e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Fecha cambio filtro</Label>
+                  <Input type="date" value={form.filtro_fecha_cambio} onChange={e => set("filtro_fecha_cambio", e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Próximo cambio filtro</Label>
+                  <Input type="date" value={form.filtro_proximo_cambio} onChange={e => set("filtro_proximo_cambio", e.target.value)} />
+                </div>
+              </div>
+            </>
+          )}
+
           <div className="space-y-1">
             <Label>Actualizar Fotografía (Opcional)</Label>
             <MultiImageUpload images={images} onChange={setImages} maxImages={1} />

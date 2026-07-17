@@ -34,14 +34,16 @@ export function MaquinaFicha() {
   if (!maquina) return <div className="p-8 text-center text-red-500">Máquina no encontrada</div>;
 
   const missingInfo: string[] = [];
-  if (!maquina.marca) missingInfo.push("Marca");
-  if (!maquina.modelo) missingInfo.push("Modelo");
-  if (!maquina.anio) missingInfo.push("Año");
-  if (!maquina.patente && !maquina.dominio) missingInfo.push("Patente / Dominio");
-  if (!maquina.motor) missingInfo.push("N° Motor");
-  if (!maquina.chasis) missingInfo.push("N° Chasis");
-  if (!maquina.filtro_tipo) missingInfo.push("Tipo de filtro");
-  if (!maquina.filtro_codigo) missingInfo.push("Código de filtro");
+  if (maquina.categoria === "maquinaria") {
+    if (!maquina.marca) missingInfo.push("Marca");
+    if (!maquina.modelo) missingInfo.push("Modelo");
+    if (!maquina.anio) missingInfo.push("Año");
+    if (!maquina.patente && !maquina.dominio) missingInfo.push("Patente / Dominio");
+    if (!maquina.motor) missingInfo.push("N° Motor");
+    if (!maquina.chasis) missingInfo.push("N° Chasis");
+    if (!maquina.filtro_tipo) missingInfo.push("Tipo de filtro");
+    if (!maquina.filtro_codigo) missingInfo.push("Código de filtro");
+  }
 
   return (
     <div className="space-y-6">
