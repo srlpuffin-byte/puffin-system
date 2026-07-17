@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useUpdateProyecto, type Proyecto } from "@/hooks/use-proyectos";
+import { useUpdateProyecto, useGetProyectos, type Proyecto } from "@/hooks/use-proyectos";
 import { useGetEmpleados, useGetMaquinas } from "@workspace/api-client-react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -26,8 +26,16 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
   const [maquinasIds, setMaquinasIds] = useState<number[]>([]);
 
   const updateMut = useUpdateProyecto();
-  const { data: empleados } = useGetEmpleados();
-  const { data: maquinas } = useGetMaquinas();
+  const { data: proyectos } = useGetProyectos();
+  const { data: empleadosData } = useGetEmpleados();
+  const { data: maquinasData } = useGetMaquinas();
+
+  // Filtrar los que ya están asignados a OTROS proyectos activos
+  const empleadosEnUso = new Set(proyectos?.filter(p => p.estado === "activo" && p.id !== proyecto?.id).flatMap(p => p.empleados_asignados || []));
+  const maquinasEnUso = new Set(proyectos?.filter(p => p.estado === "activo" && p.id !== proyecto?.id).flatMap(p => p.maquinas_asignadas || []));
+
+  const empleados = empleadosData?.filter(emp => !empleadosEnUso.has(emp.id));
+  const maquinas = maquinasData?.filter(maq => !maquinasEnUso.has(maq.id));
 
   // Cargar datos del proyecto al abrir
   useEffect(() => {

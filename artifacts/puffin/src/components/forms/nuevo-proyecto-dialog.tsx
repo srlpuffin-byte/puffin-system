@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useCreateProyecto } from "@/hooks/use-proyectos";
+import { useCreateProyecto, useGetProyectos } from "@/hooks/use-proyectos";
 import { useGetEmpleados, useGetMaquinas } from "@workspace/api-client-react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -23,8 +23,16 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
   const [maquinasIds, setMaquinasIds] = useState<number[]>([]);
   
   const createMut = useCreateProyecto();
-  const { data: empleados } = useGetEmpleados();
-  const { data: maquinas } = useGetMaquinas();
+  const { data: proyectos } = useGetProyectos();
+  const { data: empleadosData } = useGetEmpleados();
+  const { data: maquinasData } = useGetMaquinas();
+
+  // Filtrar los que ya están asignados a proyectos activos
+  const empleadosEnUso = new Set(proyectos?.filter(p => p.estado === "activo").flatMap(p => p.empleados_asignados || []));
+  const maquinasEnUso = new Set(proyectos?.filter(p => p.estado === "activo").flatMap(p => p.maquinas_asignadas || []));
+
+  const empleados = empleadosData?.filter(emp => !empleadosEnUso.has(emp.id));
+  const maquinas = maquinasData?.filter(maq => !maquinasEnUso.has(maq.id));
 
   // Reiniciar estado al abrir/cerrar
   useEffect(() => {
