@@ -65,4 +65,42 @@ router.post("/", async (req, res) => {
   return res.status(201).json({ ...egreso, monto: Number(egreso.monto) });
 });
 
+router.put("/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+  const { fecha, categoria, concepto, proveedor, monto, metodo_pago, comprobante, centro_costos, observaciones } = req.body;
+  
+  const updateData: Record<string, any> = {};
+  if (fecha !== undefined) updateData.fecha = fecha;
+  if (categoria !== undefined) updateData.categoria = categoria;
+  if (concepto !== undefined) updateData.concepto = concepto;
+  if (proveedor !== undefined) updateData.proveedor = proveedor;
+  if (monto !== undefined) updateData.monto = monto.toString();
+  if (metodo_pago !== undefined) updateData.metodo_pago = metodo_pago;
+  if (comprobante !== undefined) updateData.comprobante = comprobante;
+  if (centro_costos !== undefined) updateData.centro_costos = centro_costos;
+  if (observaciones !== undefined) updateData.observaciones = observaciones;
+
+  const [egreso] = await db.update(egresosTable).set(updateData).where(eq(egresosTable.id, id)).returning();
+  if (!egreso) return res.status(404).json({ error: "Egreso no encontrado" });
+
+  import("../services/sheets.js").then(({ updateOrAppendToSheet }) => {
+    updateOrAppendToSheet("Egresos", [
+      egreso.id,
+      egreso.fecha,
+      egreso.categoria,
+      egreso.concepto,
+      egreso.proveedor || "",
+      Number(egreso.monto),
+      egreso.metodo_pago || "",
+      egreso.comprobante ? "SI" : "NO",
+      egreso.centro_costos || "",
+      egreso.observaciones || ""
+    ], 0, egreso.id).catch(console.error);
+  });
+
+  return res.json({ ...egreso, monto: Number(egreso.monto) });
+});
+
 export default router;

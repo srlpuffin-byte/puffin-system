@@ -29,6 +29,7 @@ import type {
   DocumentoInput,
   Egreso,
   EgresoInput,
+  EgresoUpdate,
   EjecutarCierreMensual200,
   Empleado,
   EmpleadoInput,
@@ -3003,6 +3004,51 @@ export const useCreateEgreso = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateEgresoMutationOptions(options));
+    }
+
+/**
+ * @summary Actualizar egreso
+ */
+export const updateEgreso = async (id: number, egresoUpdate: EgresoUpdate, options?: RequestInit): Promise<Egreso> => {
+  return customFetch<Egreso>(`/api/egresos/${id}`,
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(egresoUpdate)
+  }
+);}
+  
+
+export const getUpdateEgresoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEgreso>>, TError,{id: number; data: BodyType<EgresoUpdate>}, TContext>, request?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof updateEgreso>>, TError,{id: number; data: BodyType<EgresoUpdate>}, TContext> => {
+const {mutation: mutationOptions, request: requestOptions} = options ?? {};
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateEgreso>>, {id: number; data: BodyType<EgresoUpdate>}> = (props) => {
+          const {id, data} = props ?? {};
+
+          return  updateEgreso(id,data,requestOptions)
+        }
+
+        return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateEgresoMutationResult = NonNullable<Awaited<ReturnType<typeof updateEgreso>>>
+    export type UpdateEgresoMutationBody = BodyType<EgresoUpdate>
+    export type UpdateEgresoMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Actualizar egreso
+ */
+export const useUpdateEgreso = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEgreso>>, TError,{id: number; data: BodyType<EgresoUpdate>}, TContext>, request?: RequestInit}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateEgreso>>,
+        TError,
+        {id: number; data: BodyType<EgresoUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateEgresoMutationOptions(options));
     }
 
 export const getGlobalSearchUrl = (params?: GlobalSearchParams,) => {

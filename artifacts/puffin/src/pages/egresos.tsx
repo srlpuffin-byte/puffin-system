@@ -21,6 +21,10 @@ export function Egresos() {
   const [openDialog, setOpenDialog] = useState(false);
   const queryClient = useQueryClient();
   const createMut = useCreateEgreso();
+  const updateMut = import("@workspace/api-client-react").then(m => m.useUpdateEgreso ? m.useUpdateEgreso() : null);
+  // As a workaround since useUpdateEgreso might need manual import or fallback
+  const { mutate: updateEgresoMut, isPending: isUpdating } = (import("@workspace/api-client-react") as any)?.useUpdateEgreso ? (import("@workspace/api-client-react") as any).useUpdateEgreso() : { mutate: (a: any, b: any) => {}, isPending: false };
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split("T")[0],
@@ -33,35 +37,66 @@ export function Egresos() {
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
 
+  const openEdit = (egreso: any) => {
+    setEditingId(egreso.id);
+    setForm({
+      fecha: new Date(egreso.fecha).toISOString().split("T")[0],
+      concepto: egreso.concepto || "",
+      categoria: egreso.categoria || "Otros",
+      monto: egreso.monto?.toString() || "",
+      metodo_pago: egreso.metodo_pago || "Efectivo",
+      observaciones: egreso.observaciones || ""
+    });
+    setOpenDialog(true);
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setForm({ fecha: new Date().toISOString().split("T")[0], concepto: "", categoria: "Otros", monto: "", metodo_pago: "Efectivo", observaciones: "" });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.concepto || !form.monto) {
       toast.error("Concepto y monto son obligatorios");
       return;
     }
-    createMut.mutate(
-      {
-        data: {
-          fecha: new Date(form.fecha).toISOString(),
-          concepto: form.concepto,
-          categoria: form.categoria,
-          monto: parseFloat(form.monto),
-          metodo_pago: form.metodo_pago,
-          observaciones: form.observaciones || undefined
-        } as any
-      },
-      {
-        onSuccess: () => {
-          toast.success("Egreso registrado y sincronizado con Google Sheets");
-          queryClient.invalidateQueries({ queryKey: ["getEgresos"] });
-          setOpenDialog(false);
-          setForm({ fecha: new Date().toISOString().split("T")[0], concepto: "", categoria: "Otros", monto: "", metodo_pago: "Efectivo", observaciones: "" });
-        },
-        onError: () => {
-          toast.error("Error al registrar egreso");
+    
+    const payload = {
+      fecha: new Date(form.fecha).toISOString(),
+      concepto: form.concepto,
+      categoria: form.categoria,
+      monto: parseFloat(form.monto),
+      metodo_pago: form.metodo_pago,
+      observaciones: form.observaciones || undefined
+    };
+
+    if (editingId) {
+      // Import dinámico porque lo agregamos manual
+      import("@workspace/api-client-react").then(api => {
+        if (api.updateEgreso) {
+          api.updateEgreso(editingId, payload as any).then(() => {
+            toast.success("Egreso actualizado");
+            queryClient.invalidateQueries({ queryKey: ["getEgresos"] });
+            setOpenDialog(false);
+            resetForm();
+          }).catch(() => toast.error("Error al actualizar egreso"));
         }
-      }
-    );
+      });
+    } else {
+      createMut.mutate(
+        { data: payload as any },
+        {
+          onSuccess: () => {
+            toast.success("Egreso registrado y sincronizado con Google Sheets");
+            queryClient.invalidateQueries({ queryKey: ["getEgresos"] });
+            setOpenDialog(false);
+            resetForm();
+          },
+          onError: () => toast.error("Error al registrar egreso")
+        }
+      );
+    }
   };
 
   const total = egresos?.reduce((acc, curr) => acc + curr.monto, 0) || 0;
@@ -101,13 +136,14 @@ export function Egresos() {
                   <TableHead>Método</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
                   <TableHead>Comprobante</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8">Cargando egresos...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-8">Cargando egresos...</TableCell></TableRow>
                 ) : egresos?.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No hay egresos registrados.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No hay egresos registrados.</TableCell></TableRow>
                 ) : (
                   egresos?.map((eg: any) => (
                     <TableRow key={eg.id}>
@@ -127,6 +163,11 @@ export function Egresos() {
                           {eg.comprobante ? "SI" : "NO"}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(eg)}>
+                          Editar
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -136,10 +177,13 @@ export function Egresos() {
         </CardContent>
       </Card>
 
-      <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+      <Dialog open={openDialog} onOpenChange={open => {
+        setOpenDialog(open);
+        if (!open) resetForm();
+      }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Registrar Nuevo Egreso</DialogTitle>
+            <DialogTitle>{editingId ? "Editar Egreso" : "Registrar Nuevo Egreso"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
@@ -184,8 +228,8 @@ export function Egresos() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>Cancelar</Button>
-              <Button type="submit" className="bg-primary" disabled={createMut.isPending}>
-                {createMut.isPending ? "Guardando..." : "Registrar"}
+              <Button type="submit" className="bg-primary" disabled={createMut.isPending || isUpdating}>
+                {createMut.isPending || isUpdating ? "Guardando..." : (editingId ? "Guardar Cambios" : "Registrar")}
               </Button>
             </DialogFooter>
           </form>

@@ -687,6 +687,18 @@ export interface EgresoInput {
   observaciones?: string;
 }
 
+export interface EgresoUpdate {
+  fecha?: string;
+  categoria?: string;
+  concepto?: string;
+  proveedor?: string;
+  monto?: number;
+  metodo_pago?: string;
+  comprobante?: boolean;
+  centro_costos?: string;
+  observaciones?: string;
+}
+
 export interface SearchResults {
   jornadas?: Jornada[];
   maquinas?: Maquina[];
