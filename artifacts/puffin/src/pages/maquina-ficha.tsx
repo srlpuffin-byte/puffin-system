@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useGetMaquina } from "@workspace/api-client-react";
+import { useGetMaquina, useGetFotografias } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, Truck, Settings, Wrench, Droplets, Edit } from "lucide-react";
+import { ChevronLeft, Truck, Settings, Wrench, Droplets, Edit, Image as ImageIcon } from "lucide-react";
 import { RegistrarMantenimientoDialog } from "@/components/forms/registrar-mantenimiento-dialog";
 import { RegistrarCargaDialog } from "@/components/forms/registrar-carga-dialog";
 import { ReportarIncidenteDialog } from "@/components/forms/reportar-incidente-dialog";
@@ -24,6 +24,7 @@ export function MaquinaFicha() {
   const { id } = useParams();
   const maquinaId = parseInt(id || "0", 10);
   const { data: maquina, isLoading } = useGetMaquina(maquinaId, { query: { enabled: !!maquinaId } as any });
+  const { data: fotos } = useGetFotografias({ entidad_tipo: "maquina", entidad_id: maquinaId }, { query: { enabled: !!maquinaId } as any });
   const [openMant, setOpenMant] = useState(false);
   const [openComb, setOpenComb] = useState(false);
   const [openInc, setOpenInc] = useState(false);
@@ -75,7 +76,26 @@ export function MaquinaFicha() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2">
+        <div className="md:col-span-2 space-y-6">
+          {fotos && fotos.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ImageIcon className="h-5 w-5" />
+                  Fotografías
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {fotos.map(f => (
+                  <div key={f.id} className="relative rounded-lg overflow-hidden border">
+                    <img src={f.url} alt="Fotografía" className="w-full h-48 object-cover" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Truck className="h-5 w-5" />
@@ -117,9 +137,8 @@ export function MaquinaFicha() {
             )}
           </CardContent>
         </Card>
-
         {maquina.descripcion && (
-          <Card className="md:col-span-2 mt-6">
+          <Card className="mt-6">
             <CardHeader>
               <CardTitle>Descripción / Observaciones</CardTitle>
             </CardHeader>
@@ -128,6 +147,7 @@ export function MaquinaFicha() {
             </CardContent>
           </Card>
         )}
+        </div>
 
         <div className="space-y-4">
           <Card>
