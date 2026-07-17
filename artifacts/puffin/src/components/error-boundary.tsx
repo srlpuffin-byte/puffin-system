@@ -23,6 +23,16 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Uncaught error:", error, errorInfo);
+    
+    // Si el error es de carga de chunks (típico cuando se actualiza Vercel),
+    // forzamos una recarga automática para traer la nueva versión
+    const isChunkLoadFailed = 
+      error.message.includes("Failed to fetch dynamically imported module") ||
+      error.message.includes("Importing a module script failed");
+      
+    if (isChunkLoadFailed) {
+      window.location.reload();
+    }
   }
 
   public render() {
