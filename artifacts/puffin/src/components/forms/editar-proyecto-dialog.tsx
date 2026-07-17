@@ -182,23 +182,55 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
                 </span>
               </div>
               <ScrollArea className="h-[220px] border rounded-md p-4">
-                <div className="space-y-3">
-                  {maquinas?.map(maq => (
-                    <div key={maq.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`edit-maq-${maq.id}`}
-                        checked={maquinasIds.includes(maq.id)}
-                        onCheckedChange={() => toggleMaquina(maq.id)}
-                      />
-                      <label
-                        htmlFor={`edit-maq-${maq.id}`}
-                        className="text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1"
-                      >
-                        {maq.marca} {maq.modelo}
-                        <span className="text-xs text-muted-foreground ml-1">· {maq.patente || maq.dominio || "S/P"}</span>
-                      </label>
+                <div className="space-y-4">
+                  {maquinas?.filter(m => m.categoria !== "inventario").length! > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3">Maquinaria Pesada</h4>
+                      <div className="space-y-3">
+                        {maquinas?.filter(m => m.categoria !== "inventario").map(maq => (
+                          <div key={maq.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`edit-maq-${maq.id}`}
+                              checked={maquinasIds.includes(maq.id)}
+                              onCheckedChange={() => toggleMaquina(maq.id)}
+                            />
+                            <label
+                              htmlFor={`edit-maq-${maq.id}`}
+                              className="text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1"
+                            >
+                              {maq.nombre} {maq.marca ? `- ${maq.marca} ${maq.modelo || ''}` : ''}
+                              <span className="text-xs text-muted-foreground ml-1">· {maq.patente || maq.dominio || "S/P"}</span>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
+                  )}
+
+                  {maquinas?.filter(m => m.categoria === "inventario").length! > 0 && (
+                    <div className="pt-2">
+                      <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3">Inventario / Herramientas</h4>
+                      <div className="space-y-3">
+                        {maquinas?.filter(m => m.categoria === "inventario").map(maq => (
+                          <div key={maq.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`edit-maq-${maq.id}`}
+                              checked={maquinasIds.includes(maq.id)}
+                              onCheckedChange={() => toggleMaquina(maq.id)}
+                            />
+                            <label
+                              htmlFor={`edit-maq-${maq.id}`}
+                              className="text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1"
+                            >
+                              {maq.nombre}
+                              <span className="text-xs text-muted-foreground ml-1">· {maq.codigo || maq.tipo}</span>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {(!maquinas || maquinas.length === 0) && (
                     <p className="text-sm text-muted-foreground">No hay máquinas disponibles.</p>
                   )}

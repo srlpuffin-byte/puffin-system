@@ -149,18 +149,46 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
               <Label>Maquinaria Asignada</Label>
               <ScrollArea className="h-[200px] border rounded-md p-4">
                 <div className="space-y-4">
-                  {maquinas?.map(maq => (
-                    <div key={maq.id} className="flex items-center space-x-2">
-                      <Checkbox 
-                        id={`maq-${maq.id}`} 
-                        checked={maquinasIds.includes(maq.id)}
-                        onCheckedChange={() => toggleMaquina(maq.id)}
-                      />
-                      <label htmlFor={`maq-${maq.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
-                        {maq.marca} {maq.modelo} - {maq.patente || maq.dominio || "S/P"}
-                      </label>
+                  {maquinas?.filter(m => m.categoria !== "inventario").length! > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3">Maquinaria Pesada</h4>
+                      <div className="space-y-4">
+                        {maquinas?.filter(m => m.categoria !== "inventario").map(maq => (
+                          <div key={maq.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={`maq-${maq.id}`} 
+                              checked={maquinasIds.includes(maq.id)}
+                              onCheckedChange={() => toggleMaquina(maq.id)}
+                            />
+                            <label htmlFor={`maq-${maq.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                              {maq.nombre} {maq.marca ? `- ${maq.marca} ${maq.modelo || ''}` : ''} <span className="text-muted-foreground">({maq.patente || maq.dominio || "S/P"})</span>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
+                  )}
+
+                  {maquinas?.filter(m => m.categoria === "inventario").length! > 0 && (
+                    <div className="pt-2">
+                      <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3">Inventario / Herramientas</h4>
+                      <div className="space-y-4">
+                        {maquinas?.filter(m => m.categoria === "inventario").map(maq => (
+                          <div key={maq.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={`maq-${maq.id}`} 
+                              checked={maquinasIds.includes(maq.id)}
+                              onCheckedChange={() => toggleMaquina(maq.id)}
+                            />
+                            <label htmlFor={`maq-${maq.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                              {maq.nombre} <span className="text-muted-foreground">- {maq.codigo || maq.tipo}</span>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {(!maquinas || maquinas.length === 0) && (
                     <p className="text-sm text-muted-foreground">No hay máquinas disponibles.</p>
                   )}
