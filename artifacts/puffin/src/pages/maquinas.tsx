@@ -72,27 +72,27 @@ export function Maquinas() {
         </div>
       </div>
 
-      <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg w-full sm:w-fit">
+      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-fit mb-4">
         <button
           onClick={() => { setActiveTab("maquinaria"); setFilterTipo("todos"); }}
-          className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 px-6 py-2.5 rounded-md text-sm font-medium transition-all ${
+          className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 px-8 py-3 rounded-lg text-sm font-semibold transition-all border-2 ${
             activeTab === "maquinaria"
-              ? "bg-white text-primary shadow-sm"
-              : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+              ? "bg-primary text-primary-foreground border-primary shadow-md"
+              : "bg-white text-slate-600 border-slate-200 hover:border-primary/50 hover:bg-slate-50"
           }`}
         >
-          <Truck className="w-4 h-4" />
+          <Truck className="w-5 h-5" />
           <span>Maquinaria Pesada</span>
         </button>
         <button
           onClick={() => { setActiveTab("inventario"); setFilterTipo("todos"); }}
-          className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 px-6 py-2.5 rounded-md text-sm font-medium transition-all ${
+          className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 px-8 py-3 rounded-lg text-sm font-semibold transition-all border-2 ${
             activeTab === "inventario"
-              ? "bg-white text-primary shadow-sm"
-              : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+              ? "bg-primary text-primary-foreground border-primary shadow-md"
+              : "bg-white text-slate-600 border-slate-200 hover:border-primary/50 hover:bg-slate-50"
           }`}
         >
-          <Package className="w-4 h-4" />
+          <Package className="w-5 h-5" />
           <span>Inventario / Herramientas</span>
         </button>
       </div>
