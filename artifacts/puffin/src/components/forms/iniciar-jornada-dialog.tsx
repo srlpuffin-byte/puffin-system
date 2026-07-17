@@ -175,9 +175,9 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
                   <Select value={form.maquina_id} onValueChange={v => set("maquina_id", v)}>
                     <SelectTrigger><SelectValue placeholder="Seleccionar máquina" /></SelectTrigger>
                     <SelectContent>
-                      {(Array.isArray(maquinas) ? maquinas : [])?.map(m => (
+                      {(Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario") : [])?.map(m => (
                         <SelectItem key={m.id} value={m.id.toString()}>
-                          {m.nombre} ({m.codigo})
+                          {m.nombre}{m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>

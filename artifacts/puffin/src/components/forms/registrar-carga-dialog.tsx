@@ -118,7 +118,7 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
                 required
               >
                 <option value="" disabled>Seleccionar máquina</option>
-                {Array.isArray(maquinas) ? maquinas.map(m => <option key={m.id} value={m.id.toString()}>{m.nombre}</option>) : null}
+                {Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario").map(m => <option key={m.id} value={m.id.toString()}>{m.nombre}{m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ''}</option>) : null}
               </select>
             </div>
           )}
