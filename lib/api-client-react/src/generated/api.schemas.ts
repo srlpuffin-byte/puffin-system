@@ -198,6 +198,7 @@ export interface Maquina {
   filtro_fecha_cambio?: string | null;
   /** @nullable */
   filtro_proximo_cambio?: string | null;
+  categoria?: string;
 }
 
 export interface MaquinaInput {
@@ -217,6 +218,7 @@ export interface MaquinaInput {
   filtro_codigo?: string;
   filtro_fecha_cambio?: string;
   filtro_proximo_cambio?: string;
+  categoria?: string;
 }
 
 export type MaquinaUpdateEstado = typeof MaquinaUpdateEstado[keyof typeof MaquinaUpdateEstado];
@@ -249,6 +251,7 @@ export interface MaquinaUpdate {
   filtro_codigo?: string;
   filtro_fecha_cambio?: string;
   filtro_proximo_cambio?: string;
+  categoria?: string;
 }
 
 export type JornadaEstado = typeof JornadaEstado[keyof typeof JornadaEstado];
@@ -721,6 +724,7 @@ export const GetEmpleadosEstado = {
 export type GetMaquinasParams = {
 estado?: GetMaquinasEstado;
 search?: string;
+categoria?: string;
 };
 
 export type GetMaquinasEstado = typeof GetMaquinasEstado[keyof typeof GetMaquinasEstado];

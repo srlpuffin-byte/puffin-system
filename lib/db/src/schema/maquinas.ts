@@ -6,6 +6,7 @@ export const maquinasTable = pgTable("maquinas", {
   id: serial("id").primaryKey(),
   empresa_id: integer("empresa_id").notNull().default(1),
   codigo: text("codigo"),
+  categoria: text("categoria").notNull().default("maquinaria"), // "maquinaria" o "inventario"
   nombre: text("nombre").notNull(),
   tipo: text("tipo").notNull(),
   marca: text("marca"),

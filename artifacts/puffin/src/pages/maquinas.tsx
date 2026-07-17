@@ -10,9 +10,10 @@ import { Search, Plus, X } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { ExportButtons } from "@/components/ui/export-buttons";
 import { NuevaMaquinaDialog } from "@/components/forms/nueva-maquina-dialog";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Package, Truck } from "lucide-react";
 
 const TIPOS_MAQUINA = ["Retroexcavadora", "Niveladora", "Compactadora", "Camión", "Camión Cisterna", "Grúa", "Pala Cargadora", "Minicargadora", "Bulldozer", "Motoniveladora", "Otro"];
+const TIPOS_INVENTARIO = ["Casilla Rodante", "Tanque de Agua", "Tanque de Combustible", "Herramienta Manual", "Herramienta Eléctrica", "Repuesto", "Otro"];
 
 const estadoBadge = (estado: string) => {
   if (estado === "activa") return <Badge className="bg-green-600 hover:bg-green-700">ACTIVA</Badge>;
@@ -25,10 +26,11 @@ export function Maquinas() {
   const searchStr = useSearch();
   const urlParams = new URLSearchParams(searchStr);
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<"maquinaria" | "inventario">("maquinaria");
   const [filterEstado, setFilterEstado] = useState(urlParams.get("estado") || "todos");
   const [filterTipo, setFilterTipo] = useState("todos");
   const [openDialog, setOpenDialog] = useState(false);
-  const { data: maquinasRaw, isLoading } = useGetMaquinas({ search: search || undefined });
+  const { data: maquinasRaw, isLoading } = useGetMaquinas({ search: search || undefined, categoria: activeTab });
 
   const maquinas = (maquinasRaw || []).filter(m => {
     if (filterEstado !== "todos" && m.estado !== filterEstado) return false;
@@ -59,15 +61,40 @@ export function Maquinas() {
             <ExportButtons 
               data={maquinas} 
               columns={exportColumns} 
-              filename="Reporte_Maquinaria" 
-              title="Reporte de Maquinaria" 
+              filename={activeTab === "maquinaria" ? "Reporte_Maquinaria" : "Reporte_Inventario"} 
+              title={activeTab === "maquinaria" ? "Reporte de Maquinaria" : "Reporte de Inventario"} 
             />
           )}
           <Button className="bg-primary flex-1 sm:flex-none" onClick={() => setOpenDialog(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            Nueva Máquina
+            {activeTab === "maquinaria" ? "Nueva Máquina" : "Nuevo Ítem"}
           </Button>
         </div>
+      </div>
+
+      <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg w-full sm:w-fit">
+        <button
+          onClick={() => { setActiveTab("maquinaria"); setFilterTipo("todos"); }}
+          className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 px-6 py-2.5 rounded-md text-sm font-medium transition-all ${
+            activeTab === "maquinaria"
+              ? "bg-white text-primary shadow-sm"
+              : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+          }`}
+        >
+          <Truck className="w-4 h-4" />
+          <span>Maquinaria Pesada</span>
+        </button>
+        <button
+          onClick={() => { setActiveTab("inventario"); setFilterTipo("todos"); }}
+          className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 px-6 py-2.5 rounded-md text-sm font-medium transition-all ${
+            activeTab === "inventario"
+              ? "bg-white text-primary shadow-sm"
+              : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+          }`}
+        >
+          <Package className="w-4 h-4" />
+          <span>Inventario / Herramientas</span>
+        </button>
       </div>
 
       <Card>
@@ -97,7 +124,7 @@ export function Maquinas() {
               <SelectTrigger className="w-[180px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos los tipos</SelectItem>
-                {TIPOS_MAQUINA.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                {(activeTab === "maquinaria" ? TIPOS_MAQUINA : TIPOS_INVENTARIO).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
               </SelectContent>
             </Select>
             {hasFilters && (
@@ -114,7 +141,7 @@ export function Maquinas() {
                   <TableHead>Código</TableHead>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Horómetro/Km</TableHead>
+                  {activeTab === "maquinaria" && <TableHead>Horómetro/Km</TableHead>}
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -130,15 +157,17 @@ export function Maquinas() {
                       <TableCell className="font-medium">{maq.codigo || "-"}</TableCell>
                       <TableCell>{maq.nombre}</TableCell>
                       <TableCell className="capitalize">{maq.tipo}</TableCell>
-                      <TableCell>
-                        {maq.horometro ? `${maq.horometro} h` : "-"}
-                        {maq.horometro && maq.kilometros ? " / " : ""}
-                        {maq.kilometros ? `${maq.kilometros} km` : ""}
-                      </TableCell>
+                      {activeTab === "maquinaria" && (
+                        <TableCell>
+                          {maq.horometro ? `${maq.horometro} h` : "-"}
+                          {maq.horometro && maq.kilometros ? " / " : ""}
+                          {maq.kilometros ? `${maq.kilometros} km` : ""}
+                        </TableCell>
+                      )}
                       <TableCell>{estadoBadge(maq.estado)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-3">
-                          {(!maq.marca || !maq.modelo || !maq.anio || (!maq.patente && !maq.dominio) || !maq.motor || !maq.chasis || !maq.filtro_tipo || !maq.filtro_codigo) && (
+                          {activeTab === "maquinaria" && (!maq.marca || !maq.modelo || !maq.anio || (!maq.patente && !maq.dominio) || !maq.motor || !maq.chasis || !maq.filtro_tipo || !maq.filtro_codigo) && (
                             <Badge variant="destructive" className="flex items-center gap-1 text-xs">
                               <AlertTriangle className="w-3 h-3" /> Faltan datos
                             </Badge>
@@ -157,7 +186,7 @@ export function Maquinas() {
         </CardContent>
       </Card>
 
-      <NuevaMaquinaDialog open={openDialog} onOpenChange={setOpenDialog} />
+      <NuevaMaquinaDialog open={openDialog} onOpenChange={setOpenDialog} defaultCategoria={activeTab} />
     </div>
   );
 }

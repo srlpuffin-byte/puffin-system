@@ -2,15 +2,17 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { maquinasTable } from "@workspace/db";
 import { eq, and, or, ilike } from "drizzle-orm";
+import { updateOrAppendToSheet } from "../services/sheets.js";
 
 const router = Router();
 
 router.get("/", async (req, res) => {
-  const { estado, search } = req.query as { estado?: string; search?: string };
+  const { estado, categoria, search } = req.query as { estado?: string; categoria?: string; search?: string };
 
   let query = db.select().from(maquinasTable).$dynamic();
   const conditions = [];
   if (estado) conditions.push(eq(maquinasTable.estado, estado));
+  if (categoria) conditions.push(eq(maquinasTable.categoria, categoria));
   if (search) conditions.push(or(
     ilike(maquinasTable.nombre, `%${search}%`),
     ilike(maquinasTable.codigo, `%${search}%`),
@@ -24,15 +26,28 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { codigo, nombre, tipo, marca, modelo, anio, patente, dominio, chasis, motor, horometro, kilometros, filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio } = req.body;
+  const { codigo, categoria, nombre, tipo, marca, modelo, anio, patente, dominio, chasis, motor, horometro, kilometros, filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio } = req.body;
   if (!nombre || !tipo) return res.status(400).json({ error: "Nombre y tipo son requeridos" });
   const [maquina] = await db.insert(maquinasTable).values({
-    codigo, nombre, tipo, marca, modelo, anio, patente, dominio, chasis, motor,
+    codigo, categoria: categoria || "maquinaria", nombre, tipo, marca, modelo, anio, patente, dominio, chasis, motor,
     filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio,
     horometro: horometro?.toString() || "0",
     kilometros: kilometros?.toString() || "0",
     estado: "activa"
   }).returning();
+
+  // Sincronizar con Google Sheets
+  await updateOrAppendToSheet("Maquinarias", [
+    maquina.id,
+    maquina.categoria === "inventario" ? "Inventario" : "Maquinaria",
+    maquina.nombre,
+    maquina.tipo,
+    maquina.marca || "",
+    maquina.modelo || "",
+    maquina.patente || maquina.dominio || "",
+    maquina.estado
+  ], 0, maquina.id);
+
   return res.status(201).json({ ...maquina, horometro: Number(maquina.horometro), kilometros: Number(maquina.kilometros) });
 });
 
@@ -77,6 +92,19 @@ router.put("/:id", async (req, res) => {
 
     const [maquina] = await db.update(maquinasTable).set(updateData).where(eq(maquinasTable.id, id)).returning();
     if (!maquina) return res.status(404).json({ error: "Maquinaria no encontrada" });
+
+    // Sincronizar con Google Sheets
+    await updateOrAppendToSheet("Maquinarias", [
+      maquina.id,
+      maquina.categoria === "inventario" ? "Inventario" : "Maquinaria",
+      maquina.nombre,
+      maquina.tipo,
+      maquina.marca || "",
+      maquina.modelo || "",
+      maquina.patente || maquina.dominio || "",
+      maquina.estado
+    ], 0, maquina.id);
+
     return res.json({ ...maquina, horometro: Number(maquina.horometro), kilometros: Number(maquina.kilometros) });
   } catch (err: any) {
     req.log?.error(err);
