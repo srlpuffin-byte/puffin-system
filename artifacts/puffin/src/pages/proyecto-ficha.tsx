@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronLeft, MapPin, Activity, DollarSign, Users, Tractor, ExternalLink, TrendingDown, TrendingUp, Minus, Receipt } from "lucide-react";
+import { ChevronLeft, MapPin, Activity, DollarSign, Users, Tractor, ExternalLink, TrendingDown, TrendingUp, Minus, Receipt, Package } from "lucide-react";
 import { format } from "date-fns";
 
 export function ProyectoFicha() {
@@ -27,7 +27,8 @@ export function ProyectoFicha() {
   if (!proyecto) return <div className="p-8 text-center text-red-500">Proyecto no encontrado</div>;
 
   const assignedEmpleados = empleados?.filter(e => proyecto.empleados_asignados?.includes(e.id)) || [];
-  const assignedMaquinas = maquinas?.filter(m => proyecto.maquinas_asignadas?.includes(m.id)) || [];
+  const assignedMaquinas = maquinas?.filter(m => proyecto.maquinas_asignadas?.includes(m.id) && m.categoria !== "inventario") || [];
+  const assignedInventario = maquinas?.filter(m => proyecto.maquinas_asignadas?.includes(m.id) && m.categoria === "inventario") || [];
 
   // Filtrar egresos de este proyecto (por nombre de lugar en centro_costos)
   const egresosProyecto = todosLosEgresos?.filter(eg =>
@@ -208,6 +209,36 @@ export function ProyectoFicha() {
                         <div className="flex flex-col">
                           <span className="font-medium">{m.nombre}</span>
                           <span className="text-xs text-muted-foreground">{m.marca} {m.modelo}</span>
+                        </div>
+                        <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Inventario */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Package className="h-4 w-4 text-purple-600" /> Inventario
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {assignedInventario.length === 0 ? (
+                <p className="text-muted-foreground italic text-sm">Sin inventario asignado.</p>
+              ) : (
+                <div className="space-y-2">
+                  {assignedInventario.map(m => (
+                    <Link key={m.id} href={`/maquinas/${m.id}`}>
+                      <div className="flex items-center justify-between p-2 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group text-sm">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{m.nombre}</span>
+                          {(m.marca || m.modelo) && (
+                            <span className="text-xs text-muted-foreground">{m.marca} {m.modelo}</span>
+                          )}
                         </div>
                         <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
