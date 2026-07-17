@@ -1,19 +1,21 @@
 import React, { useState } from "react";
-import { useGetProyectos, useDeleteProyecto } from "@/hooks/use-proyectos";
+import { useGetProyectos, useDeleteProyecto, type Proyecto } from "@/hooks/use-proyectos";
 import { useGetEmpleados, useGetMaquinas } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Trash2, MapPin, Users, Tractor, DollarSign, Activity } from "lucide-react";
+import { Search, Plus, Trash2, MapPin, Users, Tractor, DollarSign, Activity, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { NuevoProyectoDialog } from "@/components/forms/nuevo-proyecto-dialog";
+import { EditarProyectoDialog } from "@/components/forms/editar-proyecto-dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
 export function Proyectos() {
   const [search, setSearch] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
+  const [editProyecto, setEditProyecto] = useState<Proyecto | null>(null);
   const { data: proyectos, isLoading } = useGetProyectos();
   const deleteMut = useDeleteProyecto();
   const { data: empleados } = useGetEmpleados();
@@ -140,9 +142,26 @@ export function Proyectos() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)} className="h-8 w-8 text-destructive hover:bg-destructive/10" title="Eliminar proyecto">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditProyecto(p)}
+                            className="h-8 w-8 text-blue-600 hover:bg-blue-50"
+                            title="Editar proyecto"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(p.id)}
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                            title="Eliminar proyecto"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -154,6 +173,11 @@ export function Proyectos() {
       </Card>
 
       <NuevoProyectoDialog open={openDialog} onOpenChange={setOpenDialog} />
+      <EditarProyectoDialog
+        proyecto={editProyecto}
+        open={!!editProyecto}
+        onOpenChange={(open) => { if (!open) setEditProyecto(null); }}
+      />
     </div>
   );
 }
