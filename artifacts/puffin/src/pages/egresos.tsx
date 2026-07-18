@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Plus, Download, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -35,10 +36,11 @@ export function Egresos() {
     monto: "",
     metodo_pago: "Efectivo",
     centro_costos: "General",
-    observaciones: ""
+    observaciones: "",
+    comprobante: false
   });
 
-  const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
+  const set = (field: string, val: any) => setForm(prev => ({ ...prev, [field]: val }));
 
   const openEdit = (egreso: any) => {
     setEditingId(egreso.id);
@@ -49,14 +51,15 @@ export function Egresos() {
       monto: egreso.monto?.toString() || "",
       metodo_pago: egreso.metodo_pago || "Efectivo",
       centro_costos: egreso.centro_costos || "General",
-      observaciones: egreso.observaciones || ""
+      observaciones: egreso.observaciones || "",
+      comprobante: egreso.comprobante || false
     });
     setOpenDialog(true);
   };
 
   const resetForm = () => {
     setEditingId(null);
-    setForm({ fecha: new Date().toISOString().split("T")[0], concepto: "", categoria: "Otros", monto: "", metodo_pago: "Efectivo", centro_costos: "General", observaciones: "" });
+    setForm({ fecha: new Date().toISOString().split("T")[0], concepto: "", categoria: "Otros", monto: "", metodo_pago: "Efectivo", centro_costos: "General", observaciones: "", comprobante: false });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -73,7 +76,8 @@ export function Egresos() {
       monto: parseFloat(form.monto),
       metodo_pago: form.metodo_pago,
       centro_costos: form.centro_costos === "General" ? undefined : form.centro_costos,
-      observaciones: form.observaciones || undefined
+      observaciones: form.observaciones || undefined,
+      comprobante: form.comprobante
     };
 
     if (editingId) {
@@ -306,6 +310,14 @@ export function Egresos() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="flex items-center space-x-2 pt-2">
+              <Switch 
+                id="comprobante" 
+                checked={form.comprobante} 
+                onCheckedChange={v => set("comprobante", v)} 
+              />
+              <Label htmlFor="comprobante">¿Tiene comprobante?</Label>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>Cancelar</Button>
