@@ -83,10 +83,21 @@ export function SatcomMap({ points, height = "420px", activePointId }: SatcomMap
         zoomControl: true,
       });
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
+      // Google Maps Hybrid (Satélite + Calles)
+      L.tileLayer("https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}", {
+        attribution: '© Google',
+        maxZoom: 20,
       }).addTo(mapRef.current);
+
+      // Fix para líneas blancas/huecos entre tiles en algunos navegadores
+      const style = document.createElement('style');
+      style.innerHTML = `
+        .leaflet-tile-container img {
+          width: 257px !important;
+          height: 257px !important;
+        }
+      `;
+      document.head.appendChild(style);
     });
 
     return () => {
