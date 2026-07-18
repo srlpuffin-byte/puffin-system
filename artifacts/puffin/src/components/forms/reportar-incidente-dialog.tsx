@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { useCreateIncidente, useGetMaquinas, useGetEmpleados, getGetIncidentesQueryKey } from "@workspace/api-client-react";
+import { useCreateIncidente, useGetMaquinas, useGetEmpleados, getGetIncidentesQueryKey, useGetMe } from "@workspace/api-client-react";
+import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,8 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
   const createMut = useCreateIncidente();
   const { data: maquinas } = useGetMaquinas();
   const { data: empleados } = useGetEmpleados();
+  const { data: user } = useGetMe();
+  const isEmpleado = user?.rol?.toLowerCase() === "empleado";
 
   const [form, setForm] = useState({
     empleado_id: empleadoIdFijo?.toString() || "",
@@ -38,6 +41,18 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
   });
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
+
+  useEffect(() => {
+    if (isEmpleado && user && empleados?.length) {
+      const miEmpleado = empleados.find(e => 
+        e.nombre.toLowerCase() === user.nombre.toLowerCase() && 
+        e.apellido.toLowerCase() === user.apellido.toLowerCase()
+      );
+      if (miEmpleado && !form.empleado_id) {
+        set("empleado_id", miEmpleado.id.toString());
+      }
+    }
+  }, [isEmpleado, user, empleados, form.empleado_id]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,8 +100,8 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
           {!empleadoIdFijo && (
             <div className="space-y-1">
               <Label>Operario involucrado</Label>
-              <Select value={form.empleado_id} onValueChange={v => set("empleado_id", v)}>
-                <SelectTrigger><SelectValue placeholder="(Opcional)" /></SelectTrigger>
+              <Select value={form.empleado_id} onValueChange={v => set("empleado_id", v)} disabled={isEmpleado}>
+                <SelectTrigger className="disabled:opacity-50"><SelectValue placeholder="(Opcional)" /></SelectTrigger>
                 <SelectContent>
                   {(Array.isArray(empleados) ? empleados : [])?.map(e => <SelectItem key={e.id} value={e.id.toString()}>{e.apellido}, {e.nombre}</SelectItem>)}
                 </SelectContent>

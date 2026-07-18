@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { useIniciarJornada, useGetEmpleados, useGetMaquinas, getGetJornadasQueryKey, useUploadFotografia } from "@workspace/api-client-react";
+import { useIniciarJornada, useGetEmpleados, useGetMaquinas, getGetJornadasQueryKey, useUploadFotografia, useGetMe } from "@workspace/api-client-react";
+import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,8 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
   
   const { data: empleados } = useGetEmpleados({ estado: "activo" });
   const { data: maquinas } = useGetMaquinas({ estado: "activa" });
+  const { data: user } = useGetMe();
+  const isEmpleado = user?.rol?.toLowerCase() === "empleado";
 
   const [currentTab, setCurrentTab] = useState("general");
   const [images, setImages] = useState<UploadedImage[]>([]);
@@ -64,6 +67,18 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
   const toggleCheck = (field: keyof typeof checklist) => setChecklist(prev => ({ ...prev, [field]: !prev[field] }));
+
+  useEffect(() => {
+    if (isEmpleado && user && empleados?.length) {
+      const miEmpleado = empleados.find(e => 
+        e.nombre.toLowerCase() === user.nombre.toLowerCase() && 
+        e.apellido.toLowerCase() === user.apellido.toLowerCase()
+      );
+      if (miEmpleado && !form.empleado_id) {
+        set("empleado_id", miEmpleado.id.toString());
+      }
+    }
+  }, [isEmpleado, user, empleados, form.empleado_id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,8 +172,8 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
               {!empleadoIdFijo && (
                 <div className="space-y-1">
                   <Label>Operario *</Label>
-                  <Select value={form.empleado_id} onValueChange={v => set("empleado_id", v)}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar operario" /></SelectTrigger>
+                  <Select value={form.empleado_id} onValueChange={v => set("empleado_id", v)} disabled={isEmpleado}>
+                    <SelectTrigger className="disabled:opacity-50"><SelectValue placeholder="Seleccionar operario" /></SelectTrigger>
                     <SelectContent>
                       {(Array.isArray(empleados) ? empleados : [])?.map(e => (
                         <SelectItem key={e.id} value={e.id.toString()}>

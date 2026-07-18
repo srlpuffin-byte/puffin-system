@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { useCreateCombustible, useGetEmpleados, useGetMaquinas, getGetCombustibleQueryKey, useUploadFotografia } from "@workspace/api-client-react";
+import { useCreateCombustible, useGetEmpleados, useGetMaquinas, getGetCombustibleQueryKey, useUploadFotografia, useGetMe } from "@workspace/api-client-react";
+import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,8 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
   const uploadMut = useUploadFotografia();
   const { data: empleados } = useGetEmpleados({ estado: "activo" });
   const { data: maquinas } = useGetMaquinas();
+  const { data: user } = useGetMe();
+  const isEmpleado = user?.rol?.toLowerCase() === "empleado";
   const [fotoNivel, setFotoNivel] = useState<{ base64: string; name: string } | null>(null);
 
   const [form, setForm] = useState({
@@ -42,6 +45,18 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
       return next;
     });
   };
+
+  useEffect(() => {
+    if (isEmpleado && user && empleados?.length) {
+      const miEmpleado = empleados.find(e => 
+        e.nombre.toLowerCase() === user.nombre.toLowerCase() && 
+        e.apellido.toLowerCase() === user.apellido.toLowerCase()
+      );
+      if (miEmpleado && !form.empleado_id) {
+        set("empleado_id", miEmpleado.id.toString());
+      }
+    }
+  }, [isEmpleado, user, empleados, form.empleado_id]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,8 +115,9 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
               <select
                 value={form.empleado_id}
                 onChange={e => set("empleado_id", e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50"
                 required
+                disabled={isEmpleado}
               >
                 <option value="" disabled>Seleccionar operario</option>
                 {Array.isArray(empleados) ? empleados.map(e => <option key={e.id} value={e.id.toString()}>{e.apellido}, {e.nombre}</option>) : null}
