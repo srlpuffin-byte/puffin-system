@@ -76,28 +76,57 @@ export function Gps() {
   const linkedPoints = mapPoints.filter(p => !p.is_unlinked);
   const unlinkedPoints = mapPoints.filter(p => p.is_unlinked);
 
+  const [mobileView, setMobileView] = useState<"lista" | "mapa">("mapa");
+
   return (
     <div className="flex flex-col h-[calc(100vh-80px)] gap-0 -m-6">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b bg-background shrink-0">
-        <div className="flex items-center gap-3">
-          <MapPin className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-bold tracking-tight text-primary">GPS y Rastreo</h1>
-          <Badge variant="secondary" className="text-xs">
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-background shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <MapPin className="h-5 w-5 text-primary shrink-0" />
+          <h1 className="text-base sm:text-xl font-bold tracking-tight text-primary truncate">GPS y Rastreo</h1>
+          <Badge variant="secondary" className="text-xs shrink-0 hidden sm:inline-flex">
             {withGps.length} en mapa · {online.length} en línea
           </Badge>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-          Actualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Mobile toggle */}
+          <div className="flex sm:hidden rounded-lg border overflow-hidden text-xs">
+            <button
+              onClick={() => setMobileView("lista")}
+              className={`px-3 py-1.5 font-medium transition-colors ${mobileView === "lista" ? "bg-primary text-white" : "bg-background text-muted-foreground"}`}
+            >
+              Lista
+            </button>
+            <button
+              onClick={() => setMobileView("mapa")}
+              className={`px-3 py-1.5 font-medium transition-colors ${mobileView === "mapa" ? "bg-primary text-white" : "bg-background text-muted-foreground"}`}
+            >
+              Mapa
+            </button>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
+            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""} sm:mr-2`} />
+            <span className="hidden sm:inline">Actualizar</span>
+          </Button>
+        </div>
       </div>
 
-      {/* Main layout: map + sidebar */}
+      {/* Mobile badge */}
+      <div className="flex sm:hidden items-center gap-2 px-4 py-1.5 bg-muted/40 text-xs text-muted-foreground border-b shrink-0">
+        <span className="font-medium text-foreground">{withGps.length} en mapa</span>
+        <span>·</span>
+        <span className="text-green-600 font-medium">{online.length} en línea</span>
+      </div>
+
+      {/* Main layout: sidebar + map */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* Sidebar */}
-        <div className="w-72 shrink-0 border-r overflow-y-auto bg-background flex flex-col">
+        {/* Sidebar — full width on mobile when lista, hidden when mapa */}
+        <div className={`
+          ${mobileView === "lista" ? "flex" : "hidden"} sm:flex
+          w-full sm:w-72 shrink-0 border-r overflow-y-auto bg-background flex-col
+        `}>
           <div className="p-3 border-b shrink-0">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Flota ({linkedPoints.length})</p>
           </div>
@@ -122,7 +151,10 @@ export function Gps() {
               return (
                 <button
                   key={pointId}
-                  onClick={() => setSelectedId(isSelected ? null : pointId)}
+                  onClick={() => {
+                    setSelectedId(isSelected ? null : pointId);
+                    setMobileView("mapa"); // auto-switch to map on mobile
+                  }}
                   className={`w-full text-left px-4 py-3 transition-colors hover:bg-muted/60 ${isSelected ? "bg-blue-50 border-l-2 border-l-blue-500" : "border-l-2 border-l-transparent"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -258,8 +290,11 @@ export function Gps() {
           )}
         </div>
 
-        {/* Map — takes all remaining space */}
-        <div className="flex-1 relative" style={{ minHeight: 0 }}>
+        {/* Map — full screen on mobile when mapa, hidden when lista */}
+        <div className={`
+          ${mobileView === "mapa" ? "flex" : "hidden"} sm:flex
+          flex-1 flex-col relative
+        `} style={{ minHeight: 0 }}>
           <SatcomMap points={mapPoints} activePointId={selectedId} height="100%" />
           {/* Leyenda */}
           <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-3 border text-xs space-y-1.5 z-[1000]">
@@ -268,6 +303,13 @@ export function Gps() {
             <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-red-400 inline-block" /> Apagada / Sin señal</div>
             <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-slate-300 inline-block" /> Estado desconocido</div>
           </div>
+          {/* Volver a lista en mobile */}
+          <button
+            onClick={() => setMobileView("lista")}
+            className="sm:hidden absolute top-3 left-3 z-[1001] bg-white shadow-md rounded-lg px-3 py-1.5 text-xs font-semibold border flex items-center gap-1.5 text-slate-700"
+          >
+            ← Lista
+          </button>
         </div>
 
       </div>
