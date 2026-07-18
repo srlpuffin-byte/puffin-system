@@ -222,15 +222,25 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <nav className="flex-1 overflow-y-auto py-3 px-2">
         {NAV_GROUPS.filter(group => {
           if (user?.rol?.toLowerCase() === "empleado") {
-            // Empleados solo ven Principal
+            // Empleados solo ven Principal, Operación y Control
             if (group.label === "Principal") return true;
+            if (group.label === "Operación") return true;
+            if (group.label === "Control") return true;
             return false;
           }
           return true;
         }).map((group) => {
           let filteredItems = group.items;
           if (user?.rol?.toLowerCase() === "empleado") {
-            if (group.label === "Principal") {
+            if (group.label === "Operación") {
+              filteredItems = group.items.filter(item => 
+                item.href !== "/operarios" && item.href !== "/maquinas" && item.href !== "/proyectos"
+              );
+            } else if (group.label === "Control") {
+              filteredItems = group.items.filter(item => 
+                item.href === "/incidentes"
+              );
+            } else if (group.label === "Principal") {
               filteredItems = [
                 ...group.items,
                 { icon: UserCog, label: "Mis Datos", href: "/mis-datos" }
