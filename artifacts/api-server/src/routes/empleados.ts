@@ -153,7 +153,7 @@ router.put("/:id", async (req, res) => {
     const [oldEmpleado] = await db.select().from(empleadosTable).where(eq(empleadosTable.id, id)).limit(1);
     if (!oldEmpleado) return res.status(404).json({ error: "Operario no encontrado" });
 
-    const { nombre, apellido, dni, telefono, cargo, estado, fecha_ingreso, contacto_familiar_nombre, contacto_familiar_telefono, contacto_familiar_relacion } = req.body;
+    const { nombre, apellido, dni, telefono, cargo, estado, fecha_ingreso, contacto_familiar_nombre, contacto_familiar_telefono, contacto_familiar_relacion, vencimiento_carnet } = req.body;
     
     const updateData: Record<string, any> = {};
     if (nombre !== undefined) updateData.nombre = nombre;
@@ -173,6 +173,33 @@ router.put("/:id", async (req, res) => {
       .where(eq(empleadosTable.id, id))
       .returning();
     if (!empleado) return res.status(404).json({ error: "Operario no encontrado" });
+
+    // Actualizar o crear documento de carnet si se proporcionó fecha de vencimiento
+    if (vencimiento_carnet) {
+      const hoy = new Date();
+      const venc = new Date(vencimiento_carnet);
+      const diff = Math.ceil((venc.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+      const estado_doc = diff < 0 ? "vencido" : diff <= 30 ? "proximo_vencimiento" : "vigente";
+
+      const [docExistente] = await db.select().from(documentosTable)
+        .where(and(eq(documentosTable.entidad_tipo, "empleado"), eq(documentosTable.entidad_id, id), eq(documentosTable.tipo, "Carnet")))
+        .limit(1);
+
+      if (docExistente) {
+        await db.update(documentosTable)
+          .set({ fecha_vencimiento: vencimiento_carnet, estado_doc })
+          .where(eq(documentosTable.id, docExistente.id));
+      } else {
+        await db.insert(documentosTable).values({
+          tipo: "Carnet",
+          descripcion: "Carnet de conducir",
+          entidad_tipo: "empleado",
+          entidad_id: id,
+          fecha_vencimiento: vencimiento_carnet,
+          estado_doc
+        });
+      }
+    }
 
     // Sync with usuariosTable
     if ((nombre !== undefined && nombre !== oldEmpleado.nombre) || (apellido !== undefined && apellido !== oldEmpleado.apellido)) {

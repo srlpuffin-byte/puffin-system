@@ -31,7 +31,8 @@ export function MisDatos() {
 
   const [form, setForm] = useState({
     nombre: "", apellido: "", dni: "", telefono: "",
-    contacto_familiar_nombre: "", contacto_familiar_telefono: "", contacto_familiar_relacion: ""
+    contacto_familiar_nombre: "", contacto_familiar_telefono: "", contacto_familiar_relacion: "",
+    vencimiento_carnet: ""
   });
 
   useEffect(() => {
@@ -43,7 +44,8 @@ export function MisDatos() {
         telefono: operario.telefono || "",
         contacto_familiar_nombre: operario.contacto_familiar_nombre || "",
         contacto_familiar_telefono: operario.contacto_familiar_telefono || "",
-        contacto_familiar_relacion: (operario as any).contacto_familiar_relacion || ""
+        contacto_familiar_relacion: (operario as any).contacto_familiar_relacion || "",
+        vencimiento_carnet: (operario as any).vencimiento_carnet || ""
       });
       setFotoPerfil([]);
       setFotoCarnet([]);
@@ -56,6 +58,10 @@ export function MisDatos() {
     e.preventDefault();
     if (!form.nombre || !form.apellido || !form.dni) {
       toast.error("Nombre, apellido y DNI son obligatorios");
+      return;
+    }
+    if (!form.vencimiento_carnet) {
+      toast.error("La fecha de vencimiento del carnet es obligatoria");
       return;
     }
     if (!operario) return;
@@ -72,6 +78,7 @@ export function MisDatos() {
           contacto_familiar_nombre: form.contacto_familiar_nombre || null,
           contacto_familiar_telefono: form.contacto_familiar_telefono || null,
           contacto_familiar_relacion: form.contacto_familiar_relacion || null,
+          vencimiento_carnet: form.vencimiento_carnet || null,
         }),
       });
 
@@ -123,7 +130,7 @@ export function MisDatos() {
     );
   }
 
-  const isFaltante = !operario.dni || operario.dni === "COMPLETAR" || !operario.telefono || !operario.contacto_familiar_telefono;
+  const isFaltante = !operario.dni || operario.dni === "COMPLETAR" || !operario.telefono || !operario.contacto_familiar_telefono || !(operario as any).vencimiento_carnet;
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -187,6 +194,34 @@ export function MisDatos() {
                 <div className="space-y-2">
                   <Label>Relación / Parentesco</Label>
                   <Input value={form.contacto_familiar_relacion} onChange={e => set("contacto_familiar_relacion", e.target.value)} placeholder="Ej. Esposa, Madre" />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">Documentación del Carnet</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1">
+                    Vencimiento del Carnet *
+                    <span className="text-xs text-red-500 font-normal ml-1">(Obligatorio)</span>
+                  </Label>
+                  <Input
+                    type="date"
+                    value={form.vencimiento_carnet}
+                    onChange={e => set("vencimiento_carnet", e.target.value)}
+                    required
+                    className={!form.vencimiento_carnet ? "border-red-300 bg-red-50" : ""}
+                  />
+                  {!form.vencimiento_carnet && (
+                    <p className="text-xs text-red-500">Debés ingresar la fecha de vencimiento de tu carnet para poder guardar.</p>
+                  )}
+                  {form.vencimiento_carnet && (() => {
+                    const dias = Math.ceil((new Date(form.vencimiento_carnet).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                    if (dias < 0) return <p className="text-xs text-red-600 font-medium">⚠️ Tu carnet está vencido ({Math.abs(dias)} días).</p>;
+                    if (dias <= 30) return <p className="text-xs text-orange-500 font-medium">⚠️ Tu carnet vence en {dias} días.</p>;
+                    return <p className="text-xs text-green-600">✓ Vigente ({dias} días restantes).</p>;
+                  })()}
                 </div>
               </div>
             </div>
