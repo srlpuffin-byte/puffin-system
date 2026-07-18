@@ -6,6 +6,7 @@ export const mantenimientosTable = pgTable("mantenimientos", {
   id: serial("id").primaryKey(),
   empresa_id: integer("empresa_id").notNull().default(1),
   maquina_id: integer("maquina_id").notNull(),
+  empleado_id: integer("empleado_id"),
   fecha: date("fecha").notNull(),
   horas: numeric("horas", { precision: 10, scale: 1 }),
   tipo: text("tipo").notNull(),

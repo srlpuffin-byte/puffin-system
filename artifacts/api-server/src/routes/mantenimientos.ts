@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { mantenimientosTable, maquinasTable, actividadTable } from "@workspace/db";
+import { mantenimientosTable, maquinasTable, actividadTable, empleadosTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { getEmpleadoIdForUser } from "../lib/auth-helpers";
 
 const router = Router();
 
@@ -11,15 +12,29 @@ router.get("/", async (req, res) => {
   const conditions = [];
   if (maquina_id) conditions.push(eq(mantenimientosTable.maquina_id, parseInt(maquina_id)));
   if (tipo) conditions.push(eq(mantenimientosTable.tipo, tipo));
+
+  // Role-Based Access Control: Empleados solo ven sus propios mantenimientos
+  if (req.user?.rol?.toLowerCase() === "empleado") {
+    const userEmpleadoId = await getEmpleadoIdForUser(req.user.id);
+    conditions.push(eq(mantenimientosTable.empleado_id, userEmpleadoId));
+  }
+
   if (conditions.length) query = query.where(and(...conditions));
 
   const mantenimientos = await query.orderBy(mantenimientosTable.fecha);
   const enriched = await Promise.all(mantenimientos.map(async m => {
     const [maquina] = await db.select({ nombre: maquinasTable.nombre })
       .from(maquinasTable).where(eq(maquinasTable.id, m.maquina_id)).limit(1);
+    let empleado_nombre = null;
+    if (m.empleado_id) {
+      const [e] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
+        .from(empleadosTable).where(eq(empleadosTable.id, m.empleado_id)).limit(1);
+      if (e) empleado_nombre = `${e.nombre} ${e.apellido}`;
+    }
     return {
       ...m,
       maquina_nombre: maquina?.nombre || "Desconocida",
+      empleado_nombre,
       horas: m.horas ? Number(m.horas) : null,
     };
   }));
@@ -28,12 +43,20 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { maquina_id, horas, tipo, descripcion, proximo_service } = req.body;
+    const { maquina_id, empleado_id, horas, tipo, descripcion, proximo_service } = req.body;
     if (!maquina_id || !tipo) return res.status(400).json({ error: "Máquina y tipo son requeridos" });
+
+    // If employee, always use their own empleado_id regardless of what's sent
+    let finalEmpleadoId = empleado_id || null;
+    if (req.user?.rol?.toLowerCase() === "empleado") {
+      finalEmpleadoId = await getEmpleadoIdForUser(req.user.id);
+    }
 
     const today = new Date().toISOString().split("T")[0];
     const [mantenimiento] = await db.insert(mantenimientosTable).values({
-      maquina_id, fecha: today,
+      maquina_id,
+      empleado_id: finalEmpleadoId,
+      fecha: today,
       horas: horas?.toString(),
       tipo, descripcion, proximo_service,
       estado: "realizado"
