@@ -73,17 +73,9 @@ router.post("/", async (req, res) => {
     estado: "activa"
   }).returning();
 
-  // Sincronizar con Google Sheets
-  await updateOrAppendToSheet("Maquinarias", [
-    maquina.id,
-    maquina.categoria === "inventario" ? "Inventario" : "Maquinaria",
-    maquina.nombre,
-    maquina.tipo,
-    maquina.marca || "",
-    maquina.modelo || "",
-    maquina.patente || maquina.dominio || "",
-    maquina.estado
-  ], 0, maquina.id);
+  import("./sync-sheets.js").then(({ syncAllSheets }) => {
+    syncAllSheets().catch(console.error);
+  });
 
   return res.status(201).json({ ...maquina, horometro: Number(maquina.horometro), kilometros: Number(maquina.kilometros) });
 });
@@ -132,16 +124,9 @@ router.put("/:id", async (req, res) => {
     if (!maquina) return res.status(404).json({ error: "Maquinaria no encontrada" });
 
     // Sincronizar con Google Sheets
-    await updateOrAppendToSheet("Maquinarias", [
-      maquina.id,
-      maquina.categoria === "inventario" ? "Inventario" : "Maquinaria",
-      maquina.nombre,
-      maquina.tipo,
-      maquina.marca || "",
-      maquina.modelo || "",
-      maquina.patente || maquina.dominio || "",
-      maquina.estado
-    ], 0, maquina.id);
+    import("./sync-sheets.js").then(({ syncAllSheets }) => {
+      syncAllSheets().catch(console.error);
+    });
 
     return res.json({ ...maquina, horometro: Number(maquina.horometro), kilometros: Number(maquina.kilometros) });
   } catch (err: any) {

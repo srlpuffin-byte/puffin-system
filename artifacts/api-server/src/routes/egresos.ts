@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { egresosTable } from "@workspace/db/schema";
 import { eq, and, or, ilike, desc } from "drizzle-orm";
-import { appendToSheet } from "../services/sheets.js";
+import { syncAllSheets } from "../services/sync-sheets.js";
 
 const router = Router();
 
@@ -83,19 +83,7 @@ router.post("/", async (req, res) => {
     centro_costos, observaciones
   }).returning();
 
-  // Async append to Google Sheets
-  appendToSheet("Egresos", [
-    egreso.id,
-    egreso.fecha,
-    egreso.categoria,
-    egreso.concepto,
-    egreso.proveedor || "",
-    Number(egreso.monto),
-    egreso.metodo_pago || "",
-    egreso.comprobante ? "SI" : "NO",
-    egreso.centro_costos || "",
-    egreso.observaciones || ""
-  ]);
+  syncAllSheets().catch(console.error);
 
   return res.status(201).json({ ...egreso, monto: Number(egreso.monto) });
 });
@@ -120,20 +108,7 @@ router.put("/:id", async (req, res) => {
   const [egreso] = await db.update(egresosTable).set(updateData).where(eq(egresosTable.id, id)).returning();
   if (!egreso) return res.status(404).json({ error: "Egreso no encontrado" });
 
-  import("../services/sheets.js").then(({ updateOrAppendToSheet }) => {
-    updateOrAppendToSheet("Egresos", [
-      egreso.id,
-      egreso.fecha,
-      egreso.categoria,
-      egreso.concepto,
-      egreso.proveedor || "",
-      Number(egreso.monto),
-      egreso.metodo_pago || "",
-      egreso.comprobante ? "SI" : "NO",
-      egreso.centro_costos || "",
-      egreso.observaciones || ""
-    ], 0, egreso.id).catch(console.error);
-  });
+  syncAllSheets().catch(console.error);
 
   return res.json({ ...egreso, monto: Number(egreso.monto) });
 });

@@ -159,10 +159,6 @@ export function Egresos() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Gastos / Egresos</h1>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50" onClick={handleSyncSheets}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Sincronizar Sheets
-          </Button>
           <Button variant="outline" className="border-green-600 text-green-700 hover:bg-green-50" onClick={handleExportCSV}>
             <Download className="mr-2 h-4 w-4" />
             Descargar Excel

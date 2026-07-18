@@ -99,18 +99,9 @@ router.post("/", async (req, res) => {
     estado_doc: "vencido"
   });
   
-  // Sincronizar con Google Sheets
-  await updateOrAppendToSheet("Empleados", [
-    empleado.nombre,
-    empleado.apellido,
-    empleado.dni,
-    empleado.telefono || "",
-    empleado.cargo || "",
-    empleado.fecha_ingreso || "",
-    empleado.contacto_familiar_nombre || "",
-    empleado.contacto_familiar_telefono || "",
-    empleado.id // Columna I
-  ], 8, empleado.id); // index 8 is column I
+  import("../services/sync-sheets.js").then(({ syncAllSheets }) => {
+    syncAllSheets().catch(console.error);
+  });
   
   return res.status(201).json({ ...empleado, jornada_activa: false, alertas_count: 0 });
 });
@@ -189,18 +180,9 @@ router.put("/:id", async (req, res) => {
         );
     }
 
-    // Sincronizar con Google Sheets
-    await updateOrAppendToSheet("Empleados", [
-      empleado.nombre,
-      empleado.apellido,
-      empleado.dni,
-      empleado.telefono || "",
-      empleado.cargo || "",
-      empleado.fecha_ingreso || "",
-      empleado.contacto_familiar_nombre || "",
-      empleado.contacto_familiar_telefono || "",
-      empleado.id // Columna I
-    ], 8, empleado.id);
+    import("../services/sync-sheets.js").then(({ syncAllSheets }) => {
+      syncAllSheets().catch(console.error);
+    });
 
     return res.json({ ...empleado, jornada_activa: false, alertas_count: 0 });
   } catch (err: any) {

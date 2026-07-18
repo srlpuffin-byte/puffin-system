@@ -76,10 +76,6 @@ export function Maquinas() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Maquinaria</h1>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Button variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50" onClick={handleSyncSheets}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Sincronizar Sheets
-          </Button>
           {maquinas && (
             <ExportButtons 
               data={maquinas} 

@@ -74,17 +74,9 @@ router.post("/", async (req, res) => {
       estado: estado || "activo",
     }).returning();
 
-    // Sincronizar con Google Sheets
-    await updateOrAppendToSheet("Proyectos", [
-      proyecto.id,
-      proyecto.lugar,
-      proyecto.hectareas,
-      proyecto.precio_hectarea,
-      proyecto.ganancia_estimada,
-      Array.isArray(proyecto.empleados_asignados) ? proyecto.empleados_asignados.join(", ") : "",
-      Array.isArray(proyecto.maquinas_asignadas) ? proyecto.maquinas_asignadas.join(", ") : "",
-      proyecto.estado,
-    ], 0, proyecto.id);
+    import("../services/sync-sheets.js").then(({ syncAllSheets }) => {
+      syncAllSheets().catch(console.error);
+    });
 
     return res.status(201).json(proyecto);
   } catch (err: any) {
@@ -135,17 +127,9 @@ router.put("/:id", async (req, res) => {
     const [proyecto] = await db.update(proyectosTable).set(updateData).where(eq(proyectosTable.id, id)).returning();
     if (!proyecto) return res.status(404).json({ error: "Proyecto no encontrado" });
 
-    // Sincronizar con Google Sheets
-    await updateOrAppendToSheet("Proyectos", [
-      proyecto.id,
-      proyecto.lugar,
-      proyecto.hectareas,
-      proyecto.precio_hectarea,
-      proyecto.ganancia_estimada,
-      Array.isArray(proyecto.empleados_asignados) ? proyecto.empleados_asignados.join(", ") : "",
-      Array.isArray(proyecto.maquinas_asignadas) ? proyecto.maquinas_asignadas.join(", ") : "",
-      proyecto.estado,
-    ], 0, proyecto.id);
+    import("../services/sync-sheets.js").then(({ syncAllSheets }) => {
+      syncAllSheets().catch(console.error);
+    });
 
     return res.json(proyecto);
   } catch (err: any) {
