@@ -234,7 +234,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           if (user?.rol?.toLowerCase() === "empleado") {
             if (group.label === "Operación") {
               filteredItems = group.items.filter(item => 
-                item.href !== "/operarios" && item.href !== "/maquinas"
+                item.href !== "/operarios" && item.href !== "/maquinas" && item.href !== "/proyectos"
               );
             } else if (group.label === "Control") {
               filteredItems = group.items.filter(item => 
