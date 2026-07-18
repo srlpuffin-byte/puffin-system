@@ -23,6 +23,7 @@ interface MapPoint {
 
 interface SatcomMapProps {
   points: MapPoint[];
+  height?: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -48,7 +49,7 @@ function createMarkerIcon(encendido: boolean, status: string) {
   });
 }
 
-export function SatcomMap({ points }: SatcomMapProps) {
+export function SatcomMap({ points, height = "420px" }: SatcomMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<L.Marker[]>([]);
@@ -110,7 +111,7 @@ export function SatcomMap({ points }: SatcomMapProps) {
   }, [points]);
 
   return (
-    <div className="relative rounded-xl overflow-hidden border shadow-sm" style={{ height: "420px" }}>
+    <div className="relative overflow-hidden border shadow-sm" style={{ height }}>
       <div ref={containerRef} style={{ height: "100%", width: "100%" }} />
       {points.filter(p => p.lat !== null).length === 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50/80 backdrop-blur-sm pointer-events-none">
