@@ -18,17 +18,27 @@ router.get("/resumen", async (req, res) => {
   const [maquinasActivas] = await db
     .select({ count: sql<number>`count(*)` })
     .from(maquinasTable)
-    .where(eq(maquinasTable.estado, "activa"));
+    .where(and(eq(maquinasTable.estado, "activa"), sql`(categoria IS NULL OR categoria != 'inventario')`));
 
   const [maquinasDetenidas] = await db
     .select({ count: sql<number>`count(*)` })
     .from(maquinasTable)
-    .where(eq(maquinasTable.estado, "detenida"));
+    .where(and(eq(maquinasTable.estado, "detenida"), sql`(categoria IS NULL OR categoria != 'inventario')`));
 
   const [maquinasMantenimiento] = await db
     .select({ count: sql<number>`count(*)` })
     .from(maquinasTable)
-    .where(eq(maquinasTable.estado, "mantenimiento"));
+    .where(and(eq(maquinasTable.estado, "mantenimiento"), sql`(categoria IS NULL OR categoria != 'inventario')`));
+
+  const [inventarioActivo] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(maquinasTable)
+    .where(and(eq(maquinasTable.categoria, "inventario"), eq(maquinasTable.estado, "activa")));
+
+  const [inventarioTotal] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(maquinasTable)
+    .where(eq(maquinasTable.categoria, "inventario"));
 
   const [empleadosActivos] = await db
     .select({ count: sql<number>`count(*)` })
@@ -122,6 +132,8 @@ router.get("/resumen", async (req, res) => {
     maquinas_activas: Number(maquinasActivas.count),
     maquinas_detenidas: Number(maquinasDetenidas.count),
     maquinas_mantenimiento: Number(maquinasMantenimiento.count),
+    inventario_activo: Number(inventarioActivo.count),
+    inventario_total: Number(inventarioTotal.count),
     empleados_activos: Number(empleadosActivos.count),
     alertas_activas: Number(alertasActivas.count),
     alertas_rojas: Number(alertasRojas.count),

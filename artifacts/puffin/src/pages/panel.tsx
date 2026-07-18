@@ -22,6 +22,7 @@ import {
   Wrench,
   MapPin,
   User,
+  Package,
 } from "lucide-react";
 
 function prioridadColor(p: string) {
@@ -84,9 +85,9 @@ export function Panel() {
       </div>
 
       {!isEmpleado && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
           <Link href="/maquinas?estado=activa">
-            <Card className="border-l-4 border-l-green-600 cursor-pointer hover:shadow-md transition-shadow">
+            <Card className="border-l-4 border-l-green-600 cursor-pointer hover:shadow-md transition-shadow h-full">
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -99,7 +100,7 @@ export function Panel() {
             </Card>
           </Link>
           <Link href="/maquinas?estado=detenida">
-            <Card className="border-l-4 border-l-yellow-600 cursor-pointer hover:shadow-md transition-shadow">
+            <Card className="border-l-4 border-l-yellow-600 cursor-pointer hover:shadow-md transition-shadow h-full">
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -112,7 +113,7 @@ export function Panel() {
             </Card>
           </Link>
           <Link href="/maquinas?estado=mantenimiento">
-            <Card className="border-l-4 border-l-orange-500 cursor-pointer hover:shadow-md transition-shadow">
+            <Card className="border-l-4 border-l-orange-500 cursor-pointer hover:shadow-md transition-shadow h-full">
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -124,8 +125,21 @@ export function Panel() {
               </CardContent>
             </Card>
           </Link>
+          <Link href="/maquinas">
+            <Card className="border-l-4 border-l-purple-600 cursor-pointer hover:shadow-md transition-shadow h-full">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Inventario</p>
+                    <div className="text-2xl font-bold text-purple-600">{(resumen as any)?.inventario_activo ?? 0}</div>
+                  </div>
+                  <Package className="h-7 w-7 text-purple-600 opacity-70" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
           <Link href="/operarios">
-            <Card className="border-l-4 border-l-primary cursor-pointer hover:shadow-md transition-shadow">
+            <Card className="border-l-4 border-l-primary cursor-pointer hover:shadow-md transition-shadow h-full">
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -138,7 +152,7 @@ export function Panel() {
             </Card>
           </Link>
           <Link href="/alertas">
-            <Card className="border-l-4 border-l-red-600 cursor-pointer hover:shadow-md transition-shadow">
+            <Card className="border-l-4 border-l-red-600 cursor-pointer hover:shadow-md transition-shadow h-full">
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center justify-between">
                   <div>
