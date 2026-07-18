@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import logoUrl from "@assets/logo_puffin_1782946440101.jpeg";
 import { BusquedaGlobalDialog } from "@/components/ui/busqueda-global-dialog";
 import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface NavItem {
   icon: React.ElementType;
@@ -187,10 +188,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("keydown", down);
   }, []);
 
+  const queryClient = useQueryClient();
+
   const handleLogout = () => {
     logoutMut.mutate(undefined, {
       onSuccess: () => {
         removeAuthToken();
+        queryClient.clear();
         setLocation("/login");
       },
     });
