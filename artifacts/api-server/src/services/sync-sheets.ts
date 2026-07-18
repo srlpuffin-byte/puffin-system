@@ -5,6 +5,7 @@ import { desc } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 
 export async function syncAllSheets() {
+  return; // Disabled auto-sync so it doesn't prevent manual writing in Sheets
   const SHEET_ID = process.env.GOOGLE_SHEET_ID;
   if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) return;
 
