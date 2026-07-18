@@ -268,7 +268,8 @@ export function Panel() {
             </Card>
           )}
 
-          <Card>
+          {!isEmpleado && (
+            <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Activity className="h-4 w-4" /> Actividad Reciente
@@ -299,9 +300,11 @@ export function Panel() {
               )}
             </CardContent>
           </Card>
+          )}
         </div>
 
         <div className="space-y-6">
+          {!isEmpleado && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -341,6 +344,7 @@ export function Panel() {
               )}
             </CardContent>
           </Card>
+          )}
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -377,6 +381,7 @@ export function Panel() {
             </CardContent>
           </Card>
 
+          {!isEmpleado && (
           <Card className="border-2 border-dashed border-slate-200">
             <CardContent className="pt-6 pb-6">
               <div className="flex flex-col items-center text-center gap-3">
@@ -395,9 +400,11 @@ export function Panel() {
               </div>
             </CardContent>
           </Card>
+          )}
         </div>
       </div>
 
+      {!isEmpleado && (
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Link href="/jornadas">
           <Card className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-primary">
@@ -448,6 +455,7 @@ export function Panel() {
           </Card>
         </Link>
       </div>
+      )}
     </div>
   );
 }

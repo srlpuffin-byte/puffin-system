@@ -104,7 +104,11 @@ router.get("/resumen", async (req, res) => {
     ? Math.round((Number(maquinasActivas.count) / totalMaquinas) * 100)
     : 0;
 
-  const docs = await db.select().from(documentosTable);
+  const docsQuery = db.select().from(documentosTable);
+  if (isEmpleado) {
+    docsQuery.where(and(eq(documentosTable.entidad_tipo, "empleado"), eq(documentosTable.entidad_id, userEmpleadoId)));
+  }
+  const docs = await docsQuery;
   const proximos_vencimientos = docs
     .map(d => {
       const venc = new Date(d.fecha_vencimiento);
