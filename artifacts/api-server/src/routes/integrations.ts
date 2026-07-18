@@ -50,6 +50,59 @@ integrationsRouter.post("/xpert/link", requireAuth, async (req, res) => {
   }
 });
 
+// Auto-link: match machines and Satcom devices by name similarity
+integrationsRouter.post("/xpert/auto-link", requireAuth, async (req, res) => {
+  try {
+    const devices = await SatcomClient.getDevices();
+    const maquinas = await db.select().from(maquinasTable);
+
+    const normalize = (s: string) =>
+      s.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+        .replace(/[^a-z0-9\s]/g, "")
+        .trim();
+
+    const linked: { maquina: string; device: string }[] = [];
+    const skipped: { maquina: string; reason: string }[] = [];
+
+    for (const maq of maquinas) {
+      // Skip if already linked
+      if (maq.satcom_id) {
+        skipped.push({ maquina: maq.nombre, reason: "Ya vinculada" });
+        continue;
+      }
+
+      const normMaq = normalize(maq.nombre);
+      // Also try patente/dominio
+      const normPatente = maq.patente ? normalize(maq.patente) : null;
+      const normDominio = maq.dominio ? normalize(maq.dominio) : null;
+
+      // Find best matching device
+      const match = devices.find(d => {
+        const normDev = normalize(d.name);
+        return (
+          normDev.includes(normMaq) ||
+          normMaq.includes(normDev) ||
+          (normPatente && normDev.includes(normPatente)) ||
+          (normDominio && normDev.includes(normDominio))
+        );
+      });
+
+      if (match) {
+        await db.update(maquinasTable).set({ satcom_id: match.id }).where(eq(maquinasTable.id, maq.id));
+        linked.push({ maquina: maq.nombre, device: match.name });
+      } else {
+        skipped.push({ maquina: maq.nombre, reason: "Sin coincidencia" });
+      }
+    }
+
+    res.json({ linked, skipped, total_linked: linked.length });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to auto-link" });
+  }
+});
+
+
 // Endpoint del mapa: devuelve todas las máquinas vinculadas con su posición actual
 integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
   try {

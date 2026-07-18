@@ -3,9 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Satellite, Gauge, Zap, Navigation, Clock, Activity, Settings, Radio, MapPin, RefreshCw } from "lucide-react";
+import { Satellite, Gauge, Zap, Navigation, Clock, Activity, Settings, Radio, MapPin, RefreshCw, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SatcomMap } from "@/components/map/SatcomMap";
+import { toast } from "sonner";
 
 interface Maquina {
   id: number;
@@ -79,6 +80,27 @@ export function Xpert() {
     }
   });
 
+  const autoLinkMutation = useMutation({
+    mutationFn: () => apiFetch<{ linked: { maquina: string; device: string }[]; skipped: { maquina: string; reason: string }[]; total_linked: number }>(
+      "/integrations/xpert/auto-link",
+      { method: "POST" }
+    ),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["maquinas"] });
+      queryClient.invalidateQueries({ queryKey: ["satcom-mapa"] });
+      if (data.total_linked > 0) {
+        toast.success(
+          `✅ ${data.total_linked} máquina${data.total_linked > 1 ? 's' : ''} vinculada${data.total_linked > 1 ? 's' : ''} automáticamente:\n` +
+          data.linked.map(l => `• ${l.maquina} → ${l.device}`).join("\n"),
+          { duration: 8000 }
+        );
+      } else {
+        toast.info("No se encontraron coincidencias automáticas. Vinculá manualmente usando el botón de cada máquina.");
+      }
+    },
+    onError: () => toast.error("Error al intentar la vinculación automática"),
+  });
+
   const linkedCount = maquinas.filter(m => m.satcom_id).length;
   const isConfigured = devices.length > 0;
   const onlineCount = mapPoints.filter(p => p.estado_satcom === "online").length;
@@ -94,9 +116,22 @@ export function Xpert() {
           <h1 className="text-3xl font-bold tracking-tight text-primary">Xpert Satcom</h1>
           <p className="text-sm text-muted-foreground">Telemetría satelital y rastreo GPS de maquinaria</p>
         </div>
-        <Badge variant={isConfigured ? "default" : "secondary"} className={isConfigured ? "ml-auto bg-green-600" : "ml-auto"}>
-          {isConfigured ? "Integración activa" : "Integración pendiente"}
-        </Badge>
+        <div className="ml-auto flex items-center gap-2">
+          {isConfigured && linkedCount < maquinas.length && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => autoLinkMutation.mutate()}
+              disabled={autoLinkMutation.isPending}
+            >
+              <Wand2 className={`h-4 w-4 mr-2 ${autoLinkMutation.isPending ? "animate-pulse" : ""}`} />
+              {autoLinkMutation.isPending ? "Vinculando..." : "Auto-vincular GPS"}
+            </Button>
+          )}
+          <Badge variant={isConfigured ? "default" : "secondary"} className={isConfigured ? "bg-green-600" : ""}>
+            {isConfigured ? "Integración activa" : "Integración pendiente"}
+          </Badge>
+        </div>
       </div>
 
       {!isConfigured && (
