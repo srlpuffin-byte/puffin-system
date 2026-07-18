@@ -5,13 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, RefreshCw } from "lucide-react";
 import { Link } from "wouter";
 import { NuevoOperarioDialog } from "@/components/forms/nuevo-operario-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
 import { useQueryClient } from "@tanstack/react-query";
 import { Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "sonner";
 import { apiFetch } from "@/lib/api";
 
 export function Operarios() {
@@ -40,11 +41,32 @@ export function Operarios() {
     { header: "Estado", key: "estado", formatter: (v: string) => v?.toUpperCase() }
   ];
 
+  const handleSyncSheets = async () => {
+    try {
+      sonnerToast.info("Sincronizando Operarios con Google Sheets...");
+      const res = await fetch("/api/empleados/sync-sheet", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("puffin_token")}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        sonnerToast.success(`Google Sheets actualizado con ${data.rowsCount} operarios`);
+      } else {
+        sonnerToast.error(data.error || "Error al sincronizar");
+      }
+    } catch {
+      sonnerToast.error("Error de conexión al sincronizar");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Operarios</h1>
         <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50" onClick={handleSyncSheets}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Sincronizar Sheets
+          </Button>
           {operarios && (
             <ExportButtons 
               data={operarios} 

@@ -6,6 +6,42 @@ import { updateOrAppendToSheet } from "../services/sheets.js";
 
 const router = Router();
 
+router.get("/sync-sheet", async (req, res) => {
+  const { google } = await import("googleapis");
+  const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) return res.status(500).json({ error: "No credentials" });
+  
+  const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+  const auth = new google.auth.GoogleAuth({ credentials, scopes: ["https://www.googleapis.com/auth/spreadsheets"] });
+  const sheetsClient = google.sheets({ version: "v4", auth });
+
+  const maquinas = await db.select().from(maquinasTable).orderBy(maquinasTable.id);
+
+  const headers = ["ID", "Categoría", "Nombre", "Tipo", "Marca", "Modelo", "Patente/Dominio", "Estado"];
+  const rows = maquinas.map(m => [
+    m.id,
+    m.categoria === "inventario" ? "Inventario" : "Maquinaria",
+    m.nombre,
+    m.tipo,
+    m.marca || "",
+    m.modelo || "",
+    m.patente || m.dominio || "",
+    m.estado || ""
+  ]);
+
+  const allData = [headers, ...rows];
+
+  await sheetsClient.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: "Maquinarias!A:Z" });
+  await sheetsClient.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: "Maquinarias!A1",
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: allData },
+  });
+
+  return res.json({ success: true, rowsCount: rows.length });
+});
+
 router.get("/", async (req, res) => {
   const { estado, categoria, search } = req.query as { estado?: string; categoria?: string; search?: string };
 

@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Download, Plus, MapPin, Activity, DollarSign, Users, Tractor, Pencil, Trash2, Eye, Search } from "lucide-react";
+import { Download, Plus, MapPin, Activity, DollarSign, Users, Tractor, Pencil, Trash2, Eye, Search, RefreshCw } from "lucide-react";
 import { Link } from "wouter";
 import { Input } from "@/components/ui/input";
 import { NuevoProyectoDialog } from "@/components/forms/nuevo-proyecto-dialog";
@@ -55,6 +55,23 @@ export function Proyectos() {
     p.estado.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleSyncSheets = async () => {
+    try {
+      toast.info("Sincronizando Proyectos con Google Sheets...");
+      const res = await fetch("/api/proyectos/sync-sheet", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("puffin_token")}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Google Sheets actualizado con ${data.rowsCount} proyectos`);
+      } else {
+        toast.error(data.error || "Error al sincronizar");
+      }
+    } catch {
+      toast.error("Error de conexión al sincronizar");
+    }
+  };
+
   const handleDownloadCSV = () => {
     if (!proyectos || proyectos.length === 0) {
       toast.error("No hay proyectos para exportar");
@@ -100,9 +117,13 @@ export function Proyectos() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight text-primary">Proyectos</h1>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Button variant="outline" className="flex-1 sm:flex-none border-green-600 text-green-700 hover:bg-green-50" onClick={handleDownloadCSV}>
+        <h1 className="text-3xl font-bold tracking-tight text-primary">Proyectos y Presupuestos</h1>
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+          <Button variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50" onClick={handleSyncSheets}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Sincronizar Sheets
+          </Button>
+          <Button variant="outline" className="border-green-600 text-green-700 hover:bg-green-50" onClick={handleDownloadCSV}>
             <Download className="mr-2 h-4 w-4" />
             Descargar Excel
           </Button>

@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, X } from "lucide-react";
+import { Search, Plus, X, RefreshCw } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { ExportButtons } from "@/components/ui/export-buttons";
 import { NuevaMaquinaDialog } from "@/components/forms/nueva-maquina-dialog";
 import { AlertTriangle, Package, Truck } from "lucide-react";
+import { toast } from "sonner";
 
 const TIPOS_MAQUINA = ["Retroexcavadora", "Niveladora", "Compactadora", "Camión", "Camión Cisterna", "Grúa", "Pala Cargadora", "Minicargadora", "Bulldozer", "Motoniveladora", "Otro"];
 const TIPOS_INVENTARIO = ["Casilla Rodante", "Tanque de Agua", "Tanque de Combustible", "Herramienta Manual", "Herramienta Eléctrica", "Repuesto", "Otro"];
@@ -38,7 +39,25 @@ export function Maquinas() {
     return true;
   });
 
-  const hasFilters = search || filterEstado !== "todos" || filterTipo !== "todos";
+  const hasFilters = search !== "" || filterEstado !== "todos" || filterTipo !== "todos";
+
+  const handleSyncSheets = async () => {
+    try {
+      toast.info("Sincronizando Maquinarias con Google Sheets...");
+      const res = await fetch("/api/maquinas/sync-sheet", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("puffin_token")}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Google Sheets actualizado con ${data.rowsCount} maquinarias/inventario`);
+      } else {
+        toast.error(data.error || "Error al sincronizar");
+      }
+    } catch {
+      toast.error("Error de conexión al sincronizar");
+    }
+  };
+
   const clearFilters = () => { setSearch(""); setFilterEstado("todos"); setFilterTipo("todos"); };
 
   const exportColumns = [
@@ -57,6 +76,10 @@ export function Maquinas() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Maquinaria</h1>
         <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50" onClick={handleSyncSheets}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Sincronizar Sheets
+          </Button>
           {maquinas && (
             <ExportButtons 
               data={maquinas} 

@@ -7,6 +7,42 @@ import { updateOrAppendToSheet } from "../services/sheets";
 const router = Router();
 
 // Listar todos los proyectos
+router.get("/sync-sheet", async (req, res) => {
+  const { google } = await import("googleapis");
+  const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) return res.status(500).json({ error: "No credentials" });
+  
+  const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+  const auth = new google.auth.GoogleAuth({ credentials, scopes: ["https://www.googleapis.com/auth/spreadsheets"] });
+  const sheetsClient = google.sheets({ version: "v4", auth });
+
+  const proyectos = await db.select().from(proyectosTable).orderBy(proyectosTable.id);
+
+  const headers = ["ID", "Lugar", "Hectáreas", "Precio x Hectárea", "Ganancia Estimada", "Empleados Asignados", "Máquinas Asignadas", "Estado"];
+  const rows = proyectos.map(p => [
+    p.id,
+    p.lugar,
+    p.hectareas,
+    p.precio_hectarea,
+    p.ganancia_estimada,
+    Array.isArray(p.empleados_asignados) ? p.empleados_asignados.join(", ") : "",
+    Array.isArray(p.maquinas_asignadas) ? p.maquinas_asignadas.join(", ") : "",
+    p.estado || "activo"
+  ]);
+
+  const allData = [headers, ...rows];
+
+  await sheetsClient.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: "Proyectos!A:Z" });
+  await sheetsClient.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: "Proyectos!A1",
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: allData },
+  });
+
+  return res.json({ success: true, rowsCount: rows.length });
+});
+
 router.get("/", async (req, res) => {
   try {
     const proyectos = await db.select().from(proyectosTable).orderBy(proyectosTable.createdAt);

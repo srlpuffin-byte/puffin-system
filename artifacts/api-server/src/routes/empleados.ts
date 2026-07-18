@@ -6,6 +6,43 @@ import { updateOrAppendToSheet } from "../services/sheets";
 
 const router = Router();
 
+router.get("/sync-sheet", async (req, res) => {
+  const { google } = await import("googleapis");
+  const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) return res.status(500).json({ error: "No credentials" });
+  
+  const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+  const auth = new google.auth.GoogleAuth({ credentials, scopes: ["https://www.googleapis.com/auth/spreadsheets"] });
+  const sheetsClient = google.sheets({ version: "v4", auth });
+
+  const empleados = await db.select().from(empleadosTable).orderBy(empleadosTable.id);
+
+  const headers = ["Nombre", "Apellido", "DNI", "Teléfono", "Cargo", "Fecha Ingreso", "Familiar", "Tel. Familiar", "ID"];
+  const rows = empleados.map(e => [
+    e.nombre,
+    e.apellido,
+    e.dni,
+    e.telefono || "",
+    e.cargo || "",
+    e.fecha_ingreso || "",
+    e.contacto_familiar_nombre || "",
+    e.contacto_familiar_telefono || "",
+    e.id
+  ]);
+
+  const allData = [headers, ...rows];
+
+  await sheetsClient.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: "Empleados!A:Z" });
+  await sheetsClient.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: "Empleados!A1",
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: allData },
+  });
+
+  return res.json({ success: true, rowsCount: rows.length });
+});
+
 router.get("/", async (req, res) => {
   const { estado, search } = req.query as { estado?: string; search?: string };
 
