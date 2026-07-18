@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, RefreshCw, Wifi, WifiOff, Zap, ZapOff, Plus } from "lucide-react";
+import { MapPin, RefreshCw, Wifi, WifiOff, Zap, ZapOff, Plus, Pencil, Check, X } from "lucide-react";
 import { SatcomMap } from "@/components/map/SatcomMap";
 import { toast } from "sonner";
 
@@ -22,6 +22,8 @@ interface MapPoint {
 
 export function Gps() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState("");
   const queryClient = useQueryClient();
 
   const { data: mapPoints = [], isLoading, refetch } = useQuery<MapPoint[]>({
@@ -48,6 +50,23 @@ export function Gps() {
     },
     onError: () => {
       toast.error("Error al crear la máquina");
+    }
+  });
+
+  const updateMaquinaMutation = useMutation({
+    mutationFn: async ({ id, nombre }: { id: number; nombre: string }) => {
+      return apiFetch(`/maquinas/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ nombre }),
+      });
+    },
+    onSuccess: () => {
+      toast.success("Nombre actualizado correctamente");
+      setEditingId(null);
+      queryClient.invalidateQueries({ queryKey: ["satcom-mapa"] });
+    },
+    onError: () => {
+      toast.error("Error al actualizar el nombre");
     }
   });
 
@@ -112,7 +131,46 @@ export function Gps() {
                         p.estado_satcom === "offline" ? "bg-red-400" :
                         "bg-slate-300"
                       }`} />
-                      <span className="text-sm font-medium truncate">{p.nombre}</span>
+                      {editingId === p.maquina_id ? (
+                        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                          <input 
+                            autoFocus
+                            className="text-sm font-medium bg-white border border-blue-300 rounded px-1.5 py-0.5 w-32 outline-none focus:ring-2 focus:ring-blue-500"
+                            value={editingName}
+                            onChange={e => setEditingName(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') updateMaquinaMutation.mutate({ id: p.maquina_id!, nombre: editingName });
+                              if (e.key === 'Escape') setEditingId(null);
+                            }}
+                          />
+                          <button 
+                            className="p-1 hover:bg-green-100 text-green-600 rounded"
+                            onClick={() => updateMaquinaMutation.mutate({ id: p.maquina_id!, nombre: editingName })}
+                          >
+                            <Check className="h-3 w-3" />
+                          </button>
+                          <button 
+                            className="p-1 hover:bg-red-100 text-red-600 rounded"
+                            onClick={() => setEditingId(null)}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 group/name">
+                          <span className="text-sm font-medium truncate">{p.nombre}</span>
+                          <button 
+                            className="opacity-0 group-hover/name:opacity-100 p-1 hover:bg-slate-200 rounded text-slate-500 transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingId(p.maquina_id);
+                              setEditingName(p.nombre);
+                            }}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       {p.encendido
