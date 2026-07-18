@@ -73,7 +73,7 @@ router.post("/", async (req, res) => {
     estado: "activa"
   }).returning();
 
-  import("./sync-sheets.js").then(({ syncAllSheets }) => {
+  import("../services/sync-sheets.js").then(({ syncAllSheets }) => {
     syncAllSheets().catch(console.error);
   });
 
@@ -124,7 +124,7 @@ router.put("/:id", async (req, res) => {
     if (!maquina) return res.status(404).json({ error: "Maquinaria no encontrada" });
 
     // Sincronizar con Google Sheets
-    import("./sync-sheets.js").then(({ syncAllSheets }) => {
+    import("../services/sync-sheets.js").then(({ syncAllSheets }) => {
       syncAllSheets().catch(console.error);
     });
 
