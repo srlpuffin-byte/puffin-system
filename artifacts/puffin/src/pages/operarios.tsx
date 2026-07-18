@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, RefreshCw } from "lucide-react";
+import { Search, Plus, RefreshCw, User } from "lucide-react";
 import { Link } from "wouter";
 import { NuevoOperarioDialog } from "@/components/forms/nuevo-operario-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
@@ -113,7 +113,18 @@ export function Operarios() {
                 ) : (
                   operarios?.map((op) => (
                     <TableRow key={op.id}>
-                      <TableCell className="font-medium">{op.apellido}, {op.nombre}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-3">
+                          {(op as any).foto_perfil ? (
+                            <img src={(op as any).foto_perfil} alt="Perfil" className="w-8 h-8 rounded-full object-cover border" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center border">
+                              <User className="h-4 w-4 text-primary" />
+                            </div>
+                          )}
+                          <span>{op.apellido}, {op.nombre}</span>
+                        </div>
+                      </TableCell>
                       <TableCell>{op.dni}</TableCell>
                       <TableCell>{op.cargo || "-"}</TableCell>
                       <TableCell>

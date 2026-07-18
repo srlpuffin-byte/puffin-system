@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { empleadosTable, jornadasTable, alertasTable, documentosTable, usuariosTable } from "@workspace/db";
+import { empleadosTable, jornadasTable, alertasTable, documentosTable, usuariosTable, fotografiasTable } from "@workspace/db";
 import { eq, and, or, ilike, sql } from "drizzle-orm";
 import { updateOrAppendToSheet } from "../services/sheets";
 
@@ -73,10 +73,19 @@ router.get("/", async (req, res) => {
 
   const alertasMap = new Map(alertasActivas.map(a => [a.empleado_id, Number(a.count)]));
 
+  const fotos = await db.select().from(fotografiasTable).where(eq(fotografiasTable.entidad_tipo, "empleado"));
+  const fotosMap = new Map<number, string>();
+  for (const f of fotos) {
+    if (f.descripcion === "Foto de perfil" || f.descripcion?.toLowerCase().includes("perfil")) {
+      fotosMap.set(f.entidad_id, f.url);
+    }
+  }
+
   return res.json(empleados.map(e => ({
     ...e,
     jornada_activa: jornadaEmpleadoIds.has(e.id),
     alertas_count: alertasMap.get(e.id) || 0,
+    foto_perfil: fotosMap.get(e.id) || null,
   })));
 });
 
