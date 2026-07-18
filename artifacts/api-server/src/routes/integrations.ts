@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import { db } from "@workspace/db";
-import { maquinasTable } from "@workspace/db";
-import { eq, isNotNull } from "drizzle-orm";
+import { maquinasTable, fotografiasTable } from "@workspace/db";
+import { eq, isNotNull, and, inArray } from "drizzle-orm";
 import { SatcomClient } from "../services/satcom";
 
 export const integrationsRouter = Router();
@@ -111,6 +111,19 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
       .from(maquinasTable)
       .where(isNotNull(maquinasTable.satcom_id));
 
+    const maquinasIds = maquinas.map(m => m.id);
+    const fotografias = maquinasIds.length > 0 ? await db
+      .select()
+      .from(fotografiasTable)
+      .where(and(eq(fotografiasTable.entidad_tipo, "maquina"), inArray(fotografiasTable.entidad_id, maquinasIds))) : [];
+
+    const fotografiasMap = new Map();
+    fotografias.forEach(f => {
+      if (!fotografiasMap.has(f.entidad_id)) {
+        fotografiasMap.set(f.entidad_id, f.url);
+      }
+    });
+
     const devices = await SatcomClient.getDevices();
 
     // Identificar dispositivos vinculados
@@ -146,6 +159,7 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
         velocidad_kmh: position ? Math.round(position.speed * 1.852) : null,
         encendido: position?.attributes?.ignition || false,
         is_unlinked: false,
+        imagen_url: fotografiasMap.get(m.id) || null,
       });
     }
 

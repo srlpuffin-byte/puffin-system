@@ -123,7 +123,8 @@ export function SatcomMap({ points, height = "420px", activePointId }: SatcomMap
       const icon = createMarkerIcon(L, p.encendido, p.estado_satcom);
       const marker = L.marker([p.lat!, p.lng!], { icon })
         .bindPopup(`
-          <div style="font-family:system-ui;min-width:180px">
+          <div style="font-family:system-ui;min-width:180px;max-width:220px">
+            ${p.imagen_url ? `<img src="${p.imagen_url}" style="width:100%;height:100px;object-fit:cover;border-radius:6px;margin-bottom:8px" alt="${p.nombre}" />` : ''}
             <strong style="font-size:14px">${p.nombre}</strong><br/>
             <span style="color:#64748b;font-size:12px">${p.tipo}</span>
             <hr style="margin:6px 0;border-color:#e2e8f0"/>
