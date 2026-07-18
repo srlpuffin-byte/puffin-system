@@ -38,6 +38,7 @@ export function OperarioFicha() {
 
   const fotoPerfil = fotografias?.find(f => f.descripcion === "Foto de perfil" || f.descripcion?.toLowerCase().includes("perfil"));
   const fotoCarnet = fotografias?.find(f => f.descripcion === "Carnet de conducir" || f.descripcion?.toLowerCase().includes("carnet"));
+  const otrasFotos = fotografias?.filter(f => f.id !== fotoPerfil?.id && f.id !== fotoCarnet?.id) || [];
 
   return (
     <div className="space-y-6">
@@ -124,7 +125,7 @@ export function OperarioFicha() {
                   </div>
                 </div>
                 
-                {(fotoCarnet || fotoPerfil) && (
+                {(fotografias && fotografias.length > 0) && (
                   <div className="mt-6 pt-6 border-t">
                     <p className="text-sm font-semibold mb-3">Documentación Fotográfica</p>
                     <div className="flex flex-wrap gap-4">
@@ -140,6 +141,12 @@ export function OperarioFicha() {
                           <img src={fotoCarnet.url} alt="Carnet" className="max-w-full md:max-w-[300px] h-auto rounded-lg shadow-sm border border-border/50 object-cover" />
                         </div>
                       )}
+                      {otrasFotos.map(foto => (
+                        <div key={foto.id}>
+                          <p className="text-xs text-muted-foreground mb-1">{foto.descripcion || "Otra foto"}</p>
+                          <img src={foto.url} alt={foto.descripcion || "Foto"} className="max-w-full md:max-w-[300px] h-auto rounded-lg shadow-sm border border-border/50 object-cover" />
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
