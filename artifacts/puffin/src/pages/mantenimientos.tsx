@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useGetMantenimientos, useUpdateMantenimientoEstado, getGetMantenimientosQueryKey } from "@workspace/api-client-react";
+import { useGetMantenimientos, useUpdateMantenimientoEstado, getGetMantenimientosQueryKey, useGetMe } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ export function Mantenimientos() {
   const queryClient = useQueryClient();
   const { data: mantenimientos, isLoading } = useGetMantenimientos();
   const updateEstadoMut = useUpdateMantenimientoEstado();
+  const { data: user } = useGetMe();
+  const isEmpleado = user?.rol?.toLowerCase() === "empleado";
   const [openDialog, setOpenDialog] = useState(false);
   const [editData, setEditData] = useState<any>(null);
 
@@ -113,7 +115,7 @@ export function Mantenimientos() {
                         <Select
                           value={mant.estado}
                           onValueChange={(v) => handleEstadoChange(mant.id, v)}
-                          disabled={updateEstadoMut.isPending}
+                          disabled={updateEstadoMut.isPending || isEmpleado}
                         >
                           <SelectTrigger className={`w-[130px] h-8 text-xs font-semibold ${mant.estado === "realizado" ? "border-green-500 text-green-700 bg-green-50" : mant.estado === "cancelado" ? "border-red-500 text-red-700 bg-red-50" : ""}`}>
                             <SelectValue placeholder="Estado" />
@@ -126,9 +128,11 @@ export function Mantenimientos() {
                         </Select>
                       </TableCell>
                       <TableCell>
+                        {!isEmpleado && (
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(mant)}>
                           <Pencil className="h-4 w-4 text-muted-foreground" />
                         </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

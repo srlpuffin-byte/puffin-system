@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useGetIncidentes, getGetIncidentesQueryKey } from "@workspace/api-client-react";
+import { useGetIncidentes, getGetIncidentesQueryKey, useGetMe } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,6 +24,8 @@ export function Incidentes() {
   const { data: incidentes, isLoading } = useGetIncidentes();
   const [openDialog, setOpenDialog] = useState(false);
   const [resolvingId, setResolvingId] = useState<number | null>(null);
+  const { data: user } = useGetMe();
+  const isEmpleado = user?.rol?.toLowerCase() === "empleado";
   const queryClient = useQueryClient();
 
   const handleResolver = async (id: number) => {
@@ -113,7 +115,7 @@ export function Incidentes() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        {inc.estado !== "resuelto" && (
+                        {!isEmpleado && inc.estado !== "resuelto" && (
                           <Button
                             variant="outline"
                             size="sm"
