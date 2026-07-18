@@ -42,15 +42,12 @@ export async function uploadImage(filename: string, base64Data: string): Promise
     }
   }
 
-  // Fallback: Almacenamiento local (como funcionaba originalmente)
-  const filePath = path.join(UPLOADS_DIR, safeFilename);
-  const base64Image = base64Data.split(';base64,').pop();
-  
-  if (!base64Image) {
-    throw new Error('Formato base64 inválido');
-  }
-
-  await fs.promises.writeFile(filePath, base64Image, { encoding: 'base64' });
-  
-  return `/uploads/${safeFilename}`;
+  // Fallback: Guardar directamente como Base64 (Data URI) en la base de datos
+  // Esto evita problemas de archivos perdidos en entornos serverless/efímeros (como Vercel/Railway)
+  // sin depender del file system local.
+  const dataUri = base64Data.includes(';base64,') 
+    ? base64Data 
+    : `data:image/jpeg;base64,${base64Data}`;
+    
+  return dataUri;
 }
