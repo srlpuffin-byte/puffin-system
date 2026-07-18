@@ -163,7 +163,7 @@ export function MaquinaFicha() {
             <CardContent className="space-y-3">
               {mantenimientos && mantenimientos.length > 0 ? (() => {
                 const ultimo = mantenimientos[mantenimientos.length - 1];
-                const ultimo_fecha = ultimo?.fecha ? format(new Date(ultimo.fecha), "dd/MM/yyyy", { locale: es }) : "—";
+                const ultimo_fecha = ultimo?.fecha ? format(new Date(ultimo.fecha + 'T12:00:00'), "dd/MM/yyyy", { locale: es }) : "—";
                 return (
                   <>
                     <div>
@@ -173,7 +173,7 @@ export function MaquinaFicha() {
                     <div>
                       <p className="text-sm text-muted-foreground">Próximo Service</p>
                       <p className="font-medium text-yellow-600 font-bold">
-                        {ultimo?.proximo_service ? format(new Date(ultimo.proximo_service), "dd/MM/yyyy", { locale: es }) : maquina.proximo_service || "No programado"}
+                        {ultimo?.proximo_service ? format(new Date(ultimo.proximo_service + 'T12:00:00'), "dd/MM/yyyy", { locale: es }) : maquina.proximo_service || "No programado"}
                       </p>
                     </div>
                   </>
@@ -212,7 +212,7 @@ export function MaquinaFicha() {
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-semibold truncate">{m.tipo}</p>
                         <span className="text-xs text-muted-foreground shrink-0">
-                          {m.fecha ? format(new Date(m.fecha), "dd/MM/yy", { locale: es }) : "—"}
+                          {m.fecha ? format(new Date(m.fecha + 'T12:00:00'), "dd/MM/yy", { locale: es }) : "—"}
                         </span>
                       </div>
                       {m.descripcion && (

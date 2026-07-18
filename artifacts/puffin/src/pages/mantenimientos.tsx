@@ -46,12 +46,12 @@ export function Mantenimientos() {
   };
 
   const exportColumns = [
-    { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy") : "-" },
+    { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v + 'T12:00:00'), "dd/MM/yyyy") : "-" },
     { header: "Máquina", key: "maquina_nombre" },
     { header: "Tipo", key: "tipo", formatter: (v: string) => v?.charAt(0).toUpperCase() + v?.slice(1) },
     { header: "Descripción", key: "descripcion" },
     { header: "Horómetro", key: "horas" },
-    { header: "Próximo Service", key: "proximo_service", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy") : "-" },
+    { header: "Próximo Service", key: "proximo_service", formatter: (v: string) => v ? format(new Date(v + 'T12:00:00'), "dd/MM/yyyy") : "-" },
     { header: "Estado", key: "estado", formatter: (v: string) => v?.toUpperCase() }
   ];
 
@@ -100,14 +100,14 @@ export function Mantenimientos() {
                   mantenimientos?.map((mant) => (
                     <TableRow key={mant.id}>
                       <TableCell className="font-medium">
-                        {mant.fecha ? format(new Date(mant.fecha), "dd/MM/yyyy") : "-"}
+                        {mant.fecha ? format(new Date(mant.fecha + 'T12:00:00'), "dd/MM/yyyy") : "-"}
                       </TableCell>
                       <TableCell>{mant.maquina_nombre}</TableCell>
                       <TableCell className="capitalize">{mant.tipo}</TableCell>
                       <TableCell className="max-w-xs truncate" title={mant.descripcion || ""}>{mant.descripcion || "-"}</TableCell>
                       <TableCell>{mant.horas ? `${mant.horas}` : "-"}</TableCell>
                       <TableCell>
-                        {mant.proximo_service ? format(new Date(mant.proximo_service), "dd/MM/yyyy") : "-"}
+                        {mant.proximo_service ? format(new Date(mant.proximo_service + 'T12:00:00'), "dd/MM/yyyy") : "-"}
                       </TableCell>
                       <TableCell>
                         <Select
