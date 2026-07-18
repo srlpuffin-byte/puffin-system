@@ -57,4 +57,19 @@ export class SatcomClient {
       return null;
     }
   }
+
+  static async getPositionsBulk(positionIds: number[]): Promise<SatcomPosition[]> {
+    if (!positionIds.length) return [];
+    try {
+      const params = positionIds.map(id => `id=${id}`).join("&");
+      const res = await fetch(`${BASE_URL}/positions?${params}`, {
+        headers: this.getHeaders(),
+      });
+      if (!res.ok) throw new Error(`Satcom API Error: ${res.statusText}`);
+      return (await res.json()) as SatcomPosition[];
+    } catch (e) {
+      console.error("Error fetching bulk positions from Satcom", e);
+      return [];
+    }
+  }
 }

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import { db } from "@workspace/db";
 import { maquinasTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, isNotNull } from "drizzle-orm";
 import { SatcomClient } from "../services/satcom";
 
 export const integrationsRouter = Router();
@@ -43,11 +43,61 @@ integrationsRouter.post("/xpert/link", requireAuth, async (req, res) => {
       res.status(400).json({ error: "Missing ids" });
       return;
     }
-    
     await db.update(maquinasTable).set({ satcom_id }).where(eq(maquinasTable.id, maquina_id));
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: "Failed to link" });
+  }
+});
+
+// Endpoint del mapa: devuelve todas las máquinas vinculadas con su posición actual
+integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
+  try {
+    // Traer todas las maquinas con satcom_id asignado
+    const maquinas = await db
+      .select()
+      .from(maquinasTable)
+      .where(isNotNull(maquinasTable.satcom_id));
+
+    if (!maquinas.length) {
+      res.json([]);
+      return;
+    }
+
+    // Traer todos los dispositivos de Satcom en un solo request
+    const devices = await SatcomClient.getDevices();
+
+    // Hacer un solo request en bulk para todas las posiciones
+    const positionIds = maquinas
+      .map(m => {
+        const device = devices.find(d => d.id === m.satcom_id);
+        return device?.positionId;
+      })
+      .filter((id): id is number => !!id);
+
+    const positions = await SatcomClient.getPositionsBulk(positionIds);
+    const positionsMap = new Map(positions.map(p => [p.id, p]));
+
+    const result = maquinas.map(m => {
+      const device = devices.find(d => d.id === m.satcom_id);
+      const position = device ? positionsMap.get(device.positionId) : null;
+
+      return {
+        maquina_id: m.id,
+        nombre: m.nombre,
+        tipo: m.tipo,
+        estado_satcom: device?.status || "unknown",
+        lat: position?.latitude || null,
+        lng: position?.longitude || null,
+        velocidad_kmh: position ? Math.round(position.speed * 1.852) : null,
+        encendido: position?.attributes?.ignition || false,
+        ultima_actualizacion: position ? new Date().toISOString() : null,
+      };
+    });
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to fetch map data" });
   }
 });
 
@@ -60,7 +110,7 @@ integrationsRouter.get("/xpert/telemetria", requireAuth, async (req, res) => {
     }
 
     const maquina = await db.select().from(maquinasTable).where(eq(maquinasTable.id, parseInt(maquina_id as string))).limit(1);
-    
+
     if (!maquina.length || !maquina[0].satcom_id) {
       res.status(404).json({ error: "Maquina not linked to Satcom" });
       return;
@@ -69,14 +119,14 @@ integrationsRouter.get("/xpert/telemetria", requireAuth, async (req, res) => {
     const satcom_id = maquina[0].satcom_id;
     const devices = await SatcomClient.getDevices();
     const device = devices.find(d => d.id === satcom_id);
-    
+
     if (!device) {
       res.status(404).json({ error: "Device not found in Satcom API" });
       return;
     }
-    
+
     const position = await SatcomClient.getPosition(device.positionId);
-    
+
     if (!position) {
       res.status(404).json({ error: "No position data available" });
       return;
