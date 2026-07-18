@@ -229,6 +229,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             // Empleados solo ven Principal, Operación y Control
             if (group.label === "Principal") return true;
             if (group.label === "Operación") return true;
+            if (group.label === "Mantenimiento") return true;
             if (group.label === "Control") return true;
             return false;
           }
@@ -240,9 +241,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               filteredItems = group.items.filter(item => 
                 item.href !== "/operarios" && item.href !== "/maquinas" && item.href !== "/proyectos"
               );
+            } else if (group.label === "Mantenimiento") {
+              filteredItems = group.items.filter(item =>
+                item.href === "/mantenimientos"
+              );
             } else if (group.label === "Control") {
               filteredItems = group.items.filter(item => 
-                item.href === "/incidentes" || item.href === "/mantenimientos"
+                item.href === "/incidentes"
               );
             } else if (group.label === "Principal") {
               filteredItems = [
