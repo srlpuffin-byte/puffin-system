@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
+import { customFetch } from "@workspace/api-client-react";
 import { useGetEmpleado, useGetFotografias } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetJornadas } from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EditarOperarioDialog } from "@/components/forms/editar-operario-dialog";
-import { Edit, AlertTriangle } from "lucide-react";
+import { Edit, AlertTriangle, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export function OperarioFicha() {
@@ -24,6 +27,18 @@ export function OperarioFicha() {
   const [openJornada, setOpenJornada] = useState(false);
   const [openIncidente, setOpenIncidente] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleDeletePhoto = async (id: number) => {
+    if (!window.confirm("¿Estás seguro de que quieres eliminar esta foto?")) return;
+    try {
+      await customFetch(`/api/fotografias/${id}`, { method: "DELETE" });
+      toast({ title: "Foto eliminada", description: "La foto se ha eliminado correctamente." });
+      queryClient.invalidateQueries({ queryKey: ["fotografias"] });
+    } catch (err) {
+      toast({ title: "Error", description: "No se pudo eliminar la foto.", variant: "destructive" });
+    }
+  };
 
   if (isLoading) return <div className="p-8 text-center">Cargando perfil de operario...</div>;
   if (!operario) return <div className="p-8 text-center text-red-500">Operario no encontrado</div>;
@@ -130,21 +145,30 @@ export function OperarioFicha() {
                     <p className="text-sm font-semibold mb-3">Documentación Fotográfica</p>
                     <div className="flex flex-wrap gap-4">
                       {fotoPerfil && (
-                        <div>
+                        <div className="relative group">
                           <p className="text-xs text-muted-foreground mb-1">Foto de Perfil</p>
                           <img src={fotoPerfil.url} alt="Perfil" className="w-32 h-32 md:w-48 md:h-48 rounded-lg shadow-sm border border-border/50 object-cover" />
+                          <Button variant="destructive" size="icon" className="absolute top-6 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleDeletePhoto(fotoPerfil.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       )}
                       {fotoCarnet && (
-                        <div>
+                        <div className="relative group">
                           <p className="text-xs text-muted-foreground mb-1">Carnet de Conducir</p>
                           <img src={fotoCarnet.url} alt="Carnet" className="max-w-full md:max-w-[300px] h-auto rounded-lg shadow-sm border border-border/50 object-cover" />
+                          <Button variant="destructive" size="icon" className="absolute top-6 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleDeletePhoto(fotoCarnet.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       )}
                       {otrasFotos.map(foto => (
-                        <div key={foto.id}>
+                        <div key={foto.id} className="relative group">
                           <p className="text-xs text-muted-foreground mb-1">{foto.descripcion || "Otra foto"}</p>
                           <img src={foto.url} alt={foto.descripcion || "Foto"} className="max-w-full md:max-w-[300px] h-auto rounded-lg shadow-sm border border-border/50 object-cover" />
+                          <Button variant="destructive" size="icon" className="absolute top-6 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleDeletePhoto(foto.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       ))}
                     </div>

@@ -47,4 +47,15 @@ router.post("/", async (req, res) => {
   }
 });
 
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.delete(fotografiasTable).where(eq(fotografiasTable.id, parseInt(id)));
+    return res.status(204).send();
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Error al eliminar la fotografía" });
+  }
+});
+
 export default router;
