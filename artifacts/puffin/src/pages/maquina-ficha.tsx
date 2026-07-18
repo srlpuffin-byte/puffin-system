@@ -91,12 +91,7 @@ export function MaquinaFicha() {
               <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {fotos.map(f => (
                   <div key={f.id} className="relative rounded-lg overflow-hidden border">
-                    <img 
-                      src={f.url} 
-                      alt="Fotografía" 
-                      className="w-full h-48 object-cover"
-                      onError={(e) => (e.currentTarget.style.display = 'none')}
-                    />
+                    <img src={f.url} alt="Fotografía" className="w-full h-48 object-cover" />
                   </div>
                 ))}
               </CardContent>

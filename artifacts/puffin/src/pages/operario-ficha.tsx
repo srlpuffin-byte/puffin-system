@@ -46,12 +46,7 @@ export function OperarioFicha() {
           <Button variant="outline" size="icon"><ChevronLeft className="h-4 w-4" /></Button>
         </Link>
         {fotoPerfil ? (
-          <img 
-            src={fotoPerfil.url} 
-            alt="Perfil" 
-            className="w-16 h-16 rounded-full object-cover border-2 border-primary/20 shadow-sm"
-            onError={(e) => (e.currentTarget.style.display = 'none')}
-          />
+          <img src={fotoPerfil.url} alt="Perfil" className="w-16 h-16 rounded-full object-cover border-2 border-primary/20 shadow-sm" />
         ) : (
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/20">
             <User className="h-8 w-8 text-primary" />
@@ -136,12 +131,7 @@ export function OperarioFicha() {
                       {fotoPerfil && (
                         <div>
                           <p className="text-xs text-muted-foreground mb-1">Foto de Perfil</p>
-                          <img 
-                            src={fotoPerfil.url} 
-                            alt="Perfil" 
-                            className="w-32 h-32 md:w-48 md:h-48 rounded-lg shadow-sm border border-border/50 object-cover"
-                            onError={(e) => (e.currentTarget.style.display = 'none')}
-                          />
+                          <img src={fotoPerfil.url} alt="Perfil" className="w-32 h-32 md:w-48 md:h-48 rounded-lg shadow-sm border border-border/50 object-cover" />
                         </div>
                       )}
                       {fotoCarnet && (
