@@ -103,40 +103,41 @@ integrationsRouter.post("/xpert/auto-link", requireAuth, async (req, res) => {
 });
 
 
-// Endpoint del mapa: devuelve todas las máquinas vinculadas con su posición actual
+// Endpoint del mapa: devuelve todas las máquinas vinculadas con su posición actual, y los GPS sin vincular
 integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
   try {
-    // Traer todas las maquinas con satcom_id asignado
     const maquinas = await db
       .select()
       .from(maquinasTable)
       .where(isNotNull(maquinasTable.satcom_id));
 
-    if (!maquinas.length) {
-      res.json([]);
-      return;
-    }
-
-    // Traer todos los dispositivos de Satcom en un solo request
     const devices = await SatcomClient.getDevices();
 
-    // Hacer un solo request en bulk para todas las posiciones
-    const positionIds = maquinas
-      .map(m => {
-        const device = devices.find(d => d.id === m.satcom_id);
-        return device?.positionId;
-      })
-      .filter((id): id is number => !!id);
+    // Identificar dispositivos vinculados
+    const linkedDeviceIds = new Set(maquinas.map(m => m.satcom_id));
+    
+    // Dispositivos sin vincular
+    const unlinkedDevices = devices.filter(d => !linkedDeviceIds.has(d.id));
 
-    const positions = await SatcomClient.getPositionsBulk(positionIds);
+    // Obtener posiciones para todos (vinculados y no vinculados)
+    const positionIdsToFetch = [
+      ...maquinas.map(m => devices.find(d => d.id === m.satcom_id)?.positionId),
+      ...unlinkedDevices.map(d => d.positionId)
+    ].filter((id): id is number => !!id);
+
+    const positions = await SatcomClient.getPositionsBulk(positionIdsToFetch);
     const positionsMap = new Map(positions.map(p => [p.id, p]));
 
-    const result = maquinas.map(m => {
+    const result = [];
+
+    // 1. Agregar máquinas vinculadas
+    for (const m of maquinas) {
       const device = devices.find(d => d.id === m.satcom_id);
       const position = device ? positionsMap.get(device.positionId) : null;
 
-      return {
+      result.push({
         maquina_id: m.id,
+        device_id: device?.id || null,
         nombre: m.nombre,
         tipo: m.tipo,
         estado_satcom: device?.status || "unknown",
@@ -144,9 +145,26 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
         lng: position?.longitude || null,
         velocidad_kmh: position ? Math.round(position.speed * 1.852) : null,
         encendido: position?.attributes?.ignition || false,
-        ultima_actualizacion: position ? new Date().toISOString() : null,
-      };
-    });
+        is_unlinked: false,
+      });
+    }
+
+    // 2. Agregar dispositivos sin vincular
+    for (const d of unlinkedDevices) {
+      const position = positionsMap.get(d.positionId);
+      result.push({
+        maquina_id: null,
+        device_id: d.id,
+        nombre: d.name,
+        tipo: "GPS sin asignar",
+        estado_satcom: d.status,
+        lat: position?.latitude || null,
+        lng: position?.longitude || null,
+        velocidad_kmh: position ? Math.round(position.speed * 1.852) : null,
+        encendido: position?.attributes?.ignition || false,
+        is_unlinked: true,
+      });
+    }
 
     res.json(result);
   } catch (e) {

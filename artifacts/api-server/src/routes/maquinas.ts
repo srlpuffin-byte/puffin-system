@@ -26,11 +26,12 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { codigo, categoria, nombre, tipo, marca, modelo, anio, patente, dominio, chasis, motor, horometro, kilometros, filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio, descripcion } = req.body;
+  const { codigo, categoria, nombre, tipo, marca, modelo, anio, patente, dominio, chasis, motor, horometro, kilometros, filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio, descripcion, satcom_id } = req.body;
   if (!nombre || !tipo) return res.status(400).json({ error: "Nombre y tipo son requeridos" });
   const [maquina] = await db.insert(maquinasTable).values({
     codigo, categoria: categoria || "maquinaria", nombre, tipo, marca, modelo, anio, patente, dominio, chasis, motor,
     filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio, descripcion,
+    satcom_id: satcom_id || null,
     horometro: horometro?.toString() || "0",
     kilometros: kilometros?.toString() || "0",
     estado: "activa"

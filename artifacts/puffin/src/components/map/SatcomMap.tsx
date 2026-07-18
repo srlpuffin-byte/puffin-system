@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from "react";
 
 interface MapPoint {
-  maquina_id: number;
+  maquina_id: number | null;
+  device_id: number | null;
   nombre: string;
   tipo: string;
   estado_satcom: string;
@@ -9,11 +10,13 @@ interface MapPoint {
   lng: number | null;
   velocidad_kmh: number | null;
   encendido: boolean;
+  is_unlinked?: boolean;
 }
 
 interface SatcomMapProps {
   points: MapPoint[];
   height?: string;
+  activePointId?: string | null;
 }
 
 declare global {
@@ -59,7 +62,7 @@ function createMarkerIcon(L: any, encendido: boolean, status: string) {
   });
 }
 
-export function SatcomMap({ points, height = "420px" }: SatcomMapProps) {
+export function SatcomMap({ points, height = "420px", activePointId }: SatcomMapProps) {
   const mapRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<any[]>([]);
@@ -126,10 +129,20 @@ export function SatcomMap({ points, height = "420px" }: SatcomMapProps) {
     });
 
     if (validPoints.length > 0) {
-      const group = L.featureGroup(markersRef.current);
-      mapRef.current.fitBounds(group.getBounds().pad(0.3));
+      if (activePointId) {
+        const activePoint = validPoints.find(p => (p.is_unlinked ? `dev-${p.device_id}` : `maq-${p.maquina_id}`) === activePointId);
+        if (activePoint && activePoint.lat !== null && activePoint.lng !== null) {
+          mapRef.current.flyTo([activePoint.lat, activePoint.lng], 15, { animate: true, duration: 1 });
+        } else {
+          const group = L.featureGroup(markersRef.current);
+          mapRef.current.fitBounds(group.getBounds().pad(0.3));
+        }
+      } else {
+        const group = L.featureGroup(markersRef.current);
+        mapRef.current.fitBounds(group.getBounds().pad(0.3));
+      }
     }
-  }, [points]);
+  }, [points, activePointId]);
 
   return (
     <div className="relative overflow-hidden border shadow-sm" style={{ height }}>
