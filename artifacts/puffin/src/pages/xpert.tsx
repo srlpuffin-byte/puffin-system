@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 interface Maquina {
   id: number;
   nombre: string;
+  categoria: string;
   tipo: string;
   estado: string;
   horometro: number;
@@ -101,9 +102,16 @@ export function Xpert() {
     onError: () => toast.error("Error al intentar la vinculación automática"),
   });
 
-  const linkedCount = maquinas.filter(m => m.satcom_id).length;
+  const validMaquinas = maquinas.filter(m => m.categoria !== "inventario");
+  const linkedCount = validMaquinas.filter(m => m.satcom_id).length;
   const isConfigured = devices.length > 0;
-  const onlineCount = mapPoints.filter(p => p.estado_satcom === "online").length;
+  
+  useEffect(() => {
+    if (isConfigured && linkedCount < validMaquinas.length && !autoLinkMutation.isPending && !autoLinkMutation.isSuccess) {
+      // Auto-trigger auto-link on load once
+      autoLinkMutation.mutate();
+    }
+  }, [isConfigured, linkedCount, validMaquinas.length]);
 
   return (
     <div className="space-y-6">
@@ -117,7 +125,7 @@ export function Xpert() {
           <p className="text-sm text-muted-foreground">Telemetría satelital y rastreo GPS de maquinaria</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          {isConfigured && linkedCount < maquinas.length && (
+          {isConfigured && linkedCount < validMaquinas.length && (
             <Button
               variant="outline"
               size="sm"
@@ -128,9 +136,10 @@ export function Xpert() {
               {autoLinkMutation.isPending ? "Vinculando..." : "Auto-vincular GPS"}
             </Button>
           )}
-          <Badge variant={isConfigured ? "default" : "secondary"} className={isConfigured ? "bg-green-600" : ""}>
-            {isConfigured ? "Integración activa" : "Integración pendiente"}
-          </Badge>
+          <Button variant="default" size="sm" onClick={() => window.location.href = '/gps'}>
+            <MapPin className="h-4 w-4 mr-2" />
+            Ver mapa de flota
+          </Button>
         </div>
       </div>
 
@@ -153,39 +162,11 @@ export function Xpert() {
             <p className="text-xs text-muted-foreground mt-1">Dispositivos GPS</p>
           </Card>
           <Card className="text-center p-4">
-            <p className="text-2xl font-bold text-green-600">{onlineCount}</p>
-            <p className="text-xs text-muted-foreground mt-1">En línea ahora</p>
-          </Card>
-          <Card className="text-center p-4">
             <p className="text-2xl font-bold text-blue-600">{linkedCount}</p>
             <p className="text-xs text-muted-foreground mt-1">Máquinas vinculadas</p>
           </Card>
         </div>
-      )}
-
-      {/* Mapa */}
-      {isConfigured && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <MapPin className="h-5 w-5 text-blue-600" />
-                Ubicación en tiempo real
-              </CardTitle>
-              <Button variant="outline" size="sm" onClick={() => refetchMap()} disabled={mapLoading}>
-                <RefreshCw className={`h-4 w-4 mr-2 ${mapLoading ? "animate-spin" : ""}`} />
-                Actualizar
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <SatcomMap points={mapPoints} />
-            <p className="text-xs text-muted-foreground mt-2 text-right">Actualización automática cada 30 segundos</p>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      )}      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Telemetría disponible */}
         <Card>
           <CardHeader>
@@ -222,10 +203,10 @@ export function Xpert() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-[400px] overflow-y-auto">
-              {maquinas.length === 0 && (
+              {validMaquinas.length === 0 && (
                 <p className="text-center text-muted-foreground py-6 text-sm">No hay maquinaria registrada</p>
               )}
-              {maquinas.map((maq) => (
+              {validMaquinas.map((maq) => (
                 <div key={maq.id} className="flex flex-col gap-2 p-3 border rounded-lg">
                   <div className="flex items-center justify-between">
                     <div>
@@ -269,7 +250,7 @@ export function Xpert() {
                   )}
                 </div>
               ))}
-              {maquinas.length > 0 && !isConfigured && (
+              {validMaquinas.length > 0 && !isConfigured && (
                 <p className="text-xs text-muted-foreground text-center pt-2">
                   Instalá un dispositivo Xpert Satcom en cada equipo para activar el rastreo GPS
                 </p>
@@ -300,7 +281,7 @@ export function Xpert() {
             </div>
             <div className="flex justify-between items-center py-2">
               <span className="text-muted-foreground">Dispositivos vinculados</span>
-              <span className="font-bold">{linkedCount} / {maquinas.length}</span>
+              <span className="font-bold">{linkedCount} / {validMaquinas.length}</span>
             </div>
           </div>
         </CardContent>
