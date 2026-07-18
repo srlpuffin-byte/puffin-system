@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { RegistrarMantenimientoDialog } from "@/components/forms/registrar-mantenimiento-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
@@ -17,6 +17,7 @@ export function Mantenimientos() {
   const { data: mantenimientos, isLoading } = useGetMantenimientos();
   const updateEstadoMut = useUpdateMantenimientoEstado();
   const [openDialog, setOpenDialog] = useState(false);
+  const [editData, setEditData] = useState<any>(null);
 
   const handleEstadoChange = (id: number, nuevoEstado: string) => {
     toast.loading("Actualizando estado...", { id: `update-${id}` });
@@ -32,6 +33,16 @@ export function Mantenimientos() {
         }
       }
     );
+  };
+
+  const handleEdit = (mant: any) => {
+    setEditData(mant);
+    setOpenDialog(true);
+  };
+
+  const handleNew = () => {
+    setEditData(null);
+    setOpenDialog(true);
   };
 
   const exportColumns = [
@@ -57,7 +68,7 @@ export function Mantenimientos() {
               title="Reporte de Mantenimientos" 
             />
           )}
-          <Button className="bg-primary flex-1 sm:flex-none" onClick={() => setOpenDialog(true)}>
+          <Button className="bg-primary flex-1 sm:flex-none" onClick={handleNew}>
             <Plus className="mr-2 h-4 w-4" />
             Registrar Mantenimiento
           </Button>
@@ -74,16 +85,17 @@ export function Mantenimientos() {
                   <TableHead>Máquina</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Descripción</TableHead>
-                  <TableHead>Horómetro</TableHead>
+                  <TableHead>Horómetro/Odómetro</TableHead>
                   <TableHead>Próximo Service</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-8">Cargando mantenimientos...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando mantenimientos...</TableCell></TableRow>
                 ) : mantenimientos?.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No hay mantenimientos registrados.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay mantenimientos registrados.</TableCell></TableRow>
                 ) : (
                   mantenimientos?.map((mant) => (
                     <TableRow key={mant.id}>
@@ -93,7 +105,7 @@ export function Mantenimientos() {
                       <TableCell>{mant.maquina_nombre}</TableCell>
                       <TableCell className="capitalize">{mant.tipo}</TableCell>
                       <TableCell className="max-w-xs truncate" title={mant.descripcion || ""}>{mant.descripcion || "-"}</TableCell>
-                      <TableCell>{mant.horas ? `${mant.horas} h` : "-"}</TableCell>
+                      <TableCell>{mant.horas ? `${mant.horas}` : "-"}</TableCell>
                       <TableCell>
                         {mant.proximo_service ? format(new Date(mant.proximo_service), "dd/MM/yyyy") : "-"}
                       </TableCell>
@@ -113,6 +125,11 @@ export function Mantenimientos() {
                           </SelectContent>
                         </Select>
                       </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(mant)}>
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -122,7 +139,14 @@ export function Mantenimientos() {
         </CardContent>
       </Card>
 
-      <RegistrarMantenimientoDialog open={openDialog} onOpenChange={setOpenDialog} />
+      <RegistrarMantenimientoDialog 
+        open={openDialog} 
+        onOpenChange={(val) => {
+          setOpenDialog(val);
+          if (!val) setEditData(null);
+        }} 
+        editData={editData}
+      />
     </div>
   );
 }

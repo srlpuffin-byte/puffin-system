@@ -19,6 +19,7 @@ export const maquinasTable = pgTable("maquinas", {
   horometro: numeric("horometro", { precision: 10, scale: 1 }).default("0"),
   kilometros: numeric("kilometros", { precision: 10, scale: 1 }).default("0"),
   estado: text("estado").notNull().default("activa"),
+  satcom_id: integer("satcom_id"),
   ultimo_service: text("ultimo_service"),
   proximo_service: text("proximo_service"),
   filtro_tipo: text("filtro_tipo"),

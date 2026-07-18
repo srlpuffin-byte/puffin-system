@@ -1,5 +1,9 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
+import { db } from "@workspace/db";
+import { maquinasTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { SatcomClient } from "../services/satcom";
 
 export const integrationsRouter = Router();
 
@@ -21,19 +25,73 @@ integrationsRouter.get("/americangis/geocercas", requireAuth, (req, res) => {
 });
 
 // ==========================================
-// MOCK: Xpert Satcom
+// Xpert Satcom
 // ==========================================
-integrationsRouter.get("/xpert/telemetria", requireAuth, (req, res) => {
-  const { maquina_id } = req.query;
-  
-  // Simulamos datos en tiempo real del GPS y motor
-  res.json({
-    maquina_id: maquina_id ? parseInt(maquina_id as string) : null,
-    posicion: { lat: -34.6037, lng: -58.3816 },
-    velocidad_kmh: 45.5,
-    estado: "encendido", // encendido, apagado, ralenti
-    horas_motor_acumuladas: 1540.2,
-    kilometraje_acumulado: 8500.5,
-    ultima_actualizacion: new Date().toISOString()
-  });
+integrationsRouter.get("/xpert/devices", requireAuth, async (req, res) => {
+  try {
+    const devices = await SatcomClient.getDevices();
+    res.json(devices);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to fetch devices" });
+  }
+});
+
+integrationsRouter.post("/xpert/link", requireAuth, async (req, res) => {
+  try {
+    const { maquina_id, satcom_id } = req.body;
+    if (!maquina_id || !satcom_id) {
+      res.status(400).json({ error: "Missing ids" });
+      return;
+    }
+    
+    await db.update(maquinasTable).set({ satcom_id }).where(eq(maquinasTable.id, maquina_id));
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to link" });
+  }
+});
+
+integrationsRouter.get("/xpert/telemetria", requireAuth, async (req, res) => {
+  try {
+    const { maquina_id } = req.query;
+    if (!maquina_id) {
+      res.status(400).json({ error: "Missing maquina_id" });
+      return;
+    }
+
+    const maquina = await db.select().from(maquinasTable).where(eq(maquinasTable.id, parseInt(maquina_id as string))).limit(1);
+    
+    if (!maquina.length || !maquina[0].satcom_id) {
+      res.status(404).json({ error: "Maquina not linked to Satcom" });
+      return;
+    }
+
+    const satcom_id = maquina[0].satcom_id;
+    const devices = await SatcomClient.getDevices();
+    const device = devices.find(d => d.id === satcom_id);
+    
+    if (!device) {
+      res.status(404).json({ error: "Device not found in Satcom API" });
+      return;
+    }
+    
+    const position = await SatcomClient.getPosition(device.positionId);
+    
+    if (!position) {
+      res.status(404).json({ error: "No position data available" });
+      return;
+    }
+
+    res.json({
+      maquina_id: parseInt(maquina_id as string),
+      posicion: { lat: position.latitude, lng: position.longitude },
+      velocidad_kmh: position.speed * 1.852,
+      estado: position.attributes?.ignition ? "encendido" : "apagado",
+      horas_motor_acumuladas: position.attributes?.hours ? position.attributes.hours / 3600000 : 0,
+      kilometraje_acumulado: position.attributes?.distance ? position.attributes.distance / 1000 : 0,
+      ultima_actualizacion: new Date().toISOString()
+    });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to fetch telemetry" });
+  }
 });

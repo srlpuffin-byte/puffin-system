@@ -75,4 +75,35 @@ router.patch("/:id/estado", async (req, res) => {
   }
 });
 
+router.put("/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+    const { maquina_id, horas, tipo, descripcion, proximo_service } = req.body;
+    
+    if (!maquina_id || !tipo) return res.status(400).json({ error: "Máquina y tipo son requeridos" });
+
+    const [mantenimiento] = await db
+      .update(mantenimientosTable)
+      .set({
+        maquina_id,
+        horas: horas?.toString(),
+        tipo,
+        descripcion,
+        proximo_service
+      })
+      .where(eq(mantenimientosTable.id, id))
+      .returning();
+
+    if (!mantenimiento) return res.status(404).json({ error: "Mantenimiento no encontrado" });
+
+    const [maquina] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, maquina_id)).limit(1);
+
+    return res.json({ ...mantenimiento, maquina_nombre: maquina?.nombre || "Maquinaria", horas: mantenimiento.horas ? Number(mantenimiento.horas) : null });
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al actualizar mantenimiento: " + (err?.message || "Error interno") });
+  }
+});
+
 export default router;
