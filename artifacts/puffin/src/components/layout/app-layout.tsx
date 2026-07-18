@@ -242,7 +242,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               );
             } else if (group.label === "Control") {
               filteredItems = group.items.filter(item => 
-                item.href === "/incidentes"
+                item.href === "/incidentes" || item.href === "/mantenimientos"
               );
             } else if (group.label === "Principal") {
               filteredItems = [
