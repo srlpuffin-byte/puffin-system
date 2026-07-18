@@ -11,6 +11,7 @@ interface MapPoint {
   velocidad_kmh: number | null;
   encendido: boolean;
   is_unlinked?: boolean;
+  imagen_url?: string | null;
 }
 
 interface SatcomMapProps {
