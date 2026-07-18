@@ -129,6 +129,7 @@ function Router() {
 }
 
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { OfflineBadge } from "@/components/ui/offline-badge";
 
 function App() {
   return (
@@ -139,6 +140,7 @@ function App() {
         </WouterRouter>
         <Toaster />
         <SonnerToaster />
+        <OfflineBadge />
       </TooltipProvider>
     </QueryClientProvider>
   );

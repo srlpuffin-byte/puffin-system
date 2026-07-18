@@ -1,6 +1,7 @@
 export type CustomFetchOptions = RequestInit & {
   responseType?: "json" | "text" | "blob" | "auto";
 };
+import { enqueueRequest } from './offline-queue';
 
 export type ErrorType<T = unknown> = ApiError<T>;
 
@@ -360,7 +361,27 @@ export async function customFetch<T = unknown>(
 
   const requestInfo = { method, url: resolveUrl(input) };
 
-  const response = await fetch(input, { ...init, method, headers });
+  let response: Response;
+  try {
+    response = await fetch(input, { ...init, method, headers });
+  } catch (error) {
+    // Network error (offline or CORS or server down)
+    if (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
+      let stringBody: string | null = null;
+      if (typeof init.body === 'string') {
+        stringBody = init.body;
+      }
+      
+      const rawHeaders: Record<string, string> = {};
+      headers.forEach((val, key) => { rawHeaders[key] = val; });
+      
+      await enqueueRequest(requestInfo.url, method, rawHeaders, stringBody);
+      
+      // Resolve successfully with a fake JSON object to not break the app
+      return {} as T;
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     // Auto-logout on 401 (token expirado o inválido)
