@@ -201,7 +201,12 @@ export function MisDatos() {
                   {fotoPerfilExistente && fotoPerfil.length === 0 && (
                     <div className="mb-4">
                       <p className="text-xs font-medium text-green-700 mb-2 flex items-center">✓ Foto actual guardada</p>
-                      <img src={fotoPerfilExistente.url} alt="Foto de perfil actual" className="w-32 h-32 object-cover rounded-lg border border-slate-200" />
+                      <img 
+                      src={fotoPerfilExistente.url} 
+                      alt="Foto de perfil actual" 
+                      className="w-32 h-32 object-cover rounded-lg border border-slate-200"
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
                       <p className="text-xs text-muted-foreground mt-2">Sube una nueva imagen abajo si deseas reemplazarla.</p>
                     </div>
                   )}
@@ -216,7 +221,12 @@ export function MisDatos() {
                   {fotoCarnetExistente && fotoCarnet.length === 0 && (
                     <div className="mb-4">
                       <p className="text-xs font-medium text-green-700 mb-2 flex items-center">✓ Carnet actual guardado</p>
-                      <img src={fotoCarnetExistente.url} alt="Carnet actual" className="max-w-full h-auto max-h-40 object-cover rounded-lg border border-slate-200" />
+                      <img 
+                      src={fotoCarnetExistente.url} 
+                      alt="Carnet actual" 
+                      className="max-w-full h-auto max-h-40 object-cover rounded-lg border border-slate-200"
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
                       <p className="text-xs text-muted-foreground mt-2">Sube una nueva imagen abajo si deseas reemplazarla.</p>
                     </div>
                   )}
