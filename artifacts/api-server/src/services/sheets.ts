@@ -6,7 +6,6 @@ const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 let sheetsClient: any = null;
 
 function getAuthClient() {
-  return null; // Disabled to prevent Google Sheets sync issues
   if (sheetsClient) return sheetsClient;
 
   if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
