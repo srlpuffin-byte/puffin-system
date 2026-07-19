@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { Loader2, Search } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { useGetFotografias } from "@workspace/api-client-react";
 
 interface NuevoProyectoDialogProps {
   open: boolean;
@@ -28,6 +30,11 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
   const { data: proyectos } = useGetProyectos();
   const { data: empleadosData } = useGetEmpleados();
   const { data: maquinasData } = useGetMaquinas();
+  const { data: fotografias } = useGetFotografias({ entidad_tipo: "maquina" });
+
+  const getMaquinaFoto = (id: number) => {
+    return fotografias?.find(f => f.entidad_id === id)?.url;
+  };
 
   // Filtrar los que ya están asignados a proyectos activos
   const empleadosEnUso = new Set(proyectos?.filter(p => p.estado === "activo").flatMap(p => p.empleados_asignados || []));
@@ -190,9 +197,22 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
                               checked={maquinasIds.includes(maq.id)}
                               onCheckedChange={() => toggleMaquina(maq.id)}
                             />
-                            <label htmlFor={`maq-${maq.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
-                              {maq.nombre} {maq.marca ? `- ${maq.marca} ${maq.modelo || ''}` : ''} <span className="text-muted-foreground">({maq.patente || maq.dominio || "S/P"})</span>
-                            </label>
+                            <HoverCard openDelay={200}>
+                              <HoverCardTrigger asChild>
+                                <label 
+                                  htmlFor={`maq-${maq.id}`} 
+                                  className="text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 py-1"
+                                >
+                                  {maq.nombre} {maq.marca ? `- ${maq.marca} ${maq.modelo || ''}` : ''}
+                                  <span className="text-xs text-muted-foreground ml-1">· {maq.patente || maq.dominio || "S/P"}</span>
+                                </label>
+                              </HoverCardTrigger>
+                              {getMaquinaFoto(maq.id) && (
+                                <HoverCardContent side="right" className="w-64 p-0 overflow-hidden shadow-lg border-2 border-primary/20">
+                                  <img src={getMaquinaFoto(maq.id)} alt={maq.nombre} className="w-full h-auto object-cover aspect-video" />
+                                </HoverCardContent>
+                              )}
+                            </HoverCard>
                           </div>
                         ))}
                       </div>
@@ -210,9 +230,22 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
                               checked={maquinasIds.includes(maq.id)}
                               onCheckedChange={() => toggleMaquina(maq.id)}
                             />
-                            <label htmlFor={`maq-${maq.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
-                              {maq.nombre} <span className="text-muted-foreground">- {maq.codigo || maq.tipo}</span>
-                            </label>
+                            <HoverCard openDelay={200}>
+                              <HoverCardTrigger asChild>
+                                <label 
+                                  htmlFor={`maq-${maq.id}`} 
+                                  className="text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 py-1"
+                                >
+                                  {maq.nombre}
+                                  <span className="text-xs text-muted-foreground ml-1">· {maq.codigo || maq.tipo}</span>
+                                </label>
+                              </HoverCardTrigger>
+                              {getMaquinaFoto(maq.id) && (
+                                <HoverCardContent side="right" className="w-64 p-0 overflow-hidden shadow-lg border-2 border-primary/20">
+                                  <img src={getMaquinaFoto(maq.id)} alt={maq.nombre} className="w-full h-auto object-cover aspect-video" />
+                                </HoverCardContent>
+                              )}
+                            </HoverCard>
                           </div>
                         ))}
                       </div>
