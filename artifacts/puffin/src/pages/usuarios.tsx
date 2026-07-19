@@ -90,7 +90,13 @@ function NuevoUsuarioDialog({ open, onClose }: { open: boolean; onClose: () => v
 function EditarUsuarioDialog({ user, onClose }: { user: Usuario; onClose: () => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const [form, setForm] = useState({ nombre: user.nombre, apellido: user.apellido, rol: user.rol, activo: user.activo });
+  const [form, setForm] = useState({ 
+    nombre: user.nombre, 
+    apellido: user.apellido, 
+    usuario: user.usuario,
+    rol: user.rol, 
+    activo: user.activo 
+  });
 
   const mutation = useMutation({
     mutationFn: () => apiFetch(`/usuarios/${user.id}`, {
@@ -119,6 +125,10 @@ function EditarUsuarioDialog({ user, onClose }: { user: Usuario; onClose: () => 
               <Label>Apellido</Label>
               <Input value={form.apellido} onChange={(e) => setForm({ ...form, apellido: e.target.value })} />
             </div>
+          </div>
+          <div>
+            <Label>Usuario</Label>
+            <Input value={form.usuario} onChange={(e) => setForm({ ...form, usuario: e.target.value })} />
           </div>
           <div>
             <Label>Rol</Label>

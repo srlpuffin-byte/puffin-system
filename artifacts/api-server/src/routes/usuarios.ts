@@ -127,7 +127,7 @@ router.get("/:id", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const userId = Number(req.params.id);
-    const { nombre, apellido, rol, activo, bloqueado } = req.body;
+    const { nombre, apellido, usuario, rol, activo, bloqueado } = req.body;
     
     const [oldUsuario] = await db.select().from(usuariosTable).where(eq(usuariosTable.id, userId)).limit(1);
     if (!oldUsuario) return res.status(404).json({ error: "Usuario no encontrado" });
@@ -135,6 +135,7 @@ router.put("/:id", async (req, res) => {
     const updateData: Record<string, any> = {};
     if (nombre !== undefined) updateData.nombre = nombre;
     if (apellido !== undefined) updateData.apellido = apellido;
+    if (usuario !== undefined) updateData.usuario = usuario;
     if (rol !== undefined) updateData.rol = rol;
     if (activo !== undefined) updateData.activo = activo;
     if (bloqueado !== undefined) {
@@ -172,8 +173,11 @@ router.put("/:id", async (req, res) => {
     }
 
     return res.json(updated);
-  } catch (err) {
+  } catch (err: any) {
     req.log.error(err);
+    if (err.code === "23505") {
+      return res.status(409).json({ error: "El nombre de usuario ya existe" });
+    }
     return res.status(500).json({ error: "Error al actualizar usuario" });
   }
 });
