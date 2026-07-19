@@ -7,38 +7,12 @@ import { syncAllSheets } from "../services/sync-sheets.js";
 const router = Router();
 
 router.get("/sync-sheet", async (req, res) => {
-  const { google } = await import("googleapis");
-  const SHEET_ID = process.env.GOOGLE_SHEET_ID;
-  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) return res.status(500).json({ error: "No credentials" });
-  
-  const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
-  const auth = new google.auth.GoogleAuth({ credentials, scopes: ["https://www.googleapis.com/auth/spreadsheets"] });
-  const sheetsClient = google.sheets({ version: "v4", auth });
-
-  const egresos = await db.select().from(egresosTable).orderBy(desc(egresosTable.fecha));
-
-  const headers = [
-    "ID", "Fecha", "Categoría", "Concepto", "Proveedor", "Monto", 
-    "Método de Pago", "Comprobante", "Proyecto", "Observaciones"
-  ];
-
-  const rows = egresos.map(e => [
-    e.id, e.fecha, e.categoria, e.concepto, e.proveedor || "", 
-    Number(e.monto), e.metodo_pago || "", e.comprobante ? "SI" : "NO",
-    e.centro_costos || "", e.observaciones || ""
-  ]);
-
-  const allData = [headers, ...rows];
-
-  await sheetsClient.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: "Egresos!A:Z" });
-  await sheetsClient.spreadsheets.values.update({
-    spreadsheetId: SHEET_ID,
-    range: "Egresos!A1",
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: allData },
-  });
-
-  return res.json({ success: true, rowsCount: rows.length });
+  try {
+    await syncAllSheets();
+    return res.json({ success: true, message: "Sync completado" });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 router.get("/", async (req, res) => {
