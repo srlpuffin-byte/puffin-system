@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useCreateProyecto, useGetProyectos } from "@/hooks/use-proyectos";
 import { useGetEmpleados, useGetMaquinas } from "@workspace/api-client-react";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -21,6 +21,8 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
   const [precioHectarea, setPrecioHectarea] = useState("");
   const [empleadosIds, setEmpleadosIds] = useState<number[]>([]);
   const [maquinasIds, setMaquinasIds] = useState<number[]>([]);
+  const [searchEmpleados, setSearchEmpleados] = useState("");
+  const [searchMaquinas, setSearchMaquinas] = useState("");
   
   const createMut = useCreateProyecto();
   const { data: proyectos } = useGetProyectos();
@@ -42,6 +44,8 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
       setPrecioHectarea("");
       setEmpleadosIds([]);
       setMaquinasIds([]);
+      setSearchEmpleados("");
+      setSearchMaquinas("");
     }
   }, [open]);
 
@@ -132,9 +136,18 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
           <div className="grid gap-6 sm:grid-cols-2">
             <div className="space-y-3">
               <Label>Empleados Asignados</Label>
-              <ScrollArea className="h-[200px] border rounded-md p-4">
-                <div className="space-y-4">
-                  {empleados?.map(emp => (
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar empleado..."
+                  value={searchEmpleados}
+                  onChange={(e) => setSearchEmpleados(e.target.value)}
+                  className="pl-8 h-8 text-sm"
+                />
+              </div>
+              <ScrollArea className="h-[220px] border rounded-md p-4">
+                <div className="space-y-3">
+                  {empleados?.filter(emp => `${emp.nombre} ${emp.apellido}`.toLowerCase().includes(searchEmpleados.toLowerCase())).map(emp => (
                     <div key={emp.id} className="flex items-center space-x-2">
                       <Checkbox 
                         id={`emp-${emp.id}`} 
@@ -146,8 +159,8 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
                       </label>
                     </div>
                   ))}
-                  {(!empleados || empleados.length === 0) && (
-                    <p className="text-sm text-muted-foreground">No hay empleados disponibles.</p>
+                  {(!empleados || empleados.filter(emp => `${emp.nombre} ${emp.apellido}`.toLowerCase().includes(searchEmpleados.toLowerCase())).length === 0) && (
+                    <p className="text-sm text-muted-foreground">No hay empleados encontrados.</p>
                   )}
                 </div>
               </ScrollArea>
@@ -155,13 +168,22 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
 
             <div className="space-y-3">
               <Label>Maquinaria Asignada</Label>
-              <ScrollArea className="h-[200px] border rounded-md p-4">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar máquina..."
+                  value={searchMaquinas}
+                  onChange={(e) => setSearchMaquinas(e.target.value)}
+                  className="pl-8 h-8 text-sm"
+                />
+              </div>
+              <ScrollArea className="h-[220px] border rounded-md p-4">
                 <div className="space-y-4">
-                  {maquinas?.filter(m => m.categoria !== "inventario").length! > 0 && (
+                  {maquinas?.filter(m => m.categoria !== "inventario" && (`${m.nombre} ${m.marca || ''} ${m.modelo || ''}`).toLowerCase().includes(searchMaquinas.toLowerCase())).length! > 0 && (
                     <div>
                       <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3">Maquinaria Pesada</h4>
-                      <div className="space-y-4">
-                        {maquinas?.filter(m => m.categoria !== "inventario").map(maq => (
+                      <div className="space-y-3">
+                        {maquinas?.filter(m => m.categoria !== "inventario" && (`${m.nombre} ${m.marca || ''} ${m.modelo || ''}`).toLowerCase().includes(searchMaquinas.toLowerCase())).map(maq => (
                           <div key={maq.id} className="flex items-center space-x-2">
                             <Checkbox 
                               id={`maq-${maq.id}`} 
@@ -177,11 +199,11 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
                     </div>
                   )}
 
-                  {maquinas?.filter(m => m.categoria === "inventario").length! > 0 && (
+                  {maquinas?.filter(m => m.categoria === "inventario" && (`${m.nombre} ${m.codigo || ''} ${m.tipo || ''}`).toLowerCase().includes(searchMaquinas.toLowerCase())).length! > 0 && (
                     <div className="pt-2">
                       <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3">Inventario / Herramientas</h4>
-                      <div className="space-y-4">
-                        {maquinas?.filter(m => m.categoria === "inventario").map(maq => (
+                      <div className="space-y-3">
+                        {maquinas?.filter(m => m.categoria === "inventario" && (`${m.nombre} ${m.codigo || ''} ${m.tipo || ''}`).toLowerCase().includes(searchMaquinas.toLowerCase())).map(maq => (
                           <div key={maq.id} className="flex items-center space-x-2">
                             <Checkbox 
                               id={`maq-${maq.id}`} 

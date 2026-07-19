@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useUpdateProyecto, useGetProyectos, type Proyecto } from "@/hooks/use-proyectos";
 import { useGetEmpleados, useGetMaquinas } from "@workspace/api-client-react";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,6 +24,8 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
   const [estado, setEstado] = useState("activo");
   const [empleadosIds, setEmpleadosIds] = useState<number[]>([]);
   const [maquinasIds, setMaquinasIds] = useState<number[]>([]);
+  const [searchEmpleados, setSearchEmpleados] = useState("");
+  const [searchMaquinas, setSearchMaquinas] = useState("");
 
   const updateMut = useUpdateProyecto();
   const { data: proyectos } = useGetProyectos();
@@ -46,6 +48,8 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
       setEstado(proyecto.estado);
       setEmpleadosIds(proyecto.empleados_asignados ?? []);
       setMaquinasIds(proyecto.maquinas_asignadas ?? []);
+      setSearchEmpleados("");
+      setSearchMaquinas("");
     }
   }, [proyecto, open]);
 
@@ -157,9 +161,18 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
                   {empleadosIds.length} seleccionados
                 </span>
               </div>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar empleado..."
+                  value={searchEmpleados}
+                  onChange={(e) => setSearchEmpleados(e.target.value)}
+                  className="pl-8 h-8 text-sm"
+                />
+              </div>
               <ScrollArea className="h-[220px] border rounded-md p-4">
                 <div className="space-y-3">
-                  {empleados?.map(emp => (
+                  {empleados?.filter(emp => `${emp.nombre} ${emp.apellido}`.toLowerCase().includes(searchEmpleados.toLowerCase())).map(emp => (
                     <div key={emp.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={`edit-emp-${emp.id}`}
@@ -189,13 +202,22 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
                   {maquinasIds.length} seleccionadas
                 </span>
               </div>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar máquina..."
+                  value={searchMaquinas}
+                  onChange={(e) => setSearchMaquinas(e.target.value)}
+                  className="pl-8 h-8 text-sm"
+                />
+              </div>
               <ScrollArea className="h-[220px] border rounded-md p-4">
                 <div className="space-y-4">
-                  {maquinas?.filter(m => m.categoria !== "inventario").length! > 0 && (
+                  {maquinas?.filter(m => m.categoria !== "inventario" && (`${m.nombre} ${m.marca || ''} ${m.modelo || ''}`).toLowerCase().includes(searchMaquinas.toLowerCase())).length! > 0 && (
                     <div>
                       <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3">Maquinaria Pesada</h4>
                       <div className="space-y-3">
-                        {maquinas?.filter(m => m.categoria !== "inventario").map(maq => (
+                        {maquinas?.filter(m => m.categoria !== "inventario" && (`${m.nombre} ${m.marca || ''} ${m.modelo || ''}`).toLowerCase().includes(searchMaquinas.toLowerCase())).map(maq => (
                           <div key={maq.id} className="flex items-center space-x-2">
                             <Checkbox
                               id={`edit-maq-${maq.id}`}
@@ -215,11 +237,11 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
                     </div>
                   )}
 
-                  {maquinas?.filter(m => m.categoria === "inventario").length! > 0 && (
+                  {maquinas?.filter(m => m.categoria === "inventario" && (`${m.nombre} ${m.codigo || ''} ${m.tipo || ''}`).toLowerCase().includes(searchMaquinas.toLowerCase())).length! > 0 && (
                     <div className="pt-2">
                       <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3">Inventario / Herramientas</h4>
                       <div className="space-y-3">
-                        {maquinas?.filter(m => m.categoria === "inventario").map(maq => (
+                        {maquinas?.filter(m => m.categoria === "inventario" && (`${m.nombre} ${m.codigo || ''} ${m.tipo || ''}`).toLowerCase().includes(searchMaquinas.toLowerCase())).map(maq => (
                           <div key={maq.id} className="flex items-center space-x-2">
                             <Checkbox
                               id={`edit-maq-${maq.id}`}
