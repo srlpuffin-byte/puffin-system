@@ -127,14 +127,22 @@ router.get("/me", async (req, res) => {
   }
   const [empleado] = await db.select().from(empleadosTable).where(eq(empleadosTable.id, empleadoId)).limit(1);
   if (!empleado) return res.status(404).json({ error: "Operario no encontrado" });
-  return res.json({ ...empleado, jornada_activa: false, alertas_count: 0 });
+  
+  const [doc] = await db.select().from(documentosTable)
+    .where(and(eq(documentosTable.entidad_tipo, "empleado"), eq(documentosTable.entidad_id, empleado.id), eq(documentosTable.tipo, "Carnet"))).limit(1);
+    
+  return res.json({ ...empleado, vencimiento_carnet: doc?.fecha_vencimiento, jornada_activa: false, alertas_count: 0 });
 });
 
 router.get("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const [empleado] = await db.select().from(empleadosTable).where(eq(empleadosTable.id, id)).limit(1);
   if (!empleado) return res.status(404).json({ error: "Operario no encontrado" });
-  return res.json({ ...empleado, jornada_activa: false, alertas_count: 0 });
+  
+  const [doc] = await db.select().from(documentosTable)
+    .where(and(eq(documentosTable.entidad_tipo, "empleado"), eq(documentosTable.entidad_id, empleado.id), eq(documentosTable.tipo, "Carnet"))).limit(1);
+    
+  return res.json({ ...empleado, vencimiento_carnet: doc?.fecha_vencimiento, jornada_activa: false, alertas_count: 0 });
 });
 
 router.put("/:id", async (req, res) => {

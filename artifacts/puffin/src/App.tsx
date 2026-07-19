@@ -64,7 +64,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
     // Wait for all data to load before deciding to redirect
     if (isEmpleado && !operarioLoading && operario) {
-      const isFaltante = !operario.dni || operario.dni === "COMPLETAR" || !operario.telefono || !operario.contacto_familiar_telefono;
+      const isFaltante = !operario.dni || operario.dni === "COMPLETAR" || !operario.telefono || !operario.contacto_familiar_telefono || !(operario as any).vencimiento_carnet;
       if (isFaltante && location !== "/mis-datos") {
         setLocation("/mis-datos");
       }
