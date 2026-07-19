@@ -35,7 +35,7 @@ async function appendMissing(sheetsClient: any, SHEET_ID: string, tabName: strin
 
 export async function syncAllSheets() {
   const SHEET_ID = process.env.GOOGLE_SHEET_ID;
-  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) return;
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON || !SHEET_ID) return;
 
   try {
     const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
