@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "wouter";
-import { useGetDashboardResumen, useGetAlertas, useGetActividad, useGetMe } from "@workspace/api-client-react";
+import { useGetDashboardResumen, useGetAlertas, useGetActividad, useGetMe, useGetCalendarioEventos } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -61,11 +61,28 @@ export function Panel() {
   const { data: resumen, isLoading } = useGetDashboardResumen();
   const { data: alertasData } = useGetAlertas({ estado: "activa" });
   const { data: actividadData } = useGetActividad({ limit: 8 });
+  
+  const currentDate = new Date();
+  const { data: eventosData } = useGetCalendarioEventos({ 
+    mes: currentDate.getMonth() + 1, 
+    anio: currentDate.getFullYear() 
+  });
 
   const alertas = (alertasData as any[]) || [];
   const actividad = (actividadData as any[]) || [];
   const vencimientos = resumen?.proximos_vencimientos || [];
   const maquinasResumen = (resumen?.maquinas_resumen as any[]) || [];
+
+  const todayStart = new Date();
+  todayStart.setHours(0,0,0,0);
+  const upcomingEvents = ((eventosData as any[]) || [])
+    .filter(e => {
+      const eDate = new Date(e.fecha);
+      eDate.setHours(0,0,0,0);
+      return eDate >= todayStart;
+    })
+    .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+    .slice(0, 5);
 
   if (isLoading) {
     return (
@@ -301,6 +318,48 @@ export function Panel() {
             </CardContent>
           </Card>
           )}
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="h-4 w-4" /> Próximos Eventos
+              </CardTitle>
+              <Link href="/calendario">
+                <Button variant="ghost" size="sm" className="text-xs gap-1">
+                  Ver calendario <ArrowRight className="h-3 w-3" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {upcomingEvents.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4 text-sm">No hay eventos próximos para este mes</p>
+              ) : (
+                <div className="space-y-3">
+                  {upcomingEvents.map((ev: any, i: number) => {
+                    const isToday = new Date(ev.fecha).toDateString() === new Date().toDateString();
+                    return (
+                      <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${isToday ? 'bg-blue-50 border-blue-200' : 'bg-card hover:bg-slate-50 transition-colors'}`}>
+                        <div className={`h-2 w-2 rounded-full mt-1.5 flex-shrink-0 ${isToday ? 'bg-blue-500' : 'bg-slate-400'}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium ${isToday ? 'text-blue-900' : ''}`}>
+                            {ev.titulo}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {formatFechaCorta(ev.fecha)} {ev.entidad_nombre ? `· ${ev.entidad_nombre}` : ''}
+                          </p>
+                        </div>
+                        {isToday && (
+                          <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-[10px] uppercase">
+                            Hoy
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-6">
