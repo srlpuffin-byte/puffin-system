@@ -108,7 +108,7 @@ export function Egresos() {
     }
   };
 
-  const total = egresos?.reduce((acc, curr) => acc + curr.monto, 0) || 0;
+  const total = egresos?.reduce((acc, curr) => acc + Number(curr.monto || 0), 0) || 0;
 
   const handleSyncSheets = async () => {
     try {

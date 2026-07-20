@@ -249,37 +249,73 @@ export function Productividad() {
               {maquinas.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No hay maquinaria registrada</p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Máquina</TableHead>
-                      <TableHead className="text-right">Horas</TableHead>
-                      <TableHead className="text-right">Consumo (L)</TableHead>
-                      <TableHead className="text-right">Fallas</TableHead>
-                      <TableHead className="text-right">Disp.</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <div className="rounded-md border overflow-hidden">
+                  {/* Vista Desktop */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Máquina</TableHead>
+                          <TableHead className="text-right">Horas</TableHead>
+                          <TableHead className="text-right">Consumo (L)</TableHead>
+                          <TableHead className="text-right">Fallas</TableHead>
+                          <TableHead className="text-right">Disp.</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {maquinas.map((maq) => (
+                          <TableRow key={maq.id}>
+                            <TableCell>
+                              <div className="font-medium text-sm">{maq.nombre}</div>
+                              <div className="text-xs text-muted-foreground">{maq.tipo}</div>
+                            </TableCell>
+                            <TableCell className="text-right">{maq.horas}</TableCell>
+                            <TableCell className="text-right">{maq.consumo}</TableCell>
+                            <TableCell className="text-right">
+                              <span className={maq.fallas > 0 ? "text-red-600 font-bold" : ""}>{maq.fallas}</span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className={maq.disponibilidad >= 80 ? "text-green-600 font-bold" : maq.disponibilidad >= 50 ? "text-yellow-600 font-bold" : "text-red-600 font-bold"}>
+                                {maq.disponibilidad}%
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Vista Mobile */}
+                  <div className="md:hidden divide-y">
                     {maquinas.map((maq) => (
-                      <TableRow key={maq.id}>
-                        <TableCell>
-                          <div className="font-medium text-sm">{maq.nombre}</div>
-                          <div className="text-xs text-muted-foreground">{maq.tipo}</div>
-                        </TableCell>
-                        <TableCell className="text-right">{maq.horas}</TableCell>
-                        <TableCell className="text-right">{maq.consumo}</TableCell>
-                        <TableCell className="text-right">
-                          <span className={maq.fallas > 0 ? "text-red-600 font-bold" : ""}>{maq.fallas}</span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className={maq.disponibilidad >= 80 ? "text-green-600 font-bold" : maq.disponibilidad >= 50 ? "text-yellow-600 font-bold" : "text-red-600 font-bold"}>
-                            {maq.disponibilidad}%
-                          </span>
-                        </TableCell>
-                      </TableRow>
+                      <div key={maq.id} className="p-4 flex flex-col gap-2 hover:bg-slate-50 transition-colors">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-primary">{maq.nombre}</span>
+                            <span className="text-xs text-muted-foreground">{maq.tipo}</span>
+                          </div>
+                          <Badge variant="outline" className={maq.disponibilidad >= 80 ? "border-green-200 text-green-700 bg-green-50" : maq.disponibilidad >= 50 ? "border-yellow-200 text-yellow-700 bg-yellow-50" : "border-red-200 text-red-700 bg-red-50"}>
+                            {maq.disponibilidad}% Disp.
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-sm bg-slate-50 p-2 rounded border mt-1">
+                          <div className="flex flex-col">
+                            <span className="uppercase text-muted-foreground text-[10px] font-semibold">Horas</span>
+                            <span className="font-medium">{maq.horas}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="uppercase text-muted-foreground text-[10px] font-semibold">Consumo</span>
+                            <span className="font-medium">{maq.consumo} L</span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="uppercase text-muted-foreground text-[10px] font-semibold">Fallas</span>
+                            <span className={maq.fallas > 0 ? "text-red-600 font-bold" : "font-medium"}>{maq.fallas}</span>
+                          </div>
+                        </div>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
+                </div>
               )}
               {maquinas.length > 0 && (
                 <div className="mt-4 text-xs text-muted-foreground bg-slate-50 p-3 rounded">

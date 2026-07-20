@@ -184,30 +184,62 @@ export function Reportes() {
                 {maquinaria.length === 0 ? (
                   <p className="text-center text-muted-foreground py-6 text-sm">Sin datos para el período</p>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Máquina</TableHead>
-                        <TableHead className="text-right">Horas</TableHead>
-                        <TableHead className="text-right">Km</TableHead>
-                        <TableHead className="text-right">Consumo (L)</TableHead>
-                        <TableHead className="text-right">Disp.</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <div className="rounded-md border overflow-hidden">
+                    {/* Vista Desktop */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Máquina</TableHead>
+                            <TableHead className="text-right">Horas</TableHead>
+                            <TableHead className="text-right">Km</TableHead>
+                            <TableHead className="text-right">Consumo (L)</TableHead>
+                            <TableHead className="text-right">Disp.</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {maquinaria.map((maq) => (
+                            <TableRow key={maq.id}>
+                              <TableCell className="font-medium text-sm">{maq.nombre}</TableCell>
+                              <TableCell className="text-right">{maq.horas ?? 0}</TableCell>
+                              <TableCell className="text-right">{maq.kilometros ?? 0}</TableCell>
+                              <TableCell className="text-right">{maq.consumo ?? 0}</TableCell>
+                              <TableCell className={`text-right font-medium ${disponibilidadColor(maq.disponibilidad ?? 0)}`}>
+                                {maq.disponibilidad ?? 0}%
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {/* Vista Mobile */}
+                    <div className="md:hidden divide-y">
                       {maquinaria.map((maq) => (
-                        <TableRow key={maq.id}>
-                          <TableCell className="font-medium text-sm">{maq.nombre}</TableCell>
-                          <TableCell className="text-right">{maq.horas ?? 0}</TableCell>
-                          <TableCell className="text-right">{maq.kilometros ?? 0}</TableCell>
-                          <TableCell className="text-right">{maq.consumo ?? 0}</TableCell>
-                          <TableCell className={`text-right ${disponibilidadColor(maq.disponibilidad ?? 0)}`}>
-                            {maq.disponibilidad ?? 0}%
-                          </TableCell>
-                        </TableRow>
+                        <div key={maq.id} className="p-3 flex flex-col gap-2 hover:bg-slate-50 transition-colors">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-semibold text-primary">{maq.nombre}</span>
+                            <Badge variant="outline" className={maq.disponibilidad ?? 0 >= 80 ? "border-green-200 text-green-700 bg-green-50" : (maq.disponibilidad ?? 0) >= 50 ? "border-yellow-200 text-yellow-700 bg-yellow-50" : "border-red-200 text-red-700 bg-red-50"}>
+                              {maq.disponibilidad ?? 0}% Disp.
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-sm bg-slate-50 p-2 rounded border mt-1">
+                            <div className="flex flex-col">
+                              <span className="uppercase text-muted-foreground text-[10px] font-semibold">Horas</span>
+                              <span className="font-medium">{maq.horas ?? 0}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="uppercase text-muted-foreground text-[10px] font-semibold">Km</span>
+                              <span className="font-medium">{maq.kilometros ?? 0}</span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                              <span className="uppercase text-muted-foreground text-[10px] font-semibold">Consumo</span>
+                              <span className="font-medium">{maq.consumo ?? 0} L</span>
+                            </div>
+                          </div>
+                        </div>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -232,34 +264,70 @@ export function Reportes() {
                 {operarios.length === 0 ? (
                   <p className="text-center text-muted-foreground py-6 text-sm">Sin datos para el período</p>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Operario</TableHead>
-                        <TableHead className="text-right">Jornadas</TableHead>
-                        <TableHead className="text-right">Horas</TableHead>
-                        <TableHead className="text-right">Incidentes</TableHead>
-                        <TableHead className="text-right">Puntaje</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <div className="rounded-md border overflow-hidden">
+                    {/* Vista Desktop */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Operario</TableHead>
+                            <TableHead className="text-right">Jornadas</TableHead>
+                            <TableHead className="text-right">Horas</TableHead>
+                            <TableHead className="text-right">Incidentes</TableHead>
+                            <TableHead className="text-right">Puntaje</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {operarios.map((op) => (
+                            <TableRow key={op.id}>
+                              <TableCell className="font-medium text-sm">{op.nombre}</TableCell>
+                              <TableCell className="text-right">{op.jornadas ?? 0}</TableCell>
+                              <TableCell className="text-right">{op.horas ?? 0}</TableCell>
+                              <TableCell className={`text-right ${(op.incidentes ?? 0) > 0 ? "text-red-600 font-bold" : ""}`}>
+                                {op.incidentes ?? 0}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className={`px-1.5 py-0.5 rounded text-xs ${puntajeColor(op.puntaje ?? 0)}`}>
+                                  {op.puntaje ?? 100}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    {/* Vista Mobile */}
+                    <div className="md:hidden divide-y">
                       {operarios.map((op) => (
-                        <TableRow key={op.id}>
-                          <TableCell className="font-medium text-sm">{op.nombre}</TableCell>
-                          <TableCell className="text-right">{op.jornadas ?? 0}</TableCell>
-                          <TableCell className="text-right">{op.horas ?? 0}</TableCell>
-                          <TableCell className={`text-right ${(op.incidentes ?? 0) > 0 ? "text-red-600 font-bold" : ""}`}>
-                            {op.incidentes ?? 0}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className={`px-1.5 py-0.5 rounded text-xs ${puntajeColor(op.puntaje ?? 0)}`}>
-                              {op.puntaje ?? 100}
+                        <div key={op.id} className="p-3 flex flex-col gap-2 hover:bg-slate-50 transition-colors">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-semibold text-primary">{op.nombre}</span>
+                            <span className={`px-2 py-1 rounded-md text-xs font-semibold ${puntajeColor(op.puntaje ?? 0)}`}>
+                              Puntaje: {op.puntaje ?? 100}
                             </span>
-                          </TableCell>
-                        </TableRow>
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-2 text-sm bg-slate-50 p-2 rounded border mt-1">
+                            <div className="flex flex-col">
+                              <span className="uppercase text-muted-foreground text-[10px] font-semibold">Jornadas</span>
+                              <span className="font-medium">{op.jornadas ?? 0}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="uppercase text-muted-foreground text-[10px] font-semibold">Horas</span>
+                              <span className="font-medium">{op.horas ?? 0}</span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                              <span className="uppercase text-muted-foreground text-[10px] font-semibold">Incidentes</span>
+                              <span className={(op.incidentes ?? 0) > 0 ? "text-red-600 font-bold" : "font-medium"}>
+                                {op.incidentes ?? 0}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>

@@ -266,35 +266,71 @@ function BalanceOperario({ operarioId }: { operarioId: number }) {
   if (!jornadas || jornadas.length === 0) return <div className="p-4 text-center text-muted-foreground">No hay jornadas registradas para este operario.</div>;
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Fecha</TableHead>
-            <TableHead>Máquina</TableHead>
-            <TableHead>Horómetro Inicio</TableHead>
-            <TableHead>Horómetro Fin</TableHead>
-            <TableHead>Horas Trab.</TableHead>
-            <TableHead>Estado</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {jornadas.map((j) => (
-            <TableRow key={j.id}>
-              <TableCell className="font-medium">{format(new Date(j.fecha), "dd/MM/yyyy")}</TableCell>
-              <TableCell>{(j as any).maquina_nombre || "-"}</TableCell>
-              <TableCell>{j.horometro_inicio || "-"}</TableCell>
-              <TableCell>{j.horometro_fin || "-"}</TableCell>
-              <TableCell>{(j as any).horas_trabajadas?.toFixed(1) || "-"}</TableCell>
-              <TableCell>
-                <Badge variant={j.estado === "finalizada" ? "default" : "secondary"}>
-                  {j.estado}
-                </Badge>
-              </TableCell>
+    <div className="rounded-md border-0 md:border md:rounded-md overflow-hidden">
+      {/* Vista Desktop */}
+      <div className="hidden md:block overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Máquina</TableHead>
+              <TableHead>Horómetro Inicio</TableHead>
+              <TableHead>Horómetro Fin</TableHead>
+              <TableHead>Horas Trab.</TableHead>
+              <TableHead>Estado</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {jornadas.map((j) => (
+              <TableRow key={j.id}>
+                <TableCell className="font-medium">{format(new Date(j.fecha), "dd/MM/yyyy")}</TableCell>
+                <TableCell>{(j as any).maquina_nombre || "-"}</TableCell>
+                <TableCell>{j.horometro_inicio || "-"}</TableCell>
+                <TableCell>{j.horometro_fin || "-"}</TableCell>
+                <TableCell>{(j as any).horas_trabajadas?.toFixed(1) || "-"}</TableCell>
+                <TableCell>
+                  <Badge variant={j.estado === "finalizada" ? "default" : "secondary"}>
+                    {j.estado}
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Vista Mobile */}
+      <div className="md:hidden divide-y">
+        {jornadas.map((j) => (
+          <div key={j.id} className="p-4 flex flex-col gap-2 hover:bg-slate-50 transition-colors">
+            <div className="flex items-start justify-between gap-2">
+              <span className="font-semibold text-primary">{format(new Date(j.fecha), "dd/MM/yyyy")}</span>
+              <Badge variant={j.estado === "finalizada" ? "default" : "secondary"}>
+                {j.estado}
+              </Badge>
+            </div>
+            
+            <div className="text-sm font-medium text-slate-700">
+              Máquina: {(j as any).maquina_nombre || "-"}
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-xs bg-slate-50 p-2 rounded border mt-1">
+              <div className="flex flex-col">
+                <span className="uppercase text-muted-foreground font-semibold">Inicio</span>
+                <span>{j.horometro_inicio || "-"}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="uppercase text-muted-foreground font-semibold">Fin</span>
+                <span>{j.horometro_fin || "-"}</span>
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="uppercase text-muted-foreground font-semibold">Total</span>
+                <span className="font-bold text-blue-700">{(j as any).horas_trabajadas?.toFixed(1) || "-"} h</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

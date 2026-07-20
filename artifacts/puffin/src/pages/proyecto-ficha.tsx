@@ -271,52 +271,94 @@ export function ProyectoFicha() {
                   <p className="text-sm">Cuando registres un egreso asignado a <strong>{proyecto.lugar}</strong>, aparecerá acá automáticamente.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead>Categoría</TableHead>
-                        <TableHead>Concepto</TableHead>
-                        <TableHead className="text-right">Monto ARS</TableHead>
-                        <TableHead className="text-right">≈ USD</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {egresosProyecto.map(eg => {
-                        const monto = parseFloat(eg.monto?.toString() || "0");
-                        return (
-                          <TableRow key={eg.id}>
-                            <TableCell className="text-sm">
-                              {eg.fecha ? format(new Date(eg.fecha), "dd/MM/yyyy") : "-"}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs">{eg.categoria}</Badge>
-                            </TableCell>
-                            <TableCell className="text-sm max-w-[200px] truncate" title={eg.concepto}>
-                              {eg.concepto}
-                            </TableCell>
-                            <TableCell className="text-right font-medium text-red-600 text-sm">
+                <div className="rounded-md border-0 md:border md:rounded-md overflow-hidden">
+                  {/* Vista Desktop (Tabla) */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead>Categoría</TableHead>
+                          <TableHead>Concepto</TableHead>
+                          <TableHead className="text-right">Monto ARS</TableHead>
+                          <TableHead className="text-right">≈ USD</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {egresosProyecto.map(eg => {
+                          const monto = parseFloat(eg.monto?.toString() || "0");
+                          return (
+                            <TableRow key={eg.id}>
+                              <TableCell className="text-sm">
+                                {eg.fecha ? format(new Date(eg.fecha), "dd/MM/yyyy") : "-"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="text-xs">{eg.categoria}</Badge>
+                              </TableCell>
+                              <TableCell className="text-sm max-w-[200px] truncate" title={eg.concepto}>
+                                {eg.concepto}
+                              </TableCell>
+                              <TableCell className="text-right font-medium text-red-600 text-sm">
+                                ${monto.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                              </TableCell>
+                              <TableCell className="text-right text-xs text-muted-foreground">
+                                USD ${(monto / tc).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {/* Fila total */}
+                        <TableRow className="border-t-2 bg-slate-50 font-bold">
+                          <TableCell colSpan={3} className="text-right text-sm">TOTAL GASTOS</TableCell>
+                          <TableCell className="text-right text-red-600">
+                            ${totalGastosARS.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell className="text-right text-xs text-muted-foreground">
+                            USD ${(totalGastosARS / tc).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Vista Mobile (Tarjetas) */}
+                  <div className="md:hidden divide-y">
+                    {egresosProyecto.map(eg => {
+                      const monto = parseFloat(eg.monto?.toString() || "0");
+                      return (
+                        <div key={eg.id} className="p-4 flex flex-col gap-2 hover:bg-slate-50 transition-colors">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-semibold text-red-600 text-lg leading-none">
                               ${monto.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                            </TableCell>
-                            <TableCell className="text-right text-xs text-muted-foreground">
-                              USD ${(monto / tc).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                      {/* Fila total */}
-                      <TableRow className="border-t-2 bg-slate-50 font-bold">
-                        <TableCell colSpan={3} className="text-right text-sm">TOTAL GASTOS</TableCell>
-                        <TableCell className="text-right text-red-600">
-                          ${totalGastosARS.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          USD ${(totalGastosARS / tc).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
+                            </span>
+                            <Badge variant="outline" className="text-[10px] uppercase">
+                              {eg.categoria}
+                            </Badge>
+                          </div>
+                          
+                          <div className="flex items-center text-xs text-muted-foreground gap-1.5">
+                            <span>{eg.fecha ? format(new Date(eg.fecha), "dd/MM/yyyy") : "-"}</span>
+                            <span>•</span>
+                            <span>USD ${(monto / tc).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</span>
+                          </div>
+
+                          <div className="text-sm text-slate-800 bg-slate-50 p-2 rounded border mt-1 line-clamp-2">
+                            {eg.concepto}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    <div className="p-4 bg-slate-50 border-t flex flex-col items-end gap-1">
+                      <span className="text-xs uppercase text-muted-foreground font-semibold">Total Gastos</span>
+                      <span className="font-bold text-red-600 text-xl leading-none">
+                        ${totalGastosARS.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        ≈ USD ${(totalGastosARS / tc).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>
