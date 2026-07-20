@@ -33,8 +33,8 @@ export async function adminAuditMiddleware(req: Request, res: Response, next: Ne
     return next();
   }
 
-  // Solo auditar si es admin (requiere que requireAuth haya poblado req.user)
-  if (!req.user || req.user.rol !== "admin") {
+  // Auditar modificaciones (ignoramos a los operarios comunes si queremos, pero mejor registrar a cualquiera que modifique)
+  if (!req.user) {
     return next();
   }
 
@@ -59,12 +59,12 @@ export async function adminAuditMiddleware(req: Request, res: Response, next: Ne
     }
   }
 
-  // Buscar el nombre del administrador para que el mensaje sea amigable
-  let adminName = `Admin (ID: ${req.user.id})`;
+  // Buscar el nombre del administrador/usuario para que el mensaje sea amigable
+  let adminName = `${req.user.rol.toUpperCase()} (ID: ${req.user.id})`;
   try {
     const userResult = await db.select().from(schemas.usuariosTable).where(eq(schemas.usuariosTable.id, req.user.id)).limit(1);
     if (userResult.length > 0) {
-      adminName = `${userResult[0].nombre} ${userResult[0].apellido}`.trim();
+      adminName = `${userResult[0].nombre} ${userResult[0].apellido} (${userResult[0].rol})`.trim();
     }
   } catch (err) {
     // ignorar y usar ID
