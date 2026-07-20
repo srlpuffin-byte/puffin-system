@@ -122,7 +122,11 @@ router.get("/resumen", async (req, res) => {
     .sort((a, b) => a.dias_restantes - b.dias_restantes)
     .slice(0, 5);
 
-  const maquinas = await db.select().from(maquinasTable).limit(10);
+  const maquinas = await db
+    .select()
+    .from(maquinasTable)
+    .where(sql`(categoria IS NULL OR categoria != 'inventario')`)
+    .limit(10);
   const maquinas_resumen = maquinas.map(m => ({
     id: m.id,
     nombre: m.nombre,
