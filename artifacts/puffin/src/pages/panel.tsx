@@ -77,11 +77,18 @@ export function Panel() {
   todayStart.setHours(0,0,0,0);
   const upcomingEvents = ((eventosData as any[]) || [])
     .filter(e => {
-      const eDate = new Date(e.fecha);
+      // Fix timezone parsing by appending T12:00:00 if it's a date-only string
+      // or parsing local date correctly
+      const dateStr = e.fecha.includes('T') ? e.fecha : `${e.fecha}T12:00:00`;
+      const eDate = new Date(dateStr);
       eDate.setHours(0,0,0,0);
       return eDate >= todayStart;
     })
-    .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+    .sort((a, b) => {
+      const dateA = a.fecha.includes('T') ? a.fecha : `${a.fecha}T12:00:00`;
+      const dateB = b.fecha.includes('T') ? b.fecha : `${b.fecha}T12:00:00`;
+      return new Date(dateA).getTime() - new Date(dateB).getTime();
+    })
     .slice(0, 5);
 
   if (isLoading) {
@@ -336,7 +343,9 @@ export function Panel() {
               ) : (
                 <div className="space-y-3">
                   {upcomingEvents.map((ev: any, i: number) => {
-                    const isToday = new Date(ev.fecha).toDateString() === new Date().toDateString();
+                    const dateStr = ev.fecha.includes('T') ? ev.fecha : `${ev.fecha}T12:00:00`;
+                    const eDate = new Date(dateStr);
+                    const isToday = eDate.toDateString() === new Date().toDateString();
                     return (
                       <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${isToday ? 'bg-blue-50 border-blue-200' : 'bg-card hover:bg-slate-50 transition-colors'}`}>
                         <div className={`h-2 w-2 rounded-full mt-1.5 flex-shrink-0 ${isToday ? 'bg-blue-500' : 'bg-slate-400'}`} />
@@ -345,7 +354,7 @@ export function Panel() {
                             {ev.titulo}
                           </p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {formatFechaCorta(ev.fecha)} {ev.entidad_nombre ? `· ${ev.entidad_nombre}` : ''}
+                            {formatFechaCorta(dateStr)} {ev.entidad_nombre ? `· ${ev.entidad_nombre}` : ''}
                           </p>
                         </div>
                         {isToday && (
