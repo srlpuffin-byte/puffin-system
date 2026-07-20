@@ -64,6 +64,7 @@ router.get("/", async (req, res) => {
   let fotografiasMap = new Map();
   if (maquinasIds.length > 0) {
     const fotografias = await db
+      .select()
       .from(fotografiasTable)
       .where(and(eq(fotografiasTable.entidad_tipo, "maquina"), inArray(fotografiasTable.entidad_id, maquinasIds)));
     fotografias.forEach(f => {
