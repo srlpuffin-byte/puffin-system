@@ -118,7 +118,7 @@ export async function adminAuditMiddleware(req: Request, res: Response, next: Ne
         await Promise.all([
           appendToSheet("Auditoria_Admin", [timestamp, adminName, accion, section, detalles]),
           db.insert(schemas.auditoriaTable).values({
-            usuario_id: req.user.id,
+            usuario_id: req.user!.id,
             accion: req.method === "DELETE" ? "ELIMINACION" : req.method === "POST" ? "CREACION" : "MODIFICACION",
             entidad: section,
             entidad_id: id,

@@ -30,11 +30,11 @@ router.get("/eventos", async (req, res) => {
       const prioridad = diffDias < 0 ? "rojo" : diffDias <= 15 ? "amarillo" : "verde";
       
       let entidad_nombre = null;
-      if (doc.entidad_tipo === "maquina") {
-        const [maq] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, doc.entidad_id)).limit(1);
+      if (doc.entidad_tipo === "maquina" && doc.entidad_id !== null) {
+        const [maq] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, doc.entidad_id as number)).limit(1);
         if (maq) entidad_nombre = maq.nombre;
-      } else if (doc.entidad_tipo === "empleado") {
-        const [emp] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable).where(eq(empleadosTable.id, doc.entidad_id)).limit(1);
+      } else if (doc.entidad_tipo === "empleado" && doc.entidad_id !== null) {
+        const [emp] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable).where(eq(empleadosTable.id, doc.entidad_id as number)).limit(1);
         if (emp) entidad_nombre = `${emp.nombre} ${emp.apellido}`;
       }
 

@@ -95,13 +95,13 @@ export async function syncAllSheets() {
     
     await syncTableToSheet(sheetsClient, SHEET_ID, "Proyectos", 0, proyectos, p => {
       const empNames = (Array.isArray(p.empleados_asignados) ? p.empleados_asignados : [])
-        .map(id => {
+        .map((id: number) => {
           const emp = empleadosList.find(e => e.id === id);
           return emp ? `${emp.nombre} ${emp.apellido}`.trim() : `ID:${id}`;
         }).join(", ");
         
       const maqNames = (Array.isArray(p.maquinas_asignadas) ? p.maquinas_asignadas : [])
-        .map(id => {
+        .map((id: number) => {
           const maq = maquinasList.find(m => m.id === id);
           return maq ? maq.nombre : `ID:${id}`;
         }).join(", ");
