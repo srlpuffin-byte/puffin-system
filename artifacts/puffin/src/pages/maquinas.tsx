@@ -153,54 +153,111 @@ export function Maquinas() {
             )}
           </div>
 
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  {activeTab === "maquinaria" && <TableHead>Horómetro/Km</TableHead>}
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8">Cargando maquinaria...</TableCell></TableRow>
-                ) : maquinas?.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No se encontraron resultados.</TableCell></TableRow>
-                ) : (
-                  maquinas?.map((maq) => (
-                    <TableRow key={maq.id}>
-                      <TableCell className="font-medium">{maq.codigo || "-"}</TableCell>
-                      <TableCell>{maq.nombre}</TableCell>
-                      <TableCell className="capitalize">{maq.tipo}</TableCell>
-                      {activeTab === "maquinaria" && (
-                        <TableCell>
-                          {maq.horometro ? `${maq.horometro} h` : "-"}
-                          {maq.horometro && maq.kilometros ? " / " : ""}
-                          {maq.kilometros ? `${maq.kilometros} km` : ""}
+          <div className="rounded-md border overflow-hidden">
+            {/* Vista Desktop (Tabla) */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Código</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    {activeTab === "maquinaria" && <TableHead>Horómetro/Km</TableHead>}
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={6} className="text-center py-8">Cargando maquinaria...</TableCell></TableRow>
+                  ) : maquinas?.length === 0 ? (
+                    <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No se encontraron resultados.</TableCell></TableRow>
+                  ) : (
+                    maquinas?.map((maq) => (
+                      <TableRow key={maq.id}>
+                        <TableCell className="font-medium">{maq.codigo || "-"}</TableCell>
+                        <TableCell>{maq.nombre}</TableCell>
+                        <TableCell className="capitalize">{maq.tipo}</TableCell>
+                        {activeTab === "maquinaria" && (
+                          <TableCell>
+                            {maq.horometro ? `${maq.horometro} h` : "-"}
+                            {maq.horometro && maq.kilometros ? " / " : ""}
+                            {maq.kilometros ? `${maq.kilometros} km` : ""}
+                          </TableCell>
+                        )}
+                        <TableCell>{estadoBadge(maq.estado)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-3">
+                            {activeTab === "maquinaria" && (!maq.marca || !maq.modelo || !maq.anio || (!maq.patente && !maq.dominio) || !maq.motor || !maq.chasis || !maq.filtro_tipo || !maq.filtro_codigo) && (
+                              <Badge variant="destructive" className="flex items-center gap-1 text-xs">
+                                <AlertTriangle className="w-3 h-3" /> Faltan datos
+                              </Badge>
+                            )}
+                            <Link href={`/maquinas/${maq.id}`} className="text-primary hover:underline font-medium text-sm">
+                              Ver ficha
+                            </Link>
+                          </div>
                         </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Vista Mobile (Tarjetas) */}
+            <div className="md:hidden divide-y">
+              {isLoading ? (
+                <div className="text-center py-8">Cargando maquinaria...</div>
+              ) : maquinas?.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No se encontraron resultados.</div>
+              ) : (
+                maquinas?.map((maq) => (
+                  <div key={maq.id} className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-base leading-tight">{maq.nombre}</span>
+                        <span className="text-xs text-muted-foreground mt-0.5">{maq.codigo || "Sin código"} • <span className="capitalize">{maq.tipo}</span></span>
+                      </div>
+                      {estadoBadge(maq.estado)}
+                    </div>
+                    
+                    {activeTab === "maquinaria" && (
+                      <div className="flex items-center gap-4 text-sm bg-slate-50 p-2 rounded border mt-1">
+                        {maq.horometro && (
+                          <div className="flex flex-col">
+                            <span className="text-xs text-muted-foreground">Horómetro</span>
+                            <span className="font-medium">{maq.horometro} h</span>
+                          </div>
+                        )}
+                        {maq.kilometros && (
+                          <div className="flex flex-col">
+                            <span className="text-xs text-muted-foreground">Kilometraje</span>
+                            <span className="font-medium">{maq.kilometros} km</span>
+                          </div>
+                        )}
+                        {!maq.horometro && !maq.kilometros && (
+                          <span className="text-xs text-muted-foreground">Sin registros de uso</span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 mt-1">
+                      {activeTab === "maquinaria" && (!maq.marca || !maq.modelo || !maq.anio || (!maq.patente && !maq.dominio) || !maq.motor || !maq.chasis || !maq.filtro_tipo || !maq.filtro_codigo) && (
+                        <Badge variant="destructive" className="flex items-center gap-1 text-[10px] px-1.5 py-0">
+                          <AlertTriangle className="w-3 h-3" /> Faltan datos
+                        </Badge>
                       )}
-                      <TableCell>{estadoBadge(maq.estado)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-3">
-                          {activeTab === "maquinaria" && (!maq.marca || !maq.modelo || !maq.anio || (!maq.patente && !maq.dominio) || !maq.motor || !maq.chasis || !maq.filtro_tipo || !maq.filtro_codigo) && (
-                            <Badge variant="destructive" className="flex items-center gap-1 text-xs">
-                              <AlertTriangle className="w-3 h-3" /> Faltan datos
-                            </Badge>
-                          )}
-                          <Link href={`/maquinas/${maq.id}`} className="text-primary hover:underline font-medium text-sm">
-                            Ver ficha
-                          </Link>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                      <Link href={`/maquinas/${maq.id}`} className={activeTab === "inventario" || !(!maq.marca || !maq.modelo || !maq.anio || (!maq.patente && !maq.dominio) || !maq.motor || !maq.chasis || !maq.filtro_tipo || !maq.filtro_codigo) ? "ml-auto" : ""}>
+                        <Button variant="outline" size="sm" className="h-8">
+                          Ver ficha
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

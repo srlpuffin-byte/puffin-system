@@ -145,103 +145,179 @@ export function Proyectos() {
             </div>
           </div>
 
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Lugar</TableHead>
-                  <TableHead>Datos Comerciales</TableHead>
-                  <TableHead>Asignaciones</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8">Cargando proyectos...</TableCell></TableRow>
-                ) : filteredProyectos?.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No se encontraron resultados.</TableCell></TableRow>
-                ) : (
-                  filteredProyectos?.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>
-                        <div className="font-medium text-base flex items-center gap-1">
-                          <MapPin className="h-4 w-4 text-muted-foreground" />
-                          {p.lugar}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Creado: {format(new Date(p.createdAt), "dd/MM/yyyy")}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1 text-sm">
-                          <span className="flex items-center gap-1 text-slate-600">
-                            <Activity className="h-3 w-3" /> {parseFloat(p.hectareas).toLocaleString('es-AR')} Has. a ${parseFloat(p.precio_hectarea).toLocaleString('es-AR')}
-                          </span>
-                          <span className="flex items-center gap-1 font-semibold text-green-700">
-                            <DollarSign className="h-3 w-3" /> Ganancia Est: ${parseFloat(p.ganancia_estimada || "0").toLocaleString('es-AR', {minimumFractionDigits: 2})}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1 text-xs">
-                          <div className="flex items-start gap-1">
-                            <Users className="h-3 w-3 mt-0.5 text-blue-600 flex-shrink-0" />
-                            <span className="line-clamp-1 max-w-[200px]" title={getEmpleadosNames(p.empleados_asignados)}>
-                              {getEmpleadosNames(p.empleados_asignados)}
+          <div className="rounded-md border overflow-hidden">
+            {/* Vista Desktop (Tabla) */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Lugar</TableHead>
+                    <TableHead>Datos Comerciales</TableHead>
+                    <TableHead>Asignaciones</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={5} className="text-center py-8">Cargando proyectos...</TableCell></TableRow>
+                  ) : filteredProyectos?.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No se encontraron resultados.</TableCell></TableRow>
+                  ) : (
+                    filteredProyectos?.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell>
+                          <div className="font-medium text-base flex items-center gap-1">
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                            {p.lugar}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Creado: {format(new Date(p.createdAt), "dd/MM/yyyy")}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1 text-sm">
+                            <span className="flex items-center gap-1 text-slate-600">
+                              <Activity className="h-3 w-3" /> {parseFloat(p.hectareas).toLocaleString('es-AR')} Has. a ${parseFloat(p.precio_hectarea).toLocaleString('es-AR')}
+                            </span>
+                            <span className="flex items-center gap-1 font-semibold text-green-700">
+                              <DollarSign className="h-3 w-3" /> Ganancia Est: ${parseFloat(p.ganancia_estimada || "0").toLocaleString('es-AR', {minimumFractionDigits: 2})}
                             </span>
                           </div>
-                          <div className="flex items-start gap-1">
-                            <Tractor className="h-3 w-3 mt-0.5 text-amber-600 flex-shrink-0" />
-                            <span className="line-clamp-1 max-w-[200px]" title={getMaquinasNames(p.maquinas_asignadas)}>
-                              {getMaquinasNames(p.maquinas_asignadas)}
-                            </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1 text-xs">
+                            <div className="flex items-start gap-1">
+                              <Users className="h-3 w-3 mt-0.5 text-blue-600 flex-shrink-0" />
+                              <span className="line-clamp-1 max-w-[200px]" title={getEmpleadosNames(p.empleados_asignados)}>
+                                {getEmpleadosNames(p.empleados_asignados)}
+                              </span>
+                            </div>
+                            <div className="flex items-start gap-1">
+                              <Tractor className="h-3 w-3 mt-0.5 text-amber-600 flex-shrink-0" />
+                              <span className="line-clamp-1 max-w-[200px]" title={getMaquinasNames(p.maquinas_asignadas)}>
+                                {getMaquinasNames(p.maquinas_asignadas)}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={p.estado === "activo" ? "default" : p.estado === "finalizado" ? "secondary" : "outline"}
-                               className={p.estado === "activo" ? "bg-green-600 hover:bg-green-700" : ""}>
-                          {p.estado.toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Link href={`/proyectos/${p.id}`}>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={p.estado === "activo" ? "default" : p.estado === "finalizado" ? "secondary" : "outline"}
+                                 className={p.estado === "activo" ? "bg-green-600 hover:bg-green-700" : ""}>
+                            {p.estado.toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Link href={`/proyectos/${p.id}`}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-slate-600 hover:bg-slate-100"
+                                title="Ver detalles del proyecto"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </Link>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-slate-600 hover:bg-slate-100"
-                              title="Ver detalles del proyecto"
+                              onClick={() => setEditProyecto(p)}
+                              className="h-8 w-8 text-blue-600 hover:bg-blue-50"
+                              title="Editar proyecto"
                             >
-                              <Eye className="w-4 h-4" />
+                              <Pencil className="w-4 h-4" />
                             </Button>
-                          </Link>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditProyecto(p)}
-                            className="h-8 w-8 text-blue-600 hover:bg-blue-50"
-                            title="Editar proyecto"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(p.id)}
-                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                            title="Eliminar proyecto"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(p.id)}
+                              className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                              title="Eliminar proyecto"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Vista Mobile (Tarjetas) */}
+            <div className="md:hidden divide-y">
+              {isLoading ? (
+                <div className="text-center py-8">Cargando proyectos...</div>
+              ) : filteredProyectos?.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No se encontraron resultados.</div>
+              ) : (
+                filteredProyectos?.map((p) => (
+                  <div key={p.id} className="p-4 bg-card flex flex-col gap-4 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="font-semibold text-base flex items-center gap-1 text-primary">
+                          <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          {p.lugar}
+                        </h4>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Creado: {format(new Date(p.createdAt), "dd/MM/yyyy")}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                      </div>
+                      <Badge variant={p.estado === "activo" ? "default" : p.estado === "finalizado" ? "secondary" : "outline"}
+                             className={p.estado === "activo" ? "bg-green-600" : ""}>
+                        {p.estado.toUpperCase()}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-sm bg-slate-50 p-2 rounded border">
+                      <div className="flex flex-col">
+                        <span className="text-xs text-muted-foreground">Dimensiones</span>
+                        <span className="font-medium">{parseFloat(p.hectareas).toLocaleString('es-AR')} Has.</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs text-muted-foreground">Precio/Ha</span>
+                        <span className="font-medium">${parseFloat(p.precio_hectarea).toLocaleString('es-AR')}</span>
+                      </div>
+                      <div className="col-span-2 flex justify-between border-t pt-2 mt-1">
+                        <span className="text-xs text-muted-foreground">Ganancia Est.</span>
+                        <span className="font-semibold text-green-700">${parseFloat(p.ganancia_estimada || "0").toLocaleString('es-AR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 text-xs">
+                      <div className="flex items-start gap-2">
+                        <Users className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                        <span className="text-muted-foreground line-clamp-2">
+                          {getEmpleadosNames(p.empleados_asignados) || "Sin empleados asignados"}
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Tractor className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                        <span className="text-muted-foreground line-clamp-2">
+                          {getMaquinasNames(p.maquinas_asignadas) || "Sin máquinas asignadas"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-2 pt-3 border-t">
+                      <Link href={`/proyectos/${p.id}`} className="flex-1">
+                        <Button variant="outline" className="w-full h-9 text-slate-700">
+                          <Eye className="w-4 h-4 mr-2" /> Ver detalles
+                        </Button>
+                      </Link>
+                      <Button variant="outline" onClick={() => setEditProyecto(p)} className="h-9 w-12 p-0 text-blue-600 border-blue-200 hover:bg-blue-50">
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button variant="outline" onClick={() => handleDelete(p.id)} className="h-9 w-12 p-0 text-destructive border-destructive/20 hover:bg-destructive/10">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

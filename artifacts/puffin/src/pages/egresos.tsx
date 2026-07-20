@@ -189,61 +189,106 @@ export function Egresos() {
 
       <Card>
         <CardContent className="p-4">
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead>Concepto</TableHead>
-                  <TableHead>Proyecto</TableHead>
-                  <TableHead>Método</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
-                  <TableHead>Comprobante</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando egresos...</TableCell></TableRow>
-                ) : egresos?.length === 0 ? (
-                  <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay egresos registrados.</TableCell></TableRow>
-                ) : (
-                  egresos?.map((eg: any) => (
-                    <TableRow key={eg.id}>
-                      <TableCell className="font-medium">
-                        {format(new Date(eg.fecha), "dd/MM/yyyy", { locale: es })}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{eg.categoria}</Badge>
-                      </TableCell>
-                      <TableCell>{eg.concepto}</TableCell>
-                      <TableCell>
-                        {eg.centro_costos ? (
-                          <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{eg.centro_costos}</span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
+          <div className="rounded-md border overflow-hidden">
+            {/* Vista Desktop (Tabla) */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Categoría</TableHead>
+                    <TableHead>Concepto</TableHead>
+                    <TableHead>Proyecto</TableHead>
+                    <TableHead>Método</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead>Comprobante</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando egresos...</TableCell></TableRow>
+                  ) : egresos?.length === 0 ? (
+                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay egresos registrados.</TableCell></TableRow>
+                  ) : (
+                    egresos?.map((eg: any) => (
+                      <TableRow key={eg.id}>
+                        <TableCell className="font-medium">
+                          {format(new Date(eg.fecha), "dd/MM/yyyy", { locale: es })}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{eg.categoria}</Badge>
+                        </TableCell>
+                        <TableCell>{eg.concepto}</TableCell>
+                        <TableCell>
+                          {eg.centro_costos ? (
+                            <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{eg.centro_costos}</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{eg.metodo_pago || "-"}</TableCell>
+                        <TableCell className="text-right font-semibold text-red-600">
+                          ${eg.monto.toLocaleString("es-AR")}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={eg.comprobante ? "default" : "secondary"}>
+                            {eg.comprobante ? "SI" : "NO"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(eg)}>
+                            Editar
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Vista Mobile (Tarjetas) */}
+            <div className="md:hidden divide-y">
+              {isLoading ? (
+                <div className="text-center py-8">Cargando egresos...</div>
+              ) : egresos?.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No hay egresos registrados.</div>
+              ) : (
+                egresos?.map((eg: any) => (
+                  <div key={eg.id} className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-red-600">${eg.monto.toLocaleString("es-AR")}</span>
+                        <span className="text-xs text-muted-foreground">{format(new Date(eg.fecha), "dd/MM/yyyy", { locale: es })}</span>
+                      </div>
+                      <Badge variant="outline">{eg.categoria}</Badge>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium text-sm leading-snug">{eg.concepto}</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        {eg.centro_costos && (
+                          <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                            {eg.centro_costos}
+                          </span>
                         )}
-                      </TableCell>
-                      <TableCell>{eg.metodo_pago || "-"}</TableCell>
-                      <TableCell className="text-right font-semibold text-red-600">
-                        ${eg.monto.toLocaleString("es-AR")}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={eg.comprobante ? "default" : "secondary"}>
-                          {eg.comprobante ? "SI" : "NO"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(eg)}>
-                          Editar
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                        <span className="text-xs text-muted-foreground">Medio: {eg.metodo_pago || "-"}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t">
+                      <Badge variant={eg.comprobante ? "default" : "secondary"} className="text-[10px]">
+                        {eg.comprobante ? "Con comprobante" : "Sin comprobante"}
+                      </Badge>
+                      <Button variant="outline" size="sm" onClick={() => openEdit(eg)} className="h-8 text-xs">
+                        Editar
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
