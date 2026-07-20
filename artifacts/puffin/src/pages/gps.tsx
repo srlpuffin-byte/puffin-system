@@ -262,26 +262,26 @@ export function Gps() {
                           }
                         </div>
                       </div>
-                      <div className="mt-2 text-xs text-muted-foreground flex items-center justify-between">
-                        <span>No vinculado a ninguna máquina</span>
+                      <div className="mt-1.5 flex items-center justify-between">
+                        <span className="text-[11px] text-amber-600/80 font-medium">Equipo sin asignar</span>
+                        <Button 
+                          size="sm" 
+                          variant="secondary" 
+                          className="h-7 text-xs bg-amber-200/50 hover:bg-amber-200 text-amber-900 border-0 px-3 shadow-none"
+                          disabled={createMaquinaMutation.isPending}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            createMaquinaMutation.mutate(p);
+                          }}
+                        >
+                          {createMaquinaMutation.isPending ? "Creando..." : (
+                            <>
+                              <Plus className="h-3 w-3 mr-1" />
+                              Crear
+                            </>
+                          )}
+                        </Button>
                       </div>
-                      <Button 
-                        size="sm" 
-                        variant="secondary" 
-                        className="w-full mt-3 bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-200"
-                        disabled={createMaquinaMutation.isPending}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          createMaquinaMutation.mutate(p);
-                        }}
-                      >
-                        {createMaquinaMutation.isPending ? "Creando..." : (
-                          <>
-                            <Plus className="h-3 w-3 mr-1" />
-                            Crear máquina
-                          </>
-                        )}
-                      </Button>
                     </button>
                   );
                 })}
