@@ -11,8 +11,34 @@ import {
 } from "@workspace/db";
 import { eq, sql, and, gte } from "drizzle-orm";
 import { getEmpleadoIdForUser } from "../lib/auth-helpers";
+import { actividadTable } from "@workspace/db";
 
 const router = Router();
+
+router.get("/update-actividades-temp", async (req, res) => {
+  const actividades = await db.select().from(actividadTable);
+  const maquinas = await db.select().from(maquinasTable);
+  const maquinaMap = new Map(maquinas.map(m => [m.id, m.nombre]));
+
+  let count = 0;
+  for (const act of actividades) {
+    const desc = act.descripcion || "";
+    if (desc.includes("en máquina ID ")) {
+      const parts = desc.split("en máquina ID ");
+      const idStr = parts[1].split(" ")[0];
+      const id = parseInt(idStr);
+      if (!isNaN(id)) {
+        const nombre = maquinaMap.get(id);
+        if (nombre) {
+          const newDesc = desc.replace(`en máquina ID ${id}`, `en la máquina ${nombre}`);
+          await db.update(actividadTable).set({ descripcion: newDesc }).where(eq(actividadTable.id, act.id));
+          count++;
+        }
+      }
+    }
+  }
+  return res.json({ updated: count });
+});
 
 router.get("/resumen", async (req, res) => {
   const [maquinasActivas] = await db

@@ -309,17 +309,30 @@ export function Panel() {
                 <p className="text-center text-muted-foreground py-4 text-sm">Sin actividad registrada</p>
               ) : (
                 <div className="space-y-3">
-                  {actividad.slice(0, 6).map((ev: any, i: number) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <div className="h-2 w-2 rounded-full bg-primary mt-1.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm">{ev.descripcion}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {ev.usuario_nombre && `${ev.usuario_nombre} · `}{formatFecha(ev.fecha || ev.created_at)}
-                        </p>
+                  {actividad.slice(0, 6).map((ev: any, i: number) => {
+                    let desc = ev.descripcion;
+                    if (desc.includes("en máquina ID ")) {
+                      const idMatch = desc.match(/en máquina ID (\d+)/);
+                      if (idMatch && idMatch[1]) {
+                        const id = parseInt(idMatch[1]);
+                        const maq = maquinasResumen.find(m => m.id === id);
+                        if (maq) {
+                          desc = desc.replace(`en máquina ID ${id}`, `en la máquina ${maq.nombre}`);
+                        }
+                      }
+                    }
+                    return (
+                      <div key={i} className="flex items-start gap-3">
+                        <div className="h-2 w-2 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm">{desc}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {ev.usuario_nombre && `${ev.usuario_nombre} · `}{formatFecha(ev.fecha || ev.created_at)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
