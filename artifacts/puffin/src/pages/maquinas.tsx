@@ -216,8 +216,19 @@ export function Maquinas() {
                   <div key={maq.id} className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-base leading-tight">{maq.nombre}</span>
-                        <span className="text-xs text-muted-foreground mt-0.5">{maq.codigo || "Sin código"} • <span className="capitalize">{maq.tipo}</span></span>
+                        <div className="flex items-center gap-3">
+                          {(maq as any).imagen_url && (
+                            <img 
+                              src={(maq as any).imagen_url} 
+                              alt={maq.nombre} 
+                              className="w-10 h-10 rounded-md object-cover border shrink-0" 
+                            />
+                          )}
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-base leading-tight">{maq.nombre}</span>
+                            <span className="text-xs text-muted-foreground mt-0.5">{maq.codigo || "Sin código"} • <span className="capitalize">{maq.tipo}</span></span>
+                          </div>
+                        </div>
                       </div>
                       {estadoBadge(maq.estado)}
                     </div>

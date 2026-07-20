@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { maquinasTable } from "@workspace/db";
-import { eq, and, or, ilike } from "drizzle-orm";
+import { maquinasTable, fotografiasTable } from "@workspace/db";
+import { eq, and, or, ilike, inArray } from "drizzle-orm";
 import { updateOrAppendToSheet } from "../services/sheets.js";
 
 const router = Router();
@@ -58,7 +58,27 @@ router.get("/", async (req, res) => {
   if (conditions.length) query = query.where(and(...conditions));
 
   const maquinas = await query.orderBy(maquinasTable.nombre);
-  return res.json(maquinas.map(m => ({ ...m, horometro: Number(m.horometro), kilometros: Number(m.kilometros) })));
+
+  // Get fotos for the maquinas
+  const maquinasIds = maquinas.map(m => m.id);
+  let fotografiasMap = new Map();
+  if (maquinasIds.length > 0) {
+    const fotografias = await db
+      .from(fotografiasTable)
+      .where(and(eq(fotografiasTable.entidad_tipo, "maquina"), inArray(fotografiasTable.entidad_id, maquinasIds)));
+    fotografias.forEach(f => {
+      if (!fotografiasMap.has(f.entidad_id)) {
+        fotografiasMap.set(f.entidad_id, f.url);
+      }
+    });
+  }
+
+  return res.json(maquinas.map(m => ({ 
+    ...m, 
+    horometro: Number(m.horometro), 
+    kilometros: Number(m.kilometros),
+    imagen_url: fotografiasMap.get(m.id) || null
+  })));
 });
 
 router.post("/", async (req, res) => {
