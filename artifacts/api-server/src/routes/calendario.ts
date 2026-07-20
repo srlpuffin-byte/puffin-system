@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { documentosTable, mantenimientosTable, maquinasTable } from "@workspace/db";
+import { documentosTable, mantenimientosTable, maquinasTable, empleadosTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const router = Router();
@@ -28,6 +28,16 @@ router.get("/eventos", async (req, res) => {
     if (venc.getMonth() + 1 === targetMes && venc.getFullYear() === targetAnio) {
       const diffDias = Math.ceil((venc.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       const prioridad = diffDias < 0 ? "rojo" : diffDias <= 15 ? "amarillo" : "verde";
+      
+      let entidad_nombre = null;
+      if (doc.entidad_tipo === "maquina") {
+        const [maq] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, doc.entidad_id)).limit(1);
+        if (maq) entidad_nombre = maq.nombre;
+      } else if (doc.entidad_tipo === "empleado") {
+        const [emp] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable).where(eq(empleadosTable.id, doc.entidad_id)).limit(1);
+        if (emp) entidad_nombre = `${emp.nombre} ${emp.apellido}`;
+      }
+
       eventos.push({
         id: doc.id,
         tipo: "vencimiento",
@@ -35,7 +45,7 @@ router.get("/eventos", async (req, res) => {
         descripcion: doc.descripcion,
         fecha: doc.fecha_vencimiento,
         prioridad,
-        entidad_nombre: null,
+        entidad_nombre,
       });
     }
   }

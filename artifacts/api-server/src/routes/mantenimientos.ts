@@ -62,9 +62,12 @@ router.post("/", async (req, res) => {
       estado: "realizado"
     }).returning();
 
+    const [maq] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, maquina_id)).limit(1);
+    const maquinaNombre = maq?.nombre || `ID ${maquina_id}`;
+
     await db.insert(actividadTable).values({
       tipo: "mantenimiento",
-      descripcion: `Mantenimiento registrado: ${tipo} en máquina ID ${maquina_id}`,
+      descripcion: `Mantenimiento registrado: ${tipo} en la máquina ${maquinaNombre}`,
       entidad_tipo: "mantenimiento",
       entidad_id: mantenimiento.id,
     });

@@ -62,9 +62,12 @@ router.post("/", async (req, res) => {
       kilometraje: kilometraje?.toString(),
     }).returning();
 
+    const [maq] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, maquina_id)).limit(1);
+    const maquinaNombre = maq?.nombre || `ID ${maquina_id}`;
+
     await db.insert(actividadTable).values({
       tipo: "combustible",
-      descripcion: `Carga de combustible: ${litros}L en máquina ID ${maquina_id}`,
+      descripcion: `Carga de combustible: ${litros}L en la máquina ${maquinaNombre}`,
       entidad_tipo: "combustible",
       entidad_id: registro.id,
     });

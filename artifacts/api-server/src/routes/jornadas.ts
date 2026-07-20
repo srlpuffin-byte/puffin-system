@@ -80,22 +80,25 @@ router.post("/iniciar", async (req, res) => {
       estado: "en_curso"
     }).returning();
 
+    const [maquina] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, maquina_id)).limit(1);
+    const [empleado] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable).where(eq(empleadosTable.id, empleado_id)).limit(1);
+    
+    const maquinaNombre = maquina?.nombre || `ID ${maquina_id}`;
+    const empleadoNombre = empleado ? `${empleado.nombre} ${empleado.apellido}` : `ID ${empleado_id}`;
+
     await db.insert(actividadTable).values({
       tipo: "jornada",
-      descripcion: `Jornada iniciada por operario ID ${empleado_id} en máquina ID ${maquina_id}`,
+      descripcion: `Jornada iniciada por operario ${empleadoNombre} en la máquina ${maquinaNombre}`,
       entidad_tipo: "jornada",
       entidad_id: jornada.id,
     });
 
     // Generar alerta si el equipo no está apto
     if (estado_equipo_inicio === "no_apto") {
-      const [maquina] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, maquina_id)).limit(1);
-      const [empleado] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable).where(eq(empleadosTable.id, empleado_id)).limit(1);
-      
       await db.insert(alertasTable).values({
         tipo: "maquina",
         prioridad: "roja",
-        descripcion: `El operario ${empleado?.nombre} ${empleado?.apellido} reportó que el equipo ${maquina?.nombre} NO ESTÁ APTO para trabajar durante el checklist preoperacional. Observaciones: ${observaciones || "Sin observaciones adicionales."}`,
+        descripcion: `El operario ${empleadoNombre} reportó que el equipo ${maquinaNombre} NO ESTÁ APTO para trabajar durante el checklist preoperacional. Observaciones: ${observaciones || "Sin observaciones adicionales."}`,
         entidad_tipo: "maquina",
         entidad_id: maquina_id,
         entidad_nombre: maquina?.nombre
