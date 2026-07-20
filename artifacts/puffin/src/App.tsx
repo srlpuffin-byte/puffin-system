@@ -33,6 +33,7 @@ import { ProyectoFicha } from "@/pages/proyecto-ficha";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useEffect } from "react";
 import { getAuthToken } from "@/hooks/use-auth";
+import Instalar from "@/pages/instalar";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -96,6 +97,7 @@ function Router() {
   return (
     <ErrorBoundary>
       <Switch>
+        <Route path="/instalar" component={Instalar} />
         <Route path="/login" component={Login} />
         <Route path="/panel"><ProtectedRoute component={Panel} /></Route>
         <Route path="/mis-datos"><ProtectedRoute component={MisDatos} /></Route>
