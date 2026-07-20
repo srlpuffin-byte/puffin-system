@@ -260,66 +260,123 @@ export function Usuarios() {
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Cargando usuarios...</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Usuario</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Intentos fallidos</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <div className="rounded-md border overflow-hidden">
+              {/* Vista Desktop (Tabla) */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Usuario</TableHead>
+                      <TableHead>Rol</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Intentos fallidos</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {usuarios.map((u) => (
+                      <TableRow key={u.id}>
+                        <TableCell className="font-medium">{u.nombre} {u.apellido}</TableCell>
+                        <TableCell className="text-muted-foreground font-mono">{u.usuario}</TableCell>
+                        <TableCell>
+                          <Badge variant={u.rol === "administrador" ? "default" : "secondary"}>
+                            {u.rol === "administrador" ? "Administrador" : "Empleado"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {u.bloqueado ? (
+                            <Badge variant="destructive">Bloqueado</Badge>
+                          ) : u.activo ? (
+                            <Badge className="bg-green-600 hover:bg-green-700">Activo</Badge>
+                          ) : (
+                            <Badge variant="secondary">Inactivo</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className={u.intentos_fallidos > 0 ? "text-red-600 font-bold" : "text-muted-foreground"}>
+                            {u.intentos_fallidos}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button size="sm" variant="ghost" onClick={() => setEditUser(u)} title="Editar">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setResetPinUser(u)} title="Restablecer PIN">
+                              <KeyRound className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => toggleBloqueo.mutate({ id: u.id, bloqueado: !u.bloqueado })}
+                              title={u.bloqueado ? "Desbloquear" : "Bloquear"}
+                            >
+                              {u.bloqueado ? <Unlock className="h-4 w-4 text-green-600" /> : <Lock className="h-4 w-4 text-red-600" />}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {usuarios.length === 0 && (
+                      <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No hay usuarios registrados</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Vista Mobile (Tarjetas) */}
+              <div className="md:hidden divide-y">
+                {usuarios.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">No hay usuarios registrados</div>
+                )}
                 {usuarios.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.nombre} {u.apellido}</TableCell>
-                    <TableCell className="text-muted-foreground font-mono">{u.usuario}</TableCell>
-                    <TableCell>
-                      <Badge variant={u.rol === "administrador" ? "default" : "secondary"}>
-                        {u.rol === "administrador" ? "Administrador" : "Empleado"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
+                  <div key={u.id} className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-base text-primary leading-tight">{u.nombre} {u.apellido}</span>
+                        <span className="text-xs text-muted-foreground mt-0.5 font-mono">{u.usuario}</span>
+                      </div>
                       {u.bloqueado ? (
-                        <Badge variant="destructive">Bloqueado</Badge>
+                        <Badge variant="destructive" className="text-[10px]">Bloqueado</Badge>
                       ) : u.activo ? (
-                        <Badge className="bg-green-600">Activo</Badge>
+                        <Badge className="bg-green-600 text-[10px]">Activo</Badge>
                       ) : (
-                        <Badge variant="secondary">Inactivo</Badge>
+                        <Badge variant="secondary" className="text-[10px]">Inactivo</Badge>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <span className={u.intentos_fallidos > 0 ? "text-red-600 font-bold" : "text-muted-foreground"}>
-                        {u.intentos_fallidos}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => setEditUser(u)} title="Editar">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setResetPinUser(u)} title="Restablecer PIN">
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm bg-slate-50 p-2 rounded border mt-1">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={u.rol === "administrador" ? "default" : "outline"} className="text-[10px] uppercase">
+                          {u.rol === "administrador" ? "Admin" : "Empleado"}
+                        </Badge>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">Intentos</span>
+                        <span className={u.intentos_fallidos > 0 ? "text-red-600 font-bold" : "text-muted-foreground font-medium"}>
+                          {u.intentos_fallidos}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t">
+                      <Button variant="outline" size="sm" onClick={() => toggleBloqueo.mutate({ id: u.id, bloqueado: !u.bloqueado })} className={`h-8 ${u.bloqueado ? "text-green-600 border-green-200 hover:bg-green-50" : "text-red-600 border-red-200 hover:bg-red-50"}`}>
+                        {u.bloqueado ? <><Unlock className="h-3.5 w-3.5 mr-1" /> Desbloquear</> : <><Lock className="h-3.5 w-3.5 mr-1" /> Bloquear</>}
+                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setResetPinUser(u)} className="h-8 w-10 p-0 text-slate-700">
                           <KeyRound className="h-4 w-4" />
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => toggleBloqueo.mutate({ id: u.id, bloqueado: !u.bloqueado })}
-                          title={u.bloqueado ? "Desbloquear" : "Bloquear"}
-                        >
-                          {u.bloqueado ? <Unlock className="h-4 w-4 text-green-600" /> : <Lock className="h-4 w-4 text-red-600" />}
+                        <Button variant="outline" size="sm" onClick={() => setEditUser(u)} className="h-8 w-10 p-0 text-slate-700">
+                          <Pencil className="h-4 w-4" />
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                  </div>
                 ))}
-                {usuarios.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No hay usuarios registrados</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

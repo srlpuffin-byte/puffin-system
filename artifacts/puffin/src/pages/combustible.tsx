@@ -45,49 +45,92 @@ export function Combustible() {
 
       <Card>
         <CardContent className="p-4">
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Máquina</TableHead>
-                  <TableHead>Operario</TableHead>
-                  <TableHead className="text-right">Litros</TableHead>
-                  <TableHead className="text-right">Precio/L</TableHead>
-                  <TableHead className="text-right">Importe</TableHead>
-                  <TableHead>Estación</TableHead>
-                  <TableHead className="text-right">Km</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando registros...</TableCell></TableRow>
-                ) : registros?.length === 0 ? (
-                  <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay cargas registradas.</TableCell></TableRow>
-                ) : (
-                  registros?.map((reg) => (
-                    <TableRow key={reg.id}>
-                      <TableCell className="font-medium">
-                        {reg.fecha ? format(new Date(reg.fecha), "dd/MM/yyyy") : "-"}
-                      </TableCell>
-                      <TableCell>{reg.maquina_nombre}</TableCell>
-                      <TableCell>{reg.empleado_nombre}</TableCell>
-                      <TableCell className="text-right font-bold text-blue-700">{reg.litros} L</TableCell>
-                      <TableCell className="text-right">
-                        {reg.precio ? `$${Number(reg.precio).toLocaleString()}` : "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {reg.importe ? `$${Number(reg.importe).toLocaleString()}` : "-"}
-                      </TableCell>
-                      <TableCell>{reg.estacion || "-"}</TableCell>
-                      <TableCell className="text-right">
-                        {reg.kilometraje ? `${Number(reg.kilometraje).toLocaleString()} km` : "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+          <div className="rounded-md border overflow-hidden">
+            {/* Vista Desktop (Tabla) */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Máquina</TableHead>
+                    <TableHead>Operario</TableHead>
+                    <TableHead className="text-right">Litros</TableHead>
+                    <TableHead className="text-right">Precio/L</TableHead>
+                    <TableHead className="text-right">Importe</TableHead>
+                    <TableHead>Estación</TableHead>
+                    <TableHead className="text-right">Km</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando registros...</TableCell></TableRow>
+                  ) : registros?.length === 0 ? (
+                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay cargas registradas.</TableCell></TableRow>
+                  ) : (
+                    registros?.map((reg) => (
+                      <TableRow key={reg.id}>
+                        <TableCell className="font-medium">
+                          {reg.fecha ? format(new Date(reg.fecha), "dd/MM/yyyy") : "-"}
+                        </TableCell>
+                        <TableCell>{reg.maquina_nombre}</TableCell>
+                        <TableCell>{reg.empleado_nombre}</TableCell>
+                        <TableCell className="text-right font-bold text-blue-700">{reg.litros} L</TableCell>
+                        <TableCell className="text-right">
+                          {reg.precio ? `$${Number(reg.precio).toLocaleString()}` : "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {reg.importe ? `$${Number(reg.importe).toLocaleString()}` : "-"}
+                        </TableCell>
+                        <TableCell>{reg.estacion || "-"}</TableCell>
+                        <TableCell className="text-right">
+                          {reg.kilometraje ? `${Number(reg.kilometraje).toLocaleString()} km` : "-"}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Vista Mobile (Tarjetas) */}
+            <div className="md:hidden divide-y">
+              {isLoading ? (
+                <div className="text-center py-8">Cargando registros...</div>
+              ) : registros?.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No hay cargas registradas.</div>
+              ) : (
+                registros?.map((reg) => (
+                  <div key={reg.id} className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-base text-primary">{reg.maquina_nombre}</span>
+                        <span className="text-xs text-muted-foreground mt-0.5">{reg.fecha ? format(new Date(reg.fecha), "dd/MM/yyyy") : "-"}</span>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="font-bold text-blue-700">{reg.litros} L</span>
+                        <span className="text-sm font-medium">{reg.importe ? `$${Number(reg.importe).toLocaleString()}` : "-"}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-sm bg-slate-50 p-2 rounded border mt-1">
+                      <div className="flex flex-col">
+                        <span className="text-xs text-muted-foreground">Operario</span>
+                        <span className="font-medium truncate" title={reg.empleado_nombre}>{reg.empleado_nombre}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs text-muted-foreground">Estación</span>
+                        <span className="font-medium truncate" title={reg.estacion || "-"}>{reg.estacion || "-"}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
+                      <span>Precio unitario: <span className="font-medium text-slate-700">{reg.precio ? `$${Number(reg.precio).toLocaleString()}` : "-"}</span></span>
+                      <span>Uso: <span className="font-medium text-slate-700">{reg.kilometraje ? `${Number(reg.kilometraje).toLocaleString()} km/h` : "-"}</span></span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
