@@ -80,7 +80,7 @@ export default function Instalar() {
           <p className="text-white/60 text-xs text-center uppercase tracking-widest mb-4 font-semibold">Instrucciones para iPhone / iPad</p>
 
           <Step n={1} icon={<Share className="h-5 w-5 text-blue-400" />}>
-            Abrí el sitio <span className="text-blue-300 font-semibold">puffinsrl.site</span> en <span className="font-semibold">Safari</span>
+            Abrí el sitio <a href="https://www.puffinsrl.site/" target="_blank" rel="noopener noreferrer" className="text-blue-300 font-semibold underline underline-offset-2">puffinsrl.site</a> en <span className="font-semibold">Safari</span>
           </Step>
 
           <Step n={2} icon={<Share className="h-5 w-5 text-blue-400" />}>
@@ -130,7 +130,7 @@ export default function Instalar() {
           )}
 
           <Step n={1} icon={<Smartphone className="h-5 w-5 text-blue-400" />}>
-            Abrí el sitio <span className="text-blue-300 font-semibold">puffinsrl.site</span> en <span className="font-semibold">Chrome</span>
+            Abrí el sitio <a href="https://www.puffinsrl.site/" target="_blank" rel="noopener noreferrer" className="text-blue-300 font-semibold underline underline-offset-2">puffinsrl.site</a> en <span className="font-semibold">Chrome</span>
           </Step>
 
           <Step n={2} icon={<MoreVertical className="h-5 w-5 text-blue-400" />}>
@@ -182,9 +182,14 @@ export default function Instalar() {
       {/* URL reminder */}
       <div className="mt-10 flex flex-col items-center gap-2">
         <p className="text-white/40 text-xs">Dirección del sistema</p>
-        <div className="bg-white/10 rounded-xl px-5 py-3 border border-white/10">
-          <span className="text-blue-300 font-bold text-lg tracking-wide">puffinsrl.site</span>
-        </div>
+        <a 
+          href="https://www.puffinsrl.site/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="bg-white/10 hover:bg-white/20 transition-colors rounded-xl px-5 py-3 border border-white/10 cursor-pointer"
+        >
+          <span className="text-blue-300 font-bold text-lg tracking-wide underline underline-offset-4">puffinsrl.site</span>
+        </a>
       </div>
     </div>
   );
