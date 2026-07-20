@@ -90,9 +90,36 @@ export async function syncAllSheets() {
 
     // 4. Proyectos
     const proyectos = await db.select().from(proyectosTable).orderBy(proyectosTable.id);
-    await syncTableToSheet(sheetsClient, SHEET_ID, "Proyectos", 0, proyectos, p => [
-      p.id, p.lugar, p.hectareas, p.precio_hectarea, p.ganancia_estimada, Array.isArray(p.empleados_asignados) ? p.empleados_asignados.join(", ") : "", Array.isArray(p.maquinas_asignadas) ? p.maquinas_asignadas.join(", ") : "", p.estado || "activo"
-    ]);
+    const empleadosList = await db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable);
+    const maquinasList = await db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre }).from(maquinasTable);
+    
+    await syncTableToSheet(sheetsClient, SHEET_ID, "Proyectos", 0, proyectos, p => {
+      const empNames = (Array.isArray(p.empleados_asignados) ? p.empleados_asignados : [])
+        .map(id => {
+          const emp = empleadosList.find(e => e.id === id);
+          return emp ? `${emp.nombre} ${emp.apellido}`.trim() : `ID:${id}`;
+        }).join(", ");
+        
+      const maqNames = (Array.isArray(p.maquinas_asignadas) ? p.maquinas_asignadas : [])
+        .map(id => {
+          const maq = maquinasList.find(m => m.id === id);
+          return maq ? maq.nombre : `ID:${id}`;
+        }).join(", ");
+
+      return [
+        p.id, 
+        p.lugar, 
+        p.hectareas, 
+        p.precio_hectarea, 
+        p.ganancia_estimada, 
+        "", // F
+        "", // G
+        p.estado || "activo", // H
+        "", // I
+        empNames, // J (operarios)
+        maqNames  // K (maquina)
+      ];
+    });
 
     logger.info("Automatic Google Sheets Sync (Smart Update/Append) Completed.");
   } catch (error: any) {
