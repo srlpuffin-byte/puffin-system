@@ -24,6 +24,7 @@ import egresosRouter from "./egresos";
 import searchRouter from "./search";
 import cierresRouter from "./cierres";
 import { requireAuth } from "../middleware/auth";
+import { adminAuditMiddleware } from "../middleware/audit";
 
 const router: IRouter = Router();
 
@@ -52,27 +53,27 @@ router.use("/integrations", requireAuth, integrationsRouter);
 import proyectosRouter from "./proyectos";
 
 // Protected routes
-router.use("/dashboard", requireAuth, dashboardRouter);
-router.use("/empleados", requireAuth, empleadosRouter);
-router.use("/maquinas", requireAuth, maquinasRouter);
-router.use("/jornadas", requireAuth, jornadasRouter);
-router.use("/combustible", requireAuth, combustibleRouter);
-router.use("/mantenimientos", requireAuth, mantenimientosRouter);
-router.use("/documentos", requireAuth, documentosRouter);
-router.use("/alertas", requireAuth, alertasRouter);
-router.use("/incidentes", requireAuth, incidentesRouter);
-router.use("/actividad", requireAuth, actividadRouter);
-router.use("/calendario", requireAuth, calendarioRouter);
-router.use("/reportes", requireAuth, reportesRouter);
-router.use("/usuarios", requireAuth, usuariosRouter);
-router.use("/productividad", requireAuth, productividadRouter);
-router.use("/ia", requireAuth, iaRouter);
-router.use("/auditoria", requireAuth, auditoriaRouter);
-router.use("/backups", requireAuth, backupsRouter);
-router.use("/fotografias", requireAuth, fotografiasRouter);
-router.use("/egresos", requireAuth, egresosRouter);
-router.use("/search", requireAuth, searchRouter);
-router.use("/cierres", requireAuth, cierresRouter);
-router.use("/proyectos", requireAuth, proyectosRouter);
+router.use("/dashboard", requireAuth, adminAuditMiddleware, dashboardRouter);
+router.use("/empleados", requireAuth, adminAuditMiddleware, empleadosRouter);
+router.use("/maquinas", requireAuth, adminAuditMiddleware, maquinasRouter);
+router.use("/jornadas", requireAuth, adminAuditMiddleware, jornadasRouter);
+router.use("/combustible", requireAuth, adminAuditMiddleware, combustibleRouter);
+router.use("/mantenimientos", requireAuth, adminAuditMiddleware, mantenimientosRouter);
+router.use("/documentos", requireAuth, adminAuditMiddleware, documentosRouter);
+router.use("/alertas", requireAuth, adminAuditMiddleware, alertasRouter);
+router.use("/incidentes", requireAuth, adminAuditMiddleware, incidentesRouter);
+router.use("/actividad", requireAuth, adminAuditMiddleware, actividadRouter);
+router.use("/calendario", requireAuth, adminAuditMiddleware, calendarioRouter);
+router.use("/reportes", requireAuth, adminAuditMiddleware, reportesRouter);
+router.use("/usuarios", requireAuth, adminAuditMiddleware, usuariosRouter);
+router.use("/productividad", requireAuth, adminAuditMiddleware, productividadRouter);
+router.use("/ia", requireAuth, adminAuditMiddleware, iaRouter);
+router.use("/auditoria", requireAuth, adminAuditMiddleware, auditoriaRouter);
+router.use("/backups", requireAuth, adminAuditMiddleware, backupsRouter);
+router.use("/fotografias", requireAuth, adminAuditMiddleware, fotografiasRouter);
+router.use("/egresos", requireAuth, adminAuditMiddleware, egresosRouter);
+router.use("/search", requireAuth, adminAuditMiddleware, searchRouter);
+router.use("/cierres", requireAuth, adminAuditMiddleware, cierresRouter);
+router.use("/proyectos", requireAuth, adminAuditMiddleware, proyectosRouter);
 
 export default router;
