@@ -74,64 +74,120 @@ export function Incidentes() {
 
       <Card>
         <CardContent className="p-4">
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Máquina</TableHead>
-                  <TableHead>Operario</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-8">Cargando incidentes...</TableCell></TableRow>
-                ) : incidentes?.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No hay incidentes registrados.</TableCell></TableRow>
-                ) : (
-                  incidentes?.map((inc) => (
-                    <TableRow key={inc.id}>
-                      <TableCell className="font-medium">
-                        {inc.fecha ? format(new Date(inc.fecha), "dd/MM/yyyy HH:mm") : "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-destructive border-destructive">
-                          {TIPO_LABELS[inc.tipo || ""] || inc.tipo}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{inc.maquina_nombre || "-"}</TableCell>
-                      <TableCell>{inc.empleado_nombre || "-"}</TableCell>
-                      <TableCell className="max-w-xs truncate" title={inc.descripcion}>{inc.descripcion}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={inc.estado === "resuelto" ? "default" : "destructive"}
-                          className={inc.estado === "resuelto" ? "bg-green-600" : ""}
-                        >
-                          {inc.estado?.toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {!isEmpleado && inc.estado !== "resuelto" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleResolver(inc.id)}
-                            disabled={resolvingId === inc.id}
+          <div className="rounded-md border overflow-hidden">
+            {/* Vista Desktop (Tabla) */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Máquina</TableHead>
+                    <TableHead>Operario</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={7} className="text-center py-8">Cargando incidentes...</TableCell></TableRow>
+                  ) : incidentes?.length === 0 ? (
+                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No hay incidentes registrados.</TableCell></TableRow>
+                  ) : (
+                    incidentes?.map((inc) => (
+                      <TableRow key={inc.id}>
+                        <TableCell className="font-medium">
+                          {inc.fecha ? format(new Date(inc.fecha), "dd/MM/yyyy HH:mm") : "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-destructive border-destructive">
+                            {TIPO_LABELS[inc.tipo || ""] || inc.tipo}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{inc.maquina_nombre || "-"}</TableCell>
+                        <TableCell>{inc.empleado_nombre || "-"}</TableCell>
+                        <TableCell className="max-w-xs truncate" title={inc.descripcion}>{inc.descripcion}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={inc.estado === "resuelto" ? "default" : "destructive"}
+                            className={inc.estado === "resuelto" ? "bg-green-600 hover:bg-green-700" : ""}
                           >
-                            <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
-                            Resolver
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                            {inc.estado?.toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {!isEmpleado && inc.estado !== "resuelto" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleResolver(inc.id)}
+                              disabled={resolvingId === inc.id}
+                            >
+                              <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
+                              Resolver
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Vista Mobile (Tarjetas) */}
+            <div className="md:hidden divide-y">
+              {isLoading ? (
+                <div className="text-center py-8">Cargando incidentes...</div>
+              ) : incidentes?.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No hay incidentes registrados.</div>
+              ) : (
+                incidentes?.map((inc) => (
+                  <div key={inc.id} className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-base text-destructive leading-tight">{TIPO_LABELS[inc.tipo || ""] || inc.tipo}</span>
+                        <span className="text-xs text-muted-foreground mt-0.5">{inc.fecha ? format(new Date(inc.fecha), "dd/MM/yyyy HH:mm") : "-"}</span>
+                      </div>
+                      <Badge variant={inc.estado === "resuelto" ? "default" : "destructive"} className={inc.estado === "resuelto" ? "bg-green-600" : ""}>
+                        {inc.estado?.toUpperCase()}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-sm bg-slate-50 p-2 rounded border mt-1">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase text-muted-foreground font-semibold">Máquina</span>
+                        <span className="font-medium truncate" title={inc.maquina_nombre || "-"}>{inc.maquina_nombre || "-"}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase text-muted-foreground font-semibold">Operario</span>
+                        <span className="font-medium truncate" title={inc.empleado_nombre || "-"}>{inc.empleado_nombre || "-"}</span>
+                      </div>
+                    </div>
+
+                    <div className="text-sm">
+                      <p className="text-slate-800 line-clamp-3">{inc.descripcion}</p>
+                    </div>
+
+                    {!isEmpleado && inc.estado !== "resuelto" && (
+                      <div className="mt-2 pt-2 border-t flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleResolver(inc.id)}
+                          disabled={resolvingId === inc.id}
+                          className="text-green-700 border-green-200 hover:bg-green-50 h-8"
+                        >
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          Marcar Resuelto
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
