@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "wouter";
-import { useGetDashboardResumen, useGetAlertas, useGetActividad, useGetMe, useGetCalendarioEventos } from "@workspace/api-client-react";
+import { useGetDashboardResumen, useGetAlertas, useGetActividad, useGetMe, useGetCalendarioEventos, useGetMaquinas } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,11 +67,13 @@ export function Panel() {
     mes: currentDate.getMonth() + 1, 
     anio: currentDate.getFullYear() 
   });
+  const { data: maquinasTodasData } = useGetMaquinas({ limit: 1000 });
 
   const alertas = (alertasData as any[]) || [];
   const actividad = (actividadData as any[]) || [];
   const vencimientos = resumen?.proximos_vencimientos || [];
   const maquinasResumen = (resumen?.maquinas_resumen as any[]) || [];
+  const maquinasTodas = (maquinasTodasData as any[]) || [];
 
   const todayStart = new Date();
   todayStart.setHours(0,0,0,0);
@@ -315,7 +317,7 @@ export function Panel() {
                       const idMatch = desc.match(/en máquina ID (\d+)/);
                       if (idMatch && idMatch[1]) {
                         const id = parseInt(idMatch[1]);
-                        const maq = maquinasResumen.find(m => m.id === id);
+                        const maq = maquinasTodas.find(m => m.id === id);
                         if (maq) {
                           desc = desc.replace(`en máquina ID ${id}`, `en la máquina ${maq.nombre}`);
                         }
