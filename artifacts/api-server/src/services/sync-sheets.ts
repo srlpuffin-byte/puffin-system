@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import { db } from "@workspace/db";
-import { maquinasTable, empleadosTable, proyectosTable, egresosTable } from "@workspace/db/schema";
+import { maquinasTable, empleadosTable, proyectosTable, egresosTable, jornadasTable, combustibleTable, mantenimientosTable } from "@workspace/db/schema";
 import { desc } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 
@@ -118,6 +118,57 @@ export async function syncAllSheets() {
         "", // I
         empNames, // J (operarios)
         maqNames  // K (maquina)
+      ];
+    });
+
+    // 5. Jornadas
+    const jornadas = await db.select().from(jornadasTable).orderBy(jornadasTable.id);
+    await syncTableToSheet(sheetsClient, SHEET_ID, "Jornadas", 0, jornadas, j => {
+      const emp = empleadosList.find(e => e.id === j.empleado_id);
+      const maq = maquinasList.find(m => m.id === j.maquina_id);
+      return [
+        j.id,
+        emp ? `${emp.nombre} ${emp.apellido}`.trim() : `ID:${j.empleado_id}`,
+        maq ? maq.nombre : `ID:${j.maquina_id}`,
+        j.fecha,
+        j.nombre_obra || j.ubicacion || "",
+        j.tipo_trabajo || "",
+        `${j.hora_inicio || ""} - ${j.hora_fin || ""}`,
+        j.estado || ""
+      ];
+    });
+
+    // 6. Combustible
+    const combustible = await db.select().from(combustibleTable).orderBy(combustibleTable.id);
+    await syncTableToSheet(sheetsClient, SHEET_ID, "Combustible", 0, combustible, c => {
+      const emp = empleadosList.find(e => e.id === c.empleado_id);
+      const maq = maquinasList.find(m => m.id === c.maquina_id);
+      return [
+        c.id,
+        emp ? `${emp.nombre} ${emp.apellido}`.trim() : `ID:${c.empleado_id}`,
+        maq ? maq.nombre : `ID:${c.maquina_id}`,
+        c.fecha,
+        c.litros,
+        c.importe || "",
+        c.estacion || "",
+        c.kilometraje || ""
+      ];
+    });
+
+    // 7. Mantenimientos
+    const mantenimientos = await db.select().from(mantenimientosTable).orderBy(mantenimientosTable.id);
+    await syncTableToSheet(sheetsClient, SHEET_ID, "Mantenimientos", 0, mantenimientos, m => {
+      const emp = empleadosList.find(e => e.id === m.empleado_id);
+      const maq = maquinasList.find(maq => maq.id === m.maquina_id);
+      return [
+        m.id,
+        maq ? maq.nombre : `ID:${m.maquina_id}`,
+        emp ? `${emp.nombre} ${emp.apellido}`.trim() : (m.empleado_id ? `ID:${m.empleado_id}` : ""),
+        m.fecha,
+        m.horas || "",
+        m.tipo,
+        m.descripcion || "",
+        m.proximo_service || ""
       ];
     });
 
