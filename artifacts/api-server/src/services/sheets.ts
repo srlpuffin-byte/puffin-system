@@ -3,10 +3,12 @@ import { logger } from "../lib/logger.js";
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 
-let sheetsClient: any = null;
+// undefined = no inicializado, null = sin credenciales (deshabilitado)
+let sheetsClient: any = undefined;
 
 function getAuthClient() {
-  if (sheetsClient) return sheetsClient;
+  // Si ya fue inicializado exitosamente, devolver cliente cacheado
+  if (sheetsClient !== undefined) return sheetsClient;
 
   if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
     logger.warn("No GOOGLE_APPLICATION_CREDENTIALS_JSON defined. Google Sheets sync is disabled.");
@@ -24,9 +26,12 @@ function getAuthClient() {
     return sheetsClient;
   } catch (error) {
     logger.error({ err: error }, "Failed to initialize Google Sheets client");
+    // No cachear el error: permitir reintentar en la próxima llamada
+    sheetsClient = undefined;
     return null;
   }
 }
+
 
 /**
  * Appends a row to a specific tab in the Google Sheet.

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { empleadosTable, jornadasTable, alertasTable, documentosTable, usuariosTable, fotografiasTable } from "@workspace/db";
 import { eq, and, or, ilike, sql } from "drizzle-orm";
-import { updateOrAppendToSheet } from "../services/sheets";
+import { updateOrAppendToSheet } from "../services/sheets.js";
 
 const router = Router();
 

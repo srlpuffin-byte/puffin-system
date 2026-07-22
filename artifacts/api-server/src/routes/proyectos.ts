@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { proyectosTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { updateOrAppendToSheet } from "../services/sheets";
+import { updateOrAppendToSheet } from "../services/sheets.js";
 
 const router = Router();
 
