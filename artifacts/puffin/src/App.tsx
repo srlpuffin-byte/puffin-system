@@ -1,5 +1,7 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { queryPersister } from '@/lib/query-persister';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
@@ -38,8 +40,9 @@ import Instalar from "@/pages/instalar";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
-      staleTime: 30_000,
+      retry: false, // Evitar retries infinitos si está offline
+      staleTime: 5 * 60 * 1000, // 5 minutos (evita recargas al navegar)
+      gcTime: 30 * 60 * 1000, // 30 minutos guardado en cache
     },
   },
 });
@@ -135,7 +138,7 @@ import { OfflineBadge } from "@/components/ui/offline-badge";
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider client={queryClient} persistOptions={{ persister: queryPersister }}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Router />
@@ -144,7 +147,7 @@ function App() {
         <SonnerToaster />
         <OfflineBadge />
       </TooltipProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }
 

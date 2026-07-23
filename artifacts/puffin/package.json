@@ -80,6 +80,8 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@tanstack/query-async-storage-persister": "^5.101.4",
+    "@tanstack/react-query-persist-client": "^5.101.4",
     "browser-image-compression": "^2.0.2",
     "idb": "^8.0.3",
     "jspdf": "^4.2.1",

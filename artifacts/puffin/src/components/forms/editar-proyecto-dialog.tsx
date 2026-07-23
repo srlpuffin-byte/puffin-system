@@ -33,17 +33,25 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
   const { data: proyectos } = useGetProyectos();
   const { data: empleadosData } = useGetEmpleados();
   const { data: maquinasData } = useGetMaquinas();
-  const { data: fotografias } = useGetFotografias({ entidad_tipo: "maquina" });
+  const { data: fotografias } = useGetFotografias({ entidad_tipo: "maquina" } as any);
 
   const getMaquinaFoto = (id: number) => {
     return fotografias?.find(f => f.entidad_id === id)?.url;
   };
 
-  // Filtrar los que ya están asignados a OTROS proyectos activos
-  const empleadosEnUso = new Set(proyectos?.filter(p => p.estado === "activo" && p.id !== proyecto?.id).flatMap(p => p.empleados_asignados || []));
+  // Mapear en qué proyecto activo está cada empleado (excluyendo el proyecto actual)
+  const empleadoProyectos = new Map<number, string[]>();
+  proyectos?.filter(p => p.estado === "activo" && p.id !== proyecto?.id).forEach(p => {
+    (p.empleados_asignados || []).forEach(empId => {
+      const prev = empleadoProyectos.get(empId) || [];
+      empleadoProyectos.set(empId, [...prev, p.lugar]);
+    });
+  });
+
+  // Máquinas: mantener lógica de exclusión (una máquina no puede estar en dos lugares)
   const maquinasEnUso = new Set(proyectos?.filter(p => p.estado === "activo" && p.id !== proyecto?.id).flatMap(p => p.maquinas_asignadas || []));
 
-  const empleados = empleadosData?.filter(emp => !empleadosEnUso.has(emp.id));
+  const empleados = empleadosData;
   const maquinas = maquinasData?.filter(maq => !maquinasEnUso.has(maq.id));
 
   // Cargar datos del proyecto al abrir
@@ -179,22 +187,37 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
               </div>
               <ScrollArea className="h-[220px] border rounded-md p-4">
                 <div className="space-y-3">
-                  {empleados?.filter(emp => `${emp.nombre} ${emp.apellido}`.toLowerCase().includes(searchEmpleados.toLowerCase())).map(emp => (
-                    <div key={emp.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`edit-emp-${emp.id}`}
-                        checked={empleadosIds.includes(emp.id)}
-                        onCheckedChange={() => toggleEmpleado(emp.id)}
-                      />
-                      <label
-                        htmlFor={`edit-emp-${emp.id}`}
-                        className="text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1"
-                      >
-                        {emp.nombre} {emp.apellido}
-                        {emp.cargo && <span className="text-xs text-muted-foreground ml-1">· {emp.cargo}</span>}
-                      </label>
-                    </div>
-                  ))}
+                  {empleados?.filter(emp => `${emp.nombre} ${emp.apellido}`.toLowerCase().includes(searchEmpleados.toLowerCase())).map(emp => {
+                    const proyectosActuales = empleadoProyectos.get(emp.id) || [];
+                    return (
+                      <div key={emp.id} className="flex items-start space-x-2 py-0.5">
+                        <Checkbox
+                          id={`edit-emp-${emp.id}`}
+                          checked={empleadosIds.includes(emp.id)}
+                          onCheckedChange={() => toggleEmpleado(emp.id)}
+                          className="mt-0.5"
+                        />
+                        <label
+                          htmlFor={`edit-emp-${emp.id}`}
+                          className="text-sm font-medium leading-none cursor-pointer flex flex-col gap-1"
+                        >
+                          <span>
+                            {emp.nombre} {emp.apellido}
+                            {emp.cargo && <span className="text-xs text-muted-foreground ml-1">· {emp.cargo}</span>}
+                          </span>
+                          {proyectosActuales.length > 0 && (
+                            <span className="flex flex-wrap gap-1">
+                              {proyectosActuales.map((lugar, i) => (
+                                <span key={i} className="inline-flex items-center text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded-full">
+                                  En: {lugar.length > 22 ? lugar.slice(0, 22) + "…" : lugar}
+                                </span>
+                              ))}
+                            </span>
+                          )}
+                        </label>
+                      </div>
+                    );
+                  })}
                   {(!empleados || empleados.length === 0) && (
                     <p className="text-sm text-muted-foreground">No hay empleados disponibles.</p>
                   )}

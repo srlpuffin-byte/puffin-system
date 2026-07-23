@@ -72,7 +72,7 @@ export function OfflineBadge() {
       <div className="flex items-center gap-2">
         <WifiOff className="h-4 w-4" />
         <span className="text-sm font-medium">
-          {isOffline ? "Sin conexión a internet." : "Conexión restaurada."} 
+          {isOffline ? "Modo offline: usando datos guardados localmente." : "Conexión restaurada."} 
           {pendingCount > 0 && ` Hay ${pendingCount} registro(s) pendiente(s).`}
         </span>
       </div>

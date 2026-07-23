@@ -67,7 +67,7 @@ export function Panel() {
     mes: currentDate.getMonth() + 1, 
     anio: currentDate.getFullYear() 
   });
-  const { data: maquinasTodasData } = useGetMaquinas({ limit: 1000 });
+  const { data: maquinasTodasData } = useGetMaquinas({ limit: 1000 } as any);
 
   const alertas = (alertasData as any[]) || [];
   const actividad = (actividadData as any[]) || [];
