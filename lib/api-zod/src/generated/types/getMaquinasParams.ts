@@ -9,5 +9,6 @@ import type { GetMaquinasEstado } from './getMaquinasEstado';
 
 export type GetMaquinasParams = {
 estado?: GetMaquinasEstado;
+categoria?: string;
 search?: string;
 };

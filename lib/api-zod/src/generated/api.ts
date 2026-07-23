@@ -228,6 +228,7 @@ export const UpdateEmpleadoResponse = zod.object({
  */
 export const GetMaquinasQueryParams = zod.object({
   "estado": zod.enum(['activa', 'detenida', 'mantenimiento', 'baja']).optional(),
+  "categoria": zod.coerce.string().optional(),
   "search": zod.coerce.string().optional()
 })
 
@@ -247,6 +248,8 @@ export const GetMaquinasResponseItem = zod.object({
   "horometro": zod.number().optional(),
   "kilometros": zod.number().optional(),
   "estado": zod.enum(['activa', 'detenida', 'mantenimiento', 'baja']),
+  "categoria": zod.string().nullish(),
+  "descripcion": zod.string().nullish(),
   "ultimo_service": zod.string().nullish(),
   "proximo_service": zod.string().nullish(),
   "filtro_tipo": zod.string().nullish(),
@@ -273,6 +276,8 @@ export const CreateMaquinaBody = zod.object({
   "motor": zod.string().optional(),
   "horometro": zod.number().optional(),
   "kilometros": zod.number().optional(),
+  "categoria": zod.string().optional(),
+  "descripcion": zod.string().optional(),
   "filtro_tipo": zod.string().optional(),
   "filtro_codigo": zod.string().optional(),
   "filtro_fecha_cambio": zod.string().optional(),
@@ -295,6 +300,8 @@ export const CreateMaquinaResponse = zod.object({
   "horometro": zod.number().optional(),
   "kilometros": zod.number().optional(),
   "estado": zod.enum(['activa', 'detenida', 'mantenimiento', 'baja']),
+  "categoria": zod.string().nullish(),
+  "descripcion": zod.string().nullish(),
   "ultimo_service": zod.string().nullish(),
   "proximo_service": zod.string().nullish(),
   "filtro_tipo": zod.string().nullish(),
@@ -327,6 +334,8 @@ export const GetMaquinaResponse = zod.object({
   "horometro": zod.number().optional(),
   "kilometros": zod.number().optional(),
   "estado": zod.enum(['activa', 'detenida', 'mantenimiento', 'baja']),
+  "categoria": zod.string().nullish(),
+  "descripcion": zod.string().nullish(),
   "ultimo_service": zod.string().nullish(),
   "proximo_service": zod.string().nullish(),
   "filtro_tipo": zod.string().nullish(),
@@ -358,6 +367,8 @@ export const UpdateMaquinaBody = zod.object({
   "estado": zod.enum(['activa', 'detenida', 'mantenimiento', 'baja']).optional(),
   "horometro": zod.number().optional(),
   "kilometros": zod.number().optional(),
+  "categoria": zod.string().optional(),
+  "descripcion": zod.string().optional(),
   "proximo_service": zod.string().optional(),
   "filtro_tipo": zod.string().optional(),
   "filtro_codigo": zod.string().optional(),
@@ -381,6 +392,8 @@ export const UpdateMaquinaResponse = zod.object({
   "horometro": zod.number().optional(),
   "kilometros": zod.number().optional(),
   "estado": zod.enum(['activa', 'detenida', 'mantenimiento', 'baja']),
+  "categoria": zod.string().nullish(),
+  "descripcion": zod.string().nullish(),
   "ultimo_service": zod.string().nullish(),
   "proximo_service": zod.string().nullish(),
   "filtro_tipo": zod.string().nullish(),
@@ -624,6 +637,50 @@ export const CreateCombustibleResponse = zod.object({
   "estacion": zod.string().nullish(),
   "kilometraje": zod.number().nullish()
 })
+
+
+/**
+ * @summary Actualizar registro de combustible
+ */
+export const UpdateCombustibleParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateCombustibleBody = zod.object({
+  "maquina_id": zod.number(),
+  "empleado_id": zod.number(),
+  "litros": zod.number(),
+  "precio": zod.number().optional(),
+  "importe": zod.number().optional(),
+  "estacion": zod.string().optional(),
+  "kilometraje": zod.number().optional(),
+  "ubicacion": zod.string().optional()
+})
+
+export const UpdateCombustibleResponse = zod.object({
+  "id": zod.number(),
+  "empresa_id": zod.number().optional(),
+  "empleado_id": zod.number(),
+  "maquina_id": zod.number(),
+  "empleado_nombre": zod.string().optional(),
+  "maquina_nombre": zod.string().optional(),
+  "fecha": zod.string(),
+  "litros": zod.number(),
+  "precio": zod.number().nullish(),
+  "importe": zod.number().nullish(),
+  "estacion": zod.string().nullish(),
+  "kilometraje": zod.number().nullish()
+})
+
+
+/**
+ * @summary Eliminar registro de combustible
+ */
+export const DeleteCombustibleParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteCombustibleResponse = zod.unknown()
 
 
 /**
@@ -1042,6 +1099,50 @@ export const CreateEgresoResponse = zod.object({
 
 
 /**
+ * @summary Actualizar egreso
+ */
+export const UpdateEgresoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateEgresoBody = zod.object({
+  "fecha": zod.string(),
+  "categoria": zod.string(),
+  "concepto": zod.string(),
+  "proveedor": zod.string().optional(),
+  "monto": zod.number(),
+  "metodo_pago": zod.string().optional(),
+  "comprobante": zod.boolean().optional(),
+  "centro_costos": zod.string().optional(),
+  "observaciones": zod.string().optional()
+})
+
+export const UpdateEgresoResponse = zod.object({
+  "id": zod.number(),
+  "empresa_id": zod.number().optional(),
+  "fecha": zod.string(),
+  "categoria": zod.string(),
+  "concepto": zod.string(),
+  "proveedor": zod.string().nullish(),
+  "monto": zod.number(),
+  "metodo_pago": zod.string().nullish(),
+  "comprobante": zod.boolean().optional(),
+  "centro_costos": zod.string().nullish(),
+  "observaciones": zod.string().nullish()
+})
+
+
+/**
+ * @summary Eliminar egreso
+ */
+export const DeleteEgresoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteEgresoResponse = zod.unknown()
+
+
+/**
  * @summary Búsqueda global
  */
 export const GlobalSearchQueryParams = zod.object({
@@ -1093,6 +1194,8 @@ export const GlobalSearchResponse = zod.object({
   "horometro": zod.number().optional(),
   "kilometros": zod.number().optional(),
   "estado": zod.enum(['activa', 'detenida', 'mantenimiento', 'baja']),
+  "categoria": zod.string().nullish(),
+  "descripcion": zod.string().nullish(),
   "ultimo_service": zod.string().nullish(),
   "proximo_service": zod.string().nullish(),
   "filtro_tipo": zod.string().nullish(),

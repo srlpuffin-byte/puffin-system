@@ -187,6 +187,10 @@ export interface Maquina {
   kilometros?: number;
   estado: MaquinaEstado;
   /** @nullable */
+  categoria?: string | null;
+  /** @nullable */
+  descripcion?: string | null;
+  /** @nullable */
   ultimo_service?: string | null;
   /** @nullable */
   proximo_service?: string | null;
@@ -198,9 +202,6 @@ export interface Maquina {
   filtro_fecha_cambio?: string | null;
   /** @nullable */
   filtro_proximo_cambio?: string | null;
-  /** @nullable */
-  descripcion?: string | null;
-  categoria?: string;
 }
 
 export interface MaquinaInput {
@@ -216,12 +217,12 @@ export interface MaquinaInput {
   motor?: string;
   horometro?: number;
   kilometros?: number;
+  categoria?: string;
+  descripcion?: string;
   filtro_tipo?: string;
   filtro_codigo?: string;
   filtro_fecha_cambio?: string;
   filtro_proximo_cambio?: string;
-  descripcion?: string;
-  categoria?: string;
 }
 
 export type MaquinaUpdateEstado = typeof MaquinaUpdateEstado[keyof typeof MaquinaUpdateEstado];
@@ -249,13 +250,13 @@ export interface MaquinaUpdate {
   estado?: MaquinaUpdateEstado;
   horometro?: number;
   kilometros?: number;
+  categoria?: string;
+  descripcion?: string;
   proximo_service?: string;
   filtro_tipo?: string;
   filtro_codigo?: string;
   filtro_fecha_cambio?: string;
   filtro_proximo_cambio?: string;
-  descripcion?: string;
-  categoria?: string;
 }
 
 export type JornadaEstado = typeof JornadaEstado[keyof typeof JornadaEstado];
@@ -687,18 +688,6 @@ export interface EgresoInput {
   observaciones?: string;
 }
 
-export interface EgresoUpdate {
-  fecha?: string;
-  categoria?: string;
-  concepto?: string;
-  proveedor?: string;
-  monto?: number;
-  metodo_pago?: string;
-  comprobante?: boolean;
-  centro_costos?: string;
-  observaciones?: string;
-}
-
 export interface SearchResults {
   jornadas?: Jornada[];
   maquinas?: Maquina[];
@@ -739,8 +728,8 @@ export const GetEmpleadosEstado = {
 
 export type GetMaquinasParams = {
 estado?: GetMaquinasEstado;
-search?: string;
 categoria?: string;
+search?: string;
 };
 
 export type GetMaquinasEstado = typeof GetMaquinasEstado[keyof typeof GetMaquinasEstado];

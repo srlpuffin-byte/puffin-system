@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useCreateCombustible, useGetEmpleados, useGetMaquinas, getGetCombustibleQueryKey, useUploadFotografia, useGetMe } from "@workspace/api-client-react";
+import { useUpdateCombustible, useGetEmpleados, useGetMaquinas, getGetCombustibleQueryKey, useUploadFotografia, useGetMe, RegistroCombustible, useGetFotografias } from "@workspace/api-client-react";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -12,13 +12,12 @@ import { Camera } from "lucide-react";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  maquinaIdFija?: number;
-  empleadoIdFijo?: number;
+  carga: RegistroCombustible | null;
 }
 
-export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, empleadoIdFijo }: Props) {
+export function EditarCargaDialog({ open, onOpenChange, carga }: Props) {
   const queryClient = useQueryClient();
-  const createMut = useCreateCombustible();
+  const updateMut = useUpdateCombustible();
   const uploadMut = useUploadFotografia();
   const { data: empleados } = useGetEmpleados({ estado: "activo" });
   const { data: maquinas } = useGetMaquinas();
@@ -26,15 +25,34 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";
   const [fotoNivel, setFotoNivel] = useState<{ base64: string; name: string } | null>(null);
 
+  const { data: fotografias } = useGetFotografias({ entidad_tipo: "combustible", entidad_id: carga?.id || 0 }, { query: { enabled: !!carga?.id, queryKey: ['fotografias', 'combustible', carga?.id] } });
+  
+  const fotoExistente = fotografias?.length ? fotografias[fotografias.length - 1] : null;
+
   const [form, setForm] = useState({
-    empleado_id: empleadoIdFijo?.toString() || "",
-    maquina_id: maquinaIdFija?.toString() || "",
+    empleado_id: "",
+    maquina_id: "",
     litros: "",
     precio: "",
     importe: "",
     estacion: "",
     kilometraje: "",
   });
+
+  useEffect(() => {
+    if (carga) {
+      setForm({
+        empleado_id: carga.empleado_id.toString(),
+        maquina_id: carga.maquina_id.toString(),
+        litros: carga.litros?.toString() || "",
+        precio: carga.precio?.toString() || "",
+        importe: carga.importe?.toString() || "",
+        estacion: carga.estacion || "",
+        kilometraje: carga.kilometraje?.toString() || "",
+      });
+      setFotoNivel(null);
+    }
+  }, [carga]);
 
   const set = (field: string, val: string) => {
     setForm(prev => {
@@ -64,8 +82,10 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
       toast.error("Operario, máquina y litros son obligatorios");
       return;
     }
-    createMut.mutate(
+    if (!carga) return;
+    updateMut.mutate(
       {
+        id: carga.id,
         data: {
           empleado_id: parseInt(form.empleado_id),
           maquina_id: parseInt(form.maquina_id),
@@ -77,13 +97,13 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
         },
       },
       {
-        onSuccess: async (carga) => {
-          if (fotoNivel && carga.id) {
+        onSuccess: async (updatedCarga) => {
+          if (fotoNivel && updatedCarga.id) {
             try {
               await uploadMut.mutateAsync({
                 data: {
                   entidad_tipo: "combustible",
-                  entidad_id: carga.id,
+                  entidad_id: updatedCarga.id,
                   base64Data: fotoNivel.base64,
                   filename: fotoNivel.name,
                   descripcion: "Foto nivel combustible"
@@ -91,13 +111,12 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
               });
             } catch {}
           }
-          toast.success("Carga de combustible registrada");
+          toast.success("Carga actualizada exitosamente");
           queryClient.invalidateQueries({ queryKey: getGetCombustibleQueryKey() });
           onOpenChange(false);
-          setForm({ empleado_id: empleadoIdFijo?.toString() || "", maquina_id: maquinaIdFija?.toString() || "", litros: "", precio: "", importe: "", estacion: "", kilometraje: "" });
           setFotoNivel(null);
         },
-        onError: () => toast.error("Error al registrar la carga"),
+        onError: () => toast.error("Error al actualizar la carga"),
       }
     );
   };
@@ -106,10 +125,9 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Registrar Carga de Combustible</DialogTitle>
+          <DialogTitle>Editar Carga de Combustible</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
-          {!empleadoIdFijo && (
             <div className="space-y-1">
               <Label>Operario *</Label>
               <select
@@ -123,8 +141,6 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
                 {Array.isArray(empleados) ? empleados.map(e => <option key={e.id} value={e.id.toString()}>{e.apellido}, {e.nombre}</option>) : null}
               </select>
             </div>
-          )}
-          {!maquinaIdFija && (
             <div className="space-y-1">
               <Label>Máquina *</Label>
               <select
@@ -137,7 +153,6 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
                 {Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario").map(m => <option key={m.id} value={m.id.toString()}>{m.nombre}{m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ''}</option>) : null}
               </select>
             </div>
-          )}
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1">
               <Label>Litros *</Label>
@@ -184,17 +199,21 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
                   }}
                 />
               </label>
-              {fotoNivel && (
+              {fotoNivel ? (
                 <Button type="button" variant="ghost" size="sm" onClick={() => setFotoNivel(null)}>
-                  Quitar
+                  Quitar subida
                 </Button>
-              )}
+              ) : fotoExistente ? (
+                <a href={fotoExistente.url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">
+                  Ver foto actual
+                </a>
+              ) : null}
             </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" className="bg-primary" disabled={createMut.isPending}>
-              {createMut.isPending ? "Guardando..." : "Registrar Carga"}
+            <Button type="submit" className="bg-primary" disabled={updateMut.isPending}>
+              {updateMut.isPending ? "Guardando..." : "Guardar Cambios"}
             </Button>
           </DialogFooter>
         </form>

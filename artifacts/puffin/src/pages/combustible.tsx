@@ -1,16 +1,34 @@
 import React, { useState } from "react";
-import { useGetCombustible } from "@workspace/api-client-react";
+import { useGetCombustible, RegistroCombustible, useDeleteCombustible, getGetCombustibleQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus } from "lucide-react";
+import { Plus, Edit, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { RegistrarCargaDialog } from "@/components/forms/registrar-carga-dialog";
+import { EditarCargaDialog } from "@/components/forms/editar-carga-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { toast } from "sonner";
 
 export function Combustible() {
+  const queryClient = useQueryClient();
   const { data: registros, isLoading } = useGetCombustible();
   const [openDialog, setOpenDialog] = useState(false);
+  const [cargaParaEditar, setCargaParaEditar] = useState<RegistroCombustible | null>(null);
+  const deleteMut = useDeleteCombustible();
+
+  const handleDelete = (id: number) => {
+    if (confirm("¿Estás seguro de que deseas eliminar este registro?")) {
+      deleteMut.mutate({ id }, {
+        onSuccess: () => {
+          toast.success("Registro eliminado correctamente");
+          queryClient.invalidateQueries({ queryKey: getGetCombustibleQueryKey() });
+        },
+        onError: () => toast.error("Error al eliminar el registro")
+      });
+    }
+  };
 
   const exportColumns = [
     { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy") : "-" },
@@ -59,13 +77,14 @@ export function Combustible() {
                     <TableHead className="text-right">Importe</TableHead>
                     <TableHead>Estación</TableHead>
                     <TableHead className="text-right">Km</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando registros...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center py-8">Cargando registros...</TableCell></TableRow>
                   ) : registros?.length === 0 ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay cargas registradas.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No hay cargas registradas.</TableCell></TableRow>
                   ) : (
                     registros?.map((reg) => (
                       <TableRow key={reg.id}>
@@ -84,6 +103,14 @@ export function Combustible() {
                         <TableCell>{reg.estacion || "-"}</TableCell>
                         <TableCell className="text-right">
                           {reg.kilometraje ? `${Number(reg.kilometraje).toLocaleString()} km` : "-"}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button variant="ghost" size="icon" onClick={() => setCargaParaEditar(reg)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(reg.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
@@ -112,6 +139,15 @@ export function Combustible() {
                       </div>
                     </div>
 
+                    <div className="flex justify-end gap-2 mb-1">
+                      <Button variant="outline" size="sm" onClick={() => setCargaParaEditar(reg)}>
+                        <Edit className="h-4 w-4 mr-2" /> Editar
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDelete(reg.id)} className="text-red-500 hover:bg-red-50">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-2 text-sm bg-slate-50 p-2 rounded border mt-1">
                       <div className="flex flex-col">
                         <span className="text-xs text-muted-foreground">Operario</span>
@@ -136,6 +172,7 @@ export function Combustible() {
       </Card>
 
       <RegistrarCargaDialog open={openDialog} onOpenChange={setOpenDialog} />
+      <EditarCargaDialog open={!!cargaParaEditar} onOpenChange={(open) => !open && setCargaParaEditar(null)} carga={cargaParaEditar} />
     </div>
   );
 }

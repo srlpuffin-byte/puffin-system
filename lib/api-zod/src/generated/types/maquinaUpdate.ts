@@ -22,6 +22,8 @@ export interface MaquinaUpdate {
   estado?: MaquinaUpdateEstado;
   horometro?: number;
   kilometros?: number;
+  categoria?: string;
+  descripcion?: string;
   proximo_service?: string;
   filtro_tipo?: string;
   filtro_codigo?: string;

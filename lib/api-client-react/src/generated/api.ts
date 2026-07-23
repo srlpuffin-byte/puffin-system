@@ -29,7 +29,6 @@ import type {
   DocumentoInput,
   Egreso,
   EgresoInput,
-  EgresoUpdate,
   EjecutarCierreMensual200,
   Empleado,
   EmpleadoInput,
@@ -1681,6 +1680,147 @@ export const useCreateCombustible = <TError = ErrorType<unknown>,
       return useMutation(getCreateCombustibleMutationOptions(options));
     }
 
+export const getUpdateCombustibleUrl = (id: number,) => {
+
+
+
+
+  return `/api/combustible/${id}`
+}
+
+/**
+ * @summary Actualizar registro de combustible
+ */
+export const updateCombustible = async (id: number,
+    combustibleInput: CombustibleInput, options?: RequestInit): Promise<RegistroCombustible> => {
+
+  return customFetch<RegistroCombustible>(getUpdateCombustibleUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(combustibleInput)
+  }
+);}
+
+
+
+
+export const getUpdateCombustibleMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCombustible>>, TError,{id: number;data: BodyType<CombustibleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCombustible>>, TError,{id: number;data: BodyType<CombustibleInput>}, TContext> => {
+
+const mutationKey = ['updateCombustible'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCombustible>>, {id: number;data: BodyType<CombustibleInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateCombustible(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCombustibleMutationResult = NonNullable<Awaited<ReturnType<typeof updateCombustible>>>
+    export type UpdateCombustibleMutationBody = BodyType<CombustibleInput>
+    export type UpdateCombustibleMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Actualizar registro de combustible
+ */
+export const useUpdateCombustible = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCombustible>>, TError,{id: number;data: BodyType<CombustibleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCombustible>>,
+        TError,
+        {id: number;data: BodyType<CombustibleInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateCombustibleMutationOptions(options));
+    }
+
+export const getDeleteCombustibleUrl = (id: number,) => {
+
+
+
+
+  return `/api/combustible/${id}`
+}
+
+/**
+ * @summary Eliminar registro de combustible
+ */
+export const deleteCombustible = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteCombustibleUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteCombustibleMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCombustible>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCombustible>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteCombustible'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCombustible>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteCombustible(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCombustibleMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCombustible>>>
+
+    export type DeleteCombustibleMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Eliminar registro de combustible
+ */
+export const useDeleteCombustible = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCombustible>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCombustible>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteCombustibleMutationOptions(options));
+    }
+
 export const getGetMantenimientosUrl = (params?: GetMantenimientosParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -3006,49 +3146,145 @@ export const useCreateEgreso = <TError = ErrorType<unknown>,
       return useMutation(getCreateEgresoMutationOptions(options));
     }
 
+export const getUpdateEgresoUrl = (id: number,) => {
+
+
+
+
+  return `/api/egresos/${id}`
+}
+
 /**
  * @summary Actualizar egreso
  */
-export const updateEgreso = async (id: number, egresoUpdate: EgresoUpdate, options?: RequestInit): Promise<Egreso> => {
-  return customFetch<Egreso>(`/api/egresos/${id}`,
+export const updateEgreso = async (id: number,
+    egresoInput: EgresoInput, options?: RequestInit): Promise<Egreso> => {
+
+  return customFetch<Egreso>(getUpdateEgresoUrl(id),
   {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(egresoUpdate)
+    body: JSON.stringify(egresoInput)
   }
 );}
-  
+
+
+
 
 export const getUpdateEgresoMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEgreso>>, TError,{id: number; data: BodyType<EgresoUpdate>}, TContext>, request?: RequestInit}
-): UseMutationOptions<Awaited<ReturnType<typeof updateEgreso>>, TError,{id: number; data: BodyType<EgresoUpdate>}, TContext> => {
-const {mutation: mutationOptions, request: requestOptions} = options ?? {};
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEgreso>>, TError,{id: number;data: BodyType<EgresoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateEgreso>>, TError,{id: number;data: BodyType<EgresoInput>}, TContext> => {
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateEgreso>>, {id: number; data: BodyType<EgresoUpdate>}> = (props) => {
-          const {id, data} = props ?? {};
+const mutationKey = ['updateEgreso'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateEgreso>>, {id: number;data: BodyType<EgresoInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
           return  updateEgreso(id,data,requestOptions)
         }
 
-        return  { mutationFn, ...mutationOptions }}
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
 
     export type UpdateEgresoMutationResult = NonNullable<Awaited<ReturnType<typeof updateEgreso>>>
-    export type UpdateEgresoMutationBody = BodyType<EgresoUpdate>
+    export type UpdateEgresoMutationBody = BodyType<EgresoInput>
     export type UpdateEgresoMutationError = ErrorType<unknown>
 
     /**
  * @summary Actualizar egreso
  */
 export const useUpdateEgreso = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEgreso>>, TError,{id: number; data: BodyType<EgresoUpdate>}, TContext>, request?: RequestInit}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEgreso>>, TError,{id: number;data: BodyType<EgresoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateEgreso>>,
         TError,
-        {id: number; data: BodyType<EgresoUpdate>},
+        {id: number;data: BodyType<EgresoInput>},
         TContext
       > => {
       return useMutation(getUpdateEgresoMutationOptions(options));
+    }
+
+export const getDeleteEgresoUrl = (id: number,) => {
+
+
+
+
+  return `/api/egresos/${id}`
+}
+
+/**
+ * @summary Eliminar egreso
+ */
+export const deleteEgreso = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteEgresoUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteEgresoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEgreso>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteEgreso>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteEgreso'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteEgreso>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteEgreso(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteEgresoMutationResult = NonNullable<Awaited<ReturnType<typeof deleteEgreso>>>
+
+    export type DeleteEgresoMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Eliminar egreso
+ */
+export const useDeleteEgreso = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEgreso>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteEgreso>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteEgresoMutationOptions(options));
     }
 
 export const getGlobalSearchUrl = (params?: GlobalSearchParams,) => {

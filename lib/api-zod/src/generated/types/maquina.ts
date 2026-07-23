@@ -32,6 +32,10 @@ export interface Maquina {
   kilometros?: number;
   estado: MaquinaEstado;
   /** @nullable */
+  categoria?: string | null;
+  /** @nullable */
+  descripcion?: string | null;
+  /** @nullable */
   ultimo_service?: string | null;
   /** @nullable */
   proximo_service?: string | null;

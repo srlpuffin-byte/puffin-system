@@ -19,6 +19,8 @@ export interface MaquinaInput {
   motor?: string;
   horometro?: number;
   kilometros?: number;
+  categoria?: string;
+  descripcion?: string;
   filtro_tipo?: string;
   filtro_codigo?: string;
   filtro_fecha_cambio?: string;
