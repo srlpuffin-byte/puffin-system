@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useGetProyecto } from "@/hooks/use-proyectos";
+import { useGetProyecto, useDeletePago } from "@/hooks/use-proyectos";
 import { useGetEmpleados, useGetMaquinas, useGetEgresos } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronLeft, MapPin, Activity, DollarSign, Users, Tractor, ExternalLink, TrendingDown, TrendingUp, Minus, Receipt, Package } from "lucide-react";
+import { ChevronLeft, MapPin, Activity, DollarSign, Users, Tractor, ExternalLink, TrendingDown, TrendingUp, Minus, Receipt, Package, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 export function ProyectoFicha() {
   const { id } = useParams();
@@ -19,6 +20,17 @@ export function ProyectoFicha() {
   const { data: empleados } = useGetEmpleados();
   const { data: maquinas } = useGetMaquinas();
   const { data: todosLosEgresos } = useGetEgresos();
+  const deletePagoMut = useDeletePago();
+
+  const handleDeletePago = async (pagoId: string) => {
+    if (!confirm("¿Estás seguro de eliminar este cobro/pago?")) return;
+    try {
+      await deletePagoMut.mutateAsync({ id: proyectoId, pagoId });
+      toast.success("Pago eliminado correctamente");
+    } catch (e) {
+      toast.error("Error al eliminar el pago");
+    }
+  };
 
   // Tipo de cambio editable (usuario lo puede ajustar)
   const [tipoCambio, setTipoCambio] = useState("1200");
@@ -404,6 +416,7 @@ export function ProyectoFicha() {
                             <TableHead>Descripción</TableHead>
                             <TableHead className="text-right">Monto (USD)</TableHead>
                             <TableHead className="text-center">Comprobante</TableHead>
+                            <TableHead className="text-right">Acciones</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -430,6 +443,21 @@ export function ProyectoFicha() {
                                   </a>
                                 ) : (
                                   <span className="text-xs text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {pago.id ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                    onClick={() => handleDeletePago(pago.id)}
+                                    title="Eliminar este cobro"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground" title="Este pago antiguo no se puede eliminar">-</span>
                                 )}
                               </TableCell>
                             </TableRow>

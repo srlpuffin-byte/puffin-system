@@ -218,6 +218,56 @@ router.post("/:id/pagos", async (req, res) => {
   }
 });
 
+// Eliminar un pago
+router.delete("/:id/pagos/:pagoId", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { pagoId } = req.params;
+
+    const [proyecto] = await db.select().from(proyectosTable).where(eq(proyectosTable.id, id)).limit(1);
+    if (!proyecto) return res.status(404).json({ error: "Proyecto no encontrado" });
+
+    let currentPagos: any[] = [];
+    if (Array.isArray(proyecto.pagos_historial)) {
+      currentPagos = proyecto.pagos_historial;
+    } else if (typeof proyecto.pagos_historial === 'string') {
+      try { currentPagos = JSON.parse(proyecto.pagos_historial); } catch(e) {}
+    }
+
+    const pagoToDelete = currentPagos.find((p: any) => p.id === pagoId);
+    if (!pagoToDelete) return res.status(404).json({ error: "Pago no encontrado" });
+
+    const newPagosList = currentPagos.filter((p: any) => p.id !== pagoId);
+    
+    let newTotal = parseFloat(proyecto.total_cobrado || "0");
+    if (pagoToDelete.tipo !== 'especie' && pagoToDelete.tipo !== 'vehiculo') {
+      newTotal -= (pagoToDelete.monto_monetario || 0);
+      if (newTotal < 0) newTotal = 0;
+    }
+
+    const ganancia = parseFloat(proyecto.ganancia_estimada || "0");
+    let nuevoEstado = "pendiente";
+    if (newTotal > 0 && newTotal < ganancia) {
+      nuevoEstado = "parcial";
+    } else if (newTotal >= ganancia && ganancia > 0) {
+      nuevoEstado = "saldado";
+    } else if (newTotal > 0 && ganancia === 0) {
+      nuevoEstado = "saldado";
+    }
+
+    await db.update(proyectosTable).set({
+      pagos_historial: newPagosList,
+      total_cobrado: newTotal.toString(),
+      estado_pago: nuevoEstado
+    }).where(eq(proyectosTable.id, id));
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Error al eliminar pago" });
+  }
+});
+
 // Eliminar un proyecto
 router.delete("/:id", async (req, res) => {
   try {

@@ -87,6 +87,20 @@ export function useCreatePago() {
   });
 }
 
+export function useDeletePago() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, pagoId }: { id: number; pagoId: string }) => {
+      await apiFetch(`/proyectos/${id}/pagos/${pagoId}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proyectos"] });
+    },
+  });
+}
+
 export function useDeleteProyecto() {
   const queryClient = useQueryClient();
   return useMutation({
