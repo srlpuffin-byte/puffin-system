@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCreatePago, type Proyecto } from "@/hooks/use-proyectos";
+import { useUploadFotografia } from "@workspace/api-client-react";
 import { toast } from "sonner";
 import { Loader2, UploadCloud } from "lucide-react";
 
@@ -24,9 +25,9 @@ export function RegistrarPagoDialog({ open, onOpenChange, proyecto }: RegistrarP
   const [comprobanteUrl, setComprobanteUrl] = useState("");
   const [addToInventory, setAddToInventory] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   
   const createPagoMut = useCreatePago();
+  const uploadMut = useUploadFotografia();
 
   if (!proyecto) return null;
 
@@ -39,26 +40,30 @@ export function RegistrarPagoDialog({ open, onOpenChange, proyecto }: RegistrarP
       if (!file) return;
 
       setIsUploading(true);
-      setUploadProgress(10);
       try {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("upload_preset", "puffin_unsigned"); 
-
-        const res = await fetch(`https://api.cloudinary.com/v1_1/dkyd5r86v/upload`, {
-          method: "POST",
-          body: formData,
-        });
-        
-        if (!res.ok) throw new Error("Upload failed");
-        const data = await res.json();
-        setComprobanteUrl(data.secure_url);
-        toast.success("Comprobante subido");
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const result = reader.result as string;
+          const base64 = result.split(",")[1];
+          
+          const res = await uploadMut.mutateAsync({
+            data: {
+              entidad_tipo: "proyecto",
+              entidad_id: proyecto.id,
+              base64Data: base64,
+              filename: file.name,
+              descripcion: "Comprobante de pago"
+            }
+          });
+          
+          setComprobanteUrl(res.url);
+          toast.success("Comprobante subido");
+          setIsUploading(false);
+        };
+        reader.readAsDataURL(file);
       } catch (err) {
         toast.error("Error al subir el comprobante");
-      } finally {
         setIsUploading(false);
-        setUploadProgress(0);
       }
     };
     fileInput.click();
