@@ -604,7 +604,8 @@ export const GetCombustibleResponseItem = zod.object({
   "precio": zod.number().nullish(),
   "importe": zod.number().nullish(),
   "estacion": zod.string().nullish(),
-  "kilometraje": zod.number().nullish()
+  "kilometraje": zod.number().nullish(),
+  "foto_url": zod.string().nullish()
 })
 export const GetCombustibleResponse = zod.array(GetCombustibleResponseItem)
 
@@ -635,7 +636,8 @@ export const CreateCombustibleResponse = zod.object({
   "precio": zod.number().nullish(),
   "importe": zod.number().nullish(),
   "estacion": zod.string().nullish(),
-  "kilometraje": zod.number().nullish()
+  "kilometraje": zod.number().nullish(),
+  "foto_url": zod.string().nullish()
 })
 
 
@@ -669,7 +671,8 @@ export const UpdateCombustibleResponse = zod.object({
   "precio": zod.number().nullish(),
   "importe": zod.number().nullish(),
   "estacion": zod.string().nullish(),
-  "kilometraje": zod.number().nullish()
+  "kilometraje": zod.number().nullish(),
+  "foto_url": zod.string().nullish()
 })
 
 

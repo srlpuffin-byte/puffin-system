@@ -140,18 +140,27 @@ export async function syncAllSheets() {
 
     // 6. Combustible
     const combustible = await db.select().from(combustibleTable).orderBy(combustibleTable.id);
-    await syncTableToSheet(sheetsClient, SHEET_ID, "Combustible", 0, combustible, c => {
+    const { fotografiasTable } = await import("@workspace/db/schema");
+    const { eq } = await import("drizzle-orm");
+    const fotografiasComb = await db.select().from(fotografiasTable).where(eq(fotografiasTable.entidad_tipo, "combustible"));
+
+    await syncTableToSheet(sheetsClient, SHEET_ID, "Combustible", 9, combustible, c => {
       const emp = empleadosList.find(e => e.id === c.empleado_id);
       const maq = maquinasList.find(m => m.id === c.maquina_id);
+      const foto = fotografiasComb.find(f => f.entidad_id === c.id);
+      const precio_l = (c.importe && c.litros) ? (Number(c.importe) / Number(c.litros)).toFixed(2) : "";
+
       return [
-        c.id,
-        emp ? `${emp.nombre} ${emp.apellido}`.trim() : `ID:${c.empleado_id}`,
-        maq ? maq.nombre : `ID:${c.maquina_id}`,
         c.fecha,
+        "", // HORA
+        maq ? maq.nombre : `ID:${c.maquina_id}`,
+        emp ? `${emp.nombre} ${emp.apellido}`.trim() : `ID:${c.empleado_id}`,
         c.litros,
+        precio_l,
         c.importe || "",
         c.estacion || "",
-        c.kilometraje || ""
+        foto ? foto.url : "", // I: FOTO
+        c.id // J: ID
       ];
     });
 

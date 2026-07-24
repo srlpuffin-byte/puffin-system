@@ -386,6 +386,8 @@ export interface RegistroCombustible {
   estacion?: string | null;
   /** @nullable */
   kilometraje?: number | null;
+  /** @nullable */
+  foto_url?: string | null;
 }
 
 export interface CombustibleInput {

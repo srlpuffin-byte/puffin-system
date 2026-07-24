@@ -25,11 +25,15 @@ router.get("/", async (req, res) => {
   if (conditions.length) query = query.where(and(...conditions));
 
   const registros = await query.orderBy(combustibleTable.fecha);
+  const { fotografiasTable } = await import("@workspace/db/schema");
+  const fotografias = await db.select().from(fotografiasTable).where(eq(fotografiasTable.entidad_tipo, "combustible"));
+
   const enriched = await Promise.all(registros.map(async r => {
     const [empleado] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
       .from(empleadosTable).where(eq(empleadosTable.id, r.empleado_id)).limit(1);
     const [maquina] = await db.select({ nombre: maquinasTable.nombre })
       .from(maquinasTable).where(eq(maquinasTable.id, r.maquina_id)).limit(1);
+    const foto = fotografias.find(f => f.entidad_id === r.id);
     return {
       ...r,
       empleado_nombre: empleado ? `${empleado.nombre} ${empleado.apellido}` : "Desconocido",
@@ -38,6 +42,7 @@ router.get("/", async (req, res) => {
       precio: r.precio ? Number(r.precio) : null,
       importe: r.importe ? Number(r.importe) : null,
       kilometraje: r.kilometraje ? Number(r.kilometraje) : null,
+      foto_url: foto ? foto.url : null,
     };
   }));
   return res.json(enriched.reverse());
@@ -72,21 +77,20 @@ router.post("/", async (req, res) => {
       entidad_id: registro.id,
     });
 
-    const [maquina] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, maquina_id)).limit(1);
     const [empleado] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable).where(eq(empleadosTable.id, empleado_id)).limit(1);
 
     // Async append to Google Sheets
     appendToSheet("Combustible", [
       today,
       new Date().toLocaleTimeString("es-AR"),
-      maquina?.nombre || maquina_id,
+      maquinaNombre,
       `${empleado?.nombre} ${empleado?.apellido}`,
       litros,
       precio || "",
       importe || "",
       estacion || "",
-      ubicacion || "",
-      kilometraje || "",
+      "", // I: FOTO (vacío inicialmente)
+      registro.id // J: ID
     ]);
 
     return res.status(201).json({ ...registro, litros: Number(registro.litros) });

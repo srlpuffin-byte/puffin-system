@@ -1475,6 +1475,8 @@ components:
           type: ["string", "null"]
         kilometraje:
           type: ["number", "null"]
+        foto_url:
+          type: ["string", "null"]
 
     CombustibleInput:
       type: object
