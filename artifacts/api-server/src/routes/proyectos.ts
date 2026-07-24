@@ -153,7 +153,12 @@ router.post("/:id/pagos", async (req, res) => {
     const [proyecto] = await db.select().from(proyectosTable).where(eq(proyectosTable.id, id)).limit(1);
     if (!proyecto) return res.status(404).json({ error: "Proyecto no encontrado" });
 
-    const currentPagos = Array.isArray(proyecto.pagos_historial) ? proyecto.pagos_historial : [];
+    let currentPagos: any[] = [];
+    if (Array.isArray(proyecto.pagos_historial)) {
+      currentPagos = proyecto.pagos_historial;
+    } else if (typeof proyecto.pagos_historial === 'string') {
+      try { currentPagos = JSON.parse(proyecto.pagos_historial); } catch(e) {}
+    }
     const nuevoPago = {
       id: Date.now().toString(),
       fecha,
@@ -184,7 +189,7 @@ router.post("/:id/pagos", async (req, res) => {
     }).where(eq(proyectosTable.id, id));
 
     // Si el usuario marcó para enviar al inventario
-    if (tipo === 'especie' && addToInventory) {
+    if ((tipo === 'especie' || tipo === 'vehiculo') && addToInventory) {
       const { maquinasTable } = await import("@workspace/db");
       await db.insert(maquinasTable).values({
         codigo: `INV-PROY-${id}-${Date.now().toString().slice(-4)}`,

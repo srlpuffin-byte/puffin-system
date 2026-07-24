@@ -376,8 +376,14 @@ export function ProyectoFicha() {
               {(() => {
                 let pagos: any[] = [];
                 try {
-                  pagos = proyecto.pagos_historial ? JSON.parse(proyecto.pagos_historial) : [];
-                } catch (e) {}
+                  if (Array.isArray(proyecto.pagos_historial)) {
+                    pagos = proyecto.pagos_historial;
+                  } else if (typeof proyecto.pagos_historial === 'string') {
+                    pagos = proyecto.pagos_historial ? JSON.parse(proyecto.pagos_historial) : [];
+                  }
+                } catch (e) {
+                  console.error("Error parsing pagos:", e);
+                }
 
                 if (pagos.length === 0) {
                   return (
