@@ -1106,6 +1106,13 @@ components:
           type: ["string", "null"]
         contacto_familiar_relacion:
           type: ["string", "null"]
+        telefono_whatsapp:
+          type: ["string", "null"]
+        vencimiento_carnet:
+          type: ["string", "null"]
+          format: "date"
+        recibir_alertas_whatsapp:
+          type: ["boolean", "null"]
 
     EmpleadoInput:
       type: object
@@ -1129,6 +1136,13 @@ components:
           type: string
         contacto_familiar_relacion:
           type: string
+        telefono_whatsapp:
+          type: string
+        vencimiento_carnet:
+          type: string
+          format: date
+        recibir_alertas_whatsapp:
+          type: boolean
 
     EmpleadoUpdate:
       type: object
@@ -1150,6 +1164,13 @@ components:
           type: string
         contacto_familiar_relacion:
           type: string
+        telefono_whatsapp:
+          type: string
+        vencimiento_carnet:
+          type: string
+          format: date
+        recibir_alertas_whatsapp:
+          type: boolean
 
     Maquina:
       type: object
@@ -1202,6 +1223,12 @@ components:
           type: ["string", "null"]
         filtro_proximo_cambio:
           type: ["string", "null"]
+        vencimiento_seguro:
+          type: ["string", "null"]
+          format: "date"
+        vencimiento_vtv:
+          type: ["string", "null"]
+          format: "date"
 
     MaquinaInput:
       type: object
@@ -1243,6 +1270,12 @@ components:
           type: string
         filtro_proximo_cambio:
           type: string
+        vencimiento_seguro:
+          type: string
+          format: date
+        vencimiento_vtv:
+          type: string
+          format: date
 
     MaquinaUpdate:
       type: object
@@ -1292,6 +1325,12 @@ components:
           type: string
         filtro_proximo_cambio:
           type: string
+        vencimiento_seguro:
+          type: string
+          format: date
+        vencimiento_vtv:
+          type: string
+          format: date
 
     Jornada:
       type: object

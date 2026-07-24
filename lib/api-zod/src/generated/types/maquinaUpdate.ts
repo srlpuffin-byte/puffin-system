@@ -29,4 +29,6 @@ export interface MaquinaUpdate {
   filtro_codigo?: string;
   filtro_fecha_cambio?: string;
   filtro_proximo_cambio?: string;
+  vencimiento_seguro?: Date;
+  vencimiento_vtv?: Date;
 }

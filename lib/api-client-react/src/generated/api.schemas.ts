@@ -118,6 +118,12 @@ export interface Empleado {
   contacto_familiar_telefono?: string | null;
   /** @nullable */
   contacto_familiar_relacion?: string | null;
+  /** @nullable */
+  telefono_whatsapp?: string | null;
+  /** @nullable */
+  vencimiento_carnet?: string | null;
+  /** @nullable */
+  recibir_alertas_whatsapp?: boolean | null;
 }
 
 export interface EmpleadoInput {
@@ -130,6 +136,9 @@ export interface EmpleadoInput {
   contacto_familiar_nombre?: string;
   contacto_familiar_telefono?: string;
   contacto_familiar_relacion?: string;
+  telefono_whatsapp?: string;
+  vencimiento_carnet?: string;
+  recibir_alertas_whatsapp?: boolean;
 }
 
 export type EmpleadoUpdateEstado = typeof EmpleadoUpdateEstado[keyof typeof EmpleadoUpdateEstado];
@@ -150,6 +159,9 @@ export interface EmpleadoUpdate {
   contacto_familiar_nombre?: string;
   contacto_familiar_telefono?: string;
   contacto_familiar_relacion?: string;
+  telefono_whatsapp?: string;
+  vencimiento_carnet?: string;
+  recibir_alertas_whatsapp?: boolean;
 }
 
 export type MaquinaEstado = typeof MaquinaEstado[keyof typeof MaquinaEstado];
@@ -202,6 +214,10 @@ export interface Maquina {
   filtro_fecha_cambio?: string | null;
   /** @nullable */
   filtro_proximo_cambio?: string | null;
+  /** @nullable */
+  vencimiento_seguro?: string | null;
+  /** @nullable */
+  vencimiento_vtv?: string | null;
 }
 
 export interface MaquinaInput {
@@ -223,6 +239,8 @@ export interface MaquinaInput {
   filtro_codigo?: string;
   filtro_fecha_cambio?: string;
   filtro_proximo_cambio?: string;
+  vencimiento_seguro?: string;
+  vencimiento_vtv?: string;
 }
 
 export type MaquinaUpdateEstado = typeof MaquinaUpdateEstado[keyof typeof MaquinaUpdateEstado];
@@ -257,6 +275,8 @@ export interface MaquinaUpdate {
   filtro_codigo?: string;
   filtro_fecha_cambio?: string;
   filtro_proximo_cambio?: string;
+  vencimiento_seguro?: string;
+  vencimiento_vtv?: string;
 }
 
 export type JornadaEstado = typeof JornadaEstado[keyof typeof JornadaEstado];

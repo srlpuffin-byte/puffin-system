@@ -29,6 +29,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, defaultCategoria = "maq
     anio: "", patente: "", dominio: "", horometro: "", kilometros: "",
     motor: "", chasis: "",
     filtro_tipo: "", filtro_codigo: "", filtro_fecha_cambio: "", filtro_proximo_cambio: "",
+    vencimiento_seguro: "", vencimiento_vtv: "",
     descripcion: ""
   });
 
@@ -60,6 +61,8 @@ export function NuevaMaquinaDialog({ open, onOpenChange, defaultCategoria = "maq
           filtro_codigo: form.filtro_codigo || undefined,
           filtro_fecha_cambio: form.filtro_fecha_cambio || undefined,
           filtro_proximo_cambio: form.filtro_proximo_cambio || undefined,
+          vencimiento_seguro: form.vencimiento_seguro || undefined,
+          vencimiento_vtv: form.vencimiento_vtv || undefined,
           descripcion: form.descripcion || undefined,
         },
       },
@@ -88,7 +91,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, defaultCategoria = "maq
           toast.success("Máquina creada correctamente");
           queryClient.invalidateQueries({ queryKey: getGetMaquinasQueryKey() });
           onOpenChange(false);
-          setForm({ codigo: "", nombre: "", tipo: "", marca: "", modelo: "", anio: "", patente: "", dominio: "", horometro: "", kilometros: "", motor: "", chasis: "", filtro_tipo: "", filtro_codigo: "", filtro_fecha_cambio: "", filtro_proximo_cambio: "", descripcion: "" });
+          setForm({ codigo: "", nombre: "", tipo: "", marca: "", modelo: "", anio: "", patente: "", dominio: "", horometro: "", kilometros: "", motor: "", chasis: "", filtro_tipo: "", filtro_codigo: "", filtro_fecha_cambio: "", filtro_proximo_cambio: "", vencimiento_seguro: "", vencimiento_vtv: "", descripcion: "" });
           setImages([]);
         },
         onError: () => toast.error("Error al crear la máquina"),
@@ -195,6 +198,19 @@ export function NuevaMaquinaDialog({ open, onOpenChange, defaultCategoria = "maq
                   <div className="space-y-1">
                     <Label>Próximo cambio filtro</Label>
                     <Input type="date" value={form.filtro_proximo_cambio} onChange={e => set("filtro_proximo_cambio", e.target.value)} />
+                  </div>
+                </div>
+              </div>
+              <div className="border rounded-md p-4 space-y-3 bg-slate-50">
+                <h4 className="text-sm font-semibold text-slate-700">Documentación y Seguros</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Vencimiento de Seguro</Label>
+                    <Input type="date" value={form.vencimiento_seguro} onChange={e => set("vencimiento_seguro", e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Vencimiento de VTV</Label>
+                    <Input type="date" value={form.vencimiento_vtv} onChange={e => set("vencimiento_vtv", e.target.value)} />
                   </div>
                 </div>
               </div>

@@ -28,4 +28,10 @@ export interface Empleado {
   contacto_familiar_telefono?: string | null;
   /** @nullable */
   contacto_familiar_relacion?: string | null;
+  /** @nullable */
+  telefono_whatsapp?: string | null;
+  /** @nullable */
+  vencimiento_carnet?: Date | null;
+  /** @nullable */
+  recibir_alertas_whatsapp?: boolean | null;
 }
