@@ -50,7 +50,7 @@ export async function getQueueCount() {
   return await db.count('offline_queue');
 }
 
-export async function syncQueue(customFetchFn: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) {
+export async function syncQueue() {
   const db = await getDB();
   if (!db) return 0;
   
@@ -64,7 +64,9 @@ export async function syncQueue(customFetchFn: (input: RequestInfo | URL, init?:
 
   for (const item of items) {
     try {
-      const res = await customFetchFn(item.url, {
+      // Use native fetch to get the Response object back, 
+      // since the headers already contain the auth token from when it was enqueued.
+      const res = await fetch(item.url, {
         method: item.method,
         headers: item.headers,
         body: item.body ? item.body : undefined
@@ -76,7 +78,7 @@ export async function syncQueue(customFetchFn: (input: RequestInfo | URL, init?:
         successCount++;
         window.dispatchEvent(new Event('offline-queue-updated'));
       } else {
-        console.error("Server rejected offline item", res.status, await res.text());
+        console.error("Server rejected offline item", res.status);
         if (res.status >= 400 && res.status < 500) {
            const deleteTx = db.transaction('offline_queue', 'readwrite');
            await deleteTx.objectStore('offline_queue').delete(item.id!);

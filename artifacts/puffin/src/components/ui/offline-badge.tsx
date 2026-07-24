@@ -50,9 +50,9 @@ export function OfflineBadge() {
 
     setIsSyncing(true);
     try {
-      const synced = await syncQueue(customFetch);
+      const synced = await syncQueue();
       if (synced > 0) {
-        toast({ title: "Sincronización Exitosa", description: `Se enviaron ${synced} registros pendientes.`, variant: "default" });
+        toast({ title: "Sincronización Automática Exitosa", description: `Se enviaron ${synced} registros pendientes que tenías guardados.`, variant: "default" });
         queryClient.invalidateQueries();
       }
     } catch (error) {
