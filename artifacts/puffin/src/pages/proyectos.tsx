@@ -10,6 +10,7 @@ import { Link } from "wouter";
 import { Input } from "@/components/ui/input";
 import { NuevoProyectoDialog } from "@/components/forms/nuevo-proyecto-dialog";
 import { EditarProyectoDialog } from "@/components/forms/editar-proyecto-dialog";
+import { RegistrarPagoDialog } from "@/components/forms/registrar-pago-dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -17,6 +18,7 @@ export function Proyectos() {
   const [search, setSearch] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [editProyecto, setEditProyecto] = useState<Proyecto | null>(null);
+  const [pagoProyecto, setPagoProyecto] = useState<Proyecto | null>(null);
   const { data: proyectos, isLoading } = useGetProyectos();
   const deleteMut = useDeleteProyecto();
   const { data: empleados } = useGetEmpleados();
@@ -152,7 +154,7 @@ export function Proyectos() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Lugar</TableHead>
-                    <TableHead>Datos Comerciales</TableHead>
+                    <TableHead>Datos Comerciales / Pagos</TableHead>
                     <TableHead>Asignaciones</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
@@ -181,7 +183,13 @@ export function Proyectos() {
                               <Activity className="h-3 w-3" /> {parseFloat(p.hectareas).toLocaleString('es-AR')} Has. a ${parseFloat(p.precio_hectarea).toLocaleString('es-AR')}
                             </span>
                             <span className="flex items-center gap-1 font-semibold text-green-700">
-                              <DollarSign className="h-3 w-3" /> Ganancia Est: ${parseFloat(p.ganancia_estimada || "0").toLocaleString('es-AR', {minimumFractionDigits: 2})}
+                              <DollarSign className="h-3 w-3" /> Total: ${parseFloat(p.ganancia_estimada || "0").toLocaleString('es-AR', {minimumFractionDigits: 2})}
+                            </span>
+                            <span className="flex items-center gap-1 text-xs font-medium text-slate-500 mt-1">
+                              Pagado: ${parseFloat(p.total_cobrado || "0").toLocaleString('es-AR', {minimumFractionDigits: 2})}
+                            </span>
+                            <span className="flex items-center gap-1 text-xs font-semibold text-amber-600">
+                              Saldo: ${(parseFloat(p.ganancia_estimada || "0") - parseFloat(p.total_cobrado || "0")).toLocaleString('es-AR', {minimumFractionDigits: 2})}
                             </span>
                           </div>
                         </TableCell>
@@ -202,13 +210,28 @@ export function Proyectos() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={p.estado === "activo" ? "default" : p.estado === "finalizado" ? "secondary" : "outline"}
-                                 className={p.estado === "activo" ? "bg-green-600 hover:bg-green-700" : ""}>
-                            {p.estado.toUpperCase()}
-                          </Badge>
+                          <div className="flex flex-col gap-2">
+                            <Badge variant={p.estado === "activo" ? "default" : p.estado === "finalizado" ? "secondary" : "outline"}
+                                   className={p.estado === "activo" ? "bg-green-600 hover:bg-green-700 text-center" : "text-center"}>
+                              {p.estado.toUpperCase()}
+                            </Badge>
+                            <Badge variant={p.estado_pago === "saldado" ? "default" : "outline"} 
+                                   className={`text-center ${p.estado_pago === "saldado" ? "bg-blue-600" : p.estado_pago === "parcial" ? "text-amber-600 border-amber-600" : "text-slate-500 border-slate-300"}`}>
+                              Pago: {p.estado_pago?.toUpperCase()}
+                            </Badge>
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setPagoProyecto(p)}
+                              className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
+                              title="Registrar pago o cobro"
+                            >
+                              <DollarSign className="w-4 h-4" />
+                            </Button>
                             <Link href={`/proyectos/${p.id}`}>
                               <Button
                                 variant="ghost"
@@ -324,9 +347,14 @@ export function Proyectos() {
 
       <NuevoProyectoDialog open={openDialog} onOpenChange={setOpenDialog} />
       <EditarProyectoDialog
-        proyecto={editProyecto}
         open={!!editProyecto}
-        onOpenChange={(open) => { if (!open) setEditProyecto(null); }}
+        onOpenChange={(o) => !o && setEditProyecto(null)}
+        proyecto={editProyecto}
+      />
+      <RegistrarPagoDialog
+        open={!!pagoProyecto}
+        onOpenChange={(o) => !o && setPagoProyecto(null)}
+        proyecto={pagoProyecto}
       />
     </div>
   );

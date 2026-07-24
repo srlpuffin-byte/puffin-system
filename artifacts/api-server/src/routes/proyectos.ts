@@ -104,7 +104,7 @@ router.put("/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
 
-    const { lugar, hectareas, precio_hectarea, empleados_asignados, maquinas_asignadas, estado } = req.body;
+    const { lugar, hectareas, precio_hectarea, empleados_asignados, maquinas_asignadas, estado, estado_pago, total_cobrado, pagos_historial } = req.body;
     
     const updateData: Record<string, any> = {};
     if (lugar !== undefined) updateData.lugar = lugar;
@@ -113,6 +113,9 @@ router.put("/:id", async (req, res) => {
     if (empleados_asignados !== undefined) updateData.empleados_asignados = empleados_asignados;
     if (maquinas_asignadas !== undefined) updateData.maquinas_asignadas = maquinas_asignadas;
     if (estado !== undefined) updateData.estado = estado;
+    if (estado_pago !== undefined) updateData.estado_pago = estado_pago;
+    if (total_cobrado !== undefined) updateData.total_cobrado = total_cobrado.toString();
+    if (pagos_historial !== undefined) updateData.pagos_historial = pagos_historial;
 
     // Recalcular ganancia si se actualiza alguno de los factores
     if (hectareas !== undefined || precio_hectarea !== undefined) {
@@ -135,6 +138,78 @@ router.put("/:id", async (req, res) => {
   } catch (err: any) {
     req.log.error(err);
     return res.status(500).json({ error: "Error al actualizar proyecto" });
+  }
+});
+
+// Registrar un nuevo pago en el historial del proyecto
+router.post("/:id/pagos", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+    const { fecha, tipo, monto_monetario, descripcion, comprobante_url, addToInventory } = req.body;
+    
+    // Obtener proyecto actual
+    const [proyecto] = await db.select().from(proyectosTable).where(eq(proyectosTable.id, id)).limit(1);
+    if (!proyecto) return res.status(404).json({ error: "Proyecto no encontrado" });
+
+    const currentPagos = Array.isArray(proyecto.pagos_historial) ? proyecto.pagos_historial : [];
+    const nuevoPago = {
+      id: Date.now().toString(),
+      fecha,
+      tipo,
+      monto_monetario: parseFloat(monto_monetario || "0"),
+      descripcion,
+      comprobante_url
+    };
+
+    const newPagosList = [...currentPagos, nuevoPago];
+    
+    let newTotal = parseFloat(proyecto.total_cobrado || "0");
+    if (tipo !== 'especie') {
+      newTotal += nuevoPago.monto_monetario;
+    }
+
+    // Auto determinar estado (si el total pagado es >= ganancia estimada)
+    const ganancia = parseFloat(proyecto.ganancia_estimada || "0");
+    let nuevoEstado = "parcial";
+    if (newTotal >= ganancia && ganancia > 0) {
+      nuevoEstado = "saldado";
+    }
+
+    await db.update(proyectosTable).set({
+      pagos_historial: newPagosList,
+      total_cobrado: newTotal.toString(),
+      estado_pago: nuevoEstado
+    }).where(eq(proyectosTable.id, id));
+
+    // Si el usuario marcó para enviar al inventario
+    if (tipo === 'especie' && addToInventory) {
+      const { maquinasTable } = await import("@workspace/db");
+      await db.insert(maquinasTable).values({
+        codigo: `INV-PROY-${id}-${Date.now().toString().slice(-4)}`,
+        nombre: descripcion.substring(0, 50),
+        tipo: "Otro",
+        marca: "N/A",
+        modelo: "N/A",
+        anio: new Date().getFullYear(),
+        patente: "",
+        horometro: "0",
+        kilometros: "0",
+        categoria: "inventario",
+        estado: "activa",
+        descripcion: `Recibido como pago en proyecto: ${proyecto.lugar}`
+      });
+    }
+
+    import("../services/sync-sheets.js").then(({ syncAllSheets }) => {
+      syncAllSheets().catch(console.error);
+    });
+
+    return res.json({ success: true, pago: nuevoPago });
+  } catch (err: any) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Error al registrar pago" });
   }
 });
 

@@ -11,6 +11,9 @@ export interface Proyecto {
   empleados_asignados: number[] | null;
   maquinas_asignadas: number[] | null;
   estado: string;
+  estado_pago: string;
+  total_cobrado: string;
+  pagos_historial: any;
   createdAt: string;
   updatedAt: string;
 }
@@ -61,6 +64,22 @@ export function useUpdateProyecto() {
         body: JSON.stringify(data),
       });
       return res as Proyecto;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proyectos"] });
+    },
+  });
+}
+
+export function useCreatePago() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const res = await apiFetch(`/proyectos/${id}/pagos`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+      return res;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proyectos"] });

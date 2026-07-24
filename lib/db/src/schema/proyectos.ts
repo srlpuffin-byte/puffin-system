@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, numeric, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -9,6 +9,9 @@ export const proyectosTable = pgTable("proyectos", {
   hectareas: numeric("hectareas", { precision: 10, scale: 2 }).notNull(),
   precio_hectarea: numeric("precio_hectarea", { precision: 10, scale: 2 }).notNull(),
   ganancia_estimada: numeric("ganancia_estimada", { precision: 12, scale: 2 }),
+  pagos_historial: jsonb("pagos_historial").default([]),
+  estado_pago: text("estado_pago").notNull().default("pendiente"), // pendiente, parcial, saldado
+  total_cobrado: numeric("total_cobrado", { precision: 12, scale: 2 }).default("0"),
   empleados_asignados: integer("empleados_asignados").array(),
   maquinas_asignadas: integer("maquinas_asignadas").array(),
   estado: text("estado").notNull().default("activo"),
