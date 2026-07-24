@@ -81,8 +81,9 @@ export function useCreatePago() {
       });
       return res;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/proyectos"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/proyectos/${variables.id}`] });
     },
   });
 }
@@ -95,8 +96,9 @@ export function useDeletePago() {
         method: "DELETE",
       });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/proyectos"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/proyectos/${variables.id}`] });
     },
   });
 }
