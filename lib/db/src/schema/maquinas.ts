@@ -27,8 +27,6 @@ export const maquinasTable = pgTable("maquinas", {
   filtro_fecha_cambio: date("filtro_fecha_cambio"),
   filtro_proximo_cambio: date("filtro_proximo_cambio"),
   descripcion: text("descripcion"),
-  vencimiento_seguro: date("vencimiento_seguro"),
-  vencimiento_vtv: date("vencimiento_vtv"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

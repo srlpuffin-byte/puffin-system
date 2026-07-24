@@ -27,7 +27,6 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
     anio: "", patente: "", dominio: "", horometro: "", kilometros: "",
     motor: "", chasis: "", estado: "",
     filtro_tipo: "", filtro_codigo: "", filtro_fecha_cambio: "", filtro_proximo_cambio: "",
-    vencimiento_seguro: "", vencimiento_vtv: "",
     descripcion: ""
   });
 
@@ -53,8 +52,6 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
         filtro_codigo: maquina.filtro_codigo || "",
         filtro_fecha_cambio: maquina.filtro_fecha_cambio || "",
         filtro_proximo_cambio: maquina.filtro_proximo_cambio || "",
-        vencimiento_seguro: maquina.vencimiento_seguro ? new Date(maquina.vencimiento_seguro).toISOString().split('T')[0] : "",
-        vencimiento_vtv: maquina.vencimiento_vtv ? new Date(maquina.vencimiento_vtv).toISOString().split('T')[0] : "",
         descripcion: maquina.descripcion || "",
       });
       setImages([]);
@@ -90,8 +87,6 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
           filtro_codigo: form.filtro_codigo || undefined,
           filtro_fecha_cambio: form.filtro_fecha_cambio || undefined,
           filtro_proximo_cambio: form.filtro_proximo_cambio || undefined,
-          vencimiento_seguro: form.vencimiento_seguro || undefined,
-          vencimiento_vtv: form.vencimiento_vtv || undefined,
           descripcion: form.descripcion || undefined,
         },
       },
@@ -233,16 +228,6 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
                 <div className="space-y-1">
                   <Label>Próximo cambio filtro</Label>
                   <Input type="date" value={form.filtro_proximo_cambio} onChange={e => set("filtro_proximo_cambio", e.target.value)} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label>Vencimiento de Seguro</Label>
-                  <Input type="date" value={form.vencimiento_seguro} onChange={e => set("vencimiento_seguro", e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Vencimiento de VTV</Label>
-                  <Input type="date" value={form.vencimiento_vtv} onChange={e => set("vencimiento_vtv", e.target.value)} />
                 </div>
               </div>
             </>

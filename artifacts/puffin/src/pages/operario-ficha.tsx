@@ -138,21 +138,6 @@ export function OperarioFicha() {
                     <p className="text-sm text-muted-foreground">Estado</p>
                     <p className="font-medium capitalize">{operario.estado}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Vto. Carnet</p>
-                    <p className="font-medium">
-                      {(operario as any).vencimiento_carnet ? format(new Date((operario as any).vencimiento_carnet), "dd/MM/yyyy") : "-"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">WhatsApp (Alertas)</p>
-                    <p className="font-medium">
-                      {(operario as any).telefono_whatsapp || "-"} 
-                      {(operario as any).recibir_alertas_whatsapp ? (
-                        <Badge variant="outline" className="ml-2 text-xs bg-green-50 text-green-700 border-green-200">Activadas</Badge>
-                      ) : null}
-                    </p>
-                  </div>
                 </div>
                 
                 {(fotografias && fotografias.length > 0) && (

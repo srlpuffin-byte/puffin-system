@@ -124,10 +124,7 @@ export const GetEmpleadosResponseItem = zod.object({
   "alertas_count": zod.number().optional(),
   "contacto_familiar_nombre": zod.string().nullish(),
   "contacto_familiar_telefono": zod.string().nullish(),
-  "contacto_familiar_relacion": zod.string().nullish(),
-  "telefono_whatsapp": zod.string().nullish(),
-  "vencimiento_carnet": zod.coerce.date().nullish(),
-  "recibir_alertas_whatsapp": zod.boolean().nullish()
+  "contacto_familiar_relacion": zod.string().nullish()
 })
 export const GetEmpleadosResponse = zod.array(GetEmpleadosResponseItem)
 
@@ -144,10 +141,7 @@ export const CreateEmpleadoBody = zod.object({
   "fecha_ingreso": zod.string().optional(),
   "contacto_familiar_nombre": zod.string().optional(),
   "contacto_familiar_telefono": zod.string().optional(),
-  "contacto_familiar_relacion": zod.string().optional(),
-  "telefono_whatsapp": zod.string().optional(),
-  "vencimiento_carnet": zod.coerce.date().optional(),
-  "recibir_alertas_whatsapp": zod.boolean().optional()
+  "contacto_familiar_relacion": zod.string().optional()
 })
 
 export const CreateEmpleadoResponse = zod.object({
@@ -164,10 +158,7 @@ export const CreateEmpleadoResponse = zod.object({
   "alertas_count": zod.number().optional(),
   "contacto_familiar_nombre": zod.string().nullish(),
   "contacto_familiar_telefono": zod.string().nullish(),
-  "contacto_familiar_relacion": zod.string().nullish(),
-  "telefono_whatsapp": zod.string().nullish(),
-  "vencimiento_carnet": zod.coerce.date().nullish(),
-  "recibir_alertas_whatsapp": zod.boolean().nullish()
+  "contacto_familiar_relacion": zod.string().nullish()
 })
 
 
@@ -192,10 +183,7 @@ export const GetEmpleadoResponse = zod.object({
   "alertas_count": zod.number().optional(),
   "contacto_familiar_nombre": zod.string().nullish(),
   "contacto_familiar_telefono": zod.string().nullish(),
-  "contacto_familiar_relacion": zod.string().nullish(),
-  "telefono_whatsapp": zod.string().nullish(),
-  "vencimiento_carnet": zod.coerce.date().nullish(),
-  "recibir_alertas_whatsapp": zod.boolean().nullish()
+  "contacto_familiar_relacion": zod.string().nullish()
 })
 
 
@@ -214,10 +202,7 @@ export const UpdateEmpleadoBody = zod.object({
   "estado": zod.enum(['activo', 'inactivo', 'licencia']).optional(),
   "contacto_familiar_nombre": zod.string().optional(),
   "contacto_familiar_telefono": zod.string().optional(),
-  "contacto_familiar_relacion": zod.string().optional(),
-  "telefono_whatsapp": zod.string().optional(),
-  "vencimiento_carnet": zod.coerce.date().optional(),
-  "recibir_alertas_whatsapp": zod.boolean().optional()
+  "contacto_familiar_relacion": zod.string().optional()
 })
 
 export const UpdateEmpleadoResponse = zod.object({
@@ -234,10 +219,7 @@ export const UpdateEmpleadoResponse = zod.object({
   "alertas_count": zod.number().optional(),
   "contacto_familiar_nombre": zod.string().nullish(),
   "contacto_familiar_telefono": zod.string().nullish(),
-  "contacto_familiar_relacion": zod.string().nullish(),
-  "telefono_whatsapp": zod.string().nullish(),
-  "vencimiento_carnet": zod.coerce.date().nullish(),
-  "recibir_alertas_whatsapp": zod.boolean().nullish()
+  "contacto_familiar_relacion": zod.string().nullish()
 })
 
 
@@ -273,9 +255,7 @@ export const GetMaquinasResponseItem = zod.object({
   "filtro_tipo": zod.string().nullish(),
   "filtro_codigo": zod.string().nullish(),
   "filtro_fecha_cambio": zod.string().nullish(),
-  "filtro_proximo_cambio": zod.string().nullish(),
-  "vencimiento_seguro": zod.coerce.date().nullish(),
-  "vencimiento_vtv": zod.coerce.date().nullish()
+  "filtro_proximo_cambio": zod.string().nullish()
 })
 export const GetMaquinasResponse = zod.array(GetMaquinasResponseItem)
 
@@ -301,9 +281,7 @@ export const CreateMaquinaBody = zod.object({
   "filtro_tipo": zod.string().optional(),
   "filtro_codigo": zod.string().optional(),
   "filtro_fecha_cambio": zod.string().optional(),
-  "filtro_proximo_cambio": zod.string().optional(),
-  "vencimiento_seguro": zod.coerce.date().optional(),
-  "vencimiento_vtv": zod.coerce.date().optional()
+  "filtro_proximo_cambio": zod.string().optional()
 })
 
 export const CreateMaquinaResponse = zod.object({
@@ -329,9 +307,7 @@ export const CreateMaquinaResponse = zod.object({
   "filtro_tipo": zod.string().nullish(),
   "filtro_codigo": zod.string().nullish(),
   "filtro_fecha_cambio": zod.string().nullish(),
-  "filtro_proximo_cambio": zod.string().nullish(),
-  "vencimiento_seguro": zod.coerce.date().nullish(),
-  "vencimiento_vtv": zod.coerce.date().nullish()
+  "filtro_proximo_cambio": zod.string().nullish()
 })
 
 
@@ -365,9 +341,7 @@ export const GetMaquinaResponse = zod.object({
   "filtro_tipo": zod.string().nullish(),
   "filtro_codigo": zod.string().nullish(),
   "filtro_fecha_cambio": zod.string().nullish(),
-  "filtro_proximo_cambio": zod.string().nullish(),
-  "vencimiento_seguro": zod.coerce.date().nullish(),
-  "vencimiento_vtv": zod.coerce.date().nullish()
+  "filtro_proximo_cambio": zod.string().nullish()
 })
 
 
@@ -399,9 +373,7 @@ export const UpdateMaquinaBody = zod.object({
   "filtro_tipo": zod.string().optional(),
   "filtro_codigo": zod.string().optional(),
   "filtro_fecha_cambio": zod.string().optional(),
-  "filtro_proximo_cambio": zod.string().optional(),
-  "vencimiento_seguro": zod.coerce.date().optional(),
-  "vencimiento_vtv": zod.coerce.date().optional()
+  "filtro_proximo_cambio": zod.string().optional()
 })
 
 export const UpdateMaquinaResponse = zod.object({
@@ -427,9 +399,7 @@ export const UpdateMaquinaResponse = zod.object({
   "filtro_tipo": zod.string().nullish(),
   "filtro_codigo": zod.string().nullish(),
   "filtro_fecha_cambio": zod.string().nullish(),
-  "filtro_proximo_cambio": zod.string().nullish(),
-  "vencimiento_seguro": zod.coerce.date().nullish(),
-  "vencimiento_vtv": zod.coerce.date().nullish()
+  "filtro_proximo_cambio": zod.string().nullish()
 })
 
 
@@ -1234,9 +1204,7 @@ export const GlobalSearchResponse = zod.object({
   "filtro_tipo": zod.string().nullish(),
   "filtro_codigo": zod.string().nullish(),
   "filtro_fecha_cambio": zod.string().nullish(),
-  "filtro_proximo_cambio": zod.string().nullish(),
-  "vencimiento_seguro": zod.coerce.date().nullish(),
-  "vencimiento_vtv": zod.coerce.date().nullish()
+  "filtro_proximo_cambio": zod.string().nullish()
 })).optional(),
   "empleados": zod.array(zod.object({
   "id": zod.number(),
@@ -1252,10 +1220,7 @@ export const GlobalSearchResponse = zod.object({
   "alertas_count": zod.number().optional(),
   "contacto_familiar_nombre": zod.string().nullish(),
   "contacto_familiar_telefono": zod.string().nullish(),
-  "contacto_familiar_relacion": zod.string().nullish(),
-  "telefono_whatsapp": zod.string().nullish(),
-  "vencimiento_carnet": zod.coerce.date().nullish(),
-  "recibir_alertas_whatsapp": zod.boolean().nullish()
+  "contacto_familiar_relacion": zod.string().nullish()
 })).optional(),
   "mantenimientos": zod.array(zod.object({
   "id": zod.number(),

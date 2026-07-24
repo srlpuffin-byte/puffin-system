@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, date, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -15,9 +15,6 @@ export const empleadosTable = pgTable("empleados", {
   cargo: text("cargo"),
   estado: text("estado").notNull().default("activo"),
   fecha_ingreso: date("fecha_ingreso"),
-  telefono_whatsapp: text("telefono_whatsapp"),
-  vencimiento_carnet: date("vencimiento_carnet"),
-  recibir_alertas_whatsapp: boolean("recibir_alertas_whatsapp").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
