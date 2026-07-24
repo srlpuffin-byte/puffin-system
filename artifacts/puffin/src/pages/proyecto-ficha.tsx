@@ -437,8 +437,8 @@ export function ProyectoFicha() {
                                 {pago.monto && pago.monto !== "0" && pago.monto !== 0 ? `USD $${parseFloat(pago.monto).toLocaleString("es-AR", { minimumFractionDigits: 2 })}` : "-"}
                               </TableCell>
                               <TableCell className="text-center">
-                                {pago.url_comprobante ? (
-                                  <a href={pago.url_comprobante} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs flex items-center justify-center gap-1">
+                                {pago.comprobante_url ? (
+                                  <a href={pago.comprobante_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs flex items-center justify-center gap-1">
                                     <ExternalLink className="h-3 w-3" /> Ver Adjunto
                                   </a>
                                 ) : (
