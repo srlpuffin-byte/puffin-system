@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCreatePago, type Proyecto } from "@/hooks/use-proyectos";
 import { useUploadFotografia } from "@workspace/api-client-react";
+import imageCompression from 'browser-image-compression';
 import { toast } from "sonner";
 import { Loader2, UploadCloud } from "lucide-react";
 
@@ -41,6 +42,17 @@ export function RegistrarPagoDialog({ open, onOpenChange, proyecto }: RegistrarP
 
       setIsUploading(true);
       try {
+        // Comprimir imagen si no es PDF
+        let fileToUpload = file;
+        if (file.type.startsWith('image/')) {
+          const options = {
+            maxSizeMB: 1,
+            maxWidthOrHeight: 1280,
+            useWebWorker: true,
+          };
+          fileToUpload = await imageCompression(file, options);
+        }
+
         const reader = new FileReader();
         reader.onload = async () => {
           const result = reader.result as string;
@@ -60,7 +72,7 @@ export function RegistrarPagoDialog({ open, onOpenChange, proyecto }: RegistrarP
           toast.success("Comprobante subido");
           setIsUploading(false);
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(fileToUpload);
       } catch (err) {
         toast.error("Error al subir el comprobante");
         setIsUploading(false);

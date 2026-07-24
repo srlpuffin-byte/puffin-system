@@ -363,6 +363,79 @@ export function ProyectoFicha() {
               )}
             </CardContent>
           </Card>
+
+          {/* Tarjeta de Pagos Recibidos */}
+          <Card className="mt-6 border-2 border-green-100">
+            <CardHeader className="bg-green-50/50 pb-4">
+              <CardTitle className="flex items-center gap-2 text-green-800">
+                <DollarSign className="h-5 w-5 text-green-600" />
+                Historial de Cobros y Pagos Recibidos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {(() => {
+                let pagos: any[] = [];
+                try {
+                  pagos = proyecto.pagos_historial ? JSON.parse(proyecto.pagos_historial) : [];
+                } catch (e) {}
+
+                if (pagos.length === 0) {
+                  return (
+                    <div className="p-6 text-center text-muted-foreground">
+                      <p className="text-sm">Aún no se han registrado cobros para este proyecto.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="rounded-md overflow-hidden border-t">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-slate-50 hover:bg-slate-50">
+                            <TableHead>Fecha</TableHead>
+                            <TableHead>Forma de Pago</TableHead>
+                            <TableHead>Descripción</TableHead>
+                            <TableHead className="text-right">Monto (USD)</TableHead>
+                            <TableHead className="text-center">Comprobante</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {pagos.map((pago: any, idx: number) => (
+                            <TableRow key={idx}>
+                              <TableCell className="text-sm">
+                                {pago.fecha ? format(new Date(pago.fecha), "dd/MM/yyyy") : "-"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="capitalize bg-slate-50">
+                                  {pago.tipo}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm max-w-[200px] truncate" title={pago.descripcion}>
+                                {pago.descripcion || "-"}
+                              </TableCell>
+                              <TableCell className="text-right font-medium text-green-700 text-sm">
+                                {pago.monto && pago.monto !== "0" && pago.monto !== 0 ? `USD $${parseFloat(pago.monto).toLocaleString("es-AR", { minimumFractionDigits: 2 })}` : "-"}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {pago.url_comprobante ? (
+                                  <a href={pago.url_comprobante} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs flex items-center justify-center gap-1">
+                                    <ExternalLink className="h-3 w-3" /> Ver Adjunto
+                                  </a>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
