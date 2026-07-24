@@ -16,4 +16,7 @@ export interface EmpleadoUpdate {
   contacto_familiar_nombre?: string;
   contacto_familiar_telefono?: string;
   contacto_familiar_relacion?: string;
+  telefono_whatsapp?: string;
+  vencimiento_carnet?: Date;
+  recibir_alertas_whatsapp?: boolean;
 }

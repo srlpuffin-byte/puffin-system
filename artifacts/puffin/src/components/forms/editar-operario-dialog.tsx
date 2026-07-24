@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Empleado } from "@workspace/api-client-react";
 import { MultiImageUpload, UploadedImage } from "../ui/multi-image-upload";
+import { Switch } from "@/components/ui/switch";
 import { apiFetch } from "@/lib/api";
 
 const CARGOS = ["Operador de Retroexcavadora", "Operador de Niveladora", "Operador de Compactadora", "Chofer", "Ayudante", "Capataz", "Operario General", "Mecánico", "Administrativo"];
@@ -28,7 +29,8 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
 
   const [form, setForm] = useState({
     nombre: "", apellido: "", dni: "", telefono: "", cargo: "", fecha_ingreso: "",
-    contacto_familiar_nombre: "", contacto_familiar_telefono: "", contacto_familiar_relacion: "", estado: ""
+    contacto_familiar_nombre: "", contacto_familiar_telefono: "", contacto_familiar_relacion: "", estado: "",
+    vencimiento_carnet: "", telefono_whatsapp: "", recibir_alertas_whatsapp: false
   });
 
   useEffect(() => {
@@ -43,7 +45,10 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
         contacto_familiar_nombre: operario.contacto_familiar_nombre || "",
         contacto_familiar_telefono: operario.contacto_familiar_telefono || "",
         contacto_familiar_relacion: (operario as any).contacto_familiar_relacion || "",
-        estado: operario.estado || "activo"
+        estado: operario.estado || "activo",
+        vencimiento_carnet: (operario as any).vencimiento_carnet ? new Date((operario as any).vencimiento_carnet).toISOString().split('T')[0] : "",
+        telefono_whatsapp: (operario as any).telefono_whatsapp || "",
+        recibir_alertas_whatsapp: (operario as any).recibir_alertas_whatsapp || false,
       });
       setFotoPerfil([]);
       setFotoCarnet([]);
@@ -74,6 +79,9 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
           contacto_familiar_nombre: form.contacto_familiar_nombre || null,
           contacto_familiar_telefono: form.contacto_familiar_telefono || null,
           contacto_familiar_relacion: form.contacto_familiar_relacion || null,
+          vencimiento_carnet: form.vencimiento_carnet || null,
+          telefono_whatsapp: form.telefono_whatsapp || null,
+          recibir_alertas_whatsapp: form.recibir_alertas_whatsapp,
         }),
       });
 
@@ -142,6 +150,20 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
+                <Label className="text-xs">Teléfono WhatsApp</Label>
+                <Input placeholder="5491145213344" value={form.telefono_whatsapp} onChange={e => set("telefono_whatsapp", e.target.value)} />
+              </div>
+              <div className="flex items-center space-x-2 mt-4">
+                <Switch 
+                  id="alertas-edit" 
+                  checked={form.recibir_alertas_whatsapp} 
+                  onCheckedChange={v => setForm(prev => ({ ...prev, recibir_alertas_whatsapp: v }))} 
+                />
+                <Label htmlFor="alertas-edit" className="text-xs">Recibir alertas</Label>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
                 <Label className="text-xs">Cargo</Label>
                 <Select value={form.cargo} onValueChange={v => set("cargo", v)}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
@@ -161,9 +183,15 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
                 </Select>
               </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Fecha de Ingreso</Label>
-              <Input type="date" value={form.fecha_ingreso} onChange={e => set("fecha_ingreso", e.target.value)} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Fecha de Ingreso</Label>
+                <Input type="date" value={form.fecha_ingreso} onChange={e => set("fecha_ingreso", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Vencimiento Carnet</Label>
+                <Input type="date" value={form.vencimiento_carnet} onChange={e => set("vencimiento_carnet", e.target.value)} />
+              </div>
             </div>
 
             <div className="border-t pt-2">

@@ -45,6 +45,11 @@ router.get("/sync-egresos-sheet", async (req, res) => {
 
 router.use(healthRouter);
 router.use("/auth", authRouter);
+import { whatsappRouter } from "./whatsapp";
+import { cronRouter } from "./cron";
+
+router.use("/webhook/whatsapp", whatsappRouter);
+router.use("/cron", cronRouter);
 // Integraciones can sometimes be called by webhooks, but we should secure it if it's internal.
 // For now, let's leave it without requireAuth if it acts as a webhook receiver, or with it if it's UI driven.
 // Assuming it's UI driven:

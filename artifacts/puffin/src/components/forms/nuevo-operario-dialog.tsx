@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { MultiImageUpload, UploadedImage } from "../ui/multi-image-upload";
+import { Switch } from "@/components/ui/switch";
 
 const CARGOS = ["Operador de Retroexcavadora", "Operador de Niveladora", "Operador de Compactadora", "Chofer", "Ayudante", "Capataz", "Operario General", "Mecánico", "Administrativo"];
 
@@ -26,7 +27,7 @@ export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
   const [form, setForm] = useState({
     nombre: "", apellido: "", dni: "", telefono: "", cargo: "", fecha_ingreso: "",
     contacto_familiar_nombre: "", contacto_familiar_telefono: "", contacto_familiar_relacion: "",
-    fecha_vencimiento_carnet: "",
+    fecha_vencimiento_carnet: "", telefono_whatsapp: "", recibir_alertas_whatsapp: false,
   });
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
@@ -48,6 +49,9 @@ export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
           fecha_ingreso: form.fecha_ingreso || undefined,
           contacto_familiar_nombre: form.contacto_familiar_nombre || undefined,
           contacto_familiar_relacion: form.contacto_familiar_relacion || undefined,
+          vencimiento_carnet: form.fecha_vencimiento_carnet || undefined,
+          telefono_whatsapp: form.telefono_whatsapp || undefined,
+          recibir_alertas_whatsapp: form.recibir_alertas_whatsapp,
         },
       },
       {
@@ -98,7 +102,7 @@ export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
           toast.success("Operario creado correctamente");
           queryClient.invalidateQueries({ queryKey: getGetEmpleadosQueryKey() });
           onOpenChange(false);
-          setForm({ nombre: "", apellido: "", dni: "", telefono: "", cargo: "", fecha_ingreso: "", contacto_familiar_nombre: "", contacto_familiar_telefono: "", contacto_familiar_relacion: "", fecha_vencimiento_carnet: "" });
+          setForm({ nombre: "", apellido: "", dni: "", telefono: "", cargo: "", fecha_ingreso: "", contacto_familiar_nombre: "", contacto_familiar_telefono: "", contacto_familiar_relacion: "", fecha_vencimiento_carnet: "", telefono_whatsapp: "", recibir_alertas_whatsapp: false });
           setFotoPerfil([]);
           setFotoCarnet([]);
         },
@@ -132,6 +136,21 @@ export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
             <div className="space-y-1">
               <Label>Teléfono</Label>
               <Input placeholder="11-4521-3344" value={form.telefono} onChange={e => set("telefono", e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Teléfono WhatsApp (Notificaciones)</Label>
+              <Input placeholder="5491145213344" value={form.telefono_whatsapp} onChange={e => set("telefono_whatsapp", e.target.value)} />
+              <p className="text-xs text-muted-foreground">Formato internacional sin +, ej: 549...</p>
+            </div>
+            <div className="flex items-center space-x-2 pt-6">
+              <Switch 
+                id="alertas" 
+                checked={form.recibir_alertas_whatsapp} 
+                onCheckedChange={v => setForm(prev => ({ ...prev, recibir_alertas_whatsapp: v }))} 
+              />
+              <Label htmlFor="alertas">Recibir alertas por WhatsApp</Label>
             </div>
           </div>
           <div className="space-y-1">

@@ -47,4 +47,8 @@ export interface Maquina {
   filtro_fecha_cambio?: string | null;
   /** @nullable */
   filtro_proximo_cambio?: string | null;
+  /** @nullable */
+  vencimiento_seguro?: Date | null;
+  /** @nullable */
+  vencimiento_vtv?: Date | null;
 }

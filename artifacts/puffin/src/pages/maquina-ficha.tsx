@@ -138,6 +138,18 @@ export function MaquinaFicha() {
                 <p className="font-medium">{maquina.motor}</p>
               </div>
             )}
+            {maquina.vencimiento_seguro && (
+              <div>
+                <p className="text-sm text-muted-foreground">Vencimiento Seguro</p>
+                <p className="font-medium">{format(new Date(maquina.vencimiento_seguro + 'T12:00:00'), "dd/MM/yyyy")}</p>
+              </div>
+            )}
+            {maquina.vencimiento_vtv && (
+              <div>
+                <p className="text-sm text-muted-foreground">Vencimiento VTV</p>
+                <p className="font-medium">{format(new Date(maquina.vencimiento_vtv + 'T12:00:00'), "dd/MM/yyyy")}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
         {maquina.descripcion && (
