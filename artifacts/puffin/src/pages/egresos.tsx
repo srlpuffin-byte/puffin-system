@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useGetEgresos, useCreateEgreso } from "@workspace/api-client-react";
+import { useGetEgresos, useCreateEgreso, useGetEmpleados, useGetMaquinas } from "@workspace/api-client-react";
 import { useGetProyectos } from "@/hooks/use-proyectos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Download, RefreshCw } from "lucide-react";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Plus, Download, RefreshCw, Users, Tractor } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Switch } from "@/components/ui/switch";
@@ -21,6 +22,8 @@ const CATEGORIAS = ["Combustible", "Mantenimiento", "Sueldos", "Repuestos", "Ser
 export function Egresos() {
   const { data: egresos, isLoading } = useGetEgresos();
   const { data: proyectos } = useGetProyectos();
+  const { data: empleados } = useGetEmpleados();
+  const { data: maquinas } = useGetMaquinas();
   const [openDialog, setOpenDialog] = useState(false);
   const queryClient = useQueryClient();
   const createMut = useCreateEgreso();
@@ -333,9 +336,55 @@ export function Egresos() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="General">General (sin proyecto específico)</SelectItem>
-                  {proyectos?.map(p => (
-                    <SelectItem key={p.id} value={p.lugar}>{p.lugar}</SelectItem>
-                  ))}
+                  {proyectos?.map(p => {
+                    const asigEmpleados = empleados?.filter((e: any) => p.empleados_asignados?.includes(e.id)) || [];
+                    const asigMaquinas = maquinas?.filter((m: any) => p.maquinas_asignadas?.includes(m.id)) || [];
+                    
+                    return (
+                      <SelectItem key={p.id} value={p.lugar}>
+                        <HoverCard openDelay={100}>
+                          <HoverCardTrigger asChild>
+                            <div className="w-full text-left">{p.lugar}</div>
+                          </HoverCardTrigger>
+                          <HoverCardContent side="right" align="start" className="w-72 p-3 shadow-xl z-[100] bg-white border-2">
+                            <h4 className="font-bold text-sm border-b pb-2 mb-2 text-primary">{p.lugar}</h4>
+                            
+                            <div className="space-y-3">
+                              <div>
+                                <h5 className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-1">
+                                  <Users className="h-3 w-3" /> Empleados ({asigEmpleados.length})
+                                </h5>
+                                {asigEmpleados.length > 0 ? (
+                                  <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
+                                    {asigEmpleados.map((e: any) => (
+                                      <li key={e.id}>{e.nombre} {e.apellido}</li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="text-xs text-slate-400 italic">Ninguno asignado</p>
+                                )}
+                              </div>
+                              
+                              <div>
+                                <h5 className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-1">
+                                  <Tractor className="h-3 w-3" /> Maquinaria e Inventario ({asigMaquinas.length})
+                                </h5>
+                                {asigMaquinas.length > 0 ? (
+                                  <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
+                                    {asigMaquinas.map((m: any) => (
+                                      <li key={m.id}>{m.nombre} <span className="text-slate-400">({m.categoria})</span></li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="text-xs text-slate-400 italic">Ninguna asignada</p>
+                                )}
+                              </div>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
