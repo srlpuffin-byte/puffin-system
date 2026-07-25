@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Plus, Download, RefreshCw, Users, Tractor } from "lucide-react";
+import { Plus, Download, RefreshCw, Users, Tractor, Check, ChevronsUpDown } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,6 +26,7 @@ export function Egresos() {
   const { data: empleados } = useGetEmpleados();
   const { data: maquinas } = useGetMaquinas();
   const [openDialog, setOpenDialog] = useState(false);
+  const [openProyecto, setOpenProyecto] = useState(false);
   const queryClient = useQueryClient();
   const createMut = useCreateEgreso();
   const updateMut = import("@workspace/api-client-react").then(m => m.useUpdateEgreso ? m.useUpdateEgreso() : null);
@@ -570,28 +572,92 @@ export function Egresos() {
             </div>
             <div className="space-y-1">
               <Label>Proyecto / Lugar del Gasto</Label>
-              <Select value={form.centro_costos} onValueChange={v => set("centro_costos", v)}>
-                <SelectTrigger className="h-auto min-h-10 py-2">
-                  <SelectValue placeholder="Seleccionar proyecto" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="General">General (sin proyecto específico)</SelectItem>
-                  {proyectos?.map(p => {
-                    const asigEmpleados = empleados?.filter((e: any) => p.empleados_asignados?.includes(e.id)) || [];
-                    const asigMaquinas = maquinas?.filter((m: any) => p.maquinas_asignadas?.includes(m.id)) || [];
-                    const tooltip = `Asignaciones en ${p.lugar}\n👥 Empleados: ${asigEmpleados.length > 0 ? asigEmpleados.map((e: any) => e.nombre).join(", ") : "Ninguno"}\n🚜 Máquinas: ${asigMaquinas.length > 0 ? asigMaquinas.map((m: any) => m.nombre).join(", ") : "Ninguna"}`;
-                    return (
-                      <SelectItem 
-                        key={p.id} 
-                        value={p.lugar}
-                        title={tooltip}
-                      >
-                        {p.lugar}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+              <Popover open={openProyecto} onOpenChange={setOpenProyecto}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openProyecto}
+                    className="w-full justify-between h-auto min-h-10 py-2"
+                  >
+                    {form.centro_costos ? form.centro_costos : "Seleccionar proyecto"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar proyecto..." />
+                    <CommandList>
+                      <CommandEmpty>No se encontró ningún proyecto.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="General"
+                          onSelect={() => {
+                            set("centro_costos", "General");
+                            setOpenProyecto(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4 shrink-0", form.centro_costos === "General" ? "opacity-100" : "opacity-0")} />
+                          General (sin proyecto específico)
+                        </CommandItem>
+                        {proyectos?.map(p => {
+                          const asigEmpleados = empleados?.filter((e: any) => p.empleados_asignados?.includes(e.id)) || [];
+                          const asigMaquinas = maquinas?.filter((m: any) => p.maquinas_asignadas?.includes(m.id)) || [];
+                          return (
+                            <CommandItem
+                              key={p.id}
+                              value={p.lugar}
+                              onSelect={() => {
+                                set("centro_costos", p.lugar);
+                                setOpenProyecto(false);
+                              }}
+                              className="py-2"
+                            >
+                              <HoverCard openDelay={100} closeDelay={100}>
+                                <HoverCardTrigger asChild>
+                                  <div className="flex items-center w-full cursor-help">
+                                    <Check className={cn("mr-2 h-4 w-4 shrink-0", form.centro_costos === p.lugar ? "opacity-100" : "opacity-0")} />
+                                    {p.lugar}
+                                  </div>
+                                </HoverCardTrigger>
+                                <HoverCardContent side="right" align="start" className="w-72 shadow-xl z-[999999]">
+                                  <h4 className="font-bold text-sm border-b pb-2 mb-3 text-primary">{p.lugar}</h4>
+                                  <div className="space-y-4">
+                                    <div>
+                                      <h5 className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-1">
+                                        <Users className="h-3 w-3" /> Empleados
+                                      </h5>
+                                      <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
+                                        {asigEmpleados.length === 0 ? (
+                                          <li className="text-slate-400 italic list-none -ml-4">Ninguno asignado</li>
+                                        ) : (
+                                          asigEmpleados.map((e: any) => <li key={e.id}>{e.nombre} {e.apellido}</li>)
+                                        )}
+                                      </ul>
+                                    </div>
+                                    <div>
+                                      <h5 className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-1">
+                                        <Tractor className="h-3 w-3" /> Maquinaria
+                                      </h5>
+                                      <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
+                                        {asigMaquinas.length === 0 ? (
+                                          <li className="text-slate-400 italic list-none -ml-4">Ninguna asignada</li>
+                                        ) : (
+                                          asigMaquinas.map((m: any) => <li key={m.id}>{m.nombre}</li>)
+                                        )}
+                                      </ul>
+                                    </div>
+                                  </div>
+                                </HoverCardContent>
+                              </HoverCard>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
