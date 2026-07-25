@@ -264,11 +264,28 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
                                   <span className="text-xs text-muted-foreground ml-1">· {maq.patente || maq.dominio || "S/P"}</span>
                                 </label>
                               </HoverCardTrigger>
-                              {getMaquinaFoto(maq.id) && (
-                                <HoverCardContent side="right" className="w-64 p-0 overflow-hidden shadow-lg border-2 border-primary/20">
-                                  <img src={getMaquinaFoto(maq.id)} alt={maq.nombre} className="w-full h-auto object-cover aspect-video" />
-                                </HoverCardContent>
-                              )}
+                              <HoverCardContent side="right" className="w-64 p-0 overflow-hidden shadow-lg border-2 border-primary/20 bg-white z-50">
+                                {getMaquinaFoto(maq.id) ? (
+                                  <img src={getMaquinaFoto(maq.id)} alt={maq.nombre} className="w-full h-auto object-cover aspect-video border-b" />
+                                ) : (
+                                  <div className="w-full h-24 bg-slate-100 flex items-center justify-center text-slate-400 text-xs border-b">Sin foto</div>
+                                )}
+                                <div className="p-3 text-sm space-y-1">
+                                  <p className="font-bold text-slate-800 leading-tight">{maq.nombre}</p>
+                                  {maq.descripcion && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{maq.descripcion}</p>}
+                                  
+                                  <div className="grid grid-cols-2 gap-1 pt-2 border-t mt-2">
+                                    <div className="text-[10px] text-slate-500 uppercase font-semibold">Marca</div>
+                                    <div className="text-xs">{maq.marca || "-"}</div>
+                                    <div className="text-[10px] text-slate-500 uppercase font-semibold">Modelo</div>
+                                    <div className="text-xs">{maq.modelo || "-"}</div>
+                                    <div className="text-[10px] text-slate-500 uppercase font-semibold">Año</div>
+                                    <div className="text-xs">{maq.anio || "-"}</div>
+                                    <div className="text-[10px] text-slate-500 uppercase font-semibold">Patente</div>
+                                    <div className="text-xs">{maq.patente || maq.dominio || "-"}</div>
+                                  </div>
+                                </div>
+                              </HoverCardContent>
                             </HoverCard>
                           </div>
                         ))}
@@ -297,11 +314,26 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
                                   <span className="text-xs text-muted-foreground ml-1">· {maq.codigo || maq.tipo}</span>
                                 </label>
                               </HoverCardTrigger>
-                              {getMaquinaFoto(maq.id) && (
-                                <HoverCardContent side="right" className="w-64 p-0 overflow-hidden shadow-lg border-2 border-primary/20">
-                                  <img src={getMaquinaFoto(maq.id)} alt={maq.nombre} className="w-full h-auto object-cover aspect-video" />
-                                </HoverCardContent>
-                              )}
+                              <HoverCardContent side="right" className="w-64 p-0 overflow-hidden shadow-lg border-2 border-primary/20 bg-white z-50">
+                                {getMaquinaFoto(maq.id) ? (
+                                  <img src={getMaquinaFoto(maq.id)} alt={maq.nombre} className="w-full h-auto object-cover aspect-video border-b" />
+                                ) : (
+                                  <div className="w-full h-24 bg-slate-100 flex items-center justify-center text-slate-400 text-xs border-b">Sin foto</div>
+                                )}
+                                <div className="p-3 text-sm space-y-1">
+                                  <p className="font-bold text-slate-800 leading-tight">{maq.nombre}</p>
+                                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{maq.descripcion || "Sin descripción"}</p>
+                                  
+                                  <div className="grid grid-cols-2 gap-1 pt-2 border-t mt-2">
+                                    <div className="text-[10px] text-slate-500 uppercase font-semibold">Código</div>
+                                    <div className="text-xs font-mono bg-slate-100 px-1 py-0.5 rounded">{maq.codigo || "-"}</div>
+                                    <div className="text-[10px] text-slate-500 uppercase font-semibold">Categoría</div>
+                                    <div className="text-xs capitalize">{maq.tipo || "-"}</div>
+                                    <div className="text-[10px] text-slate-500 uppercase font-semibold">Marca/Mod</div>
+                                    <div className="text-xs">{maq.marca} {maq.modelo}</div>
+                                  </div>
+                                </div>
+                              </HoverCardContent>
                             </HoverCard>
                           </div>
                         ))}
