@@ -226,7 +226,50 @@ export function Egresos() {
                         <TableCell>{eg.concepto}</TableCell>
                         <TableCell>
                           {eg.centro_costos ? (
-                            <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{eg.centro_costos}</span>
+                            (() => {
+                              const p = proyectos?.find(p => p.lugar === eg.centro_costos);
+                              if (!p) {
+                                return <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{eg.centro_costos}</span>;
+                              }
+                              
+                              const asigEmpleados = empleados?.filter((e: any) => p.empleados_asignados?.includes(e.id)) || [];
+                              const asigMaquinas = maquinas?.filter((m: any) => p.maquinas_asignadas?.includes(m.id)) || [];
+                              
+                              return (
+                                <HoverCard openDelay={100}>
+                                  <HoverCardTrigger asChild>
+                                    <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full cursor-help hover:bg-blue-100 transition-colors">
+                                      {eg.centro_costos}
+                                    </span>
+                                  </HoverCardTrigger>
+                                  <HoverCardContent side="top" className="w-80 p-3 shadow-xl z-[100] bg-white border-2">
+                                    <h4 className="font-bold text-sm border-b pb-2 mb-2 text-primary">{p.lugar}</h4>
+                                    <div className="space-y-3">
+                                      <div>
+                                        <h5 className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-1">
+                                          <Users className="h-3 w-3" /> Empleados ({asigEmpleados.length})
+                                        </h5>
+                                        {asigEmpleados.length > 0 ? (
+                                          <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
+                                            {asigEmpleados.map((e: any) => <li key={e.id}>{e.nombre} {e.apellido}</li>)}
+                                          </ul>
+                                        ) : <p className="text-xs text-slate-400 italic">Ninguno asignado</p>}
+                                      </div>
+                                      <div>
+                                        <h5 className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-1">
+                                          <Tractor className="h-3 w-3" /> Maquinaria e Inventario ({asigMaquinas.length})
+                                        </h5>
+                                        {asigMaquinas.length > 0 ? (
+                                          <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
+                                            {asigMaquinas.map((m: any) => <li key={m.id}>{m.nombre}</li>)}
+                                          </ul>
+                                        ) : <p className="text-xs text-slate-400 italic">Ninguna asignada</p>}
+                                      </div>
+                                    </div>
+                                  </HoverCardContent>
+                                </HoverCard>
+                              );
+                            })()
                           ) : (
                             <span className="text-xs text-muted-foreground">-</span>
                           )}

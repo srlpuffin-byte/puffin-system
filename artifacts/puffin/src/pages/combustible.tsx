@@ -9,11 +9,15 @@ import { format } from "date-fns";
 import { RegistrarCargaDialog } from "@/components/forms/registrar-carga-dialog";
 import { EditarCargaDialog } from "@/components/forms/editar-carga-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { useGetProyectos } from "@/hooks/use-proyectos";
 import { toast } from "sonner";
+import { Users, Tractor, Briefcase } from "lucide-react";
 
 export function Combustible() {
   const queryClient = useQueryClient();
   const { data: registros, isLoading } = useGetCombustible();
+  const { data: proyectos } = useGetProyectos();
   const [openDialog, setOpenDialog] = useState(false);
   const [cargaParaEditar, setCargaParaEditar] = useState<RegistroCombustible | null>(null);
   const deleteMut = useDeleteCombustible();
@@ -93,8 +97,48 @@ export function Combustible() {
                         <TableCell className="font-medium">
                           {reg.fecha ? format(new Date(reg.fecha), "dd/MM/yyyy") : "-"}
                         </TableCell>
-                        <TableCell>{reg.maquina_nombre}</TableCell>
-                        <TableCell>{reg.empleado_nombre}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const asig = proyectos?.find(p => p.maquinas_asignadas?.includes(reg.maquina_id));
+                            return (
+                              <HoverCard openDelay={100}>
+                                <HoverCardTrigger asChild>
+                                  <span className="cursor-help font-medium border-b border-dashed border-slate-300 hover:text-primary transition-colors pb-0.5">
+                                    {reg.maquina_nombre}
+                                  </span>
+                                </HoverCardTrigger>
+                                <HoverCardContent side="top" className="w-64 p-3 shadow-xl z-[100] bg-white border-2">
+                                  <h4 className="font-bold text-sm border-b pb-2 mb-2 flex items-center gap-1 text-primary"><Tractor className="h-4 w-4"/> {reg.maquina_nombre}</h4>
+                                  <div className="text-xs text-slate-600">
+                                    <div className="flex items-center gap-1 font-semibold text-slate-500 mb-2"><Briefcase className="h-3 w-3"/> Proyecto asignado:</div>
+                                    {asig ? <span className="font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">{asig.lugar}</span> : <span className="italic text-slate-400">Sin proyecto asignado</span>}
+                                  </div>
+                                </HoverCardContent>
+                              </HoverCard>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const asig = proyectos?.find(p => p.empleados_asignados?.includes(reg.empleado_id));
+                            return (
+                              <HoverCard openDelay={100}>
+                                <HoverCardTrigger asChild>
+                                  <span className="cursor-help font-medium border-b border-dashed border-slate-300 hover:text-primary transition-colors pb-0.5">
+                                    {reg.empleado_nombre}
+                                  </span>
+                                </HoverCardTrigger>
+                                <HoverCardContent side="top" className="w-64 p-3 shadow-xl z-[100] bg-white border-2">
+                                  <h4 className="font-bold text-sm border-b pb-2 mb-2 flex items-center gap-1 text-primary"><Users className="h-4 w-4"/> {reg.empleado_nombre}</h4>
+                                  <div className="text-xs text-slate-600">
+                                    <div className="flex items-center gap-1 font-semibold text-slate-500 mb-2"><Briefcase className="h-3 w-3"/> Proyecto asignado:</div>
+                                    {asig ? <span className="font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">{asig.lugar}</span> : <span className="italic text-slate-400">Sin proyecto asignado</span>}
+                                  </div>
+                                </HoverCardContent>
+                              </HoverCard>
+                            );
+                          })()}
+                        </TableCell>
                         <TableCell className="text-right font-bold text-blue-700">{reg.litros} L</TableCell>
                         <TableCell className="text-right">
                           {reg.precio ? `$${Number(reg.precio).toLocaleString()}` : "-"}
