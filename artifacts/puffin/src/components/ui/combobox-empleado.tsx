@@ -37,6 +37,20 @@ export function ComboboxEmpleado({
 
   const selectedEmpleado = value ? empleados.find((e) => e.id.toString() === value) : null;
 
+  const proyectosMap = React.useMemo(() => {
+    const map = new Map<number, string>();
+    if (proyectos) {
+      for (const p of proyectos) {
+        if (p.empleados_asignados) {
+          for (const empId of p.empleados_asignados) {
+            map.set(empId, p.lugar);
+          }
+        }
+      }
+    }
+    return map;
+  }, [proyectos]);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -72,7 +86,7 @@ export function ComboboxEmpleado({
             <CommandEmpty>No se encontró ningún operario.</CommandEmpty>
             <CommandGroup>
               {empleados.map((e) => {
-                const asig = proyectos?.find((p) => p.empleados_asignados?.includes(e.id));
+                const lugarProyecto = proyectosMap.get(e.id);
                 const isSelected = value === e.id.toString();
 
                 return (
@@ -133,9 +147,9 @@ export function ComboboxEmpleado({
                             <div className="flex items-center gap-1 font-semibold text-slate-500 mb-1">
                               <Briefcase className="h-3 w-3" /> Proyecto asignado:
                             </div>
-                            {asig ? (
+                            {lugarProyecto ? (
                               <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                                {asig.lugar}
+                                {lugarProyecto}
                               </span>
                             ) : (
                               <span className="italic text-slate-400">Sin proyecto asignado</span>

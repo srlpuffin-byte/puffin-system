@@ -37,6 +37,20 @@ export function ComboboxMaquina({
 
   const selectedMaquina = value ? maquinas.find((m) => m.id.toString() === value) : null;
 
+  const proyectosMap = React.useMemo(() => {
+    const map = new Map<number, string>();
+    if (proyectos) {
+      for (const p of proyectos) {
+        if (p.maquinas_asignadas) {
+          for (const maqId of p.maquinas_asignadas) {
+            map.set(maqId, p.lugar);
+          }
+        }
+      }
+    }
+    return map;
+  }, [proyectos]);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -75,7 +89,7 @@ export function ComboboxMaquina({
             <CommandEmpty>No se encontró ninguna máquina.</CommandEmpty>
             <CommandGroup>
               {maquinas.map((m) => {
-                const asig = proyectos?.find((p) => p.maquinas_asignadas?.includes(m.id));
+                const lugarProyecto = proyectosMap.get(m.id);
                 const isSelected = value === m.id.toString();
 
                 return (
@@ -133,9 +147,9 @@ export function ComboboxMaquina({
                             <div className="flex items-center gap-1 font-semibold text-slate-500 mb-1">
                               <Briefcase className="h-3 w-3" /> Proyecto asignado:
                             </div>
-                            {asig ? (
+                            {lugarProyecto ? (
                               <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                                {asig.lugar}
+                                {lugarProyecto}
                               </span>
                             ) : (
                               <span className="italic text-slate-400">Sin proyecto asignado</span>
