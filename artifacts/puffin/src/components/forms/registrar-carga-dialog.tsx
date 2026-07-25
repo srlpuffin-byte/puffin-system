@@ -134,13 +134,19 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
                     <SelectItem 
                       key={e.id} 
                       value={e.id.toString()}
-                      onPointerMove={(ev) => {
-                        setHoveredItem({ tipo: 'operario', id: e.id });
-                        setMousePos({ x: ev.clientX, y: ev.clientY });
-                      }}
-                      onPointerLeave={() => setHoveredItem(null)}
+                      className="p-0"
                     >
-                      {e.apellido}, {e.nombre}
+                      <div
+                        className="w-full px-2 py-1.5"
+                        onMouseEnter={(ev) => {
+                          setHoveredItem({ tipo: 'operario', id: e.id });
+                          setMousePos({ x: ev.clientX, y: ev.clientY });
+                        }}
+                        onMouseMove={(ev) => setMousePos({ x: ev.clientX, y: ev.clientY })}
+                        onMouseLeave={() => setHoveredItem(null)}
+                      >
+                        {e.apellido}, {e.nombre}
+                      </div>
                     </SelectItem>
                   )) : null}
                 </SelectContent>
@@ -163,14 +169,17 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
                     <SelectItem 
                       key={m.id} 
                       value={m.id.toString()} 
-                      className="py-2"
-                      onPointerMove={(ev) => {
-                        setHoveredItem({ tipo: 'maquina', id: m.id });
-                        setMousePos({ x: ev.clientX, y: ev.clientY });
-                      }}
-                      onPointerLeave={() => setHoveredItem(null)}
+                      className="p-0"
                     >
-                      <div className="flex flex-col text-left">
+                      <div
+                        className="w-full px-2 py-2 flex flex-col text-left"
+                        onMouseEnter={(ev) => {
+                          setHoveredItem({ tipo: 'maquina', id: m.id });
+                          setMousePos({ x: ev.clientX, y: ev.clientY });
+                        }}
+                        onMouseMove={(ev) => setMousePos({ x: ev.clientX, y: ev.clientY })}
+                        onMouseLeave={() => setHoveredItem(null)}
+                      >
                         <span className="font-semibold text-sm">
                           {m.nombre}{m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ''}
                         </span>

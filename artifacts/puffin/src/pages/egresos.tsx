@@ -390,13 +390,19 @@ export function Egresos() {
                       <SelectItem 
                         key={p.id} 
                         value={p.lugar}
-                        onPointerMove={(e) => {
-                          setHoveredProject(p);
-                          setMousePos({ x: e.clientX, y: e.clientY });
-                        }}
-                        onPointerLeave={() => setHoveredProject(null)}
+                        className="p-0"
                       >
-                        {p.lugar}
+                        <div
+                          className="w-full px-2 py-1.5"
+                          onMouseEnter={(ev) => {
+                            setHoveredProject(p);
+                            setMousePos({ x: ev.clientX, y: ev.clientY });
+                          }}
+                          onMouseMove={(ev) => setMousePos({ x: ev.clientX, y: ev.clientY })}
+                          onMouseLeave={() => setHoveredProject(null)}
+                        >
+                          {p.lugar}
+                        </div>
                       </SelectItem>
                     );
                   })}
