@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { useGetEgresos, useCreateEgreso, useGetEmpleados, useGetMaquinas } from "@workspace/api-client-react";
 import { useGetProyectos } from "@/hooks/use-proyectos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -438,7 +439,7 @@ export function Egresos() {
       </Dialog>
 
       {/* Custom Tooltip that escapes Radix UI traps */}
-      {hoveredProject && openDialog && (
+      {hoveredProject && openDialog && typeof document !== 'undefined' && createPortal(
         <div 
           style={{ position: 'fixed', left: mousePos.x + 20, top: mousePos.y - 40, zIndex: 999999 }}
           className="bg-white border-2 border-slate-200 shadow-2xl p-4 w-72 rounded-xl pointer-events-none animate-in fade-in zoom-in-95 duration-100"
@@ -472,7 +473,8 @@ export function Egresos() {
               </ul>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

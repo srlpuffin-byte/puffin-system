@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useCreateCombustible, useGetEmpleados, useGetMaquinas, getGetCombustibleQueryKey, useUploadFotografia, useGetMe } from "@workspace/api-client-react";
-import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -248,8 +248,8 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
         </form>
       </DialogContent>
 
-      {/* Custom Tooltip that escapes Radix UI traps */}
-      {hoveredItem && open && (
+      {/* Custom Tooltip that escapes Radix UI traps using Portal */}
+      {hoveredItem && open && typeof document !== 'undefined' && createPortal(
         <div 
           style={{ position: 'fixed', left: mousePos.x + 20, top: mousePos.y - 40, zIndex: 999999 }}
           className="bg-white border-2 border-slate-200 shadow-2xl p-4 w-72 rounded-xl pointer-events-none animate-in fade-in zoom-in-95 duration-100"
@@ -293,7 +293,8 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
               </div>
             );
           })()}
-        </div>
+        </div>,
+        document.body
       )}
     </Dialog>
   );
