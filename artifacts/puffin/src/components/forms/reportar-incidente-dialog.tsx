@@ -10,6 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Camera, X, ImagePlus, Search } from "lucide-react";
+import { ComboboxEmpleado } from "@/components/ui/combobox-empleado";
+import { ComboboxMaquina } from "@/components/ui/combobox-maquina";
+import { useGetProyectos } from "@/hooks/use-proyectos";
 
 const TIPOS_INCIDENTE = [
   { value: "rotura", label: "Rotura", color: "bg-orange-100 text-orange-800 border-orange-300" },
@@ -33,6 +36,7 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
   const uploadMut = useUploadFotografia();
   const { data: maquinas } = useGetMaquinas();
   const { data: empleados } = useGetEmpleados();
+  const { data: proyectos } = useGetProyectos();
   const { data: user } = useGetMe();
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";
 
@@ -170,70 +174,28 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
           {!empleadoIdFijo && (
             <div className="space-y-1">
               <Label>Operario involucrado</Label>
-              <Select value={form.empleado_id} onValueChange={v => set("empleado_id", v)} disabled={isEmpleado}>
-                <SelectTrigger className="disabled:opacity-50"><SelectValue placeholder="(Opcional)" /></SelectTrigger>
-                <SelectContent>
-                  {(Array.isArray(empleados) ? empleados : [])?.map(e => <SelectItem key={e.id} value={e.id.toString()}>{e.apellido}, {e.nombre}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <ComboboxEmpleado
+                value={form.empleado_id}
+                onChange={v => set("empleado_id", v)}
+                empleados={Array.isArray(empleados) ? empleados : []}
+                proyectos={proyectos}
+                disabled={isEmpleado}
+                placeholder="(Opcional) Seleccionar operario"
+              />
             </div>
           )}
 
-          {/* MÁQUINA con buscador */}
+          {/* MÁQUINA */}
           {!maquinaIdFija && (
             <div className="space-y-1">
               <Label>Máquina involucrada</Label>
-              <div className="border rounded-md overflow-hidden">
-                <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/30">
-                  <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <input
-                    type="text"
-                    placeholder="Buscar máquina..."
-                    value={maquinaSearch}
-                    onChange={e => setMaquinaSearch(e.target.value)}
-                    className="flex-1 bg-transparent outline-none text-sm"
-                  />
-                  {maquinaSearch && (
-                    <button type="button" onClick={() => setMaquinaSearch("")}>
-                      <X className="h-3 w-3 text-muted-foreground" />
-                    </button>
-                  )}
-                </div>
-                <div className="max-h-36 overflow-y-auto">
-                  <button
-                    type="button"
-                    onClick={() => set("maquina_id", "")}
-                    className={`w-full text-left px-3 py-2 text-sm text-muted-foreground hover:bg-muted/50 transition-colors ${!form.maquina_id ? "bg-primary/10 font-medium text-primary" : ""}`}
-                  >
-                    (Ninguna / No aplica)
-                  </button>
-                  {maquinasFiltradas.length === 0 ? (
-                    <p className="text-xs text-muted-foreground px-3 py-2">Sin resultados</p>
-                  ) : (
-                    maquinasFiltradas.map(m => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => set("maquina_id", m.id.toString())}
-                        className={`w-full text-left px-3 py-2 text-sm hover:bg-muted/50 transition-colors flex items-center justify-between ${form.maquina_id === m.id.toString() ? "bg-primary/10 font-semibold text-primary" : ""}`}
-                      >
-                        <span>{m.nombre}</span>
-                        {(m.patente || m.dominio) && (
-                          <span className="text-xs text-muted-foreground ml-2">{m.patente || m.dominio}</span>
-                        )}
-                      </button>
-                    ))
-                  )}
-                </div>
-                {maquinaSeleccionada && (
-                  <div className="px-3 py-1.5 bg-primary/10 border-t text-xs text-primary font-medium flex items-center justify-between">
-                    <span>✓ Seleccionada: {maquinaSeleccionada.nombre}</span>
-                    <button type="button" onClick={() => set("maquina_id", "")} className="hover:text-destructive ml-2">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                )}
-              </div>
+              <ComboboxMaquina
+                value={form.maquina_id}
+                onChange={v => set("maquina_id", v)}
+                maquinas={Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario") : []}
+                proyectos={proyectos}
+                placeholder="(Opcional) Seleccionar máquina"
+              />
             </div>
           )}
 

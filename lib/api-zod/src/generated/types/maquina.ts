@@ -51,4 +51,6 @@ export interface Maquina {
   vencimiento_seguro?: Date | null;
   /** @nullable */
   vencimiento_vtv?: Date | null;
+  /** @nullable */
+  imagen_url?: string | null;
 }

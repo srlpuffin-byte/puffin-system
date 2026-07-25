@@ -13,6 +13,9 @@ import { MultiImageUpload, UploadedImage } from "../ui/multi-image-upload";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { ComboboxEmpleado } from "@/components/ui/combobox-empleado";
+import { ComboboxMaquina } from "@/components/ui/combobox-maquina";
+import { useGetProyectos } from "@/hooks/use-proyectos";
 
 interface Props {
   open: boolean;
@@ -28,6 +31,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
   
   const { data: empleados } = useGetEmpleados({ estado: "activo" });
   const { data: maquinas } = useGetMaquinas({ estado: "activa" });
+  const { data: proyectos } = useGetProyectos();
   const { data: user } = useGetMe();
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";
 
@@ -172,31 +176,24 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
               {!empleadoIdFijo && (
                 <div className="space-y-1">
                   <Label>Operario *</Label>
-                  <Select value={form.empleado_id} onValueChange={v => set("empleado_id", v)} disabled={isEmpleado}>
-                    <SelectTrigger className="disabled:opacity-50"><SelectValue placeholder="Seleccionar operario" /></SelectTrigger>
-                    <SelectContent>
-                      {(Array.isArray(empleados) ? empleados : [])?.map(e => (
-                        <SelectItem key={e.id} value={e.id.toString()}>
-                          {e.apellido}, {e.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <ComboboxEmpleado
+                    value={form.empleado_id}
+                    onChange={v => set("empleado_id", v)}
+                    empleados={Array.isArray(empleados) ? empleados : []}
+                    proyectos={proyectos}
+                    disabled={isEmpleado}
+                  />
                 </div>
               )}
               {!maquinaIdFija && (
                 <div className="space-y-1">
                   <Label>Máquina *</Label>
-                  <Select value={form.maquina_id} onValueChange={v => set("maquina_id", v)}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar máquina" /></SelectTrigger>
-                    <SelectContent>
-                      {(Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario") : [])?.map(m => (
-                        <SelectItem key={m.id} value={m.id.toString()}>
-                          {m.nombre}{m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <ComboboxMaquina
+                    value={form.maquina_id}
+                    onChange={v => set("maquina_id", v)}
+                    maquinas={Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario") : []}
+                    proyectos={proyectos}
+                  />
                 </div>
               )}
               <div className="grid grid-cols-2 gap-4">

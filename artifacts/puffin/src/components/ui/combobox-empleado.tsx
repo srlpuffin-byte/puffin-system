@@ -1,0 +1,166 @@
+import React, { useState } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Check, ChevronsUpDown, Users, Briefcase, AlertTriangle } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { Empleado } from "@workspace/api-client-react";
+
+interface ProyectoResumen {
+  id: number;
+  lugar: string;
+  empleados_asignados?: number[] | null;
+}
+
+interface ComboboxEmpleadoProps {
+  value: string;
+  onChange: (value: string) => void;
+  empleados: Empleado[];
+  proyectos?: ProyectoResumen[];
+  disabled?: boolean;
+  placeholder?: string;
+  className?: string;
+}
+
+export function ComboboxEmpleado({
+  value,
+  onChange,
+  empleados,
+  proyectos,
+  disabled,
+  placeholder = "Seleccionar operario",
+  className,
+}: ComboboxEmpleadoProps) {
+  const [open, setOpen] = useState(false);
+
+  const selectedEmpleado = value ? empleados.find((e) => e.id.toString() === value) : null;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn("w-full justify-between h-auto py-2", className)}
+          disabled={disabled}
+        >
+          {selectedEmpleado ? (
+            <div className="flex items-center gap-2">
+              <Avatar className="h-6 w-6">
+                <AvatarImage src={selectedEmpleado.foto_perfil || undefined} />
+                <AvatarFallback className="text-[10px]">
+                  {selectedEmpleado.nombre[0]}{selectedEmpleado.apellido[0]}
+                </AvatarFallback>
+              </Avatar>
+              <span className="truncate">
+                {selectedEmpleado.apellido}, {selectedEmpleado.nombre}
+              </span>
+            </div>
+          ) : (
+            <span className="text-muted-foreground">{placeholder}</span>
+          )}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[400px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar operario..." />
+          <CommandList>
+            <CommandEmpty>No se encontró ningún operario.</CommandEmpty>
+            <CommandGroup>
+              {empleados.map((e) => {
+                const asig = proyectos?.find((p) => p.empleados_asignados?.includes(e.id));
+                const isSelected = value === e.id.toString();
+
+                return (
+                  <CommandItem
+                    key={e.id}
+                    value={`${e.apellido} ${e.nombre}`}
+                    onSelect={() => {
+                      onChange(e.id.toString());
+                      setOpen(false);
+                    }}
+                    className="py-2"
+                  >
+                    <HoverCard openDelay={100} closeDelay={100}>
+                      <HoverCardTrigger asChild>
+                        <div className="flex items-center w-full cursor-help">
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4 shrink-0",
+                              isSelected ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <Avatar className="h-6 w-6 mr-2 shrink-0">
+                            <AvatarImage src={e.foto_perfil || undefined} />
+                            <AvatarFallback className="text-[10px]">
+                              {e.nombre[0]}{e.apellido[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col text-left overflow-hidden">
+                            <span className="font-medium text-sm truncate">
+                              {e.apellido}, {e.nombre}
+                            </span>
+                            {e.cargo && (
+                              <span className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                                {e.cargo}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </HoverCardTrigger>
+                      <HoverCardContent side="right" align="start" className="w-72 shadow-xl z-[999999]">
+                        <div className="flex gap-4 mb-3">
+                          <Avatar className="h-16 w-16 border-2 border-primary/10">
+                            <AvatarImage src={e.foto_perfil || undefined} className="object-cover" />
+                            <AvatarFallback className="text-lg">
+                              {e.nombre[0]}{e.apellido[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col justify-center">
+                            <h4 className="font-bold text-sm text-primary flex items-center gap-1">
+                              <Users className="h-4 w-4" /> {e.nombre} {e.apellido}
+                            </h4>
+                            <span className="text-xs text-slate-500 font-medium">{e.cargo || "Sin cargo"}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-3 text-xs text-slate-600 border-t pt-3">
+                          <div>
+                            <div className="flex items-center gap-1 font-semibold text-slate-500 mb-1">
+                              <Briefcase className="h-3 w-3" /> Proyecto asignado:
+                            </div>
+                            {asig ? (
+                              <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                                {asig.lugar}
+                              </span>
+                            ) : (
+                              <span className="italic text-slate-400">Sin proyecto asignado</span>
+                            )}
+                          </div>
+
+                          {(e.alertas_count ?? 0) > 0 && (
+                            <div className="bg-orange-50 text-orange-700 p-2 rounded-md flex items-start gap-2">
+                              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-bold block">¡Atención!</span>
+                                Este operario tiene {e.alertas_count} alerta(s) activa(s).
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}

@@ -124,6 +124,8 @@ export interface Empleado {
   vencimiento_carnet?: string | null;
   /** @nullable */
   recibir_alertas_whatsapp?: boolean | null;
+  /** @nullable */
+  foto_perfil?: string | null;
 }
 
 export interface EmpleadoInput {
@@ -218,6 +220,8 @@ export interface Maquina {
   vencimiento_seguro?: string | null;
   /** @nullable */
   vencimiento_vtv?: string | null;
+  /** @nullable */
+  imagen_url?: string | null;
 }
 
 export interface MaquinaInput {

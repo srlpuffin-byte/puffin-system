@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Camera } from "lucide-react";
+import { ComboboxEmpleado } from "@/components/ui/combobox-empleado";
+import { ComboboxMaquina } from "@/components/ui/combobox-maquina";
+import { useGetProyectos } from "@/hooks/use-proyectos";
 
 interface Props {
   open: boolean;
@@ -21,6 +24,7 @@ export function EditarCargaDialog({ open, onOpenChange, carga }: Props) {
   const uploadMut = useUploadFotografia();
   const { data: empleados } = useGetEmpleados({ estado: "activo" });
   const { data: maquinas } = useGetMaquinas();
+  const { data: proyectos } = useGetProyectos();
   const { data: user } = useGetMe();
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";
   const [fotoNivel, setFotoNivel] = useState<{ base64: string; name: string } | null>(null);
@@ -130,28 +134,22 @@ export function EditarCargaDialog({ open, onOpenChange, carga }: Props) {
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
             <div className="space-y-1">
               <Label>Operario *</Label>
-              <select
+              <ComboboxEmpleado
                 value={form.empleado_id}
-                onChange={e => set("empleado_id", e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50"
-                required
+                onChange={v => set("empleado_id", v)}
+                empleados={Array.isArray(empleados) ? empleados : []}
+                proyectos={proyectos}
                 disabled={isEmpleado}
-              >
-                <option value="" disabled>Seleccionar operario</option>
-                {Array.isArray(empleados) ? empleados.map(e => <option key={e.id} value={e.id.toString()}>{e.apellido}, {e.nombre}</option>) : null}
-              </select>
+              />
             </div>
             <div className="space-y-1">
               <Label>Máquina *</Label>
-              <select
+              <ComboboxMaquina
                 value={form.maquina_id}
-                onChange={e => set("maquina_id", e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                required
-              >
-                <option value="" disabled>Seleccionar máquina</option>
-                {Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario").map(m => <option key={m.id} value={m.id.toString()}>{m.nombre}{m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ''}</option>) : null}
-              </select>
+                onChange={v => set("maquina_id", v)}
+                maquinas={Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario") : []}
+                proyectos={proyectos}
+              />
             </div>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1">

@@ -1133,6 +1133,8 @@ components:
           format: "date"
         recibir_alertas_whatsapp:
           type: ["boolean", "null"]
+        foto_perfil:
+          type: ["string", "null"]
 
     EmpleadoInput:
       type: object
@@ -1249,6 +1251,8 @@ components:
         vencimiento_vtv:
           type: ["string", "null"]
           format: "date"
+        imagen_url:
+          type: ["string", "null"]
 
     MaquinaInput:
       type: object

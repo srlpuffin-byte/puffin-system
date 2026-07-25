@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { ComboboxMaquina } from "@/components/ui/combobox-maquina";
+import { useGetProyectos } from "@/hooks/use-proyectos";
 
 const TIPOS_MANTENIMIENTO = ["Service Periódico", "Service por km", "Service por horas", "Reparación", "Preventivo", "Correctivo", "Cambio de neumáticos", "Cambio de aceite", "Revisión general", "Otro"];
 
@@ -23,6 +25,7 @@ export function RegistrarMantenimientoDialog({ open, onOpenChange, maquinaIdFija
   const queryClient = useQueryClient();
   const createMut = useCreateMantenimiento();
   const { data: maquinas } = useGetMaquinas();
+  const { data: proyectos } = useGetProyectos();
 
   const updateMut = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
@@ -115,12 +118,12 @@ export function RegistrarMantenimientoDialog({ open, onOpenChange, maquinaIdFija
           {!maquinaIdFija && (
             <div className="space-y-1">
               <Label>Máquina *</Label>
-              <Select value={form.maquina_id} onValueChange={v => set("maquina_id", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar máquina" /></SelectTrigger>
-                <SelectContent>
-                  {(Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario") : [])?.map(m => <SelectItem key={m.id} value={m.id.toString()}>{m.nombre}{m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ''}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <ComboboxMaquina
+                value={form.maquina_id}
+                onChange={v => set("maquina_id", v)}
+                maquinas={(Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario") : [])}
+                proyectos={proyectos}
+              />
             </div>
           )}
           <div className="space-y-1">

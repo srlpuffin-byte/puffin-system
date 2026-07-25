@@ -127,7 +127,8 @@ export const GetEmpleadosResponseItem = zod.object({
   "contacto_familiar_relacion": zod.string().nullish(),
   "telefono_whatsapp": zod.string().nullish(),
   "vencimiento_carnet": zod.coerce.date().nullish(),
-  "recibir_alertas_whatsapp": zod.boolean().nullish()
+  "recibir_alertas_whatsapp": zod.boolean().nullish(),
+  "foto_perfil": zod.string().nullish()
 })
 export const GetEmpleadosResponse = zod.array(GetEmpleadosResponseItem)
 
@@ -167,7 +168,8 @@ export const CreateEmpleadoResponse = zod.object({
   "contacto_familiar_relacion": zod.string().nullish(),
   "telefono_whatsapp": zod.string().nullish(),
   "vencimiento_carnet": zod.coerce.date().nullish(),
-  "recibir_alertas_whatsapp": zod.boolean().nullish()
+  "recibir_alertas_whatsapp": zod.boolean().nullish(),
+  "foto_perfil": zod.string().nullish()
 })
 
 
@@ -195,7 +197,8 @@ export const GetEmpleadoResponse = zod.object({
   "contacto_familiar_relacion": zod.string().nullish(),
   "telefono_whatsapp": zod.string().nullish(),
   "vencimiento_carnet": zod.coerce.date().nullish(),
-  "recibir_alertas_whatsapp": zod.boolean().nullish()
+  "recibir_alertas_whatsapp": zod.boolean().nullish(),
+  "foto_perfil": zod.string().nullish()
 })
 
 
@@ -237,7 +240,8 @@ export const UpdateEmpleadoResponse = zod.object({
   "contacto_familiar_relacion": zod.string().nullish(),
   "telefono_whatsapp": zod.string().nullish(),
   "vencimiento_carnet": zod.coerce.date().nullish(),
-  "recibir_alertas_whatsapp": zod.boolean().nullish()
+  "recibir_alertas_whatsapp": zod.boolean().nullish(),
+  "foto_perfil": zod.string().nullish()
 })
 
 
@@ -275,7 +279,8 @@ export const GetMaquinasResponseItem = zod.object({
   "filtro_fecha_cambio": zod.string().nullish(),
   "filtro_proximo_cambio": zod.string().nullish(),
   "vencimiento_seguro": zod.coerce.date().nullish(),
-  "vencimiento_vtv": zod.coerce.date().nullish()
+  "vencimiento_vtv": zod.coerce.date().nullish(),
+  "imagen_url": zod.string().nullish()
 })
 export const GetMaquinasResponse = zod.array(GetMaquinasResponseItem)
 
@@ -331,7 +336,8 @@ export const CreateMaquinaResponse = zod.object({
   "filtro_fecha_cambio": zod.string().nullish(),
   "filtro_proximo_cambio": zod.string().nullish(),
   "vencimiento_seguro": zod.coerce.date().nullish(),
-  "vencimiento_vtv": zod.coerce.date().nullish()
+  "vencimiento_vtv": zod.coerce.date().nullish(),
+  "imagen_url": zod.string().nullish()
 })
 
 
@@ -367,7 +373,8 @@ export const GetMaquinaResponse = zod.object({
   "filtro_fecha_cambio": zod.string().nullish(),
   "filtro_proximo_cambio": zod.string().nullish(),
   "vencimiento_seguro": zod.coerce.date().nullish(),
-  "vencimiento_vtv": zod.coerce.date().nullish()
+  "vencimiento_vtv": zod.coerce.date().nullish(),
+  "imagen_url": zod.string().nullish()
 })
 
 
@@ -429,7 +436,8 @@ export const UpdateMaquinaResponse = zod.object({
   "filtro_fecha_cambio": zod.string().nullish(),
   "filtro_proximo_cambio": zod.string().nullish(),
   "vencimiento_seguro": zod.coerce.date().nullish(),
-  "vencimiento_vtv": zod.coerce.date().nullish()
+  "vencimiento_vtv": zod.coerce.date().nullish(),
+  "imagen_url": zod.string().nullish()
 })
 
 
@@ -1248,7 +1256,8 @@ export const GlobalSearchResponse = zod.object({
   "filtro_fecha_cambio": zod.string().nullish(),
   "filtro_proximo_cambio": zod.string().nullish(),
   "vencimiento_seguro": zod.coerce.date().nullish(),
-  "vencimiento_vtv": zod.coerce.date().nullish()
+  "vencimiento_vtv": zod.coerce.date().nullish(),
+  "imagen_url": zod.string().nullish()
 })).optional(),
   "empleados": zod.array(zod.object({
   "id": zod.number(),
@@ -1267,7 +1276,8 @@ export const GlobalSearchResponse = zod.object({
   "contacto_familiar_relacion": zod.string().nullish(),
   "telefono_whatsapp": zod.string().nullish(),
   "vencimiento_carnet": zod.coerce.date().nullish(),
-  "recibir_alertas_whatsapp": zod.boolean().nullish()
+  "recibir_alertas_whatsapp": zod.boolean().nullish(),
+  "foto_perfil": zod.string().nullish()
 })).optional(),
   "mantenimientos": zod.array(zod.object({
   "id": zod.number(),

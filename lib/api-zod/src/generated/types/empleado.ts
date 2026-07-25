@@ -34,4 +34,6 @@ export interface Empleado {
   vencimiento_carnet?: Date | null;
   /** @nullable */
   recibir_alertas_whatsapp?: boolean | null;
+  /** @nullable */
+  foto_perfil?: string | null;
 }
