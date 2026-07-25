@@ -335,78 +335,50 @@ export function Egresos() {
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar proyecto" />
                 </SelectTrigger>
-                <SelectContent className={proyectos && proyectos.length > 0 ? "w-[600px]" : ""}>
-                  <div className={proyectos && proyectos.length > 0 ? "flex h-[300px]" : ""}>
-                    <div className={proyectos && proyectos.length > 0 ? "w-1/2 overflow-y-auto pr-2 border-r" : ""}>
-                      <SelectItem value="General" onPointerMove={() => setHoveredProject(null)}>General (sin proyecto específico)</SelectItem>
-                      {proyectos?.map(p => (
-                        <SelectItem 
-                          key={p.id} 
-                          value={p.lugar}
-                          onPointerMove={() => setHoveredProject(p.id)}
-                        >
-                          {p.lugar}
-                        </SelectItem>
-                      ))}
-                    </div>
-                    {proyectos && proyectos.length > 0 && (
-                      <div className="w-1/2 p-4 overflow-y-auto bg-slate-50">
-                        {(() => {
-                          const hoveredP = proyectos.find(p => p.id === hoveredProject);
-                          if (!hoveredP) {
-                            return (
-                              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center">
-                                <span className="text-sm">Pasá el mouse por un proyecto para ver sus asignaciones</span>
-                              </div>
-                            );
-                          }
-                          
-                          const asigEmpleados = empleados?.filter((e: any) => hoveredP.empleados_asignados?.includes(e.id)) || [];
-                          const asigMaquinas = maquinas?.filter((m: any) => hoveredP.maquinas_asignadas?.includes(m.id)) || [];
-
-                          return (
-                            <div>
-                              <h4 className="font-bold text-sm border-b pb-2 mb-3 text-primary leading-tight">
-                                {hoveredP.lugar}
-                              </h4>
-                              <div className="space-y-4">
-                                <div>
-                                  <h5 className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-1">
-                                    <Users className="h-3 w-3" /> Empleados ({asigEmpleados.length})
-                                  </h5>
-                                  {asigEmpleados.length > 0 ? (
-                                    <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
-                                      {asigEmpleados.map((e: any) => (
-                                        <li key={e.id}>{e.nombre} {e.apellido}</li>
-                                      ))}
-                                    </ul>
-                                  ) : (
-                                    <p className="text-xs text-slate-400 italic">Ninguno asignado</p>
-                                  )}
-                                </div>
-                                <div>
-                                  <h5 className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-1">
-                                    <Tractor className="h-3 w-3" /> Maquinaria e Inventario ({asigMaquinas.length})
-                                  </h5>
-                                  {asigMaquinas.length > 0 ? (
-                                    <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
-                                      {asigMaquinas.map((m: any) => (
-                                        <li key={m.id}>{m.nombre} <span className="text-slate-400">({m.categoria})</span></li>
-                                      ))}
-                                    </ul>
-                                  ) : (
-                                    <p className="text-xs text-slate-400 italic">Ninguna asignada</p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
+                <SelectContent>
+                  <SelectItem value="General">General (sin proyecto específico)</SelectItem>
+                  {proyectos?.map(p => (
+                    <SelectItem key={p.id} value={p.lugar}>
+                      {p.lugar}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              
+              {form.centro_costos && form.centro_costos !== "General" && (
+                <div className="mt-2 bg-slate-50 border rounded-md p-3 text-sm animate-in fade-in slide-in-from-top-2">
+                  {(() => {
+                    const selP = proyectos?.find(p => p.lugar === form.centro_costos);
+                    if (!selP) return null;
+                    const asigEmpleados = empleados?.filter((e: any) => selP.empleados_asignados?.includes(e.id)) || [];
+                    const asigMaquinas = maquinas?.filter((m: any) => selP.maquinas_asignadas?.includes(m.id)) || [];
+                    
+                    return (
+                      <div>
+                        <div className="font-semibold text-slate-700 mb-2 border-b pb-1">Asignaciones en {selP.lugar}</div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-xs text-slate-500 font-medium flex items-center gap-1 mb-1"><Users className="h-3 w-3"/> Empleados</span>
+                            {asigEmpleados.length > 0 ? (
+                              <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
+                                {asigEmpleados.map((e: any) => <li key={e.id}>{e.nombre} {e.apellido}</li>)}
+                              </ul>
+                            ) : <span className="text-xs text-slate-400 italic">Ninguno</span>}
+                          </div>
+                          <div>
+                            <span className="text-xs text-slate-500 font-medium flex items-center gap-1 mb-1"><Tractor className="h-3 w-3"/> Maquinaria</span>
+                            {asigMaquinas.length > 0 ? (
+                              <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
+                                {asigMaquinas.map((m: any) => <li key={m.id}>{m.nombre}</li>)}
+                              </ul>
+                            ) : <span className="text-xs text-slate-400 italic">Ninguna</span>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">

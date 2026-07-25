@@ -144,59 +144,46 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar máquina" />
                 </SelectTrigger>
-                <SelectContent className={maquinas && maquinas.length > 0 ? "w-[500px]" : ""}>
-                  <div className={maquinas && maquinas.length > 0 ? "flex h-[250px]" : ""}>
-                    <div className={maquinas && maquinas.length > 0 ? "w-1/2 overflow-y-auto pr-2 border-r" : ""}>
-                      {Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario").map(m => (
-                        <SelectItem 
-                          key={m.id} 
-                          value={m.id.toString()}
-                          onPointerMove={() => setHoveredMaquina(m.id)}
-                        >
-                          {m.nombre}{m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ''}
-                        </SelectItem>
-                      )) : null}
-                    </div>
-                    {maquinas && maquinas.length > 0 && (
-                      <div className="w-1/2 p-4 overflow-y-auto bg-slate-50">
-                        {(() => {
-                          const hoveredM = maquinas.find(m => m.id === hoveredMaquina);
-                          if (!hoveredM) {
-                            return (
-                              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center">
-                                <span className="text-sm">Pasá el mouse por una máquina para ver sus detalles</span>
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <div>
-                              <h4 className="font-bold text-sm border-b pb-2 mb-3 text-primary leading-tight flex items-center gap-1">
-                                <Tractor className="h-4 w-4" /> {hoveredM.nombre}
-                              </h4>
-                              <div className="grid grid-cols-2 gap-y-2 gap-x-1 text-xs">
-                                <div className="text-slate-500 uppercase font-semibold text-[10px]">Marca</div>
-                                <div>{hoveredM.marca || "-"}</div>
-                                <div className="text-slate-500 uppercase font-semibold text-[10px]">Modelo</div>
-                                <div>{hoveredM.modelo || "-"}</div>
-                                <div className="text-slate-500 uppercase font-semibold text-[10px]">Año</div>
-                                <div>{hoveredM.anio || "-"}</div>
-                                <div className="text-slate-500 uppercase font-semibold text-[10px]">Patente</div>
-                                <div>{hoveredM.patente || hoveredM.dominio || "-"}</div>
-                              </div>
-                              {hoveredM.descripcion && (
-                                <div className="mt-3 text-xs text-muted-foreground italic border-t pt-2">
-                                  "{hoveredM.descripcion}"
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
+                <SelectContent>
+                  {Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario").map(m => (
+                    <SelectItem key={m.id} value={m.id.toString()}>
+                      {m.nombre}{m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ''}
+                    </SelectItem>
+                  )) : null}
                 </SelectContent>
               </Select>
+              
+              {form.maquina_id && (
+                <div className="mt-2 bg-slate-50 border rounded-md p-3 text-sm animate-in fade-in slide-in-from-top-2">
+                  {(() => {
+                    const selM = maquinas?.find(m => m.id.toString() === form.maquina_id);
+                    if (!selM) return null;
+
+                    return (
+                      <div>
+                        <div className="font-semibold text-slate-700 mb-2 border-b pb-1 flex items-center gap-1">
+                          <Tractor className="h-4 w-4" /> {selM.nombre}
+                        </div>
+                        <div className="grid grid-cols-2 gap-y-2 gap-x-1 text-xs">
+                          <div className="text-slate-500 uppercase font-semibold text-[10px]">Marca</div>
+                          <div>{selM.marca || "-"}</div>
+                          <div className="text-slate-500 uppercase font-semibold text-[10px]">Modelo</div>
+                          <div>{selM.modelo || "-"}</div>
+                          <div className="text-slate-500 uppercase font-semibold text-[10px]">Año</div>
+                          <div>{selM.anio || "-"}</div>
+                          <div className="text-slate-500 uppercase font-semibold text-[10px]">Patente</div>
+                          <div>{selM.patente || selM.dominio || "-"}</div>
+                        </div>
+                        {selM.descripcion && (
+                          <div className="mt-3 text-xs text-muted-foreground italic border-t pt-2">
+                            "{selM.descripcion}"
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           )}
           <div className="grid grid-cols-3 gap-4">
