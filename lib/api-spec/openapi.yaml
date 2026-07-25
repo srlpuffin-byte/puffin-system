@@ -307,6 +307,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Maquina"
+    delete:
+      operationId: deleteMaquina
+      tags: [maquinas]
+      summary: Eliminar maquinaria
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Maquinaria eliminada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
 
   /jornadas:
     get:
@@ -1294,7 +1314,6 @@ components:
           type: string
         dominio:
           type: string
-
         motor:
           type: string
         chasis:

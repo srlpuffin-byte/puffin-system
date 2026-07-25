@@ -434,6 +434,18 @@ export const UpdateMaquinaResponse = zod.object({
 
 
 /**
+ * @summary Eliminar maquinaria
+ */
+export const DeleteMaquinaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteMaquinaResponse = zod.object({
+  "success": zod.boolean().optional()
+})
+
+
+/**
  * @summary Listar jornadas
  */
 export const GetJornadasQueryParams = zod.object({

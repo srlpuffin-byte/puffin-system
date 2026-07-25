@@ -14,6 +14,7 @@ export * from './alertaUpdateEstado';
 export * from './backup';
 export * from './combustibleInput';
 export * from './dashboardResumen';
+export * from './deleteMaquina200';
 export * from './documento';
 export * from './documentoEstado';
 export * from './documentoInput';

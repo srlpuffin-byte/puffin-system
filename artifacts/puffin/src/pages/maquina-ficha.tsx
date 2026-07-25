@@ -97,58 +97,69 @@ export function MaquinaFicha() {
               </CardContent>
             </Card>
           )}
-
           <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Truck className="h-5 w-5" />
-              Datos Técnicos
+              Datos {maquina.categoria === "inventario" ? "Generales" : "Técnicos"}
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">Marca / Modelo</p>
-              <p className="font-medium">{maquina.marca || "-"} {maquina.modelo || "-"}</p>
+              <p className="text-sm text-muted-foreground">Marca {maquina.categoria === "maquinaria" ? "/ Modelo" : ""}</p>
+              <p className="font-medium">{maquina.marca || "-"} {maquina.categoria === "maquinaria" ? maquina.modelo || "-" : ""}</p>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Año</p>
-              <p className="font-medium">{maquina.anio || "-"}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Patente / Dominio</p>
-              <p className="font-medium">{maquina.patente || maquina.dominio || "-"}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Horómetro Actual</p>
-              <p className="font-medium text-lg text-primary">{maquina.horometro || 0} h</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Kilometraje</p>
-              <p className="font-medium">{maquina.kilometros || 0} km</p>
-            </div>
-            {maquina.chasis && (
-              <div>
-                <p className="text-sm text-muted-foreground">N° Chasis</p>
-                <p className="font-medium">{maquina.chasis}</p>
-              </div>
+            {maquina.categoria === "maquinaria" && (
+              <>
+                <div>
+                  <p className="text-sm text-muted-foreground">Año</p>
+                  <p className="font-medium">{maquina.anio || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Patente / Dominio</p>
+                  <p className="font-medium">{maquina.patente || maquina.dominio || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Horómetro Actual</p>
+                  <p className="font-medium text-lg text-primary">{maquina.horometro || 0} h</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Kilometraje</p>
+                  <p className="font-medium">{maquina.kilometros || 0} km</p>
+                </div>
+                {maquina.chasis && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">N° Chasis</p>
+                    <p className="font-medium">{maquina.chasis}</p>
+                  </div>
+                )}
+                {maquina.motor && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">N° Motor</p>
+                    <p className="font-medium">{maquina.motor}</p>
+                  </div>
+                )}
+                {maquina.vencimiento_seguro && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Vencimiento Seguro</p>
+                    <p className="font-medium">{format(new Date(maquina.vencimiento_seguro + 'T12:00:00'), "dd/MM/yyyy")}</p>
+                  </div>
+                )}
+                {maquina.vencimiento_vtv && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Vencimiento VTV</p>
+                    <p className="font-medium">{format(new Date(maquina.vencimiento_vtv + 'T12:00:00'), "dd/MM/yyyy")}</p>
+                  </div>
+                )}
+              </>
             )}
-            {maquina.motor && (
-              <div>
-                <p className="text-sm text-muted-foreground">N° Motor</p>
-                <p className="font-medium">{maquina.motor}</p>
-              </div>
-            )}
-            {maquina.vencimiento_seguro && (
-              <div>
-                <p className="text-sm text-muted-foreground">Vencimiento Seguro</p>
-                <p className="font-medium">{format(new Date(maquina.vencimiento_seguro + 'T12:00:00'), "dd/MM/yyyy")}</p>
-              </div>
-            )}
-            {maquina.vencimiento_vtv && (
-              <div>
-                <p className="text-sm text-muted-foreground">Vencimiento VTV</p>
-                <p className="font-medium">{format(new Date(maquina.vencimiento_vtv + 'T12:00:00'), "dd/MM/yyyy")}</p>
-              </div>
+            {maquina.categoria === "inventario" && (
+              <>
+                <div>
+                  <p className="text-sm text-muted-foreground">Modelo</p>
+                  <p className="font-medium">{maquina.modelo || "-"}</p>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -165,8 +176,10 @@ export function MaquinaFicha() {
         </div>
 
         <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
+          {maquina.categoria === "maquinaria" && (
+            <>
+            <Card>
+              <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
                 Mantenimiento
@@ -240,6 +253,8 @@ export function MaquinaFicha() {
                 ))}
               </CardContent>
             </Card>
+          )}
+          </>
           )}
 
           <Card>

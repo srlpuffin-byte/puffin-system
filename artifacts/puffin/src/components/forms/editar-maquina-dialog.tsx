@@ -25,13 +25,13 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
   const [form, setForm] = useState({
     codigo: "", nombre: "", tipo: "", marca: "", modelo: "",
     anio: "", patente: "", dominio: "", horometro: "", kilometros: "",
-    motor: "", chasis: "", estado: "",
+    motor: "", chasis: "", estado: "", categoria: "",
     filtro_tipo: "", filtro_codigo: "", filtro_fecha_cambio: "", filtro_proximo_cambio: "",
     vencimiento_seguro: "", vencimiento_vtv: "",
     descripcion: ""
   });
 
-  const categoria = maquina?.categoria || "maquinaria";
+  const categoria = form.categoria || "maquinaria";
 
   useEffect(() => {
     if (maquina && open) {
@@ -49,6 +49,7 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
         motor: maquina.motor || "",
         chasis: maquina.chasis || "",
         estado: maquina.estado || "activa",
+        categoria: maquina.categoria || "maquinaria",
         filtro_tipo: maquina.filtro_tipo || "",
         filtro_codigo: maquina.filtro_codigo || "",
         filtro_fecha_cambio: maquina.filtro_fecha_cambio || "",
@@ -86,6 +87,7 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
           motor: form.motor || undefined,
           chasis: form.chasis || undefined,
           estado: form.estado as MaquinaUpdateEstado || undefined,
+          categoria: form.categoria || undefined,
           filtro_tipo: form.filtro_tipo || undefined,
           filtro_codigo: form.filtro_codigo || undefined,
           filtro_fecha_cambio: form.filtro_fecha_cambio || undefined,
@@ -156,14 +158,12 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Estado</Label>
-              <Select value={form.estado} onValueChange={v => set("estado", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar estado" /></SelectTrigger>
+              <Label>Categoría</Label>
+              <Select value={form.categoria} onValueChange={v => { set("categoria", v); set("tipo", ""); }}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="activa">Activa</SelectItem>
-                  <SelectItem value="detenida">Detenida</SelectItem>
-                  <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
-                  <SelectItem value="baja">Baja</SelectItem>
+                  <SelectItem value="maquinaria">Maquinaria Pesada</SelectItem>
+                  <SelectItem value="inventario">Inventario / Herramientas</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -176,6 +176,18 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
             <div className="space-y-1">
               <Label>Modelo</Label>
               <Input placeholder="Ej. 320D" value={form.modelo} onChange={e => set("modelo", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Estado</Label>
+              <Select value={form.estado} onValueChange={v => set("estado", v)}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar estado" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="activa">Activa</SelectItem>
+                  <SelectItem value="detenida">Detenida</SelectItem>
+                  <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
+                  <SelectItem value="baja">Baja</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

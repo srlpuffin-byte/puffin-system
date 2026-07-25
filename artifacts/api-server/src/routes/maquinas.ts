@@ -114,8 +114,11 @@ router.put("/:id", async (req, res) => {
     if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
     const { 
       nombre, estado, horometro, kilometros, proximo_service,
-      codigo, tipo, marca, modelo, anio, patente, dominio, chasis, motor,
-      filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio, descripcion
+      codigo, tipo, marca, modelo, anio, patente, dominio, categoria,
+      motor,
+      chasis,
+      descripcion,
+      filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio
     } = req.body;
     
     const updateData: Record<string, unknown> = {};
@@ -153,6 +156,35 @@ router.put("/:id", async (req, res) => {
   } catch (err: any) {
     req.log?.error(err);
     return res.status(500).json({ error: "Error al actualizar máquina: " + (err?.message || "Error interno") });
+  }
+});
+
+router.delete("/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+    // Ensure it exists first
+    const [existing] = await db.select().from(maquinasTable).where(eq(maquinasTable.id, id));
+    if (!existing) {
+      return res.status(404).json({ error: "Máquina no encontrada" });
+    }
+
+    // Attempt delete
+    await db.delete(maquinasTable).where(eq(maquinasTable.id, id));
+
+    // Also delete associated photos
+    await db.delete(fotografiasTable).where(and(eq(fotografiasTable.entidad_tipo, "maquina"), eq(fotografiasTable.entidad_id, id)));
+
+    // Sincronizar con Google Sheets
+    import("../services/sync-sheets.js").then(({ syncAllSheets }) => {
+      syncAllSheets().catch(console.error);
+    });
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al eliminar máquina: " + (err?.message || "Error interno") });
   }
 });
 

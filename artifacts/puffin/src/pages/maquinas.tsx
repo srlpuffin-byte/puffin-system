@@ -10,8 +10,13 @@ import { Search, Plus, X, RefreshCw } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { ExportButtons } from "@/components/ui/export-buttons";
 import { NuevaMaquinaDialog } from "@/components/forms/nueva-maquina-dialog";
-import { AlertTriangle, Package, Truck } from "lucide-react";
+import { AlertTriangle, Package, Truck, Trash2, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
+import { useDeleteMaquina, useUpdateMaquina, getGetMaquinasQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
 
 const TIPOS_MAQUINA = ["Retroexcavadora", "Niveladora", "Compactadora", "Camión", "Camión Cisterna", "Grúa", "Pala Cargadora", "Minicargadora", "Bulldozer", "Motoniveladora", "Otro"];
 const TIPOS_INVENTARIO = ["Casilla Rodante", "Tanque de Agua", "Tanque de Combustible", "Herramienta Manual", "Herramienta Eléctrica", "Repuesto", "Otro"];
@@ -31,6 +36,10 @@ export function Maquinas() {
   const [filterEstado, setFilterEstado] = useState(urlParams.get("estado") || "todos");
   const [filterTipo, setFilterTipo] = useState("todos");
   const [openDialog, setOpenDialog] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const queryClient = useQueryClient();
+  const deleteMut = useDeleteMaquina();
+  const updateMut = useUpdateMaquina();
   const { data: maquinasRaw, isLoading } = useGetMaquinas({ search: search || undefined, categoria: activeTab });
 
   const maquinas = (maquinasRaw || []).filter(m => {
@@ -59,6 +68,29 @@ export function Maquinas() {
   };
 
   const clearFilters = () => { setSearch(""); setFilterEstado("todos"); setFilterTipo("todos"); };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    deleteMut.mutate({ id: deleteId }, {
+      onSuccess: () => {
+        toast.success("Ítem eliminado correctamente");
+        queryClient.invalidateQueries({ queryKey: getGetMaquinasQueryKey() });
+        setDeleteId(null);
+      },
+      onError: (err: any) => toast.error("Error al eliminar: " + err.message)
+    });
+  };
+
+  const handleMoveCategory = (maquina: any) => {
+    const newCat = activeTab === "maquinaria" ? "inventario" : "maquinaria";
+    updateMut.mutate({ id: maquina.id, data: { categoria: newCat, estado: maquina.estado } as any }, {
+      onSuccess: () => {
+        toast.success(`Movido a ${newCat === "inventario" ? "Inventario" : "Maquinaria Pesada"}`);
+        queryClient.invalidateQueries({ queryKey: getGetMaquinasQueryKey() });
+      },
+      onError: (err: any) => toast.error("Error al mover: " + err.message)
+    });
+  };
 
   const exportColumns = [
     { header: "Código", key: "codigo" },
@@ -193,9 +225,28 @@ export function Maquinas() {
                                 <AlertTriangle className="w-3 h-3" /> Faltan datos
                               </Badge>
                             )}
-                            <Link href={`/maquinas/${maq.id}`} className="text-primary hover:underline font-medium text-sm">
-                              Ver ficha
-                            </Link>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/maquinas/${maq.id}`} className="w-full cursor-pointer">
+                                    Ver ficha
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleMoveCategory(maq)} className="cursor-pointer">
+                                  <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                  Mover a {activeTab === "maquinaria" ? "Inventario" : "Maquinaria Pesada"}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setDeleteId(maq.id)} className="cursor-pointer text-red-600 focus:text-red-600">
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Eliminar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -259,11 +310,17 @@ export function Maquinas() {
                           <AlertTriangle className="w-3 h-3" /> Faltan datos
                         </Badge>
                       )}
-                      <Link href={`/maquinas/${maq.id}`} className={activeTab === "inventario" || !(!maq.marca || !maq.modelo || !maq.anio || (!maq.patente && !maq.dominio) || !maq.motor || !maq.chasis || !maq.filtro_tipo || !maq.filtro_codigo) ? "ml-auto" : ""}>
-                        <Button variant="outline" size="sm" className="h-8">
-                          Ver ficha
+                      <div className="flex items-center gap-2 mt-1">
+                        <Button asChild variant="outline" size="sm" className="flex-1">
+                          <Link href={`/maquinas/${maq.id}`}>Ver ficha</Link>
                         </Button>
-                      </Link>
+                        <Button variant="outline" size="sm" onClick={() => handleMoveCategory(maq)}>
+                          <ArrowRightLeft className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => setDeleteId(maq.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -273,7 +330,28 @@ export function Maquinas() {
         </CardContent>
       </Card>
 
-      <NuevaMaquinaDialog open={openDialog} onOpenChange={setOpenDialog} defaultCategoria={activeTab} />
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente este registro y todas sus fotos asociadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
+              Sí, eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <NuevaMaquinaDialog 
+        open={openDialog} 
+        onOpenChange={setOpenDialog} 
+        defaultCategoria={activeTab}
+      />
     </div>
   );
 }

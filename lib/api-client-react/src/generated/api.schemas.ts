@@ -764,6 +764,10 @@ export const GetMaquinasEstado = {
   baja: 'baja',
 } as const;
 
+export type DeleteMaquina200 = {
+  success?: boolean;
+};
+
 export type GetJornadasParams = {
 empleado_id?: number;
 maquina_id?: number;
