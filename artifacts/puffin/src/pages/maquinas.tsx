@@ -16,7 +16,8 @@ import { useDeleteMaquina, useUpdateMaquina, getGetMaquinasQueryKey } from "@wor
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Tractor } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const TIPOS_MAQUINA = ["Retroexcavadora", "Niveladora", "Compactadora", "Camión", "Camión Cisterna", "Grúa", "Pala Cargadora", "Minicargadora", "Bulldozer", "Motoniveladora", "Otro"];
 const TIPOS_INVENTARIO = ["Casilla Rodante", "Tanque de Agua", "Tanque de Combustible", "Herramienta Manual", "Herramienta Eléctrica", "Repuesto", "Otro"];
@@ -191,6 +192,7 @@ export function Maquinas() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-14">Foto</TableHead>
                     <TableHead>Código</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Tipo</TableHead>
@@ -201,12 +203,20 @@ export function Maquinas() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-8">Cargando maquinaria...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center py-8">Cargando maquinaria...</TableCell></TableRow>
                   ) : maquinas?.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No se encontraron resultados.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No se encontraron resultados.</TableCell></TableRow>
                   ) : (
                     maquinas?.map((maq) => (
                       <TableRow key={maq.id}>
+                        <TableCell className="w-14">
+                          <Avatar className="h-10 w-10 rounded-md border">
+                            <AvatarImage src={(maq as any).imagen_url || undefined} className="object-cover" />
+                            <AvatarFallback className="rounded-md bg-slate-100 text-xs">
+                              <Tractor className="h-5 w-5 text-slate-400" />
+                            </AvatarFallback>
+                          </Avatar>
+                        </TableCell>
                         <TableCell className="font-medium">{maq.codigo || "-"}</TableCell>
                         <TableCell>{maq.nombre}</TableCell>
                         <TableCell className="capitalize">{maq.tipo}</TableCell>
