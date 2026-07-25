@@ -141,49 +141,26 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
                 onValueChange={v => set("maquina_id", v)}
                 required
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-auto min-h-10 py-2">
                   <SelectValue placeholder="Seleccionar máquina" />
                 </SelectTrigger>
                 <SelectContent>
                   {Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario").map(m => (
-                    <SelectItem key={m.id} value={m.id.toString()}>
-                      {m.nombre}{m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ''}
+                    <SelectItem key={m.id} value={m.id.toString()} className="py-2">
+                      <div className="flex flex-col text-left">
+                        <span className="font-semibold text-sm">
+                          {m.nombre}{m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ''}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground mt-0.5 flex gap-2">
+                          <span className="font-medium text-slate-500">M: <span className="font-normal text-slate-700">{m.marca || "-"}</span></span>
+                          <span className="font-medium text-slate-500">Mod: <span className="font-normal text-slate-700">{m.modelo || "-"}</span></span>
+                          <span className="font-medium text-slate-500">Año: <span className="font-normal text-slate-700">{m.anio || "-"}</span></span>
+                        </span>
+                      </div>
                     </SelectItem>
                   )) : null}
                 </SelectContent>
               </Select>
-              
-              {form.maquina_id && (
-                <div className="mt-2 bg-slate-50 border rounded-md p-3 text-sm animate-in fade-in slide-in-from-top-2">
-                  {(() => {
-                    const selM = maquinas?.find(m => m.id.toString() === form.maquina_id);
-                    if (!selM) return null;
-
-                    return (
-                      <div>
-                        <div className="font-semibold text-slate-700 mb-2 border-b pb-1 flex items-center gap-1">
-                          <Tractor className="h-4 w-4" /> {selM.nombre}
-                        </div>
-                        <div className="grid grid-cols-2 gap-y-2 gap-x-1 text-xs">
-                          <div className="text-slate-500 uppercase font-semibold text-[10px]">Marca</div>
-                          <div>{selM.marca || "-"}</div>
-                          <div className="text-slate-500 uppercase font-semibold text-[10px]">Modelo</div>
-                          <div>{selM.modelo || "-"}</div>
-                          <div className="text-slate-500 uppercase font-semibold text-[10px]">Año</div>
-                          <div>{selM.anio || "-"}</div>
-                          <div className="text-slate-500 uppercase font-semibold text-[10px]">Patente</div>
-                          <div>{selM.patente || selM.dominio || "-"}</div>
-                        </div>
-                        {selM.descripcion && (
-                          <div className="mt-3 text-xs text-muted-foreground italic border-t pt-2">
-                            "{selM.descripcion}"
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
             </div>
           )}
           <div className="grid grid-cols-3 gap-4">

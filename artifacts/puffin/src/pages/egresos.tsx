@@ -332,53 +332,35 @@ export function Egresos() {
             <div className="space-y-1">
               <Label>Proyecto / Lugar del Gasto</Label>
               <Select value={form.centro_costos} onValueChange={v => set("centro_costos", v)}>
-                <SelectTrigger>
+                <SelectTrigger className="h-auto min-h-10 py-2">
                   <SelectValue placeholder="Seleccionar proyecto" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="General">General (sin proyecto específico)</SelectItem>
-                  {proyectos?.map(p => (
-                    <SelectItem key={p.id} value={p.lugar}>
-                      {p.lugar}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              {form.centro_costos && form.centro_costos !== "General" && (
-                <div className="mt-2 bg-slate-50 border rounded-md p-3 text-sm animate-in fade-in slide-in-from-top-2">
-                  {(() => {
-                    const selP = proyectos?.find(p => p.lugar === form.centro_costos);
-                    if (!selP) return null;
-                    const asigEmpleados = empleados?.filter((e: any) => selP.empleados_asignados?.includes(e.id)) || [];
-                    const asigMaquinas = maquinas?.filter((m: any) => selP.maquinas_asignadas?.includes(m.id)) || [];
+                  {proyectos?.map(p => {
+                    const asigEmpleados = empleados?.filter((e: any) => p.empleados_asignados?.includes(e.id)) || [];
+                    const asigMaquinas = maquinas?.filter((m: any) => p.maquinas_asignadas?.includes(m.id)) || [];
                     
                     return (
-                      <div>
-                        <div className="font-semibold text-slate-700 mb-2 border-b pb-1">Asignaciones en {selP.lugar}</div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <span className="text-xs text-slate-500 font-medium flex items-center gap-1 mb-1"><Users className="h-3 w-3"/> Empleados</span>
-                            {asigEmpleados.length > 0 ? (
-                              <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
-                                {asigEmpleados.map((e: any) => <li key={e.id}>{e.nombre} {e.apellido}</li>)}
-                              </ul>
-                            ) : <span className="text-xs text-slate-400 italic">Ninguno</span>}
-                          </div>
-                          <div>
-                            <span className="text-xs text-slate-500 font-medium flex items-center gap-1 mb-1"><Tractor className="h-3 w-3"/> Maquinaria</span>
-                            {asigMaquinas.length > 0 ? (
-                              <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
-                                {asigMaquinas.map((m: any) => <li key={m.id}>{m.nombre}</li>)}
-                              </ul>
-                            ) : <span className="text-xs text-slate-400 italic">Ninguna</span>}
-                          </div>
+                      <SelectItem key={p.id} value={p.lugar} className="py-2">
+                        <div className="flex flex-col text-left">
+                          <span className="font-semibold text-sm">{p.lugar}</span>
+                          <span className="text-[11px] text-muted-foreground mt-0.5 flex flex-col gap-0.5">
+                            <span className="line-clamp-1">
+                              <Users className="inline h-3 w-3 mr-1" />
+                              {asigEmpleados.length > 0 ? asigEmpleados.map((e: any) => e.nombre).join(", ") : "Ninguno asignado"}
+                            </span>
+                            <span className="line-clamp-1">
+                              <Tractor className="inline h-3 w-3 mr-1" />
+                              {asigMaquinas.length > 0 ? asigMaquinas.map((m: any) => m.nombre).join(", ") : "Ninguna asignada"}
+                            </span>
+                          </span>
                         </div>
-                      </div>
+                      </SelectItem>
                     );
-                  })()}
-                </div>
-              )}
+                  })}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
