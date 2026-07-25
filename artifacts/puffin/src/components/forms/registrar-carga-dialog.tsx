@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Camera, Tractor } from "lucide-react";
+import { Camera, Tractor, Users, Briefcase } from "lucide-react";
+import { useGetProyectos } from "@/hooks/use-proyectos";
 
 interface Props {
   open: boolean;
@@ -24,9 +25,11 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
   const { data: empleados } = useGetEmpleados({ estado: "activo" });
   const { data: maquinas } = useGetMaquinas();
   const { data: user } = useGetMe();
+  const { data: proyectos } = useGetProyectos();
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";
   const [fotoNivel, setFotoNivel] = useState<{ base64: string; name: string } | null>(null);
-  const [hoveredMaquina, setHoveredMaquina] = useState<number | null>(null);
+  const [hoveredItem, setHoveredItem] = useState<{ tipo: 'operario' | 'maquina', id: number } | null>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   const [form, setForm] = useState({
     empleado_id: empleadoIdFijo?.toString() || "",
@@ -105,7 +108,10 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={open => {
+        onOpenChange(open);
+        if (!open) setHoveredItem(null);
+      }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Registrar Carga de Combustible</DialogTitle>
@@ -125,7 +131,15 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
                 </SelectTrigger>
                 <SelectContent>
                   {Array.isArray(empleados) ? empleados.map(e => (
-                    <SelectItem key={e.id} value={e.id.toString()}>
+                    <SelectItem 
+                      key={e.id} 
+                      value={e.id.toString()}
+                      onPointerMove={(ev) => {
+                        setHoveredItem({ tipo: 'operario', id: e.id });
+                        setMousePos({ x: ev.clientX, y: ev.clientY });
+                      }}
+                      onPointerLeave={() => setHoveredItem(null)}
+                    >
                       {e.apellido}, {e.nombre}
                     </SelectItem>
                   )) : null}
@@ -146,7 +160,16 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
                 </SelectTrigger>
                 <SelectContent>
                   {Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario").map(m => (
-                    <SelectItem key={m.id} value={m.id.toString()} className="py-2">
+                    <SelectItem 
+                      key={m.id} 
+                      value={m.id.toString()} 
+                      className="py-2"
+                      onPointerMove={(ev) => {
+                        setHoveredItem({ tipo: 'maquina', id: m.id });
+                        setMousePos({ x: ev.clientX, y: ev.clientY });
+                      }}
+                      onPointerLeave={() => setHoveredItem(null)}
+                    >
                       <div className="flex flex-col text-left">
                         <span className="font-semibold text-sm">
                           {m.nombre}{m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ''}
@@ -224,6 +247,54 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
           </DialogFooter>
         </form>
       </DialogContent>
+
+      {/* Custom Tooltip that escapes Radix UI traps */}
+      {hoveredItem && open && (
+        <div 
+          style={{ position: 'fixed', left: mousePos.x + 20, top: mousePos.y - 40, zIndex: 999999 }}
+          className="bg-white border-2 border-slate-200 shadow-2xl p-4 w-72 rounded-xl pointer-events-none animate-in fade-in zoom-in-95 duration-100"
+        >
+          {hoveredItem.tipo === 'maquina' ? (() => {
+            const m = maquinas?.find(x => x.id === hoveredItem.id);
+            if (!m) return null;
+            const asig = proyectos?.find(p => p.maquinas_asignadas?.includes(m.id));
+            return (
+              <div>
+                <h4 className="font-bold text-sm border-b pb-2 mb-3 text-primary flex items-center gap-1">
+                  <Tractor className="h-4 w-4" /> {m.nombre}
+                </h4>
+                <div className="text-xs text-slate-600 mb-3">
+                  <div className="flex items-center gap-1 font-semibold text-slate-500 mb-1"><Briefcase className="h-3 w-3"/> Proyecto asignado:</div>
+                  {asig ? <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{asig.lugar}</span> : <span className="italic text-slate-400">Sin proyecto asignado</span>}
+                </div>
+                <div className="grid grid-cols-2 gap-y-2 gap-x-1 text-xs">
+                  <div className="text-slate-500 uppercase font-semibold text-[10px]">Marca</div>
+                  <div>{m.marca || "-"}</div>
+                  <div className="text-slate-500 uppercase font-semibold text-[10px]">Modelo</div>
+                  <div>{m.modelo || "-"}</div>
+                  <div className="text-slate-500 uppercase font-semibold text-[10px]">Patente</div>
+                  <div>{m.patente || m.dominio || "-"}</div>
+                </div>
+              </div>
+            );
+          })() : (() => {
+            const e = empleados?.find(x => x.id === hoveredItem.id);
+            if (!e) return null;
+            const asig = proyectos?.find(p => p.empleados_asignados?.includes(e.id));
+            return (
+              <div>
+                <h4 className="font-bold text-sm border-b pb-2 mb-3 text-primary flex items-center gap-1">
+                  <Users className="h-4 w-4" /> {e.nombre} {e.apellido}
+                </h4>
+                <div className="text-xs text-slate-600">
+                  <div className="flex items-center gap-1 font-semibold text-slate-500 mb-1"><Briefcase className="h-3 w-3"/> Proyecto asignado:</div>
+                  {asig ? <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{asig.lugar}</span> : <span className="italic text-slate-400">Sin proyecto asignado</span>}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
     </Dialog>
   );
 }

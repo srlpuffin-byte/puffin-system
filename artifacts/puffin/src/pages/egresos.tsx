@@ -25,7 +25,8 @@ export function Egresos() {
   const { data: empleados } = useGetEmpleados();
   const { data: maquinas } = useGetMaquinas();
   const [openDialog, setOpenDialog] = useState(false);
-  const [hoveredProject, setHoveredProject] = useState<number | null>(null);
+  const [hoveredProject, setHoveredProject] = useState<any>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const queryClient = useQueryClient();
   const createMut = useCreateEgreso();
   const updateMut = import("@workspace/api-client-react").then(m => m.useUpdateEgreso ? m.useUpdateEgreso() : null);
@@ -342,7 +343,10 @@ export function Egresos() {
 
       <Dialog open={openDialog} onOpenChange={open => {
         setOpenDialog(open);
-        if (!open) resetForm();
+        if (!open) {
+          resetForm();
+          setHoveredProject(null);
+        }
       }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -379,26 +383,19 @@ export function Egresos() {
                   <SelectValue placeholder="Seleccionar proyecto" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="General">General (sin proyecto específico)</SelectItem>
+                  <SelectItem value="General" onPointerMove={() => setHoveredProject(null)}>General (sin proyecto específico)</SelectItem>
                   {proyectos?.map(p => {
-                    const asigEmpleados = empleados?.filter((e: any) => p.empleados_asignados?.includes(e.id)) || [];
-                    const asigMaquinas = maquinas?.filter((m: any) => p.maquinas_asignadas?.includes(m.id)) || [];
-                    
                     return (
-                      <SelectItem key={p.id} value={p.lugar} className="py-2">
-                        <div className="flex flex-col text-left">
-                          <span className="font-semibold text-sm">{p.lugar}</span>
-                          <span className="text-[11px] text-muted-foreground mt-0.5 flex flex-col gap-0.5">
-                            <span className="line-clamp-1">
-                              <Users className="inline h-3 w-3 mr-1" />
-                              {asigEmpleados.length > 0 ? asigEmpleados.map((e: any) => e.nombre).join(", ") : "Ninguno asignado"}
-                            </span>
-                            <span className="line-clamp-1">
-                              <Tractor className="inline h-3 w-3 mr-1" />
-                              {asigMaquinas.length > 0 ? asigMaquinas.map((m: any) => m.nombre).join(", ") : "Ninguna asignada"}
-                            </span>
-                          </span>
-                        </div>
+                      <SelectItem 
+                        key={p.id} 
+                        value={p.lugar}
+                        onPointerMove={(e) => {
+                          setHoveredProject(p);
+                          setMousePos({ x: e.clientX, y: e.clientY });
+                        }}
+                        onPointerLeave={() => setHoveredProject(null)}
+                      >
+                        {p.lugar}
                       </SelectItem>
                     );
                   })}
@@ -439,6 +436,44 @@ export function Egresos() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Custom Tooltip that escapes Radix UI traps */}
+      {hoveredProject && openDialog && (
+        <div 
+          style={{ position: 'fixed', left: mousePos.x + 20, top: mousePos.y - 40, zIndex: 999999 }}
+          className="bg-white border-2 border-slate-200 shadow-2xl p-4 w-72 rounded-xl pointer-events-none animate-in fade-in zoom-in-95 duration-100"
+        >
+          <h4 className="font-bold text-sm border-b pb-2 mb-3 text-primary">{hoveredProject.lugar}</h4>
+          
+          <div className="space-y-4">
+            <div>
+              <h5 className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-1">
+                <Users className="h-3 w-3" /> Empleados
+              </h5>
+              <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
+                {(() => {
+                  const asigEmpleados = empleados?.filter((e: any) => hoveredProject.empleados_asignados?.includes(e.id)) || [];
+                  if (asigEmpleados.length === 0) return <li className="text-slate-400 italic list-none -ml-4">Ninguno asignado</li>;
+                  return asigEmpleados.map((e: any) => <li key={e.id}>{e.nombre} {e.apellido}</li>);
+                })()}
+              </ul>
+            </div>
+            
+            <div>
+              <h5 className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-1">
+                <Tractor className="h-3 w-3" /> Maquinaria
+              </h5>
+              <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
+                {(() => {
+                  const asigMaquinas = maquinas?.filter((m: any) => hoveredProject.maquinas_asignadas?.includes(m.id)) || [];
+                  if (asigMaquinas.length === 0) return <li className="text-slate-400 italic list-none -ml-4">Ninguna asignada</li>;
+                  return asigMaquinas.map((m: any) => <li key={m.id}>{m.nombre}</li>);
+                })()}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
