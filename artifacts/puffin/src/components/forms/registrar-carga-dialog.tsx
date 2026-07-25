@@ -6,8 +6,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Camera } from "lucide-react";
+import { Camera, Tractor } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -25,6 +26,7 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
   const { data: user } = useGetMe();
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";
   const [fotoNivel, setFotoNivel] = useState<{ base64: string; name: string } | null>(null);
+  const [hoveredMaquina, setHoveredMaquina] = useState<number | null>(null);
 
   const [form, setForm] = useState({
     empleado_id: empleadoIdFijo?.toString() || "",
@@ -112,30 +114,89 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
           {!empleadoIdFijo && (
             <div className="space-y-1">
               <Label>Operario *</Label>
-              <select
+              <Select
                 value={form.empleado_id}
-                onChange={e => set("empleado_id", e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50"
-                required
+                onValueChange={v => set("empleado_id", v)}
                 disabled={isEmpleado}
+                required
               >
-                <option value="" disabled>Seleccionar operario</option>
-                {Array.isArray(empleados) ? empleados.map(e => <option key={e.id} value={e.id.toString()}>{e.apellido}, {e.nombre}</option>) : null}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar operario" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.isArray(empleados) ? empleados.map(e => (
+                    <SelectItem key={e.id} value={e.id.toString()}>
+                      {e.apellido}, {e.nombre}
+                    </SelectItem>
+                  )) : null}
+                </SelectContent>
+              </Select>
             </div>
           )}
           {!maquinaIdFija && (
             <div className="space-y-1">
               <Label>Máquina *</Label>
-              <select
+              <Select
                 value={form.maquina_id}
-                onChange={e => set("maquina_id", e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                onValueChange={v => set("maquina_id", v)}
                 required
               >
-                <option value="" disabled>Seleccionar máquina</option>
-                {Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario").map(m => <option key={m.id} value={m.id.toString()}>{m.nombre}{m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ''}</option>) : null}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar máquina" />
+                </SelectTrigger>
+                <SelectContent className={maquinas && maquinas.length > 0 ? "w-[500px]" : ""}>
+                  <div className={maquinas && maquinas.length > 0 ? "flex h-[250px]" : ""}>
+                    <div className={maquinas && maquinas.length > 0 ? "w-1/2 overflow-y-auto pr-2 border-r" : ""}>
+                      {Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario").map(m => (
+                        <SelectItem 
+                          key={m.id} 
+                          value={m.id.toString()}
+                          onPointerMove={() => setHoveredMaquina(m.id)}
+                        >
+                          {m.nombre}{m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ''}
+                        </SelectItem>
+                      )) : null}
+                    </div>
+                    {maquinas && maquinas.length > 0 && (
+                      <div className="w-1/2 p-4 overflow-y-auto bg-slate-50">
+                        {(() => {
+                          const hoveredM = maquinas.find(m => m.id === hoveredMaquina);
+                          if (!hoveredM) {
+                            return (
+                              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center">
+                                <span className="text-sm">Pasá el mouse por una máquina para ver sus detalles</span>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div>
+                              <h4 className="font-bold text-sm border-b pb-2 mb-3 text-primary leading-tight flex items-center gap-1">
+                                <Tractor className="h-4 w-4" /> {hoveredM.nombre}
+                              </h4>
+                              <div className="grid grid-cols-2 gap-y-2 gap-x-1 text-xs">
+                                <div className="text-slate-500 uppercase font-semibold text-[10px]">Marca</div>
+                                <div>{hoveredM.marca || "-"}</div>
+                                <div className="text-slate-500 uppercase font-semibold text-[10px]">Modelo</div>
+                                <div>{hoveredM.modelo || "-"}</div>
+                                <div className="text-slate-500 uppercase font-semibold text-[10px]">Año</div>
+                                <div>{hoveredM.anio || "-"}</div>
+                                <div className="text-slate-500 uppercase font-semibold text-[10px]">Patente</div>
+                                <div>{hoveredM.patente || hoveredM.dominio || "-"}</div>
+                              </div>
+                              {hoveredM.descripcion && (
+                                <div className="mt-3 text-xs text-muted-foreground italic border-t pt-2">
+                                  "{hoveredM.descripcion}"
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                </SelectContent>
+              </Select>
             </div>
           )}
           <div className="grid grid-cols-3 gap-4">
