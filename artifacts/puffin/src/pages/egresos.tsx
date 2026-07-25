@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { createPortal } from "react-dom";
 import { useGetEgresos, useCreateEgreso, useGetEmpleados, useGetMaquinas } from "@workspace/api-client-react";
 import { useGetProyectos } from "@/hooks/use-proyectos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,8 +25,6 @@ export function Egresos() {
   const { data: empleados } = useGetEmpleados();
   const { data: maquinas } = useGetMaquinas();
   const [openDialog, setOpenDialog] = useState(false);
-  const [hoveredProject, setHoveredProject] = useState<any>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const queryClient = useQueryClient();
   const createMut = useCreateEgreso();
   const updateMut = import("@workspace/api-client-react").then(m => m.useUpdateEgreso ? m.useUpdateEgreso() : null);
@@ -346,7 +343,6 @@ export function Egresos() {
         setOpenDialog(open);
         if (!open) {
           resetForm();
-          setHoveredProject(null);
         }
       }}>
         <DialogContent className="max-w-lg">
@@ -384,25 +380,213 @@ export function Egresos() {
                   <SelectValue placeholder="Seleccionar proyecto" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="General" onPointerMove={() => setHoveredProject(null)}>General (sin proyecto específico)</SelectItem>
+                  <SelectItem value="General">General (sin proyecto específico)</SelectItem>
                   {proyectos?.map(p => {
+                    const asigEmpleados = empleados?.filter((e: any) => p.empleados_asignados?.includes(e.id)) || [];
+                    const asigMaquinas = maquinas?.filter((m: any) => p.maquinas_asignadas?.includes(m.id)) || [];
+                    const tooltip = `Asignaciones en ${p.lugar}\n👥 Empleados: ${asigEmpleados.length > 0 ? asigEmpleados.map((e: any) => e.nombre).join(", ") : "Ninguno"}\n🚜 Máquinas: ${asigMaquinas.length > 0 ? asigMaquinas.map((m: any) => m.nombre).join(", ") : "Ninguna"}`;
                     return (
                       <SelectItem 
                         key={p.id} 
                         value={p.lugar}
-                        className="p-0"
+                        title={tooltip}
                       >
-                        <div
-                          className="w-full px-2 py-1.5"
-                          onMouseEnter={(ev) => {
-                            setHoveredProject(p);
-                            setMousePos({ x: ev.clientX, y: ev.clientY });
-                          }}
-                          onMouseMove={(ev) => setMousePos({ x: ev.clientX, y: ev.clientY })}
-                          onMouseLeave={() => setHoveredProject(null)}
-                        >
-                          {p.lugar}
-                        </div>
+                        {p.lugar}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Observaciones / Ref</Label>
+                <Input placeholder="Ticket Nro..." value={form.observaciones} onChange={e => set("observaciones", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Método de Pago</Label>
+                <Select value={form.metodo_pago} onValueChange={v => set("metodo_pago", v)}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Efectivo">Efectivo</SelectItem>
+                    <SelectItem value="Transferencia">Transferencia</SelectItem>
+                    <SelectItem value="Tarjeta">Tarjeta</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 pt-2">
+              <Switch 
+                id="comprobante" 
+                checked={form.comprobante} 
+{eg.centro_costos ? (
+                            (() => {
+                              const p = proyectos?.find(p => p.lugar === eg.centro_costos);
+                              if (!p) {
+                                return <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{eg.centro_costos}</span>;
+                              }
+                              
+                              const asigEmpleados = empleados?.filter((e: any) => p.empleados_asignados?.includes(e.id)) || [];
+                              const asigMaquinas = maquinas?.filter((m: any) => p.maquinas_asignadas?.includes(m.id)) || [];
+                              
+                              return (
+                                <HoverCard openDelay={100}>
+                                  <HoverCardTrigger asChild>
+                                    <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full cursor-help hover:bg-blue-100 transition-colors">
+                                      {eg.centro_costos}
+                                    </span>
+                                  </HoverCardTrigger>
+                                  <HoverCardContent side="top" className="w-80 p-3 shadow-xl z-[100] bg-white border-2">
+                                    <h4 className="font-bold text-sm border-b pb-2 mb-2 text-primary">{p.lugar}</h4>
+                                    <div className="space-y-3">
+                                      <div>
+                                        <h5 className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-1">
+                                          <Users className="h-3 w-3" /> Empleados ({asigEmpleados.length})
+                                        </h5>
+                                        {asigEmpleados.length > 0 ? (
+                                          <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
+                                            {asigEmpleados.map((e: any) => <li key={e.id}>{e.nombre} {e.apellido}</li>)}
+                                          </ul>
+                                        ) : <p className="text-xs text-slate-400 italic">Ninguno asignado</p>}
+                                      </div>
+                                      <div>
+                                        <h5 className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-1">
+                                          <Tractor className="h-3 w-3" /> Maquinaria e Inventario ({asigMaquinas.length})
+                                        </h5>
+                                        {asigMaquinas.length > 0 ? (
+                                          <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
+                                            {asigMaquinas.map((m: any) => <li key={m.id}>{m.nombre}</li>)}
+                                          </ul>
+                                        ) : <p className="text-xs text-slate-400 italic">Ninguna asignada</p>}
+                                      </div>
+                                    </div>
+                                  </HoverCardContent>
+                                </HoverCard>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{eg.metodo_pago || "-"}</TableCell>
+                        <TableCell className="text-right font-semibold text-red-600">
+                          ${eg.monto.toLocaleString("es-AR")}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={eg.comprobante ? "default" : "secondary"}>
+                            {eg.comprobante ? "SI" : "NO"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(eg)}>
+                            Editar
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Vista Mobile (Tarjetas) */}
+            <div className="md:hidden divide-y">
+              {isLoading ? (
+                <div className="text-center py-8">Cargando egresos...</div>
+              ) : egresos?.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No hay egresos registrados.</div>
+              ) : (
+                egresos?.map((eg: any) => (
+                  <div key={eg.id} className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-red-600">${eg.monto.toLocaleString("es-AR")}</span>
+                        <span className="text-xs text-muted-foreground">{format(new Date(eg.fecha), "dd/MM/yyyy", { locale: es })}</span>
+                      </div>
+                      <Badge variant="outline">{eg.categoria}</Badge>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium text-sm leading-snug">{eg.concepto}</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        {eg.centro_costos && (
+                          <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                            {eg.centro_costos}
+                          </span>
+                        )}
+                        <span className="text-xs text-muted-foreground">Medio: {eg.metodo_pago || "-"}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t">
+                      <Badge variant={eg.comprobante ? "default" : "secondary"} className="text-[10px]">
+                        {eg.comprobante ? "Con comprobante" : "Sin comprobante"}
+                      </Badge>
+                      <Button variant="outline" size="sm" onClick={() => openEdit(eg)} className="h-8 text-xs">
+                        Editar
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={openDialog} onOpenChange={open => {
+        setOpenDialog(open);
+        if (!open) {
+          resetForm();
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingId ? "Editar Egreso" : "Registrar Nuevo Egreso"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Fecha</Label>
+                <Input type="date" value={form.fecha} onChange={e => set("fecha", e.target.value)} required />
+              </div>
+              <div className="space-y-1">
+                <Label>Monto ($) *</Label>
+                <Input type="number" step="0.01" value={form.monto} onChange={e => set("monto", e.target.value)} required />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Categoría</Label>
+              <Select value={form.categoria} onValueChange={v => set("categoria", v)}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORIAS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Concepto *</Label>
+              <Input placeholder="Ej. Compra de repuestos" value={form.concepto} onChange={e => set("concepto", e.target.value)} required />
+            </div>
+            <div className="space-y-1">
+              <Label>Proyecto / Lugar del Gasto</Label>
+              <Select value={form.centro_costos} onValueChange={v => set("centro_costos", v)}>
+                <SelectTrigger className="h-auto min-h-10 py-2">
+                  <SelectValue placeholder="Seleccionar proyecto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="General">General (sin proyecto específico)</SelectItem>
+                  {proyectos?.map(p => {
+                    const asigEmpleados = empleados?.filter((e: any) => p.empleados_asignados?.includes(e.id)) || [];
+                    const asigMaquinas = maquinas?.filter((m: any) => p.maquinas_asignadas?.includes(m.id)) || [];
+                    const tooltip = `Asignaciones en ${p.lugar}\n👥 Empleados: ${asigEmpleados.length > 0 ? asigEmpleados.map((e: any) => e.nombre).join(", ") : "Ninguno"}\n🚜 Máquinas: ${asigMaquinas.length > 0 ? asigMaquinas.map((m: any) => m.nombre).join(", ") : "Ninguna"}`;
+                    return (
+                      <SelectItem 
+                        key={p.id} 
+                        value={p.lugar}
+                        title={tooltip}
+                      >
+                        {p.lugar}
                       </SelectItem>
                     );
                   })}
@@ -443,45 +627,6 @@ export function Egresos() {
           </form>
         </DialogContent>
       </Dialog>
-
-      {/* Custom Tooltip that escapes Radix UI traps */}
-      {hoveredProject && openDialog && typeof document !== 'undefined' && createPortal(
-        <div 
-          style={{ position: 'fixed', left: mousePos.x + 20, top: mousePos.y - 40, zIndex: 999999 }}
-          className="bg-white border-2 border-slate-200 shadow-2xl p-4 w-72 rounded-xl pointer-events-none animate-in fade-in zoom-in-95 duration-100"
-        >
-          <h4 className="font-bold text-sm border-b pb-2 mb-3 text-primary">{hoveredProject.lugar}</h4>
-          
-          <div className="space-y-4">
-            <div>
-              <h5 className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-1">
-                <Users className="h-3 w-3" /> Empleados
-              </h5>
-              <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
-                {(() => {
-                  const asigEmpleados = empleados?.filter((e: any) => hoveredProject.empleados_asignados?.includes(e.id)) || [];
-                  if (asigEmpleados.length === 0) return <li className="text-slate-400 italic list-none -ml-4">Ninguno asignado</li>;
-                  return asigEmpleados.map((e: any) => <li key={e.id}>{e.nombre} {e.apellido}</li>);
-                })()}
-              </ul>
-            </div>
-            
-            <div>
-              <h5 className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-1">
-                <Tractor className="h-3 w-3" /> Maquinaria
-              </h5>
-              <ul className="text-xs text-slate-700 list-disc pl-4 space-y-0.5">
-                {(() => {
-                  const asigMaquinas = maquinas?.filter((m: any) => hoveredProject.maquinas_asignadas?.includes(m.id)) || [];
-                  if (asigMaquinas.length === 0) return <li className="text-slate-400 italic list-none -ml-4">Ninguna asignada</li>;
-                  return asigMaquinas.map((m: any) => <li key={m.id}>{m.nombre}</li>);
-                })()}
-              </ul>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
     </div>
   );
 }
