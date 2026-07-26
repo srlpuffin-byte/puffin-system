@@ -58,16 +58,29 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   }
 ];
 
+// Números de administradores autorizados para usar el asistente IA
+const ADMIN_PHONES = ["3472629600", "3572665637", "3572400877"];
+
 export async function handleWhatsAppMessage(from: string, text: string) {
-  if (!openai) {
-    console.warn("OpenAI API KEY no configurada. Asistente deshabilitado.");
-    await sendWhatsAppMessage(from, "Lo siento, mi cerebro (IA) no está configurado por el momento.");
+  // Normalizar número: solo dígitos, sin código de país
+  const senderPhone = from.replace(/[^0-9]/g, "");
+
+  // Verificar si el número está autorizado (últimos 10 dígitos para manejar código de país)
+  const isAdmin = ADMIN_PHONES.some(admin =>
+    senderPhone.endsWith(admin) || admin.endsWith(senderPhone.slice(-10))
+  );
+
+  if (!isAdmin) {
+    // Empleados no autorizados: ignorar silenciosamente (sin respuesta)
+    console.log(`[WhatsApp] Mensaje de número no autorizado ${senderPhone} ignorado.`);
     return;
   }
 
-  // 1. Identificar si el número pertenece a un administrador o empleado
-  const senderPhone = from.replace(/[^0-9]/g, "");
-  // TODO: Podríamos verificar permisos en db, pero asumimos que responde a lo que se le pide.
+  if (!openai) {
+    console.warn("OpenAI API KEY no configurada. Asistente deshabilitado.");
+    await sendWhatsAppMessage(from, "Lo siento, el asistente no está configurado por el momento.");
+    return;
+  }
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { 
