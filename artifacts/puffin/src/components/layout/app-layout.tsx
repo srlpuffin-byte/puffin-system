@@ -38,6 +38,7 @@ import { TutorialDialog } from "@/components/ui/tutorial-dialog";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { usePWAUpdate } from "@/hooks/use-pwa-update";
 
 interface NavItem {
   icon: React.ElementType;
@@ -181,6 +182,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     !m.motor || !m.chasis || !m.filtro_tipo || !m.filtro_codigo
   ) : false;
 
+  // Detectar actualizaciones de Vercel en todos los celulares (iOS + Android)
+  usePWAUpdate();
+
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
@@ -189,26 +193,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       }
     };
     document.addEventListener("keydown", down);
-
-  // ── Escuchar actualizaciones del PWA ──
-    const handlePWAUpdate = () => {
-      toast("🔄 Nueva versión disponible", {
-        description: "Hay una actualización de PUFFIN. Tocá para aplicarla ahora.",
-        duration: Infinity,
-        action: {
-          label: "Actualizar ahora",
-          onClick: () => {
-            (window as any).__puffin_updateSW?.();
-            setTimeout(() => window.location.reload(), 300);
-          },
-        },
-      });
-    };
-    window.addEventListener("pwa-update-available", handlePWAUpdate);
-    return () => {
-      document.removeEventListener("keydown", down);
-      window.removeEventListener("pwa-update-available", handlePWAUpdate);
-    };
+    return () => document.removeEventListener("keydown", down);
   }, []);
 
   const queryClient = useQueryClient();
