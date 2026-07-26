@@ -43,6 +43,8 @@ export default defineConfig({
         ]
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         maximumFileSizeToCacheInBytes: 5000000,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp}'],
         runtimeCaching: [
@@ -50,10 +52,10 @@ export default defineConfig({
             urlPattern: /^\/api\/.*/,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'api-cache',
+              cacheName: 'api-cache-v2',
               expiration: {
                 maxEntries: 200,
-                maxAgeSeconds: 24 * 60 * 60, // 24 horas
+                maxAgeSeconds: 24 * 60 * 60,
               },
               cacheableResponse: {
                 statuses: [0, 200]
