@@ -152,3 +152,122 @@ cronRouter.get("/alertas-diarias", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// CRON: Jornadas sin finalizar después de 9 horas
+// Llamar cada hora desde Railway Cron / cron externo
+// GET /api/cron/jornadas-sin-finalizar?token=TU_TOKEN
+// ──────────────────────────────────────────────────────────────────────────────
+import { jornadasTable } from "@workspace/db/schema";
+import { lte } from "drizzle-orm";
+
+cronRouter.get("/jornadas-sin-finalizar", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1] || req.query.token;
+  if (token !== CRON_SECRET) {
+    return res.status(401).json({ error: "Unauthorized cron execution" });
+  }
+
+  try {
+    const ahora = new Date();
+    // Threshold: jornadas iniciadas hace más de 9 horas
+    const threshold = new Date(ahora.getTime() - 9 * 60 * 60 * 1000);
+    const thresholdHora = threshold.toTimeString().slice(0, 5); // "HH:MM"
+    const thresholdFecha = threshold.toISOString().split("T")[0];    // "YYYY-MM-DD"
+
+    // Buscamos jornadas en_curso cuya fecha+hora_inicio sea anterior al threshold
+    const jornadasAbiertas = await db
+      .select({
+        id: jornadasTable.id,
+        empleado_id: jornadasTable.empleado_id,
+        maquina_id: jornadasTable.maquina_id,
+        fecha: jornadasTable.fecha,
+        hora_inicio: jornadasTable.hora_inicio,
+      })
+      .from(jornadasTable)
+      .where(
+        and(
+          eq(jornadasTable.estado, "en_curso"),
+          // fecha anterior, o misma fecha con hora anterior al threshold
+          or(
+            lte(jornadasTable.fecha, thresholdFecha),
+          )
+        )
+      );
+
+    // Filtrar más precisamente: combinando fecha + hora_inicio
+    const vencidas = jornadasAbiertas.filter(j => {
+      if (!j.fecha || !j.hora_inicio) return false;
+      const inicioDt = new Date(`${j.fecha}T${j.hora_inicio}:00`);
+      const diffHoras = (ahora.getTime() - inicioDt.getTime()) / (1000 * 60 * 60);
+      return diffHoras >= 9;
+    });
+
+    const logs: string[] = [];
+
+    for (const jornada of vencidas) {
+      // Obtener datos del empleado
+      const [empleado] = await db
+        .select()
+        .from(empleadosTable)
+        .where(eq(empleadosTable.id, jornada.empleado_id))
+        .limit(1);
+
+      // Obtener nombre de la máquina
+      const [maquina] = await db
+        .select({ nombre: maquinasTable.nombre })
+        .from(maquinasTable)
+        .where(eq(maquinasTable.id, jornada.maquina_id))
+        .limit(1);
+
+      if (!empleado) continue;
+
+      const horasTranscurridas = Math.floor(
+        (ahora.getTime() - new Date(`${jornada.fecha}T${jornada.hora_inicio}:00`).getTime()) / (1000 * 60 * 60)
+      );
+
+      const mensaje =
+        `⚠️ PUFFIN SRL - Recordatorio\n\n` +
+        `Hola ${empleado.nombre}, llevas *${horasTranscurridas} horas* con la jornada abierta` +
+        (maquina ? ` (${maquina.nombre})` : "") +
+        ` iniciada a las *${jornada.hora_inicio}*.\n\n` +
+        `Por favor finalizá tu jornada en el sistema: https://puffinsrl.site\n\n` +
+        `_Si ya terminaste de trabajar, ingresá al sistema → Jornadas → Finalizar Jornada._`;
+
+      logs.push(`Notificando a ${empleado.nombre} ${empleado.apellido} (jornada ${jornada.id}, ${horasTranscurridas}h abierta)`);
+
+      // Crear alerta en el sistema
+      await db.insert(alertasTable).values({
+        empresa_id: empleado.empresa_id,
+        tipo: "operacion",
+        prioridad: horasTranscurridas >= 12 ? "rojo" : "amarillo",
+        descripcion: `Jornada sin finalizar: ${empleado.nombre} ${empleado.apellido} lleva ${horasTranscurridas}h con la jornada abierta${maquina ? ` en ${maquina.nombre}` : ""}`,
+        estado: "activa",
+        entidad_tipo: "empleado",
+        entidad_id: empleado.id,
+        entidad_nombre: `${empleado.nombre} ${empleado.apellido}`,
+      });
+
+      // Enviar WhatsApp si el empleado tiene número y aceptó alertas
+      if (empleado.telefono_whatsapp && empleado.recibir_alertas_whatsapp) {
+        try {
+          await sendWhatsAppMessage(empleado.telefono_whatsapp, mensaje);
+          logs.push(`  ✅ WhatsApp enviado a ${empleado.telefono_whatsapp}`);
+        } catch (e) {
+          logs.push(`  ❌ Error WhatsApp: ${e}`);
+        }
+      } else {
+        logs.push(`  ℹ️ Sin WhatsApp configurado para este empleado`);
+      }
+    }
+
+    return res.json({
+      success: true,
+      jornadas_vencidas: vencidas.length,
+      notificaciones: logs,
+      ejecutado_a: ahora.toISOString(),
+    });
+  } catch (error: any) {
+    console.error("Error en cron jornadas-sin-finalizar:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
