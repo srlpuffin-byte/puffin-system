@@ -19,7 +19,8 @@ interface RegistrarPagoDialogProps {
 }
 
 export function RegistrarPagoDialog({ open, onOpenChange, proyecto }: RegistrarPagoDialogProps) {
-  const [fecha, setFecha] = useState(new Date().toISOString().split("T")[0]);
+  const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+  const [fecha, setFecha] = useState(localToday());
   const [tipo, setTipo] = useState("efectivo");
   const [monto, setMonto] = useState("");
   const [descripcion, setDescripcion] = useState("");

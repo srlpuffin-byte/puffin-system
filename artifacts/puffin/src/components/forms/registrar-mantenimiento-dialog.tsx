@@ -58,7 +58,7 @@ export function RegistrarMantenimientoDialog({ open, onOpenChange, maquinaIdFija
           tipo: editData.tipo || "",
           horas: editData.horas?.toString() || "",
           descripcion: editData.descripcion || "",
-          proximo_service: editData.proximo_service ? new Date(editData.proximo_service).toISOString().split('T')[0] : "",
+          proximo_service: editData.proximo_service ? (editData.proximo_service as string).substring(0, 10) : "",
         });
       } else {
         setForm({

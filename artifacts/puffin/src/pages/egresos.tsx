@@ -34,8 +34,14 @@ export function Egresos() {
   const { mutate: updateEgresoMut, isPending: isUpdating } = (import("@workspace/api-client-react") as any)?.useUpdateEgreso ? (import("@workspace/api-client-react") as any).useUpdateEgreso() : { mutate: (a: any, b: any) => {}, isPending: false };
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  // Helper: fecha local sin conversión UTC
+  const localToday = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
   const [form, setForm] = useState({
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: localToday(),
     concepto: "",
     categoria: "Otros",
     monto: "",
@@ -50,7 +56,7 @@ export function Egresos() {
   const openEdit = (egreso: any) => {
     setEditingId(egreso.id);
     setForm({
-      fecha: new Date(egreso.fecha).toISOString().split("T")[0],
+      fecha: (egreso.fecha || "").substring(0, 10),
       concepto: egreso.concepto || "",
       categoria: egreso.categoria || "Otros",
       monto: egreso.monto?.toString() || "",
@@ -64,7 +70,7 @@ export function Egresos() {
 
   const resetForm = () => {
     setEditingId(null);
-    setForm({ fecha: new Date().toISOString().split("T")[0], concepto: "", categoria: "Otros", monto: "", metodo_pago: "Efectivo", centro_costos: "General", observaciones: "", comprobante: false });
+    setForm({ fecha: localToday(), concepto: "", categoria: "Otros", monto: "", metodo_pago: "Efectivo", centro_costos: "General", observaciones: "", comprobante: false });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -75,7 +81,8 @@ export function Egresos() {
     }
     
     const payload = {
-      fecha: new Date(form.fecha).toISOString(),
+      // Enviamos mediodía UTC para evitar cruzar la medianoche en cualquier zona horaria
+      fecha: form.fecha + "T12:00:00.000Z",
       concepto: form.concepto,
       categoria: form.categoria,
       monto: parseFloat(form.monto),
@@ -219,7 +226,7 @@ export function Egresos() {
                     egresos?.map((eg: any) => (
                       <TableRow key={eg.id}>
                         <TableCell className="font-medium">
-                          {format(new Date(eg.fecha), "dd/MM/yyyy", { locale: es })}
+                          {(eg.fecha || "").substring(0, 10).split("-").reverse().join("/")}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">{eg.categoria}</Badge>

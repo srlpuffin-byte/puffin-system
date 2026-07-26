@@ -54,8 +54,8 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
         filtro_codigo: maquina.filtro_codigo || "",
         filtro_fecha_cambio: maquina.filtro_fecha_cambio || "",
         filtro_proximo_cambio: maquina.filtro_proximo_cambio || "",
-        vencimiento_seguro: maquina.vencimiento_seguro ? new Date(maquina.vencimiento_seguro).toISOString().split('T')[0] : "",
-        vencimiento_vtv: maquina.vencimiento_vtv ? new Date(maquina.vencimiento_vtv).toISOString().split('T')[0] : "",
+        vencimiento_seguro: maquina.vencimiento_seguro ? (maquina.vencimiento_seguro as string).substring(0, 10) : "",
+        vencimiento_vtv: maquina.vencimiento_vtv ? (maquina.vencimiento_vtv as string).substring(0, 10) : "",
         descripcion: maquina.descripcion || "",
       });
       setImages([]);
