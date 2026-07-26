@@ -1,103 +1,98 @@
 import React, { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, X, PlayCircle, Fuel, Wrench, CheckSquare, ClipboardList, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TutorialStep {
-  icon: React.ReactNode;
   color: string;
+  bgGradient: string;
+  emoji: string;
   title: string;
   description: string;
-  tip?: string;
   steps: string[];
+  tip?: string;
+  image: string;
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
-    icon: <PlayCircle className="h-16 w-16" />,
-    color: "text-blue-500",
-    title: "🚜 Cómo iniciar una Jornada",
-    description: "Antes de arrancar a trabajar, tenés que registrar el inicio de tu jornada en el sistema.",
+    emoji: "🚜",
+    color: "text-blue-600",
+    bgGradient: "from-blue-500 to-blue-700",
+    title: "Iniciar una Jornada",
+    description: "Antes de arrancar a trabajar, registrá el inicio de tu jornada.",
+    image: "/tutorial/step1.png",
     steps: [
-      "Tocá el botón \"Iniciar Jornada\" en la pantalla principal",
-      "Seleccioná tu nombre en el campo Operario",
-      "Seleccioná la máquina que vas a usar ese día",
-      "Ingresá el horómetro actual (lo ves en el tablero de la máquina)",
-      "Completá el checklist de seguridad y estado del equipo",
-      "Tocá \"Iniciar Jornada\" y ¡listo!",
+      "Tocá \"Iniciar Jornada\" en la pantalla de Jornadas",
+      "Seleccioná tu nombre como Operario",
+      "Elegí la máquina que vas a usar",
+      "Ingresá el horómetro actual (número del tablero)",
+      "Completá el estado del equipo y checklist",
     ],
-    tip: "💡 Si ya tenés una jornada en curso, el sistema te va a avisar antes de crear otra.",
+    tip: "💡 El sistema avisa si ya hay una jornada en curso con esa máquina.",
   },
   {
-    icon: <Fuel className="h-16 w-16" />,
-    color: "text-orange-500",
-    title: "⛽ Registrar Carga de Combustible",
-    description: "Cada vez que cargás combustible, tenés que registrarlo en el sistema.",
+    emoji: "📋",
+    color: "text-indigo-600",
+    bgGradient: "from-indigo-500 to-indigo-700",
+    title: "Completar el Formulario",
+    description: "Llená todos los datos requeridos antes de confirmar.",
+    image: "/tutorial/step2.png",
     steps: [
-      "Andá al menú y tocá \"Combustible\"",
-      "Tocá el botón \"Registrar Carga\"",
-      "Seleccioná la máquina que cargaste",
-      "Ingresá los litros cargados y el precio por litro",
-      "Agregá la estación de servicio y el km/horómetro actual",
-      "Si querés, sacá una foto del ticket y adjuntala",
+      "Completá los 4 tabs: General, Seguridad, Mecánica y Fotos",
+      "En Seguridad y Mecánica: activá los ítems que verificaste",
+      "Opcional: sacá fotos del estado del equipo",
+      "Tocá \"Iniciar Jornada\" al final para confirmar",
     ],
-    tip: "💡 El sistema calcula el importe total automáticamente.",
+    tip: "💡 Los campos marcados con * son obligatorios. Sin ellos no podés guardar.",
   },
   {
-    icon: <Wrench className="h-16 w-16" />,
-    color: "text-red-500",
-    title: "🔧 Reportar un Problema o Incidente",
-    description: "Si la máquina tiene alguna falla o pasó algo en el trabajo, registralo de inmediato.",
+    emoji: "⛽",
+    color: "text-orange-600",
+    bgGradient: "from-orange-400 to-orange-600",
+    title: "Registrar Combustible",
+    description: "Cada carga de combustible debe registrarse en el sistema.",
+    image: "/tutorial/step3.png",
     steps: [
-      "Andá al menú y tocá \"Incidentes\"",
-      "Tocá \"Reportar Incidente\"",
-      "Describí qué pasó con el mayor detalle posible",
-      "Seleccioná el tipo de incidente y la máquina afectada",
-      "Si podés, sacá una foto de la falla",
-      "Enviá el reporte — el administrador recibirá una notificación",
+      "Andá a \"Combustible\" desde el menú",
+      "Tocá \"Registrar Carga\"",
+      "Seleccioná la máquina y completá los litros y precio",
+      "Agregá la estación de servicio y km/horómetro",
+      "Si tenés el ticket, sacale una foto y adjuntala",
     ],
-    tip: "💡 No esperes para reportar problemas. Cuanto antes se registra, más fácil es solucionarlo.",
+    tip: "💡 El importe total se calcula solo. Solo ingresás litros y precio.",
   },
   {
-    icon: <CheckSquare className="h-16 w-16" />,
-    color: "text-green-500",
-    title: "✅ Finalizar la Jornada",
-    description: "Al terminar el día o cuando dejes de usar la máquina, cerrá la jornada.",
+    emoji: "✅",
+    color: "text-green-600",
+    bgGradient: "from-green-500 to-green-700",
+    title: "Finalizar la Jornada",
+    description: "Al terminar el día, cerrá la jornada correctamente.",
+    image: "/tutorial/step4.png",
     steps: [
-      "En la pantalla de Jornadas, buscá tu jornada \"EN CURSO\"",
+      "En Jornadas, buscá tu jornada \"EN CURSO\"",
       "Tocá el botón rojo \"Finalizar Jornada\"",
       "Ingresá el horómetro final (número actual del tablero)",
-      "Completá las observaciones si hay algo para aclarar",
+      "Agregá observaciones si hay algo para aclarar",
       "Confirmá el cierre",
     ],
-    tip: "💡 Es importante cerrar la jornada para que el sistema calcule correctamente las horas trabajadas.",
+    tip: "💡 Sin finalizar la jornada, el sistema no puede calcular las horas trabajadas.",
   },
   {
-    icon: <ClipboardList className="h-16 w-16" />,
-    color: "text-purple-500",
-    title: "📋 Ver tu Historial",
-    description: "Podés ver todas tus jornadas, cargas de combustible y documentos desde el menú.",
+    emoji: "📅",
+    color: "text-purple-600",
+    bgGradient: "from-purple-500 to-purple-700",
+    title: "Ver tu Historial",
+    description: "Podés ver todas tus jornadas y registros desde el menú.",
+    image: "/tutorial/step5.png",
     steps: [
-      "Tocá el menú (≡) arriba a la izquierda",
       "En \"Jornadas\" ves todo tu historial de trabajo",
+      "Las jornadas FINALIZADAS aparecen con las horas totales",
       "En \"Combustible\" ves las cargas que registraste",
-      "En \"Mis Datos\" podés ver y actualizar tu información personal",
+      "Usá el buscador 🔍 para encontrar algo específico",
     ],
-    tip: "💡 Si necesitás ver algo específico, usá el buscador (🔍) arriba a la derecha.",
-  },
-  {
-    icon: <User className="h-16 w-16" />,
-    color: "text-slate-500",
-    title: "👤 Tus Datos Personales",
-    description: "Mantené tus datos actualizados para que la empresa pueda contactarte cuando sea necesario.",
-    steps: [
-      "Andá a \"Mis Datos\" desde el menú",
-      "Revisá que tu teléfono esté correcto",
-      "Si tenés un contacto familiar, verificá que esté cargado",
-      "Tu foto de perfil aparece en las jornadas que iniciás",
-    ],
-    tip: "💡 Si algo está mal en tus datos, avisale al administrador para que lo corrija.",
+    tip: "💡 Si algo está mal en un registro, avisale al administrador.",
   },
 ];
 
@@ -108,85 +103,94 @@ interface TutorialDialogProps {
 
 export function TutorialDialog({ open, onOpenChange }: TutorialDialogProps) {
   const [step, setStep] = useState(0);
+  const [imgExpanded, setImgExpanded] = useState(false);
   const current = TUTORIAL_STEPS[step];
   const isLast = step === TUTORIAL_STEPS.length - 1;
   const isFirst = step === 0;
 
   const handleClose = () => {
     setStep(0);
+    setImgExpanded(false);
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
-      <DialogContent className="max-w-md p-0 overflow-hidden gap-0">
-        {/* Header with gradient */}
-        <div className={cn("flex flex-col items-center justify-center py-10 px-6 text-white relative", 
-          step === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700" :
-          step === 1 ? "bg-gradient-to-br from-orange-400 to-orange-600" :
-          step === 2 ? "bg-gradient-to-br from-red-400 to-red-600" :
-          step === 3 ? "bg-gradient-to-br from-green-500 to-green-700" :
-          step === 4 ? "bg-gradient-to-br from-purple-500 to-purple-700" :
-          "bg-gradient-to-br from-slate-500 to-slate-700"
-        )}>
-          <button
-            onClick={handleClose}
-            className="absolute top-3 right-3 text-white/70 hover:text-white transition-colors"
-          >
+      <DialogContent className="max-w-sm p-0 overflow-hidden gap-0 max-h-[92vh] flex flex-col">
+
+        {/* Colored header */}
+        <div className={cn("bg-gradient-to-br text-white px-5 pt-5 pb-4 flex-shrink-0 relative", current.bgGradient)}>
+          <button onClick={handleClose} className="absolute top-3 right-3 text-white/70 hover:text-white">
             <X className="h-5 w-5" />
           </button>
-          <div className="text-white/90 mb-3">{current.icon}</div>
-          <h2 className="text-xl font-bold text-center">{current.title}</h2>
-          <p className="text-sm text-white/80 text-center mt-2">{current.description}</p>
+          <div className="text-3xl mb-1">{current.emoji}</div>
+          <h2 className="text-lg font-bold leading-tight">{current.title}</h2>
+          <p className="text-sm text-white/80 mt-1">{current.description}</p>
         </div>
 
-        {/* Steps list */}
-        <div className="p-5 space-y-2 max-h-64 overflow-y-auto">
+        {/* Screenshot */}
+        <div
+          className="bg-slate-100 flex-shrink-0 cursor-zoom-in overflow-hidden"
+          style={{ maxHeight: imgExpanded ? "280px" : "160px", transition: "max-height 0.3s" }}
+          onClick={() => setImgExpanded(v => !v)}
+        >
+          <img
+            src={current.image}
+            alt={`Paso ${step + 1}: ${current.title}`}
+            className="w-full object-cover object-top"
+            style={{ maxHeight: imgExpanded ? "280px" : "160px", objectFit: "cover", objectPosition: "top" }}
+          />
+          <div className="text-center text-[10px] text-slate-400 py-0.5">
+            {imgExpanded ? "Tocá para reducir" : "Tocá la imagen para ampliar"}
+          </div>
+        </div>
+
+        {/* Steps */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
           {current.steps.map((s, i) => (
-            <div key={i} className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center mt-0.5">
+            <div key={i} className="flex items-start gap-2.5">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-[11px] font-bold flex items-center justify-center mt-0.5">
                 {i + 1}
               </span>
-              <p className="text-sm text-slate-700">{s}</p>
+              <p className="text-sm text-slate-700 leading-snug">{s}</p>
             </div>
           ))}
-
           {current.tip && (
-            <div className="mt-3 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+            <div className="mt-2 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
               <p className="text-xs text-amber-800">{current.tip}</p>
             </div>
           )}
         </div>
 
-        {/* Footer with navigation */}
-        <div className="px-5 pb-5 flex items-center justify-between border-t pt-4">
-          {/* Dot indicators */}
+        {/* Footer */}
+        <div className="px-4 pb-4 pt-3 border-t flex items-center justify-between flex-shrink-0">
+          {/* Dots */}
           <div className="flex gap-1.5">
             {TUTORIAL_STEPS.map((_, i) => (
               <button
                 key={i}
-                onClick={() => setStep(i)}
+                onClick={() => { setStep(i); setImgExpanded(false); }}
                 className={cn(
-                  "w-2 h-2 rounded-full transition-all",
-                  i === step ? "bg-primary w-4" : "bg-slate-300"
+                  "h-2 rounded-full transition-all duration-200",
+                  i === step ? "bg-primary w-5" : "bg-slate-300 w-2"
                 )}
               />
             ))}
           </div>
 
-          {/* Navigation buttons */}
+          {/* Nav buttons */}
           <div className="flex gap-2">
             {!isFirst && (
-              <Button variant="outline" size="sm" onClick={() => setStep(s => s - 1)}>
+              <Button variant="outline" size="sm" onClick={() => { setStep(s => s - 1); setImgExpanded(false); }}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
             )}
             {isLast ? (
-              <Button size="sm" onClick={handleClose}>
-                ¡Entendido! ✓
+              <Button size="sm" onClick={handleClose} className="bg-green-600 hover:bg-green-700">
+                ¡Listo! ✓
               </Button>
             ) : (
-              <Button size="sm" onClick={() => setStep(s => s + 1)}>
+              <Button size="sm" onClick={() => { setStep(s => s + 1); setImgExpanded(false); }}>
                 Siguiente <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             )}
