@@ -3,6 +3,7 @@ import { useIniciarJornada, useGetEmpleados, useGetMaquinas, getGetJornadasQuery
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +38,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
 
   const [currentTab, setCurrentTab] = useState("general");
   const [images, setImages] = useState<UploadedImage[]>([]);
+  const [conflictWarning, setConflictWarning] = useState<string[] | null>(null);
   const [form, setForm] = useState({
     empleado_id: empleadoIdFijo?.toString() || "",
     maquina_id: maquinaIdFija?.toString() || "",
@@ -84,17 +86,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
     }
   }, [isEmpleado, user, empleados, form.empleado_id]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.empleado_id || !form.maquina_id || !form.horometro_inicio) {
-      toast.error("Operario, máquina y horómetro son obligatorios");
-      return;
-    }
-    if (!form.estado_equipo) {
-      toast.error("Debe seleccionar el estado general del equipo");
-      return;
-    }
-
+  const doSubmit = async (confirmarDuplicado = false) => {
     try {
       // 1. Crear la jornada
       const jornada = await createMut.mutateAsync({
@@ -109,7 +101,8 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
           ubicacion: form.ubicacion || undefined,
           nombre_obra: form.nombre_obra || undefined,
           descripcion_trabajo: form.descripcion_trabajo || undefined,
-        },
+          ...(confirmarDuplicado ? { confirmar_duplicado: true } : {}),
+        } as any,
       });
 
       // 2. Subir fotos si hay
@@ -133,10 +126,29 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
       queryClient.invalidateQueries({ queryKey: getGetJornadasQueryKey() });
       onOpenChange(false);
       resetForm();
-    } catch (error) {
+    } catch (error: any) {
       toast.dismiss("uploading-photos");
-      toast.error("Error al iniciar la jornada");
+      // Check if it's a duplicate conflict (409)
+      const body = error?.response?.data || error?.data;
+      if (body?.error === "conflict" && body?.conflictos?.length > 0) {
+        setConflictWarning(body.conflictos);
+      } else {
+        toast.error("Error al iniciar la jornada");
+      }
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.empleado_id || !form.maquina_id || !form.horometro_inicio) {
+      toast.error("Operario, máquina y horómetro son obligatorios");
+      return;
+    }
+    if (!form.estado_equipo) {
+      toast.error("Debe seleccionar el estado general del equipo");
+      return;
+    }
+    await doSubmit(false);
   };
 
   const resetForm = () => {
@@ -154,6 +166,34 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
   );
 
   return (
+    <>
+      {/* Conflict warning AlertDialog */}
+      <AlertDialog open={!!conflictWarning} onOpenChange={(v) => { if (!v) setConflictWarning(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" /> ¡Atención! Jornada ya en curso
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2 pt-1">
+              <p className="text-sm font-medium text-slate-700">Se detectaron las siguientes jornadas activas:</p>
+              {conflictWarning?.map((c, i) => (
+                <p key={i} className="text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-md px-3 py-2">⚠️ {c}</p>
+              ))}
+              <p className="text-sm text-slate-600 pt-1">¿Querés crear una nueva jornada igual?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConflictWarning(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700"
+              onClick={() => { setConflictWarning(null); doSubmit(true); }}
+            >
+              Sí, crear igual
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetForm(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -327,5 +367,6 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

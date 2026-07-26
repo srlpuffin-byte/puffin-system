@@ -54,9 +54,35 @@ router.get("/", async (req, res) => {
 
 router.post("/iniciar", async (req, res) => {
   try {
-    const { empleado_id, maquina_id, horometro_inicio, km_inicio, observaciones, checklist_previo, checklist_ok, estado_equipo_inicio, foto_tablero_inicio, ubicacion, tipo_trabajo, nombre_obra, descripcion_trabajo } = req.body;
+    const { empleado_id, maquina_id, horometro_inicio, km_inicio, observaciones, checklist_previo, checklist_ok, estado_equipo_inicio, foto_tablero_inicio, ubicacion, tipo_trabajo, nombre_obra, descripcion_trabajo, confirmar_duplicado } = req.body;
     if (!empleado_id || !maquina_id || horometro_inicio === undefined) {
       return res.status(400).json({ error: "Campos requeridos faltantes" });
+    }
+
+    // Check for active jornadas (unless the user explicitly confirmed)
+    if (!confirmar_duplicado) {
+      const [jornadaEmpleado] = await db.select().from(jornadasTable)
+        .where(and(eq(jornadasTable.empleado_id, empleado_id), eq(jornadasTable.estado, "en_curso")))
+        .limit(1);
+      const [jornadaMaquina] = await db.select().from(jornadasTable)
+        .where(and(eq(jornadasTable.maquina_id, maquina_id), eq(jornadasTable.estado, "en_curso")))
+        .limit(1);
+
+      const conflictos = [];
+      if (jornadaEmpleado) {
+        const [emp] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
+          .from(empleadosTable).where(eq(empleadosTable.id, empleado_id)).limit(1);
+        conflictos.push(`El operario ${emp ? `${emp.nombre} ${emp.apellido}` : ""} ya tiene una jornada en curso iniciada a las ${jornadaEmpleado.hora_inicio}`);
+      }
+      if (jornadaMaquina && (!jornadaEmpleado || jornadaMaquina.id !== jornadaEmpleado.id)) {
+        const [maq] = await db.select({ nombre: maquinasTable.nombre })
+          .from(maquinasTable).where(eq(maquinasTable.id, maquina_id)).limit(1);
+        conflictos.push(`La máquina ${maq?.nombre || ""} ya tiene una jornada en curso iniciada a las ${jornadaMaquina.hora_inicio}`);
+      }
+
+      if (conflictos.length > 0) {
+        return res.status(409).json({ error: "conflict", conflictos });
+      }
     }
 
     const today = new Date().toISOString().split("T")[0];

@@ -27,12 +27,14 @@ import {
   Moon,
   Sun,
   Search,
+  HelpCircle,
 } from "lucide-react";
 import { useLogout, useGetMe } from "@workspace/api-client-react";
 import { removeAuthToken } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import logoUrl from "@assets/logo_puffin_1782946440101.jpeg";
 import { BusquedaGlobalDialog } from "@/components/ui/busqueda-global-dialog";
+import { TutorialDialog } from "@/components/ui/tutorial-dialog";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -165,6 +167,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const logoutMut = useLogout();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
   const { data: empleados } = useGetEmpleados();
   const hasIncompleteOperarios = Array.isArray(empleados) ? empleados.some(e => 
     !e.dni || e.dni === "COMPLETAR" || !e.telefono || !e.fecha_ingreso || 
@@ -302,6 +305,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <Button
           variant="ghost"
           size="sm"
+          className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent mb-1"
+          onClick={() => setTutorialOpen(true)}
+        >
+          <HelpCircle className="mr-2 h-4 w-4" />
+          Cómo usar el sistema
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent"
           onClick={handleLogout}
         >
@@ -346,6 +358,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </main>
 
       <BusquedaGlobalDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <TutorialDialog open={tutorialOpen} onOpenChange={setTutorialOpen} />
     </div>
   );
 }
