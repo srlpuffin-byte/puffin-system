@@ -378,7 +378,11 @@ export function Egresos() {
             </div>
             <div className="space-y-1">
               <Label>Proyecto / Lugar del Gasto</Label>
-              <Select value={form.centro_costos} onValueChange={v => set("centro_costos", v)}>
+              <Select
+                value={form.centro_costos}
+                onValueChange={v => { set("centro_costos", v); setHoveredProject(null); }}
+                onOpenChange={() => setHoveredProject(null)}
+              >
                 <SelectTrigger className="h-auto min-h-10 py-2">
                   <SelectValue placeholder="Seleccionar proyecto" />
                 </SelectTrigger>
@@ -386,8 +390,8 @@ export function Egresos() {
                   <SelectItem value="General" onPointerMove={() => setHoveredProject(null)}>General (sin proyecto específico)</SelectItem>
                   {proyectos?.map(p => {
                     return (
-                      <SelectItem 
-                        key={p.id} 
+                      <SelectItem
+                        key={p.id}
                         value={p.lugar}
                         onPointerMove={(e) => {
                           setHoveredProject(p);
