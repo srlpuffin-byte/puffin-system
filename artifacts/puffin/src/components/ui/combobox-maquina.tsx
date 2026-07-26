@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Check, ChevronsUpDown, Tractor, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Maquina } from "@workspace/api-client-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ProyectoResumen {
   id: number;
@@ -34,6 +35,7 @@ export function ComboboxMaquina({
   className,
 }: ComboboxMaquinaProps) {
   const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const selectedMaquina = value ? maquinas.find((m) => m.id.toString() === value) : null;
 
@@ -102,69 +104,108 @@ export function ComboboxMaquina({
                     }}
                     className="py-2"
                   >
-                    <HoverCard openDelay={100} closeDelay={100}>
-                      <HoverCardTrigger asChild>
-                        <div className="flex items-center w-full cursor-help">
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4 shrink-0",
-                              isSelected ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          <Avatar className="h-8 w-8 mr-2 shrink-0 rounded-md">
-                            <AvatarImage src={m.imagen_url || undefined} className="object-cover" />
-                            <AvatarFallback className="rounded-md bg-slate-100 text-[10px]">
-                              <Tractor className="h-4 w-4 text-slate-400" />
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col text-left overflow-hidden">
-                            <span className="font-semibold text-sm truncate">
-                              {m.nombre}
-                              {m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ""}
+                    {isMobile ? (
+                      <div className="flex items-center w-full cursor-pointer">
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4 shrink-0",
+                            isSelected ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        <Avatar className="h-8 w-8 mr-2 shrink-0 rounded-md">
+                          <AvatarImage src={m.imagen_url || undefined} className="object-cover" />
+                          <AvatarFallback className="rounded-md bg-slate-100 text-[10px]">
+                            <Tractor className="h-4 w-4 text-slate-400" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col text-left overflow-hidden">
+                          <span className="font-semibold text-sm truncate">
+                            {m.nombre}
+                            {m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ""}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground mt-0.5 flex gap-2 truncate">
+                            <span className="font-medium text-slate-500">
+                              M: <span className="font-normal text-slate-700">{m.marca || "-"}</span>
                             </span>
-                            <span className="text-[11px] text-muted-foreground mt-0.5 flex gap-2 truncate">
-                              <span className="font-medium text-slate-500">
-                                M: <span className="font-normal text-slate-700">{m.marca || "-"}</span>
-                              </span>
-                              <span className="font-medium text-slate-500">
-                                Mod: <span className="font-normal text-slate-700">{m.modelo || "-"}</span>
-                              </span>
+                            <span className="font-medium text-slate-500">
+                              Mod: <span className="font-normal text-slate-700">{m.modelo || "-"}</span>
                             </span>
-                          </div>
+                          </span>
                         </div>
-                      </HoverCardTrigger>
-                      <HoverCardContent side="right" align="start" className="w-80 shadow-xl z-[999999]">
-                        {m.imagen_url && (
-                          <div className="w-full h-32 mb-3 rounded-md overflow-hidden bg-slate-100">
-                            <img src={m.imagen_url} alt={m.nombre} className="w-full h-full object-cover" />
-                          </div>
-                        )}
-                        <h4 className="font-bold text-sm border-b pb-2 mb-3 text-primary flex items-center gap-1">
-                          <Tractor className="h-4 w-4" /> {m.nombre}
-                        </h4>
-                        <div className="space-y-3 text-xs text-slate-600">
-                          <div>
-                            <div className="flex items-center gap-1 font-semibold text-slate-500 mb-1">
-                              <Briefcase className="h-3 w-3" /> Proyecto asignado:
-                            </div>
-                            {lugarProyecto ? (
-                              <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                                {lugarProyecto}
+                      </div>
+                    ) : (
+                      <HoverCard openDelay={100} closeDelay={100}>
+                        <HoverCardTrigger asChild>
+                          <div className="flex items-center w-full cursor-help">
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4 shrink-0",
+                                isSelected ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <Avatar className="h-8 w-8 mr-2 shrink-0 rounded-md">
+                              <AvatarImage src={m.imagen_url || undefined} className="object-cover" />
+                              <AvatarFallback className="rounded-md bg-slate-100 text-[10px]">
+                                <Tractor className="h-4 w-4 text-slate-400" />
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col text-left overflow-hidden">
+                              <span className="font-semibold text-sm truncate">
+                                {m.nombre}
+                                {m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ""}
                               </span>
-                            ) : (
-                              <span className="italic text-slate-400">Sin proyecto asignado</span>
+                              <span className="text-[11px] text-muted-foreground mt-0.5 flex gap-2 truncate">
+                                <span className="font-medium text-slate-500">
+                                  M: <span className="font-normal text-slate-700">{m.marca || "-"}</span>
+                                </span>
+                                <span className="font-medium text-slate-500">
+                                  Mod: <span className="font-normal text-slate-700">{m.modelo || "-"}</span>
+                                </span>
+                              </span>
+                            </div>
+                          </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent side="right" align="start" className="w-80 shadow-xl z-[999999]">
+                          {m.imagen_url && (
+                            <div className="w-full h-32 mb-3 rounded-md overflow-hidden bg-slate-100">
+                              <img src={m.imagen_url} alt={m.nombre} className="w-full h-full object-cover" />
+                            </div>
+                          )}
+                          <div className="flex flex-col gap-1 mb-3">
+                            <h4 className="font-bold text-base text-primary flex items-center gap-2">
+                              <Tractor className="h-5 w-5" /> {m.nombre}
+                            </h4>
+                            {(m.patente || m.dominio) && (
+                              <span className="text-sm font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md self-start border">
+                                {m.patente || m.dominio}
+                              </span>
                             )}
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t">
-                            <div><span className="font-semibold text-slate-500">Marca:</span> {m.marca || "-"}</div>
-                            <div><span className="font-semibold text-slate-500">Modelo:</span> {m.modelo || "-"}</div>
-                            <div><span className="font-semibold text-slate-500">Año:</span> {m.anio || "-"}</div>
-                            <div><span className="font-semibold text-slate-500">Estado:</span> <span className="uppercase">{m.estado}</span></div>
+                          <div className="space-y-2 text-xs text-slate-600 border-t pt-3">
+                            <div>
+                              <div className="flex items-center gap-1 font-semibold text-slate-500 mb-1">
+                                <Briefcase className="h-3 w-3" /> Proyecto actual:
+                              </div>
+                              {lugarProyecto ? (
+                                <div className="bg-primary/5 p-1.5 rounded-md border border-primary/10">
+                                  <span className="font-medium text-primary">{lugarProyecto}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 italic">En base / Sin proyecto asignado</span>
+                              )}
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t mt-2">
+                              <div><span className="font-semibold text-slate-500">Marca:</span> {m.marca || "-"}</div>
+                              <div><span className="font-semibold text-slate-500">Modelo:</span> {m.modelo || "-"}</div>
+                              <div><span className="font-semibold text-slate-500">Año:</span> {m.anio || "-"}</div>
+                              <div><span className="font-semibold text-slate-500">Estado:</span> <span className="uppercase">{m.estado}</span></div>
+                            </div>
                           </div>
-                        </div>
-                      </HoverCardContent>
-                    </HoverCard>
+                        </HoverCardContent>
+                      </HoverCard>
+                    )}
                   </CommandItem>
                 );
               })}
