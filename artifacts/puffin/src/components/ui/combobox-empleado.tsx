@@ -81,10 +81,10 @@ export function ComboboxEmpleado({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0" align="start">
+      <PopoverContent className="w-[min(400px,90vw)] p-0" align="start">
         <Command>
           <CommandInput placeholder="Buscar operario..." />
-          <CommandList>
+          <CommandList className="max-h-[40vh]">
             <CommandEmpty>No se encontró ningún operario.</CommandEmpty>
             <CommandGroup>
               {empleados.map((e) => {
