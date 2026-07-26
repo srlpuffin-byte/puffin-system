@@ -36,6 +36,7 @@ import logoUrl from "@assets/logo_puffin_1782946440101.jpeg";
 import { BusquedaGlobalDialog } from "@/components/ui/busqueda-global-dialog";
 import { TutorialDialog } from "@/components/ui/tutorial-dialog";
 import { useEffect } from "react";
+import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface NavItem {
@@ -188,7 +189,26 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       }
     };
     document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
+
+  // ── Escuchar actualizaciones del PWA ──
+    const handlePWAUpdate = () => {
+      toast("🔄 Nueva versión disponible", {
+        description: "Hay una actualización de PUFFIN. Tocá para aplicarla ahora.",
+        duration: Infinity,
+        action: {
+          label: "Actualizar ahora",
+          onClick: () => {
+            (window as any).__puffin_updateSW?.();
+            setTimeout(() => window.location.reload(), 300);
+          },
+        },
+      });
+    };
+    window.addEventListener("pwa-update-available", handlePWAUpdate);
+    return () => {
+      document.removeEventListener("keydown", down);
+      window.removeEventListener("pwa-update-available", handlePWAUpdate);
+    };
   }, []);
 
   const queryClient = useQueryClient();
