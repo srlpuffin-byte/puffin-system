@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { jornadasTable, empleadosTable, maquinasTable, actividadTable, alertasTable } from "@workspace/db";
+import { jornadasTable, empleadosTable, maquinasTable, actividadTable, alertasTable, combustibleTable, incidentesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { appendToSheet } from "../services/sheets.js";
+import { sendWhatsAppMessage } from "../services/whatsapp.js";
 
 const router = Router();
 
@@ -200,6 +201,67 @@ router.post("/:id/finalizar", async (req, res) => {
       jornada.tipo_trabajo || "",
       estado_equipo_fin || "",
     ]);
+
+    // ── Verificación post-cierre: ¿olvidó cargar combustible o incidente? ──
+    // Corre en background sin bloquear la respuesta
+    setImmediate(async () => {
+      try {
+        const [empleado] = await db
+          .select()
+          .from(empleadosTable)
+          .where(eq(empleadosTable.id, jornada.empleado_id))
+          .limit(1);
+
+        if (!empleado?.telefono_whatsapp) return; // Sin WhatsApp, no hay nada que hacer
+
+        // Verificar si registró combustible en esta jornada (misma máquina, mismo día)
+        const combustibleDelDia = await db
+          .select({ id: combustibleTable.id })
+          .from(combustibleTable)
+          .where(
+            and(
+              eq(combustibleTable.empleado_id, jornada.empleado_id),
+              eq(combustibleTable.maquina_id, jornada.maquina_id),
+              eq(combustibleTable.fecha, jornada.fecha!)
+            )
+          )
+          .limit(1);
+
+        // Verificar si reportó algún incidente en esta jornada
+        const incidenteDelDia = await db
+          .select({ id: incidentesTable.id })
+          .from(incidentesTable)
+          .where(
+            and(
+              eq(incidentesTable.empleado_id, jornada.empleado_id),
+              eq(incidentesTable.maquina_id, jornada.maquina_id),
+              eq(incidentesTable.fecha, jornada.fecha!)
+            )
+          )
+          .limit(1);
+
+        const olvidos: string[] = [];
+        if (combustibleDelDia.length === 0) olvidos.push("⛽ *carga de combustible*");
+        if (incidenteDelDia.length === 0) olvidos.push("🔧 *incidente o novedad del equipo*");
+
+        if (olvidos.length > 0) {
+          const maqNombre = enriched.maquina_nombre;
+          const mensaje =
+            `📋 *PUFFIN SRL - Recordatorio de cierre*\n\n` +
+            `Hola ${empleado.nombre}, cerraste tu jornada de hoy` +
+            (maqNombre ? ` en *${maqNombre}*` : "") + `.\n\n` +
+            `¿Olvidaste registrar alguno de estos datos?\n` +
+            olvidos.map(o => `  • ${o}`).join("\n") + `\n\n` +
+            `Si corresponde, podés cargarlo ahora en: https://puffinsrl.site\n` +
+            `_Si no hubo novedades, ignorá este mensaje._`;
+
+          await sendWhatsAppMessage(empleado.telefono_whatsapp, mensaje);
+          console.log(`[Post-cierre] Recordatorio enviado a ${empleado.nombre} (${empleado.telefono_whatsapp})`);
+        }
+      } catch (e) {
+        console.error("[Post-cierre] Error verificando registros:", e);
+      }
+    });
 
     return res.json(enriched);
   } catch (err: any) {
