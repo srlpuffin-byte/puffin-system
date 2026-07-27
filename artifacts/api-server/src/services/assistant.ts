@@ -79,7 +79,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "consultar_empleados",
-      description: "Consulta empleados: total, primer/último en ingresar, carnet vencido, datos de contacto.",
+      description: "Consulta empleados: total, primer/último en ingresar, carnet vencido, empleados sin asignar a proyectos, datos de contacto.",
       parameters: {
         type: "object",
         properties: {
@@ -87,6 +87,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           solo_activos: { type: "boolean", description: "Filtrar solo activos" },
           orden: { type: "string", description: "primer (primero en ingresar), ultimo, nombre" },
           carnet_vencido: { type: "boolean", description: "Si true, muestra empleados con carnet vencido o próximo a vencer" },
+          sin_proyecto: { type: "boolean", description: "Si true, muestra empleados que no están asignados a ningún proyecto activo" },
         },
         required: [],
       },
@@ -96,13 +97,14 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "consultar_proyectos",
-      description: "Consulta proyectos/obras: estado, hectáreas, ganancia estimada, pagos, primer/último proyecto.",
+      description: "Consulta proyectos/obras con sus empleados y máquinas asignadas. Puede buscar qué operarios o máquinas están en un proyecto específico.",
       parameters: {
         type: "object",
         properties: {
           estado: { type: "string", description: "Filtrar por estado: activo, finalizado, pausado (opcional)" },
           nombre: { type: "string", description: "Buscar por nombre/lugar del proyecto (opcional)" },
           orden: { type: "string", description: "primer, ultimo, mayor_ganancia (opcional)" },
+          incluir_asignaciones: { type: "boolean", description: "Si true, muestra los nombres de empleados y máquinas asignadas (default: false)" },
         },
         required: [],
       },
@@ -145,12 +147,13 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "enviar_mensaje_whatsapp",
-      description: "Envía un mensaje de WhatsApp a un empleado o a un número específico en nombre de PUFFIN SRL.",
+      description: "Envía un mensaje de WhatsApp a un empleado, a un número, o a TODOS los empleados con número registrado en el sistema.",
       parameters: {
         type: "object",
         properties: {
-          numero: { type: "string", description: "Número de teléfono del destinatario (solo dígitos, con código de área argentina, ej: 3472629600)" },
-          nombre_empleado: { type: "string", description: "Nombre del empleado si se busca por nombre en lugar de número (opcional)" },
+          numero: { type: "string", description: "Número de teléfono (solo dígitos, ej: 3472629600). Omitir si se usa nombre_empleado o todos." },
+          nombre_empleado: { type: "string", description: "Nombre del empleado (opcional si se da número o todos)" },
+          todos: { type: "boolean", description: "Si true, envía el mensaje a TODOS los empleados con WhatsApp registrado en el sistema" },
           mensaje: { type: "string", description: "Texto del mensaje a enviar" },
         },
         required: ["mensaje"],
@@ -323,9 +326,9 @@ Categorías de gasto disponibles: Combustible, Materiales, Servicios, Mantenimie
         } else if (functionName === "consultar_gastos" || functionName === "analizar_gastos") {
           toolResult = await executeAnalizarGastos(functionArgs);
         } else if (functionName === "consultar_empleados") {
-          toolResult = await executeConsultarEmpleados(functionArgs.termino, functionArgs.solo_activos, functionArgs.orden, functionArgs.carnet_vencido);
+          toolResult = await executeConsultarEmpleados(functionArgs.termino, functionArgs.solo_activos, functionArgs.orden, functionArgs.carnet_vencido, functionArgs.sin_proyecto);
         } else if (functionName === "consultar_proyectos") {
-          toolResult = await executeConsultarProyectos(functionArgs.estado, functionArgs.nombre, functionArgs.orden);
+          toolResult = await executeConsultarProyectos(functionArgs.estado, functionArgs.nombre, functionArgs.orden, functionArgs.incluir_asignaciones);
         } else if (functionName === "consultar_jornadas") {
           toolResult = await executeConsultarJornadas(functionArgs.estado, functionArgs.nombre_empleado, functionArgs.fecha, functionArgs.desde, functionArgs.hasta);
         } else if (functionName === "consultar_google_sheets") {
@@ -333,7 +336,7 @@ Categorías de gasto disponibles: Combustible, Materiales, Servicios, Mantenimie
         } else if (functionName === "enviar_imagen_vehiculo") {
           toolResult = await executeEnviarImagenVehiculo(from, functionArgs.nombre_maquina, functionArgs.maquina_id);
         } else if (functionName === "enviar_mensaje_whatsapp") {
-          toolResult = await executeEnviarMensaje(functionArgs.mensaje, functionArgs.numero, functionArgs.nombre_empleado);
+          toolResult = await executeEnviarMensaje(functionArgs.mensaje, functionArgs.numero, functionArgs.nombre_empleado, functionArgs.todos);
         } else if (functionName === "registrar_gasto") {
           toolResult = await executeRegistrarGasto(functionArgs);
         }
@@ -381,7 +384,32 @@ Categorías de gasto disponibles: Combustible, Materiales, Servicios, Mantenimie
 
 // ─── Implementaciones de herramientas ───────────────────────────────────────
 
-async function executeEnviarMensaje(mensaje: string, numero?: string, nombreEmpleado?: string) {
+async function executeEnviarMensaje(mensaje: string, numero?: string, nombreEmpleado?: string, todos?: boolean) {
+  // Enviar a todos los empleados con WhatsApp
+  if (todos) {
+    const empleados = await db.select({
+      nombre: empleadosTable.nombre,
+      apellido: empleadosTable.apellido,
+      telefono: empleadosTable.telefono_whatsapp,
+    }).from(empleadosTable)
+      .where(and(eq(empleadosTable.estado, "activo"), eq(empleadosTable.recibir_alertas_whatsapp, true)));
+
+    const conTelefono = empleados.filter(e => e.telefono);
+    if (conTelefono.length === 0) return "No hay empleados activos con WhatsApp registrado.";
+
+    let exitosos = 0;
+    const errores: string[] = [];
+    for (const emp of conTelefono) {
+      try {
+        await sendWhatsAppMessage(emp.telefono!, mensaje);
+        exitosos++;
+      } catch (e: any) {
+        errores.push(`${emp.nombre} ${emp.apellido}: ${e.message}`);
+      }
+    }
+    return `✅ Mensaje enviado a ${exitosos}/${conTelefono.length} empleados.${errores.length ? ` Errores: ${errores.join(", ")}` : ""}`;
+  }
+
   let destino = numero;
 
   // Buscar por nombre de empleado si no se dio número
@@ -412,7 +440,7 @@ async function executeEnviarMensaje(mensaje: string, numero?: string, nombreEmpl
   }
 }
 
-async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean, orden?: string, carnetVencido?: boolean) {
+async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean, orden?: string, carnetVencido?: boolean, sinProyecto?: boolean) {
   let query = db.select().from(empleadosTable).$dynamic();
   const conditions: any[] = [];
 
@@ -422,34 +450,43 @@ async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean
     conditions.push(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t)));
   }
   if (carnetVencido) {
-    const hoy = new Date().toISOString().split("T")[0];
     const en30 = new Date(Date.now() + 30 * 864e5).toISOString().split("T")[0];
     const { lte } = await import("drizzle-orm");
     conditions.push(lte(empleadosTable.vencimiento_carnet, en30));
   }
   if (conditions.length) query = query.where(and(...conditions));
 
-  // Ordenamiento
   const { asc } = await import("drizzle-orm");
   if (orden === "primer") query = query.orderBy(asc(empleadosTable.fecha_ingreso));
   else if (orden === "ultimo") query = query.orderBy(desc(empleadosTable.fecha_ingreso));
   else if (orden === "nombre") query = query.orderBy(asc(empleadosTable.apellido));
   else query = query.orderBy(asc(empleadosTable.id));
 
-  const results = await query.limit(15);
+  let results = await query.limit(50);
+
+  // Filtrar empleados sin proyecto activo
+  if (sinProyecto) {
+    const proyectos = await db.select({ asignados: proyectosTable.empleados_asignados })
+      .from(proyectosTable).where(eq(proyectosTable.estado, "activo"));
+    const idsAsignados = new Set(proyectos.flatMap(p => (p.asignados as number[]) || []));
+    results = results.filter(e => !idsAsignados.has(e.id));
+    if (results.length === 0) return "Todos los empleados activos están asignados a algún proyecto.";
+    const lineas = results.map(e => `• ${e.nombre} ${e.apellido} — ${e.cargo || "Sin cargo"} | ${e.estado}`);
+    return `Empleados sin asignar a ningún proyecto activo (${results.length}):\n${lineas.join("\n")}`;
+  }
 
   if (results.length === 0) return termino
     ? `No encontré empleados que coincidan con "${termino}".`
     : "No hay empleados registrados.";
 
-  const activos = results.filter(e => e.estado === "activo").length;
+  const activos = results.slice(0, 15).filter(e => e.estado === "activo").length;
 
   if (orden === "primer" && !termino) {
     const e = results[0];
     return `El primer empleado en ingresar fue *${e.nombre} ${e.apellido}* — Cargo: ${e.cargo || "-"} | Fecha ingreso: ${e.fecha_ingreso || "No registrada"} | Estado: ${e.estado}`;
   }
 
-  const lineas = results.map(e =>
+  const lineas = results.slice(0, 15).map(e =>
     `• ${e.nombre} ${e.apellido} — ${e.cargo || "Sin cargo"} | Ingreso: ${e.fecha_ingreso || "-"} | ${e.estado === "activo" ? "Activo" : "Inactivo"}${
       carnetVencido && e.vencimiento_carnet ? ` | Carnet vence: ${e.vencimiento_carnet}` : ""
     }`
@@ -457,7 +494,7 @@ async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean
   return `Total: ${results.length} empleados (${activos} activos)\n${lineas.join("\n")}`;
 }
 
-async function executeConsultarProyectos(estado?: string, nombre?: string, orden?: string) {
+async function executeConsultarProyectos(estado?: string, nombre?: string, orden?: string, incluirAsignaciones?: boolean) {
   let query = db.select().from(proyectosTable).$dynamic();
   const conditions: any[] = [];
   if (estado) conditions.push(eq(proyectosTable.estado, estado));
@@ -476,10 +513,41 @@ async function executeConsultarProyectos(estado?: string, nombre?: string, orden
   const totalCobrado = results.reduce((a, p) => a + Number(p.total_cobrado || 0), 0);
   const gananciaTotal = results.reduce((a, p) => a + Number(p.ganancia_estimada || 0), 0);
 
-  const lineas = results.map(p =>
-    `• ${p.lugar} — ${p.hectareas} ha | Estado: ${p.estado} | Ganancia estimada: $${Number(p.ganancia_estimada || 0).toLocaleString("es-AR")} | Cobrado: $${Number(p.total_cobrado || 0).toLocaleString("es-AR")} | Pago: ${p.estado_pago}`
-  );
-  return `${results.length} proyecto(s) | Total cobrado: $${totalCobrado.toLocaleString("es-AR")} | Ganancia estimada total: $${gananciaTotal.toLocaleString("es-AR")}\n${lineas.join("\n")}`;
+  // Resolver nombres de empleados y máquinas si se pide
+  let empMap: Record<number, string> = {};
+  let maqMap: Record<number, string> = {};
+  if (incluirAsignaciones) {
+    const todosEmpIds = [...new Set(results.flatMap(p => (p.empleados_asignados as number[]) || []))];
+    const todosMaqIds = [...new Set(results.flatMap(p => (p.maquinas_asignadas as number[]) || []))];
+
+    if (todosEmpIds.length > 0) {
+      const emps = await db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido, cargo: empleadosTable.cargo })
+        .from(empleadosTable).where(or(...todosEmpIds.map(id => eq(empleadosTable.id, id))));
+      empMap = Object.fromEntries(emps.map(e => [e.id, `${e.nombre} ${e.apellido} (${e.cargo || "operario"})`]));
+    }
+    if (todosMaqIds.length > 0) {
+      const maqs = await db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre, tipo: maquinasTable.tipo })
+        .from(maquinasTable).where(or(...todosMaqIds.map(id => eq(maquinasTable.id, id))));
+      maqMap = Object.fromEntries(maqs.map(m => [m.id, `${m.nombre} (${m.tipo})`]));
+    }
+  }
+
+  const lineas = results.map(p => {
+    let linea = `• *${p.lugar}* — ${p.hectareas} ha | Estado: ${p.estado} | Cobrado: $${Number(p.total_cobrado || 0).toLocaleString("es-AR")} | Pago: ${p.estado_pago}`;
+    if (incluirAsignaciones) {
+      const empIds = (p.empleados_asignados as number[]) || [];
+      const maqIds = (p.maquinas_asignadas as number[]) || [];
+      const empNombres = empIds.map(id => empMap[id] || `#${id}`).join(", ") || "Ninguno";
+      const maqNombres = maqIds.map(id => maqMap[id] || `#${id}`).join(", ") || "Ninguna";
+      linea += `\n  👷 Operarios: ${empNombres}\n  🛠️ Máquinas: ${maqNombres}`;
+    }
+    return linea;
+  });
+
+  const resumen = results.length > 1
+    ? `${results.length} proyecto(s) | Total cobrado: $${totalCobrado.toLocaleString("es-AR")} | Ganancia estimada total: $${gananciaTotal.toLocaleString("es-AR")}\n`
+    : "";
+  return resumen + lineas.join("\n");
 }
 
 async function executeConsultarJornadas(estado?: string, nombreEmpleado?: string, fecha?: string, desde?: string, hasta?: string) {
