@@ -7,12 +7,11 @@ import {
   egresosTable,
   whatsappSesionesTable,
   proyectosTable,
-  jornadasTable,
   combustibleTable,
   mantenimientosTable,
   usuariosTable,
 } from "@workspace/db/schema";
-import { eq, like, or, and, desc, ilike } from "drizzle-orm";
+import { eq, like, or, and, desc, ilike, notInArray } from "drizzle-orm";
 import crypto from "crypto";
 import { sendWhatsAppImage, sendWhatsAppMessage } from "./whatsapp.js";
 
@@ -365,6 +364,18 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "crear_accesos_faltantes",
+      description: "Revisa todos los empleados de la base de datos y les crea automáticamente un usuario para el sistema web a los que todavía no lo tengan. Usa su DNI como usuario y como PIN.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
 ];
 
 
@@ -457,7 +468,7 @@ export async function handleWhatsAppMessage(from: string, text: string) {
   const todayISO = new Date().toISOString().split("T")[0];
 
   // Herramientas disponibles según rol
-  const WRITE_TOOLS = ["registrar_gasto", "registrar_empleado", "enviar_mensaje_whatsapp", "registrar_jornada", "actualizar_jornada", "registrar_combustible_bot", "registrar_mantenimiento_bot", "actualizar_proyecto", "crear_acceso_sistema"];
+  const WRITE_TOOLS = ["registrar_gasto", "registrar_empleado", "enviar_mensaje_whatsapp", "registrar_jornada", "actualizar_jornada", "registrar_combustible_bot", "registrar_mantenimiento_bot", "actualizar_proyecto", "crear_acceso_sistema", "crear_accesos_faltantes"];
   const toolsParaRol = isAdmin ? tools : tools.filter(
     (t: any) => !WRITE_TOOLS.includes(t.function.name)
   );
@@ -476,7 +487,7 @@ LO QUE PUEDO HACER (acciones de escritura):
 🔧 Registrar mantenimientos y services de máquinas
 💰 Registrar gastos/egresos (con confirmación)
 👤 Registrar nuevos empleados
-🔑 Crear accesos al sistema web (usuarios y PIN)
+🔑 Crear accesos al sistema web (individual o masivo a todos los faltantes)
 🏗️ Actualizar proyectos: estado, asignar/desasignar empleados y máquinas
 📲 Enviar mensajes de WhatsApp. CRÍTICO: Si te piden enviar un mensaje a TODOS o a varios empleados en general, DEBÉS usar enviar_mensaje_whatsapp con el parámetro todos=true. NO intentes enviar uno por uno llamando a la función repetidas veces.
 
@@ -572,6 +583,8 @@ Nunca inventés datos. Usá siempre las herramientas disponibles.`;
           toolResult = await executeActualizarProyecto(functionArgs);
         } else if (functionName === "crear_acceso_sistema") {
           toolResult = await executeCrearAccesoSistema(functionArgs);
+        } else if (functionName === "crear_accesos_faltantes") {
+          toolResult = await executeCrearAccesosFaltantes();
         }
 
         messages.push({
@@ -1296,5 +1309,40 @@ async function executeCrearAccesoSistema(args: { nombre: string; apellido: strin
     return `✅ Acceso al sistema creado para *${args.nombre} ${args.apellido}*.\nUsuario: ${dniStr}\nPIN: ${pinStr}\nRol: ${rolStr}`;
   } catch (error: any) {
     return `❌ Error al crear acceso al sistema: ${error.message}`;
+  }
+}
+
+async function executeCrearAccesosFaltantes() {
+  try {
+    const empleados = await db.select().from(empleadosTable);
+    const usuarios = await db.select().from(usuariosTable);
+    
+    const dnisConUsuario = new Set(usuarios.map(u => u.usuario));
+    
+    const empleadosSinUsuario = empleados.filter(e => e.dni && !dnisConUsuario.has(e.dni));
+    
+    if (empleadosSinUsuario.length === 0) {
+      return `✅ Todos los operarios ya tienen usuario creado en el sistema.`;
+    }
+
+    let creados = 0;
+    for (const emp of empleadosSinUsuario) {
+      const dniStr = String(emp.dni).trim();
+      const pinHash = crypto.createHash("sha256").update(dniStr + "puffin-salt").digest("hex");
+      
+      await db.insert(usuariosTable).values({
+        nombre: emp.nombre,
+        apellido: emp.apellido,
+        usuario: dniStr,
+        pin_hash: pinHash,
+        rol: "empleado",
+        activo: true
+      });
+      creados++;
+    }
+
+    return `✅ ¡Listo! Creé acceso masivo para los ${creados} operarios que faltaban. Se usó su DNI como usuario y su DNI como PIN para todos.`;
+  } catch (error: any) {
+    return `❌ Error al crear accesos masivos: ${error.message}`;
   }
 }
