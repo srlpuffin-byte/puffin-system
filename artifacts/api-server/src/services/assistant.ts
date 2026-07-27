@@ -6,8 +6,10 @@ import {
   fotografiasTable,
   egresosTable,
   whatsappSesionesTable,
+  proyectosTable,
+  jornadasTable,
 } from "@workspace/db/schema";
-import { eq, like, or, and, desc } from "drizzle-orm";
+import { eq, like, or, and, desc, count, ilike } from "drizzle-orm";
 import { sendWhatsAppImage, sendWhatsAppMessage } from "./whatsapp.js";
 
 const groqApiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
@@ -45,6 +47,51 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         type: "object",
         properties: {
           categoria: { type: "string", description: "Categoría del gasto a filtrar (opcional)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_empleados",
+      description: "Consulta información sobre los empleados: cantidad total, lista, datos de contacto, cargo, estado activo/inactivo.",
+      parameters: {
+        type: "object",
+        properties: {
+          termino: { type: "string", description: "Nombre o apellido a buscar (opcional, si no se da devuelve el resumen general)" },
+          solo_activos: { type: "boolean", description: "Si true, filtra solo empleados activos (default: false)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_proyectos",
+      description: "Consulta los proyectos/obras activos o históricos de la empresa, incluyendo estado, hectáreas y cobros.",
+      parameters: {
+        type: "object",
+        properties: {
+          estado: { type: "string", description: "Filtrar por estado: activo, finalizado, pausado (opcional)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_jornadas",
+      description: "Consulta jornadas de trabajo: las activas en este momento, las del día de hoy, o busca por empleado/máquina.",
+      parameters: {
+        type: "object",
+        properties: {
+          estado: { type: "string", description: "Estado de la jornada: en_curso, finalizada (opcional)" },
+          nombre_empleado: { type: "string", description: "Nombre del empleado a buscar (opcional)" },
+          fecha: { type: "string", description: "Fecha a consultar en formato YYYY-MM-DD (opcional, default: hoy)" },
         },
         required: [],
       },
@@ -237,6 +284,12 @@ Categorías de gasto disponibles: Combustible, Materiales, Servicios, Mantenimie
           toolResult = await executeConsultarInventario(functionArgs.termino);
         } else if (functionName === "consultar_gastos") {
           toolResult = await executeConsultarGastos(functionArgs.categoria);
+        } else if (functionName === "consultar_empleados") {
+          toolResult = await executeConsultarEmpleados(functionArgs.termino, functionArgs.solo_activos);
+        } else if (functionName === "consultar_proyectos") {
+          toolResult = await executeConsultarProyectos(functionArgs.estado);
+        } else if (functionName === "consultar_jornadas") {
+          toolResult = await executeConsultarJornadas(functionArgs.estado, functionArgs.nombre_empleado, functionArgs.fecha);
         } else if (functionName === "enviar_imagen_vehiculo") {
           toolResult = await executeEnviarImagenVehiculo(from, functionArgs.nombre_maquina, functionArgs.maquina_id);
         } else if (functionName === "enviar_mensaje_whatsapp") {
@@ -317,6 +370,100 @@ async function executeEnviarMensaje(mensaje: string, numero?: string, nombreEmpl
   } catch (error: any) {
     return `❌ Error al enviar el mensaje a ${nombreEmpleado || destino}: ${error.message}`;
   }
+}
+
+async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean) {
+  let query = db.select().from(empleadosTable).$dynamic();
+  const conditions: any[] = [];
+
+  if (soloActivos) conditions.push(eq(empleadosTable.activo, true));
+  if (termino) {
+    const t = `%${termino.toLowerCase()}%`;
+    conditions.push(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t)));
+  }
+  if (conditions.length) query = query.where(and(...conditions));
+
+  const results = await query.limit(15);
+
+  if (results.length === 0) return termino
+    ? `No encontré empleados que coincidan con "${termino}".`
+    : "No hay empleados registrados.";
+
+  if (!termino) {
+    const activos = results.filter(e => e.activo).length;
+    const lineas = results.map(e =>
+      `• ${e.nombre} ${e.apellido} — ${e.cargo || "Sin cargo"} | ${e.activo ? "Activo" : "Inactivo"}`
+    );
+    return `Total: ${results.length} empleados (${activos} activos)\n${lineas.join("\n")}`;
+  }
+
+  const lineas = results.map(e =>
+    `• ${e.nombre} ${e.apellido} — Cargo: ${e.cargo || "-"} | Tel: ${e.telefono_whatsapp || "-"} | ${e.activo ? "Activo" : "Inactivo"}`
+  );
+  return lineas.join("\n");
+}
+
+async function executeConsultarProyectos(estado?: string) {
+  let query = db.select().from(proyectosTable).$dynamic();
+  if (estado) query = query.where(eq(proyectosTable.estado, estado));
+  const results = await query.orderBy(desc(proyectosTable.createdAt)).limit(10);
+
+  if (results.length === 0) return `No hay proyectos${estado ? ` con estado "${estado}"` : ""} registrados.`;
+
+  const lineas = results.map(p =>
+    `• ${p.lugar} — ${p.hectareas} ha | Estado: ${p.estado} | Pago: ${p.estado_pago} | Cobrado: $${Number(p.total_cobrado || 0).toLocaleString("es-AR")}`
+  );
+  return `${results.length} proyecto(s):\n${lineas.join("\n")}`;
+}
+
+async function executeConsultarJornadas(estado?: string, nombreEmpleado?: string, fecha?: string) {
+  const hoy = fecha || new Date().toISOString().split("T")[0];
+
+  let empId: number | undefined;
+  if (nombreEmpleado) {
+    const t = `%${nombreEmpleado.toLowerCase()}%`;
+    const [emp] = await db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
+      .from(empleadosTable)
+      .where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t)))
+      .limit(1);
+    if (!emp) return `No encontré empleado con nombre "${nombreEmpleado}".`;
+    empId = emp.id;
+  }
+
+  let query = db
+    .select({
+      id: jornadasTable.id,
+      fecha: jornadasTable.fecha,
+      estado: jornadasTable.estado,
+      hora_inicio: jornadasTable.hora_inicio,
+      hora_fin: jornadasTable.hora_fin,
+      nombre_obra: jornadasTable.nombre_obra,
+      empleado_id: jornadasTable.empleado_id,
+    })
+    .from(jornadasTable)
+    .$dynamic();
+
+  const conditions: any[] = [];
+  if (estado) conditions.push(eq(jornadasTable.estado, estado));
+  if (empId) conditions.push(eq(jornadasTable.empleado_id, empId));
+  if (!estado && !empId) conditions.push(eq(jornadasTable.fecha, hoy));
+  if (conditions.length) query = query.where(and(...conditions));
+
+  const results = await query.orderBy(desc(jornadasTable.fecha)).limit(10);
+
+  if (results.length === 0) return `No hay jornadas${estado ? ` "${estado}"` : ""} ${nombreEmpleado ? `para ${nombreEmpleado}` : `para hoy (${hoy})`}.`;
+
+  // Obtener nombres de empleados
+  const empIds = [...new Set(results.map(j => j.empleado_id))];
+  const empleados = await db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
+    .from(empleadosTable)
+    .where(or(...empIds.map(id => eq(empleadosTable.id, id))));
+  const empMap = Object.fromEntries(empleados.map(e => [e.id, `${e.nombre} ${e.apellido}`]));
+
+  const lineas = results.map(j =>
+    `• [${j.fecha}] ${empMap[j.empleado_id] || `Emp#${j.empleado_id}`} — ${j.nombre_obra || "Sin obra"} | ${j.hora_inicio || "?"}–${j.hora_fin || "en curso"} | Estado: ${j.estado}`
+  );
+  return `${results.length} jornada(s):\n${lineas.join("\n")}`;
 }
 
 async function executeConsultarInventario(termino: string) {
