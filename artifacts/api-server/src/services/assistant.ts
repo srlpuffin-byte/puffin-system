@@ -8,6 +8,8 @@ import {
   whatsappSesionesTable,
   proyectosTable,
   jornadasTable,
+  combustibleTable,
+  mantenimientosTable,
 } from "@workspace/db/schema";
 import { eq, like, or, and, desc, ilike } from "drizzle-orm";
 import { sendWhatsAppImage, sendWhatsAppMessage } from "./whatsapp.js";
@@ -197,7 +199,62 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "consultar_combustible",
+      description: "Consulta registros de combustible: litros cargados, importe, máquina, empleado, estación, fecha. Puede calcular totales y filtrar por máquina o empleado.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre_maquina: { type: "string", description: "Nombre de la máquina (opcional)" },
+          nombre_empleado: { type: "string", description: "Nombre del empleado (opcional)" },
+          desde: { type: "string", description: "Fecha inicio YYYY-MM-DD (opcional)" },
+          hasta: { type: "string", description: "Fecha fin YYYY-MM-DD (opcional)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_mantenimientos",
+      description: "Consulta registros de mantenimiento de máquinas: tipo de service, fecha, estado, próximo service.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre_maquina: { type: "string", description: "Nombre de la máquina (opcional)" },
+          tipo: { type: "string", description: "Tipo de mantenimiento (opcional)" },
+          desde: { type: "string", description: "Fecha inicio YYYY-MM-DD (opcional)" },
+          hasta: { type: "string", description: "Fecha fin YYYY-MM-DD (opcional)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "registrar_empleado",
+      description: "Registra un nuevo empleado en el sistema. Pedirá confirmación antes de guardar.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre: { type: "string", description: "Nombre del empleado" },
+          apellido: { type: "string", description: "Apellido del empleado" },
+          dni: { type: "string", description: "DNI del empleado" },
+          telefono: { type: "string", description: "Teléfono (opcional)" },
+          telefono_whatsapp: { type: "string", description: "Número de WhatsApp (opcional)" },
+          cargo: { type: "string", description: "Cargo o puesto (opcional)" },
+          fecha_ingreso: { type: "string", description: "Fecha de ingreso YYYY-MM-DD (opcional)" },
+        },
+        required: ["nombre", "apellido", "dni"],
+      },
+    },
+  },
 ];
+
 
 // Números de administradores autorizados
 const ADMIN_PHONES = ["3472629600", "3572665637", "3572400877"];
@@ -363,6 +420,12 @@ Categorías de gasto: Combustible, Materiales, Servicios, Mantenimiento, Herrami
           toolResult = await executeEnviarMensaje(functionArgs.mensaje, functionArgs.numero, functionArgs.nombre_empleado, functionArgs.todos);
         } else if (functionName === "registrar_gasto") {
           toolResult = await executeRegistrarGasto(functionArgs);
+        } else if (functionName === "consultar_combustible") {
+          toolResult = await executeConsultarCombustible(functionArgs);
+        } else if (functionName === "consultar_mantenimientos") {
+          toolResult = await executeConsultarMantenimientos(functionArgs);
+        } else if (functionName === "registrar_empleado") {
+          toolResult = await executeRegistrarEmpleado(functionArgs);
         }
 
         messages.push({
@@ -798,5 +861,105 @@ async function executeRegistrarGasto(args: {
   } catch (error: any) {
     console.error("Error registrando gasto:", error);
     return `❌ Error al registrar el gasto: ${error.message}`;
+  }
+}
+
+async function executeConsultarCombustible(args: { nombre_maquina?: string; nombre_empleado?: string; desde?: string; hasta?: string }) {
+  const { gte, lte, between } = await import("drizzle-orm");
+
+  // Resolver IDs si se dan nombres
+  let maqId: number | undefined;
+  let empId: number | undefined;
+  if (args.nombre_maquina) {
+    const [m] = await db.select({ id: maquinasTable.id }).from(maquinasTable)
+      .where(ilike(maquinasTable.nombre, `%${args.nombre_maquina}%`)).limit(1);
+    if (!m) return `No encontré máquina llamada "${args.nombre_maquina}".`;
+    maqId = m.id;
+  }
+  if (args.nombre_empleado) {
+    const t = `%${args.nombre_empleado.toLowerCase()}%`;
+    const [e] = await db.select({ id: empleadosTable.id }).from(empleadosTable)
+      .where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t))).limit(1);
+    if (!e) return `No encontré empleado llamado "${args.nombre_empleado}".`;
+    empId = e.id;
+  }
+
+  let query = db.select().from(combustibleTable).$dynamic();
+  const conditions: any[] = [eq(combustibleTable.estado, "activo")];
+  if (maqId) conditions.push(eq(combustibleTable.maquina_id, maqId));
+  if (empId) conditions.push(eq(combustibleTable.empleado_id, empId));
+  if (args.desde && args.hasta) conditions.push(between(combustibleTable.fecha, args.desde, args.hasta));
+  else if (args.desde) conditions.push(gte(combustibleTable.fecha, args.desde));
+  else if (args.hasta) conditions.push(lte(combustibleTable.fecha, args.hasta));
+  query = query.where(and(...conditions)).orderBy(desc(combustibleTable.fecha)).limit(20);
+
+  const results = await query;
+  if (results.length === 0) return "No hay registros de combustible con esos filtros.";
+
+  // Resolver nombres
+  const maqIds = [...new Set(results.map(r => r.maquina_id))];
+  const maqs = await db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre }).from(maquinasTable)
+    .where(or(...maqIds.map(id => eq(maquinasTable.id, id))));
+  const maqMap = Object.fromEntries(maqs.map(m => [m.id, m.nombre]));
+
+  const totalLitros = results.reduce((a, r) => a + Number(r.litros || 0), 0);
+  const totalImporte = results.reduce((a, r) => a + Number(r.importe || 0), 0);
+
+  const lineas = results.map(r =>
+    `• [${r.fecha}] ${maqMap[r.maquina_id] || `Máq#${r.maquina_id}`} — ${r.litros}L | $${Number(r.importe || 0).toLocaleString("es-AR")} | ${r.estacion || "-"}`
+  );
+  return `${results.length} cargas | Total: ${totalLitros.toFixed(1)}L | $${totalImporte.toLocaleString("es-AR")}\n${lineas.join("\n")}`;
+}
+
+async function executeConsultarMantenimientos(args: { nombre_maquina?: string; tipo?: string; desde?: string; hasta?: string }) {
+  const { gte, lte, between } = await import("drizzle-orm");
+
+  let maqId: number | undefined;
+  if (args.nombre_maquina) {
+    const [m] = await db.select({ id: maquinasTable.id }).from(maquinasTable)
+      .where(ilike(maquinasTable.nombre, `%${args.nombre_maquina}%`)).limit(1);
+    if (!m) return `No encontré máquina llamada "${args.nombre_maquina}".`;
+    maqId = m.id;
+  }
+
+  let query = db.select().from(mantenimientosTable).$dynamic();
+  const conditions: any[] = [];
+  if (maqId) conditions.push(eq(mantenimientosTable.maquina_id, maqId));
+  if (args.tipo) conditions.push(ilike(mantenimientosTable.tipo, `%${args.tipo}%`));
+  if (args.desde && args.hasta) conditions.push(between(mantenimientosTable.fecha, args.desde, args.hasta));
+  else if (args.desde) conditions.push(gte(mantenimientosTable.fecha, args.desde));
+  else if (args.hasta) conditions.push(lte(mantenimientosTable.fecha, args.hasta));
+  if (conditions.length) query = query.where(and(...conditions));
+  query = query.orderBy(desc(mantenimientosTable.fecha)).limit(15);
+
+  const results = await query;
+  if (results.length === 0) return "No hay registros de mantenimiento con esos filtros.";
+
+  const maqIds = [...new Set(results.map(r => r.maquina_id))];
+  const maqs = await db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre }).from(maquinasTable)
+    .where(or(...maqIds.map(id => eq(maquinasTable.id, id))));
+  const maqMap = Object.fromEntries(maqs.map(m => [m.id, m.nombre]));
+
+  const lineas = results.map(r =>
+    `• [${r.fecha}] ${maqMap[r.maquina_id] || `Máq#${r.maquina_id}`} — ${r.tipo} | ${r.descripcion || "-"} | Estado: ${r.estado}${r.proximo_service ? ` | Próximo: ${r.proximo_service}` : ""}`
+  );
+  return `${results.length} mantenimiento(s):\n${lineas.join("\n")}`;
+}
+
+async function executeRegistrarEmpleado(args: { nombre: string; apellido: string; dni: string; telefono?: string; telefono_whatsapp?: string; cargo?: string; fecha_ingreso?: string }) {
+  try {
+    const [emp] = await db.insert(empleadosTable).values({
+      nombre: args.nombre,
+      apellido: args.apellido,
+      dni: args.dni,
+      telefono: args.telefono || null,
+      telefono_whatsapp: args.telefono_whatsapp || null,
+      cargo: args.cargo || null,
+      fecha_ingreso: args.fecha_ingreso || null,
+      estado: "activo",
+    }).returning();
+    return `✅ Empleado registrado: *${emp.nombre} ${emp.apellido}* (ID #${emp.id}) | DNI: ${emp.dni} | Cargo: ${emp.cargo || "-"}`;
+  } catch (error: any) {
+    return `❌ Error al registrar empleado: ${error.message}`;
   }
 }
