@@ -238,7 +238,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "registrar_empleado",
-      description: "Registra un nuevo empleado en el sistema. Pedirá confirmación antes de guardar.",
+      description: "Registra un nuevo empleado en el sistema. CRÍTICO: Si faltan datos obligatorios (Nombre, Apellido, DNI), debes preguntarle al usuario antes de usar esta herramienta. Luego pide confirmación.",
       parameters: {
         type: "object",
         properties: {
@@ -258,7 +258,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "registrar_jornada",
-      description: "Registra una nueva jornada de trabajo para un empleado en un proyecto/obra. Pedir confirmación antes de guardar.",
+      description: "Registra una nueva jornada de trabajo. CRÍTICO: Si faltan datos (Empleado, Obra/Proyecto), pregúntale al usuario antes de llamar a la función. Pedir confirmación antes de guardar.",
       parameters: {
         type: "object",
         properties: {
@@ -294,7 +294,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "registrar_combustible_bot",
-      description: "Registra una carga de combustible para una máquina.",
+      description: "Registra combustible. CRÍTICO: Debes pedir los datos obligatorios (Máquina, Litros, Empleado que cargó) si el usuario no los proporciona. Luego pide confirmación.",
       parameters: {
         type: "object",
         properties: {
@@ -313,7 +313,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "registrar_mantenimiento_bot",
-      description: "Registra un mantenimiento o service de una máquina.",
+      description: "Registra un mantenimiento de máquina. CRÍTICO: Debes pedir los datos obligatorios (Máquina, Tipo de mantenimiento) si el usuario no los da. Luego pide confirmación.",
       parameters: {
         type: "object",
         properties: {
@@ -350,7 +350,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "crear_acceso_sistema",
-      description: "Crea un usuario para que un empleado pueda iniciar sesión en el panel web. Requiere nombre, apellido, DNI (como usuario) y un PIN de 4 dígitos.",
+      description: "Crea un usuario web. CRÍTICO: Requiere nombre, apellido, DNI y PIN. Si falta alguno, pregúntale al usuario primero.",
       parameters: {
         type: "object",
         properties: {
@@ -482,6 +482,8 @@ Fecha de hoy: ${today} (${todayISO}).
 SOY EL EMPLEADO ADMINISTRATIVO DIGITAL DE PUFFIN. El administrador puede pedirme cualquier cosa y yo la ejecuto en el sistema. Funciono como un colaborador humano: pienso, interpreto, consulto los datos y realizo las operaciones.
 
 LO QUE PUEDO HACER (acciones de escritura):
+REGLA DE ORO PARA TODAS LAS ACCIONES DE ESCRITURA: NUNCA INVENTES DATOS. Si el usuario te pide registrar algo (gasto, empleado, jornada, combustible, mantenimiento) pero no te da todos los datos requeridos, DEBÉS preguntarle los datos faltantes de forma amigable ANTES de registrarlo en el sistema. Siempre mostrá un resumen final y pedí confirmación antes de guardar.
+
 📋 Registrar y actualizar jornadas de empleados
 ⚽ Registrar cargas de combustible por máquina
 🔧 Registrar mantenimientos y services de máquinas
