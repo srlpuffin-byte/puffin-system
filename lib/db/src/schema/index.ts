@@ -14,3 +14,4 @@ export * from "./backups";
 export * from "./fotografias";
 export * from "./egresos";
 export * from "./proyectos";
+export * from "./whatsapp-sesiones";
