@@ -68,6 +68,22 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "enviar_mensaje_whatsapp",
+      description: "Envía un mensaje de WhatsApp a un empleado o a un número específico en nombre de PUFFIN SRL.",
+      parameters: {
+        type: "object",
+        properties: {
+          numero: { type: "string", description: "Número de teléfono del destinatario (solo dígitos, con código de área argentina, ej: 3472629600)" },
+          nombre_empleado: { type: "string", description: "Nombre del empleado si se busca por nombre en lugar de número (opcional)" },
+          mensaje: { type: "string", description: "Texto del mensaje a enviar" },
+        },
+        required: ["mensaje"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "registrar_gasto",
       description: "Registra un gasto/egreso en el sistema. Llamar SOLO cuando el usuario haya confirmado con 'OK' o 'sí' o 'confirmar'. Antes de llamar esta función, SIEMPRE mostrar un resumen detallado al usuario y pedir confirmación explícita.",
       parameters: {
@@ -223,6 +239,8 @@ Categorías de gasto disponibles: Combustible, Materiales, Servicios, Mantenimie
           toolResult = await executeConsultarGastos(functionArgs.categoria);
         } else if (functionName === "enviar_imagen_vehiculo") {
           toolResult = await executeEnviarImagenVehiculo(from, functionArgs.nombre_maquina, functionArgs.maquina_id);
+        } else if (functionName === "enviar_mensaje_whatsapp") {
+          toolResult = await executeEnviarMensaje(functionArgs.mensaje, functionArgs.numero, functionArgs.nombre_empleado);
         } else if (functionName === "registrar_gasto") {
           toolResult = await executeRegistrarGasto(functionArgs);
         }
@@ -269,6 +287,37 @@ Categorías de gasto disponibles: Combustible, Materiales, Servicios, Mantenimie
 }
 
 // ─── Implementaciones de herramientas ───────────────────────────────────────
+
+async function executeEnviarMensaje(mensaje: string, numero?: string, nombreEmpleado?: string) {
+  let destino = numero;
+
+  // Buscar por nombre de empleado si no se dio número
+  if (!destino && nombreEmpleado) {
+    const t = `%${nombreEmpleado.toLowerCase()}%`;
+    const [emp] = await db
+      .select({ telefono: empleadosTable.telefono_whatsapp, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
+      .from(empleadosTable)
+      .where(or(like(empleadosTable.nombre, t), like(empleadosTable.apellido, t)))
+      .limit(1);
+
+    if (!emp || !emp.telefono) {
+      return `No encontré un empleado llamado "${nombreEmpleado}" con número de WhatsApp registrado.`;
+    }
+    destino = emp.telefono;
+    nombreEmpleado = `${emp.nombre} ${emp.apellido}`;
+  }
+
+  if (!destino) {
+    return "No se pudo determinar el destinatario. Proporcioná un número o nombre de empleado.";
+  }
+
+  try {
+    await sendWhatsAppMessage(destino, mensaje);
+    return `✅ Mensaje enviado correctamente a ${nombreEmpleado || destino}.`;
+  } catch (error: any) {
+    return `❌ Error al enviar el mensaje a ${nombreEmpleado || destino}: ${error.message}`;
+  }
+}
 
 async function executeConsultarInventario(termino: string) {
   const t = `%${termino.toLowerCase()}%`;
