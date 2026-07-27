@@ -28,8 +28,8 @@ if (groqApiKey) {
   console.log("[IA] Usando Groq: llama-3.3-70b-versatile");
 } else if (geminiApiKey) {
   openai = new OpenAI({ apiKey: geminiApiKey, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/" });
-  MODEL = "gemini-2.0-flash";
-  console.log("[IA] Usando Google Gemini: gemini-2.0-flash");
+  MODEL = "gemini-1.5-flash";
+  console.log("[IA] Usando Google Gemini: gemini-1.5-flash");
 } else if (openaiApiKey) {
   openai = new OpenAI({ apiKey: openaiApiKey });
   MODEL = "gpt-4o-mini";
