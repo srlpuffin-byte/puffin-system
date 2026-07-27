@@ -267,18 +267,28 @@ export async function handleWhatsAppMessage(from: string, text: string) {
 Hablás en español rioplatense, de forma profesional, clara y concisa.
 La fecha de hoy es ${today} (${todayISO}).
 
-Tus capacidades:
-1. Consultar inventario de máquinas y equipos
-2. Consultar gastos registrados
-3. Enviar fotos de vehículos/máquinas por WhatsApp
-4. Registrar nuevos gastos/egresos en el sistema
+TENÉS ACCESO COMPLETO A TODA LA INFORMACIÓN DEL SISTEMA. Si el usuario pregunta algo que esté en la base de datos, SIEMPRE usá las herramientas para buscarlo. Nunca digas que no tenés acceso a algo si hay una herramienta disponible para consultarlo.
 
-Para registrar un gasto, seguí este protocolo estrictamente:
-- Recolectá los datos necesarios de forma conversacional (podés pedir varios datos juntos)
+ACCESO TOTAL AL SISTEMA:
+👥 EMPLEADOS: nombres, apellidos, DNI, teléfonos, cargos, estado, fecha de ingreso, carnet de conducir, contacto familiar
+🛠️ MÁQUINAS/EQUIPOS: nombre, tipo, estado, categoría, asignación a proyectos
+🏗️ PROYECTOS/OBRAS: lugar, hectáreas, estado, empleados asignados, máquinas asignadas, pagos, ganancia
+📅 JORNADAS: quién trabajó, en qué proyecto, qué horario, estado de la jornada
+💰 GASTOS/EGRESOS: monto, categoría, fecha, proveedor, proyecto al que se imputa
+📊 GOOGLE SHEETS: cualquier dato en las planillas de la empresa
+
+REGLAS FUNDAMENTALES:
+- Cuando alguien pregunte por un dato de una persona (teléfono, cargo, DNI, etc.), usá consultar_empleados con su nombre
+- Cuando pregunten por un proyecto, usá consultar_proyectos con incluir_asignaciones=true para ver empleados y máquinas
+- Cuando pidan enviar mensaje a todos, usá enviar_mensaje_whatsapp con todos=true
+- Nunca inventés datos. Si no encontrás algo, decílo claramente
+- Respondé siempre en español
+
+PARA REGISTRAR UN GASTO (protocolo obligatorio):
+- Recolectá los datos de forma conversacional
 - Campos OBLIGATORIOS: fecha, categoría, concepto, monto
-- Campos opcionales: proveedor, método de pago (efectivo/transferencia/tarjeta), centro de costos/proyecto, observaciones
-- Cuando tenés TODOS los datos obligatorios, mostrá un resumen completo y pedí confirmación
-- Usá este formato para el resumen:
+- Opcionales: proveedor, método de pago (efectivo/transferencia/tarjeta), proyecto/obra, observaciones
+- Mostrá resumen con este formato y pedió confirmación:
   📋 *Resumen del gasto:*
   • Fecha: [fecha]
   • Categoría: [categoria]
@@ -287,12 +297,10 @@ Para registrar un gasto, seguí este protocolo estrictamente:
   • Proveedor: [proveedor o "-"]
   • Método de pago: [metodo o "-"]
   • Proyecto/Obra: [centro_costos o "-"]
-  
   ¿Confirmás el registro? Respondé *OK* para guardar o *No* para cancelar.
-- SOLO llamás a la función registrar_gasto cuando el usuario responde OK, sí, confirmar, o similar
-- Si el usuario dice No o cancela, descartás los datos y preguntás si necesita algo más
+- SOLO llamás a registrar_gasto cuando el usuario responde OK, sí, confirmar, o similar
 
-Categorías de gasto disponibles: Combustible, Materiales, Servicios, Mantenimiento, Herramientas, Administrativo, Personal, Alquiler, Otro.`;
+Categorías de gasto: Combustible, Materiales, Servicios, Mantenimiento, Herramientas, Administrativo, Personal, Alquiler, Otro.`;
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
@@ -484,6 +492,22 @@ async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean
   if (orden === "primer" && !termino) {
     const e = results[0];
     return `El primer empleado en ingresar fue *${e.nombre} ${e.apellido}* — Cargo: ${e.cargo || "-"} | Fecha ingreso: ${e.fecha_ingreso || "No registrada"} | Estado: ${e.estado}`;
+  }
+
+  // Si se busca por nombre, mostrar info completa incluyendo teléfono
+  if (termino) {
+    const lineas = results.slice(0, 10).map(e =>
+      `👤 *${e.nombre} ${e.apellido}*
+   • Cargo: ${e.cargo || "-"}
+   • Teléfono: ${e.telefono || "-"}
+   • WhatsApp: ${e.telefono_whatsapp || "-"}
+   • DNI: ${e.dni || "-"}
+   • Estado: ${e.estado}
+   • Ingreso: ${e.fecha_ingreso || "-"}
+   • Venc. carnet: ${e.vencimiento_carnet || "-"}
+   • Contacto familiar: ${e.contacto_familiar_nombre || "-"} (${e.contacto_familiar_telefono || "-"})`
+    );
+    return lineas.join("\n\n");
   }
 
   const lineas = results.slice(0, 15).map(e =>
