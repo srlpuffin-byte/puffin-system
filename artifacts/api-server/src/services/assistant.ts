@@ -457,7 +457,7 @@ LO QUE PUEDO HACER (acciones de escritura):
 💰 Registrar gastos/egresos (con confirmación)
 👤 Registrar nuevos empleados
 🏗️ Actualizar proyectos: estado, asignar/desasignar empleados y máquinas
-📲 Enviar mensajes de WhatsApp a empleados individuales o a todos
+📲 Enviar mensajes de WhatsApp. CRÍTICO: Si te piden enviar un mensaje a TODOS o a varios empleados en general, DEBÉS usar enviar_mensaje_whatsapp con el parámetro todos=true. NO intentes enviar uno por uno llamando a la función repetidas veces.
 
 LO QUE PUEDO CONSULTAR (acceso total a la BD):
 👥 Empleados: teléfonos, DNI, cargos, carnet, contacto familiar
