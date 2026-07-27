@@ -472,52 +472,53 @@ Categorías de gasto: Combustible, Materiales, Servicios, Mantenimiento, Herrami
 // ─── Implementaciones de herramientas ───────────────────────────────────────
 
 async function executeEnviarMensaje(mensaje: string, numero?: string, nombreEmpleado?: string, todos?: boolean) {
-  // Enviar a todos los empleados con WhatsApp
+  // Helper: obtener el mejor número disponible (whatsapp > telefono)
+  const getNumero = (e: { telefono_whatsapp?: string | null; telefono?: string | null }) =>
+    e.telefono_whatsapp || e.telefono || null;
+
+  // Enviar a todos los empleados
   if (todos) {
     const empleados = await db.select({
       nombre: empleadosTable.nombre,
       apellido: empleadosTable.apellido,
-      telefono: empleadosTable.telefono_whatsapp,
-    }).from(empleadosTable)
-      .where(and(eq(empleadosTable.estado, "activo"), eq(empleadosTable.recibir_alertas_whatsapp, true)));
+      telefono_whatsapp: empleadosTable.telefono_whatsapp,
+      telefono: empleadosTable.telefono,
+    }).from(empleadosTable).where(eq(empleadosTable.estado, "activo"));
 
-    const conTelefono = empleados.filter(e => e.telefono);
-    if (conTelefono.length === 0) return "No hay empleados activos con WhatsApp registrado.";
+    const conTelefono = empleados.map(e => ({ ...e, num: getNumero(e) })).filter(e => e.num);
+    if (conTelefono.length === 0) return "No hay empleados activos con teléfono registrado en el sistema.";
 
     let exitosos = 0;
     const errores: string[] = [];
     for (const emp of conTelefono) {
       try {
-        await sendWhatsAppMessage(emp.telefono!, mensaje);
+        await sendWhatsAppMessage(emp.num!, mensaje);
         exitosos++;
       } catch (e: any) {
-        errores.push(`${emp.nombre} ${emp.apellido}: ${e.message}`);
+        errores.push(`${emp.nombre} ${emp.apellido}`);
       }
     }
-    return `✅ Mensaje enviado a ${exitosos}/${conTelefono.length} empleados.${errores.length ? ` Errores: ${errores.join(", ")}` : ""}`;
+    return `✅ Mensaje enviado a ${exitosos}/${conTelefono.length} empleados.${errores.length ? ` No se pudo enviar a: ${errores.join(", ")}` : ""}`;
   }
 
   let destino = numero;
 
-  // Buscar por nombre de empleado si no se dio número
+  // Buscar por nombre si no se dio número
   if (!destino && nombreEmpleado) {
     const t = `%${nombreEmpleado.toLowerCase()}%`;
     const [emp] = await db
-      .select({ telefono: empleadosTable.telefono_whatsapp, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
+      .select({ telefono_whatsapp: empleadosTable.telefono_whatsapp, telefono: empleadosTable.telefono, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
       .from(empleadosTable)
-      .where(or(like(empleadosTable.nombre, t), like(empleadosTable.apellido, t)))
+      .where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t)))
       .limit(1);
 
-    if (!emp || !emp.telefono) {
-      return `No encontré un empleado llamado "${nombreEmpleado}" con número de WhatsApp registrado.`;
-    }
-    destino = emp.telefono;
+    if (!emp) return `No encontré un empleado llamado "${nombreEmpleado}".`;
+    destino = getNumero(emp) || undefined;
+    if (!destino) return `El empleado ${emp.nombre} ${emp.apellido} no tiene teléfono registrado en el sistema.`;
     nombreEmpleado = `${emp.nombre} ${emp.apellido}`;
   }
 
-  if (!destino) {
-    return "No se pudo determinar el destinatario. Proporcioná un número o nombre de empleado.";
-  }
+  if (!destino) return "No se pudo determinar el destinatario. Proporcioná un número o nombre de empleado.";
 
   try {
     await sendWhatsAppMessage(destino, mensaje);
