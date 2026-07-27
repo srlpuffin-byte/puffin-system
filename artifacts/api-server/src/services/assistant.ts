@@ -315,10 +315,9 @@ export async function handleWhatsAppMessage(from: string, text: string) {
     senderPhone.endsWith(admin) || admin.endsWith(senderPhone.slice(-10))
   );
 
-  if (!isAdmin) {
-    console.log(`[WhatsApp] Mensaje de número no autorizado ${senderPhone} ignorado.`);
-    return;
-  }
+  // Operarios no autorizados: acceso solo lectura. Admins: acceso total.
+  // Si el número no está ni en admins ni en empleados conocidos, ignorar.
+  // Por ahora: todos los que escriban son operarios o admins.
 
   if (!openai) {
     console.warn("API KEY de IA no configurada. Asistente deshabilitado.");
@@ -336,44 +335,43 @@ export async function handleWhatsAppMessage(from: string, text: string) {
   const today = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
   const todayISO = new Date().toISOString().split("T")[0];
 
-  const systemPrompt = `Sos el Asistente Virtual de PUFFIN SRL, empresa de maquinaria vial.
+  // Herramientas disponibles según rol
+  const WRITE_TOOLS = ["registrar_gasto", "registrar_empleado", "enviar_mensaje_whatsapp"];
+  const toolsParaRol = isAdmin ? tools : tools.filter(
+    (t: any) => !WRITE_TOOLS.includes(t.function.name)
+  );
+
+  const systemPrompt = isAdmin
+    ? `Sos el Asistente Administrativo de PUFFIN SRL, empresa de maquinaria vial.
 Hablás en español rioplatense, de forma profesional, clara y concisa.
+Rol del usuario: *ADMINISTRADOR* — tiene acceso total al sistema.
 La fecha de hoy es ${today} (${todayISO}).
 
-TENÉS ACCESO COMPLETO A TODA LA INFORMACIÓN DEL SISTEMA. Si el usuario pregunta algo que esté en la base de datos, SIEMPRE usá las herramientas para buscarlo. Nunca digas que no tenés acceso a algo si hay una herramienta disponible para consultarlo.
+TENÉS ACCESO COMPLETO AL SISTEMA. Si te preguntan algo que esté en la BD, SIEMPRE usá las herramientas. Nunca digas que no tenés acceso si hay una herramienta disponible.
 
-ACCESO TOTAL AL SISTEMA:
-👥 EMPLEADOS: nombres, apellidos, DNI, teléfonos, cargos, estado, fecha de ingreso, carnet de conducir, contacto familiar
-🛠️ MÁQUINAS/EQUIPOS: nombre, tipo, estado, categoría, asignación a proyectos
-🏗️ PROYECTOS/OBRAS: lugar, hectáreas, estado, empleados asignados, máquinas asignadas, pagos, ganancia
-📅 JORNADAS: quién trabajó, en qué proyecto, qué horario, estado de la jornada
-💰 GASTOS/EGRESOS: monto, categoría, fecha, proveedor, proyecto al que se imputa
-📊 GOOGLE SHEETS: cualquier dato en las planillas de la empresa
+DATOS DISPONIBLES:
+👥 EMPLEADOS: nombres, teléfonos, DNI, cargos, carnet, contacto familiar
+🛠️ MÁQUINAS: nombre, tipo, estado, asignaciones
+🏗️ PROYECTOS: empleados y máquinas asignadas, pagos, ganancia
+📅 JORNADAS: quién trabajó, dónde, cuándo
+💰 GASTOS: monto, categoría, proveedor, proyecto
+⚽ COMBUSTIBLE y MANTENIMIENTOS de máquinas
 
-REGLAS FUNDAMENTALES:
-- Cuando alguien pregunte por un dato de una persona (teléfono, cargo, DNI, etc.), usá consultar_empleados con su nombre
-- Cuando pregunten por un proyecto, usá consultar_proyectos con incluir_asignaciones=true para ver empleados y máquinas
-- Cuando pidan enviar mensaje a todos, usá enviar_mensaje_whatsapp con todos=true
-- Nunca inventés datos. Si no encontrás algo, decílo claramente
-- Respondé siempre en español
+ACCIONES DISPONIBLES:
+- Registrar gastos (con confirmación obligatoria antes de guardar)
+- Registrar empleados nuevos
+- Enviar mensajes a empleados individuales o a todos
 
-PARA REGISTRAR UN GASTO (protocolo obligatorio):
-- Recolectá los datos de forma conversacional
-- Campos OBLIGATORIOS: fecha, categoría, concepto, monto
-- Opcionales: proveedor, método de pago (efectivo/transferencia/tarjeta), proyecto/obra, observaciones
-- Mostrá resumen con este formato y pedió confirmación:
-  📋 *Resumen del gasto:*
-  • Fecha: [fecha]
-  • Categoría: [categoria]
-  • Concepto: [concepto]
-  • Monto: $[monto]
-  • Proveedor: [proveedor o "-"]
-  • Método de pago: [metodo o "-"]
-  • Proyecto/Obra: [centro_costos o "-"]
-  ¿Confirmás el registro? Respondé *OK* para guardar o *No* para cancelar.
-- SOLO llamás a registrar_gasto cuando el usuario responde OK, sí, confirmar, o similar
+PROTOCOLO DE GASTO: Pedí todos los datos, mostrá resumen con formato 📋, esperá OK del administrador, recien ahí registrá.
+Categorías: Combustible, Materiales, Servicios, Mantenimiento, Herramientas, Administrativo, Personal, Alquiler, Otro.`
+    : `Sos el Asistente de PUFFIN SRL.
+Hablás en español rioplatense, de forma profesional.
+Rol del usuario: *OPERARIO* — acceso solo lectura.
+La fecha de hoy es ${today} (${todayISO}).
 
-Categorías de gasto: Combustible, Materiales, Servicios, Mantenimiento, Herramientas, Administrativo, Personal, Alquiler, Otro.`;
+Podés consultar: empleados, proyectos, jornadas, máquinas, combustible, mantenimientos, gastos.
+NO podés registrar gastos, enviar mensajes ni modificar datos. Si te piden eso, informá que solo los administradores pueden realizar esa acción.
+Nunca inventés datos. Usá siempre las herramientas para consultar la información.`;
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
@@ -384,9 +382,10 @@ Categorías de gasto: Combustible, Materiales, Servicios, Mantenimiento, Herrami
     const response = await openai.chat.completions.create({
       model: MODEL,
       messages,
-      tools,
+      tools: toolsParaRol,
       tool_choice: "auto",
     });
+
 
     const responseMessage = response.choices[0].message;
 
