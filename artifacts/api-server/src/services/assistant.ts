@@ -9,7 +9,7 @@ import {
   proyectosTable,
   jornadasTable,
 } from "@workspace/db/schema";
-import { eq, like, or, and, desc, count, ilike } from "drizzle-orm";
+import { eq, like, or, and, desc, ilike } from "drizzle-orm";
 import { sendWhatsAppImage, sendWhatsAppMessage } from "./whatsapp.js";
 
 const groqApiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
@@ -49,6 +49,21 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           categoria: { type: "string", description: "Categoría del gasto a filtrar (opcional)" },
         },
         required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_google_sheets",
+      description: "Lee datos de una pestaña del Google Sheet de la empresa. Útil para consultar datos de planillas, presupuestos, reportes o cualquier información almacenada en el Google Sheets.",
+      parameters: {
+        type: "object",
+        properties: {
+          pestana: { type: "string", description: "Nombre de la pestaña/tab a leer (ej: Egresos, Jornadas, Combustible, Empleados)" },
+          rango: { type: "string", description: "Rango de celdas a leer, ej: A1:E20 (opcional, default: A1:Z50)" },
+        },
+        required: ["pestana"],
       },
     },
   },
@@ -154,44 +169,53 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 // Números de administradores autorizados
 const ADMIN_PHONES = ["3472629600", "3572665637", "3572400877"];
 
-// Obtener o crear sesión para un número
+// Obtener o crear sesión — con fallback si la tabla no existe aún
 async function obtenerSesion(phone: string) {
-  const [sesion] = await db
-    .select()
-    .from(whatsappSesionesTable)
-    .where(eq(whatsappSesionesTable.phone, phone))
-    .limit(1);
+  try {
+    const [sesion] = await db
+      .select()
+      .from(whatsappSesionesTable)
+      .where(eq(whatsappSesionesTable.phone, phone))
+      .limit(1);
 
-  if (!sesion) {
-    const [nueva] = await db
-      .insert(whatsappSesionesTable)
-      .values({ phone, messages: [], estado: "idle", datos_pendientes: null })
-      .returning();
-    return nueva;
+    if (!sesion) {
+      const [nueva] = await db
+        .insert(whatsappSesionesTable)
+        .values({ phone, messages: [], estado: "idle", datos_pendientes: null })
+        .returning();
+      return nueva;
+    }
+
+    // Limpiar sesión si lleva más de 2 horas inactiva
+    const ahora = Date.now();
+    const ultimaActividad = sesion.updated_at ? new Date(sesion.updated_at).getTime() : 0;
+    if (ahora - ultimaActividad > SESSION_TIMEOUT_MS) {
+      await db
+        .update(whatsappSesionesTable)
+        .set({ messages: [], estado: "idle", datos_pendientes: null, updated_at: new Date() })
+        .where(eq(whatsappSesionesTable.phone, phone));
+      return { ...sesion, messages: [], estado: "idle", datos_pendientes: null };
+    }
+
+    return sesion;
+  } catch (e) {
+    // Si la tabla no existe todavía, devolver sesión vacía en memoria
+    console.warn("[Sesion] Tabla whatsapp_sesiones no disponible, usando sesion en memoria:", (e as any).message);
+    return { phone, messages: [], estado: "idle", datos_pendientes: null, updated_at: new Date() };
   }
-
-  // Limpiar sesión si lleva más de 2 horas inactiva
-  const ahora = Date.now();
-  const ultimaActividad = sesion.updated_at ? new Date(sesion.updated_at).getTime() : 0;
-  if (ahora - ultimaActividad > SESSION_TIMEOUT_MS) {
-    await db
-      .update(whatsappSesionesTable)
-      .set({ messages: [], estado: "idle", datos_pendientes: null, updated_at: new Date() })
-      .where(eq(whatsappSesionesTable.phone, phone));
-    return { ...sesion, messages: [], estado: "idle", datos_pendientes: null };
-  }
-
-  return sesion;
 }
 
-// Guardar sesión actualizada
+// Guardar sesión — con fallback si la tabla no existe
 async function guardarSesion(phone: string, messages: any[], estado: string = "idle", datos_pendientes: any = null) {
-  // Mantener solo los últimos MAX_HISTORY mensajes
-  const historial = messages.slice(-MAX_HISTORY);
-  await db
-    .update(whatsappSesionesTable)
-    .set({ messages: historial, estado, datos_pendientes, updated_at: new Date() })
-    .where(eq(whatsappSesionesTable.phone, phone));
+  try {
+    const historial = messages.slice(-MAX_HISTORY);
+    await db
+      .update(whatsappSesionesTable)
+      .set({ messages: historial, estado, datos_pendientes, updated_at: new Date() })
+      .where(eq(whatsappSesionesTable.phone, phone));
+  } catch (e) {
+    console.warn("[Sesion] No se pudo guardar la sesion:", (e as any).message);
+  }
 }
 
 export async function handleWhatsAppMessage(from: string, text: string) {
@@ -290,6 +314,8 @@ Categorías de gasto disponibles: Combustible, Materiales, Servicios, Mantenimie
           toolResult = await executeConsultarProyectos(functionArgs.estado);
         } else if (functionName === "consultar_jornadas") {
           toolResult = await executeConsultarJornadas(functionArgs.estado, functionArgs.nombre_empleado, functionArgs.fecha);
+        } else if (functionName === "consultar_google_sheets") {
+          toolResult = await executeConsultarSheets(functionArgs.pestana, functionArgs.rango);
         } else if (functionName === "enviar_imagen_vehiculo") {
           toolResult = await executeEnviarImagenVehiculo(from, functionArgs.nombre_maquina, functionArgs.maquina_id);
         } else if (functionName === "enviar_mensaje_whatsapp") {
@@ -376,7 +402,8 @@ async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean
   let query = db.select().from(empleadosTable).$dynamic();
   const conditions: any[] = [];
 
-  if (soloActivos) conditions.push(eq(empleadosTable.activo, true));
+  // FIX: el campo es 'estado' (texto), no 'activo' (boolean)
+  if (soloActivos) conditions.push(eq(empleadosTable.estado, "activo"));
   if (termino) {
     const t = `%${termino.toLowerCase()}%`;
     conditions.push(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t)));
@@ -390,15 +417,15 @@ async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean
     : "No hay empleados registrados.";
 
   if (!termino) {
-    const activos = results.filter(e => e.activo).length;
+    const activos = results.filter(e => e.estado === "activo").length;
     const lineas = results.map(e =>
-      `• ${e.nombre} ${e.apellido} — ${e.cargo || "Sin cargo"} | ${e.activo ? "Activo" : "Inactivo"}`
+      `• ${e.nombre} ${e.apellido} — ${e.cargo || "Sin cargo"} | ${e.estado === "activo" ? "Activo" : "Inactivo"}`
     );
     return `Total: ${results.length} empleados (${activos} activos)\n${lineas.join("\n")}`;
   }
 
   const lineas = results.map(e =>
-    `• ${e.nombre} ${e.apellido} — Cargo: ${e.cargo || "-"} | Tel: ${e.telefono_whatsapp || "-"} | ${e.activo ? "Activo" : "Inactivo"}`
+    `• ${e.nombre} ${e.apellido} — Cargo: ${e.cargo || "-"} | Tel: ${e.telefono_whatsapp || "-"} | Estado: ${e.estado}`
   );
   return lineas.join("\n");
 }
@@ -464,6 +491,43 @@ async function executeConsultarJornadas(estado?: string, nombreEmpleado?: string
     `• [${j.fecha}] ${empMap[j.empleado_id] || `Emp#${j.empleado_id}`} — ${j.nombre_obra || "Sin obra"} | ${j.hora_inicio || "?"}–${j.hora_fin || "en curso"} | Estado: ${j.estado}`
   );
   return `${results.length} jornada(s):\n${lineas.join("\n")}`;
+}
+
+async function executeConsultarSheets(pestana: string, rango?: string) {
+  const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+  const credsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+
+  if (!SHEET_ID || !credsJson) {
+    return "Google Sheets no está configurado en el servidor.";
+  }
+
+  try {
+    const { google } = await import("googleapis");
+    const credentials = JSON.parse(credsJson);
+    const auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    });
+    const sheets = google.sheets({ version: "v4", auth });
+    const rangoFinal = rango || "A1:Z50";
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `${pestana}!${rangoFinal}`,
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length === 0) return `La pestaña "${pestana}" está vacía o no existe.`;
+
+    // Formatear como tabla legible
+    const headers = rows[0];
+    const data = rows.slice(1).slice(0, 20); // Máximo 20 filas para no saturar
+    const lineas = data.map((row, i) =>
+      headers.map((h: string, j: number) => `${h}: ${row[j] || "-"}`).join(" | ")
+    );
+    return `📊 *${pestana}* (${data.length} registros):\n` + lineas.join("\n");
+  } catch (error: any) {
+    return `Error al leer Google Sheets (pestaña: ${pestana}): ${error.message}`;
+  }
 }
 
 async function executeConsultarInventario(termino: string) {
