@@ -24,8 +24,8 @@ let MODEL = "llama-3.3-70b-versatile";
 
 if (groqApiKey) {
   openai = new OpenAI({ apiKey: groqApiKey, baseURL: "https://api.groq.com/openai/v1" });
-  MODEL = "llama-3.3-70b-versatile";
-  console.log("[IA] Usando Groq: llama-3.3-70b-versatile");
+  MODEL = "llama-3.1-8b-instant"; // 500K tokens/día gratis (vs 100K del 70b)
+  console.log("[IA] Usando Groq: llama-3.1-8b-instant");
 } else if (geminiApiKey) {
   openai = new OpenAI({ apiKey: geminiApiKey, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/" });
   MODEL = "gemini-1.5-flash";
@@ -37,7 +37,7 @@ if (groqApiKey) {
 } else {
   console.error("[IA] ERROR: No hay ninguna API key configurada (GROQ_API_KEY, GEMINI_API_KEY u OPENAI_API_KEY)");
 }
-const MAX_HISTORY = 20; // últimos 20 mensajes por sesión
+const MAX_HISTORY = 8;  // reducido para ahorrar tokens
 const SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 horas
 
 // Herramientas disponibles para la IA
