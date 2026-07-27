@@ -10,8 +10,10 @@ import {
   jornadasTable,
   combustibleTable,
   mantenimientosTable,
+  usuariosTable,
 } from "@workspace/db/schema";
 import { eq, like, or, and, desc, ilike } from "drizzle-orm";
+import crypto from "crypto";
 import { sendWhatsAppImage, sendWhatsAppMessage } from "./whatsapp.js";
 
 const groqApiKey = process.env.GROQ_API_KEY;
@@ -345,6 +347,24 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "crear_acceso_sistema",
+      description: "Crea un usuario para que un empleado pueda iniciar sesión en el panel web. Requiere nombre, apellido, DNI (como usuario) y un PIN de 4 dígitos.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre: { type: "string", description: "Nombre del empleado" },
+          apellido: { type: "string", description: "Apellido del empleado" },
+          dni: { type: "string", description: "DNI del empleado (se usará como nombre de usuario para el login)" },
+          pin: { type: "string", description: "PIN de 4 a 6 dígitos para la contraseña" },
+          rol: { type: "string", description: "Rol: empleado, admin (default: empleado)" },
+        },
+        required: ["nombre", "apellido", "dni", "pin"],
+      },
+    },
+  },
 ];
 
 
@@ -437,7 +457,7 @@ export async function handleWhatsAppMessage(from: string, text: string) {
   const todayISO = new Date().toISOString().split("T")[0];
 
   // Herramientas disponibles según rol
-  const WRITE_TOOLS = ["registrar_gasto", "registrar_empleado", "enviar_mensaje_whatsapp", "registrar_jornada", "actualizar_jornada", "registrar_combustible_bot", "registrar_mantenimiento_bot", "actualizar_proyecto"];
+  const WRITE_TOOLS = ["registrar_gasto", "registrar_empleado", "enviar_mensaje_whatsapp", "registrar_jornada", "actualizar_jornada", "registrar_combustible_bot", "registrar_mantenimiento_bot", "actualizar_proyecto", "crear_acceso_sistema"];
   const toolsParaRol = isAdmin ? tools : tools.filter(
     (t: any) => !WRITE_TOOLS.includes(t.function.name)
   );
@@ -456,6 +476,7 @@ LO QUE PUEDO HACER (acciones de escritura):
 🔧 Registrar mantenimientos y services de máquinas
 💰 Registrar gastos/egresos (con confirmación)
 👤 Registrar nuevos empleados
+🔑 Crear accesos al sistema web (usuarios y PIN)
 🏗️ Actualizar proyectos: estado, asignar/desasignar empleados y máquinas
 📲 Enviar mensajes de WhatsApp. CRÍTICO: Si te piden enviar un mensaje a TODOS o a varios empleados en general, DEBÉS usar enviar_mensaje_whatsapp con el parámetro todos=true. NO intentes enviar uno por uno llamando a la función repetidas veces.
 
@@ -549,6 +570,8 @@ Nunca inventés datos. Usá siempre las herramientas disponibles.`;
           toolResult = await executeRegistrarMantenimiento(functionArgs);
         } else if (functionName === "actualizar_proyecto") {
           toolResult = await executeActualizarProyecto(functionArgs);
+        } else if (functionName === "crear_acceso_sistema") {
+          toolResult = await executeCrearAccesoSistema(functionArgs);
         }
 
         messages.push({
@@ -1245,5 +1268,29 @@ async function executeActualizarProyecto(args: { nombre_proyecto: string; nuevo_
     return `✅ Proyecto *${proy.lugar}* actualizado:\n${cambios.map(c => `• ${c}`).join("\n")}`;
   } catch (error: any) {
     return `❌ Error al actualizar proyecto: ${error.message}`;
+  }
+}
+
+async function executeCrearAccesoSistema(args: { nombre: string; apellido: string; dni: string; pin: string; rol?: string }) {
+  try {
+    const usuarioExistente = await db.select().from(usuariosTable).where(eq(usuariosTable.usuario, args.dni));
+    if (usuarioExistente.length > 0) {
+      return `❌ El usuario con DNI ${args.dni} ya tiene acceso al sistema.`;
+    }
+
+    const pinHash = crypto.createHash("sha256").update(args.pin + "puffin-salt").digest("hex");
+    
+    await db.insert(usuariosTable).values({
+      nombre: args.nombre,
+      apellido: args.apellido,
+      usuario: args.dni,
+      pin_hash: pinHash,
+      rol: args.rol || "empleado",
+      activo: true
+    });
+
+    return `✅ Acceso al sistema creado para *${args.nombre} ${args.apellido}*.\nUsuario: ${args.dni}\nPIN: ${args.pin}\nRol: ${args.rol || "empleado"}`;
+  } catch (error: any) {
+    return `❌ Error al crear acceso al sistema: ${error.message}`;
   }
 }
