@@ -12,13 +12,29 @@ import {
 import { eq, like, or, and, desc, ilike } from "drizzle-orm";
 import { sendWhatsAppImage, sendWhatsAppMessage } from "./whatsapp.js";
 
-const groqApiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
-const openai = groqApiKey ? new OpenAI({
-  apiKey: groqApiKey,
-  baseURL: process.env.GROQ_API_KEY ? "https://api.groq.com/openai/v1" : undefined,
-}) : null;
+const groqApiKey = process.env.GROQ_API_KEY;
+const geminiApiKey = process.env.GEMINI_API_KEY;
+const openaiApiKey = process.env.OPENAI_API_KEY;
 
-const MODEL = process.env.GROQ_API_KEY ? "llama-3.3-70b-versatile" : "gpt-4o-mini";
+// Prioridad: Groq (gratis, rápido) → Gemini (gratis, sin límite diario) → OpenAI (pago)
+let openai: OpenAI | null = null;
+let MODEL = "llama-3.3-70b-versatile";
+
+if (groqApiKey) {
+  openai = new OpenAI({ apiKey: groqApiKey, baseURL: "https://api.groq.com/openai/v1" });
+  MODEL = "llama-3.3-70b-versatile";
+  console.log("[IA] Usando Groq: llama-3.3-70b-versatile");
+} else if (geminiApiKey) {
+  openai = new OpenAI({ apiKey: geminiApiKey, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/" });
+  MODEL = "gemini-2.0-flash";
+  console.log("[IA] Usando Google Gemini: gemini-2.0-flash");
+} else if (openaiApiKey) {
+  openai = new OpenAI({ apiKey: openaiApiKey });
+  MODEL = "gpt-4o-mini";
+  console.log("[IA] Usando OpenAI: gpt-4o-mini");
+} else {
+  console.error("[IA] ERROR: No hay ninguna API key configurada (GROQ_API_KEY, GEMINI_API_KEY u OPENAI_API_KEY)");
+}
 const MAX_HISTORY = 20; // últimos 20 mensajes por sesión
 const SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 horas
 
