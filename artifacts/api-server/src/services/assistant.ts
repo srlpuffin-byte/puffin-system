@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI from "openai"; // Usamos el SDK de OpenAI apuntando a Groq
 import { db } from "@workspace/db";
 import {
   empleadosTable,
@@ -9,7 +9,11 @@ import {
 import { eq, like, or, and } from "drizzle-orm";
 import { sendWhatsAppImage, sendWhatsAppMessage } from "./whatsapp.js";
 
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+const groqApiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
+const openai = groqApiKey ? new OpenAI({
+  apiKey: groqApiKey,
+  baseURL: process.env.GROQ_API_KEY ? "https://api.groq.com/openai/v1" : undefined,
+}) : null;
 
 // Herramientas que la IA puede usar
 const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
@@ -95,7 +99,7 @@ export async function handleWhatsAppMessage(from: string, text: string) {
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: process.env.GROQ_API_KEY ? "llama-3.3-70b-versatile" : "gpt-4o-mini",
       messages,
       tools,
       tool_choice: "auto",
@@ -130,7 +134,7 @@ export async function handleWhatsAppMessage(from: string, text: string) {
 
       // Segunda llamada a OpenAI con los resultados de las herramientas
       const secondResponse = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: process.env.GROQ_API_KEY ? "llama-3.3-70b-versatile" : "gpt-4o-mini",
         messages,
       });
 
