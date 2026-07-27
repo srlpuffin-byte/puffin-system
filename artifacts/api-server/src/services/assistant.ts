@@ -714,7 +714,7 @@ async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean
   }
 
   const lineas = results.slice(0, 15).map(e =>
-    `• ${e.nombre} ${e.apellido} — ${e.cargo || "Sin cargo"} | Ingreso: ${e.fecha_ingreso || "-"} | ${e.estado === "activo" ? "Activo" : "Inactivo"}${
+    `• ${e.nombre} ${e.apellido} — ${e.cargo || "Sin cargo"} | Tel: ${e.telefono_whatsapp || e.telefono || "No registrado"} | ${e.estado === "activo" ? "Activo" : "Inactivo"}${
       carnetVencido && e.vencimiento_carnet ? ` | Carnet vence: ${e.vencimiento_carnet}` : ""
     }`
   );
