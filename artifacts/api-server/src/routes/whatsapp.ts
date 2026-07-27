@@ -31,26 +31,39 @@ whatsappRouter.post("/", async (req, res) => {
     res.status(200).send("EVENT_RECEIVED");
 
     try {
-      if (
-        body.entry &&
-        body.entry[0].changes &&
-        body.entry[0].changes[0] &&
-        body.entry[0].changes[0].value.messages &&
-        body.entry[0].changes[0].value.messages[0]
-      ) {
-        const phoneNumberId = body.entry[0].changes[0].value.metadata.phone_number_id;
-        const from = body.entry[0].changes[0].value.messages[0].from; // Número de quien envía el mensaje
-        const msgBody = body.entry[0].changes[0].value.messages[0].text?.body; // Texto del mensaje
-        const msgType = body.entry[0].changes[0].value.messages[0].type;
+      const change = body.entry?.[0]?.changes?.[0]?.value;
+      if (!change) return;
 
-        console.log(`Mensaje recibido de ${from}: ${msgBody} (Tipo: ${msgType})`);
-        
-        if (msgType === "text" && msgBody) {
-          await handleWhatsAppMessage(from, msgBody);
-        }
+      // Ignorar actualizaciones de estado (delivered, read, sent) — no son mensajes entrantes
+      if (change.statuses) return;
+
+      const message = change.messages?.[0];
+      if (!message) return;
+
+      const from: string = message.from;
+      const msgType: string = message.type;
+      const msgBody: string | undefined = message.text?.body;
+
+      // Ignorar mensajes enviados por el propio bot (evitar loop)
+      const botPhoneNumber = process.env.WHATSAPP_PHONE_NUMBER_ID || "";
+      const botDisplayNumber = change.metadata?.display_phone_number?.replace(/\D/g, "") || "";
+      const fromClean = from.replace(/\D/g, "");
+      if (botDisplayNumber && fromClean === botDisplayNumber) {
+        console.log(`[Webhook] Ignorando mensaje del propio bot (${from})`);
+        return;
       }
+
+      // Ignorar mensajes sin texto (imágenes, audio, etc. sin caption)
+      if (msgType !== "text" || !msgBody) {
+        console.log(`[Webhook] Ignorando mensaje tipo: ${msgType} de ${from}`);
+        return;
+      }
+
+      console.log(`[Webhook] Mensaje entrante de ${from}: ${msgBody}`);
+      await handleWhatsAppMessage(from, msgBody);
+
     } catch (error) {
-      console.error("Error processing WhatsApp webhook:", error);
+      console.error("[Webhook] Error procesando mensaje:", error);
     }
   } else {
     res.sendStatus(404);
