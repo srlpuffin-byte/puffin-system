@@ -253,6 +253,98 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "registrar_jornada",
+      description: "Registra una nueva jornada de trabajo para un empleado en un proyecto/obra. Pedir confirmación antes de guardar.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre_empleado: { type: "string", description: "Nombre del empleado" },
+          nombre_obra: { type: "string", description: "Nombre de la obra o proyecto" },
+          fecha: { type: "string", description: "Fecha YYYY-MM-DD (default: hoy)" },
+          hora_inicio: { type: "string", description: "Hora de inicio HH:MM (opcional)" },
+          hora_fin: { type: "string", description: "Hora de fin HH:MM (opcional)" },
+          estado: { type: "string", description: "Estado: activo, completado, ausente (default: activo)" },
+        },
+        required: ["nombre_empleado", "nombre_obra"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "actualizar_jornada",
+      description: "Actualiza una jornada existente: marcar como completada, registrar hora de salida, cambiar estado.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre_empleado: { type: "string", description: "Nombre del empleado" },
+          fecha: { type: "string", description: "Fecha YYYY-MM-DD (default: hoy)" },
+          hora_fin: { type: "string", description: "Hora de fin HH:MM" },
+          estado: { type: "string", description: "Nuevo estado: completado, ausente, activo" },
+        },
+        required: ["nombre_empleado"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "registrar_combustible_bot",
+      description: "Registra una carga de combustible para una máquina.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre_maquina: { type: "string", description: "Nombre de la máquina" },
+          nombre_empleado: { type: "string", description: "Nombre del empleado que cargó" },
+          litros: { type: "number", description: "Litros cargados" },
+          importe: { type: "number", description: "Importe total en pesos (opcional)" },
+          estacion: { type: "string", description: "Nombre de la estación de servicio (opcional)" },
+          fecha: { type: "string", description: "Fecha YYYY-MM-DD (default: hoy)" },
+        },
+        required: ["nombre_maquina", "litros"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "registrar_mantenimiento_bot",
+      description: "Registra un mantenimiento o service de una máquina.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre_maquina: { type: "string", description: "Nombre de la máquina" },
+          tipo: { type: "string", description: "Tipo de mantenimiento (aceite, filtros, neumaticos, frenos, general, etc.)" },
+          descripcion: { type: "string", description: "Descripción del trabajo realizado (opcional)" },
+          proximo_service: { type: "string", description: "Fecha o descripción del próximo service (opcional)" },
+          fecha: { type: "string", description: "Fecha YYYY-MM-DD (default: hoy)" },
+        },
+        required: ["nombre_maquina", "tipo"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "actualizar_proyecto",
+      description: "Actualiza el estado de un proyecto o asigna/desasigna empleados y máquinas.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre_proyecto: { type: "string", description: "Nombre o lugar del proyecto" },
+          nuevo_estado: { type: "string", description: "Nuevo estado: activo, finalizado, pausado (opcional)" },
+          agregar_empleado: { type: "string", description: "Nombre del empleado a asignar (opcional)" },
+          quitar_empleado: { type: "string", description: "Nombre del empleado a desasignar (opcional)" },
+          agregar_maquina: { type: "string", description: "Nombre de la máquina a asignar (opcional)" },
+          quitar_maquina: { type: "string", description: "Nombre de la máquina a desasignar (opcional)" },
+        },
+        required: ["nombre_proyecto"],
+      },
+    },
+  },
 ];
 
 
@@ -336,42 +428,55 @@ export async function handleWhatsAppMessage(from: string, text: string) {
   const todayISO = new Date().toISOString().split("T")[0];
 
   // Herramientas disponibles según rol
-  const WRITE_TOOLS = ["registrar_gasto", "registrar_empleado", "enviar_mensaje_whatsapp"];
+  const WRITE_TOOLS = ["registrar_gasto", "registrar_empleado", "enviar_mensaje_whatsapp", "registrar_jornada", "actualizar_jornada", "registrar_combustible_bot", "registrar_mantenimiento_bot", "actualizar_proyecto"];
   const toolsParaRol = isAdmin ? tools : tools.filter(
     (t: any) => !WRITE_TOOLS.includes(t.function.name)
   );
 
   const systemPrompt = isAdmin
-    ? `Sos el Asistente Administrativo de PUFFIN SRL, empresa de maquinaria vial.
+    ? `Sos el Asistente Administrativo Digital de PUFFIN SRL, empresa de maquinaria vial.
 Hablás en español rioplatense, de forma profesional, clara y concisa.
-Rol del usuario: *ADMINISTRADOR* — tiene acceso total al sistema.
-La fecha de hoy es ${today} (${todayISO}).
+Rol: *ADMINISTRADOR* — acceso y control total del sistema.
+Fecha de hoy: ${today} (${todayISO}).
 
-TENÉS ACCESO COMPLETO AL SISTEMA. Si te preguntan algo que esté en la BD, SIEMPRE usá las herramientas. Nunca digas que no tenés acceso si hay una herramienta disponible.
+SOY EL EMPLEADO ADMINISTRATIVO DIGITAL DE PUFFIN. El administrador puede pedirme cualquier cosa y yo la ejecuto en el sistema. Funciono como un colaborador humano: pienso, interpreto, consulto los datos y realizo las operaciones.
 
-DATOS DISPONIBLES:
-👥 EMPLEADOS: nombres, teléfonos, DNI, cargos, carnet, contacto familiar
-🛠️ MÁQUINAS: nombre, tipo, estado, asignaciones
-🏗️ PROYECTOS: empleados y máquinas asignadas, pagos, ganancia
-📅 JORNADAS: quién trabajó, dónde, cuándo
-💰 GASTOS: monto, categoría, proveedor, proyecto
-⚽ COMBUSTIBLE y MANTENIMIENTOS de máquinas
+LO QUE PUEDO HACER (acciones de escritura):
+📋 Registrar y actualizar jornadas de empleados
+⚽ Registrar cargas de combustible por máquina
+🔧 Registrar mantenimientos y services de máquinas
+💰 Registrar gastos/egresos (con confirmación)
+👤 Registrar nuevos empleados
+🏗️ Actualizar proyectos: estado, asignar/desasignar empleados y máquinas
+📲 Enviar mensajes de WhatsApp a empleados individuales o a todos
 
-ACCIONES DISPONIBLES:
-- Registrar gastos (con confirmación obligatoria antes de guardar)
-- Registrar empleados nuevos
-- Enviar mensajes a empleados individuales o a todos
+LO QUE PUEDO CONSULTAR (acceso total a la BD):
+👥 Empleados: teléfonos, DNI, cargos, carnet, contacto familiar
+🛠️ Máquinas: estado, tipo, asignaciones a proyectos
+🏗️ Proyectos: empleados y máquinas asignadas, pagos, ganancia
+📅 Jornadas: quién trabajó, dónde, cuándo, horarios
+💰 Gastos: monto, categoría, proveedor, proyecto
+⚽ Combustible: cargas por máquina, litros, importes
+🔧 Mantenimientos: servicios realizados, próximos services
+📊 Google Sheets: cualquier dato en las planillas
 
-PROTOCOLO DE GASTO: Pedí todos los datos, mostrá resumen con formato 📋, esperá OK del administrador, recien ahí registrá.
-Categorías: Combustible, Materiales, Servicios, Mantenimiento, Herramientas, Administrativo, Personal, Alquiler, Otro.`
+REGLAS DE OPERACIÓN:
+- SIEMPRE usá las herramientas para buscar datos. Nunca inventés información.
+- Para GASTOS: recolectá todos los datos, mostrá resumen con 📋 y esperá OK antes de guardar.
+- Para JORNADAS, COMBUSTIBLE, MANTENIMIENTOS: podés registrar directamente con los datos que te dan.
+- Para PROYECTOS: podés actualizar estado y asignaciones directamente.
+- Cuando no encontrés algo, decilo claramente.
+- Respondé siempre de forma concisa y profesional.
+
+CATEGORÍAS DE GASTO: Combustible, Materiales, Servicios, Mantenimiento, Herramientas, Administrativo, Personal, Alquiler, Otro.`
     : `Sos el Asistente de PUFFIN SRL.
 Hablás en español rioplatense, de forma profesional.
-Rol del usuario: *OPERARIO* — acceso solo lectura.
-La fecha de hoy es ${today} (${todayISO}).
+Rol: *OPERARIO* — acceso solo lectura.
+Fecha de hoy: ${today} (${todayISO}).
 
 Podés consultar: empleados, proyectos, jornadas, máquinas, combustible, mantenimientos, gastos.
-NO podés registrar gastos, enviar mensajes ni modificar datos. Si te piden eso, informá que solo los administradores pueden realizar esa acción.
-Nunca inventés datos. Usá siempre las herramientas para consultar la información.`;
+NO podés registrar ni modificar datos. Si te piden eso, informá que solo los administradores pueden hacerlo.
+Nunca inventés datos. Usá siempre las herramientas disponibles.`;
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
@@ -425,6 +530,16 @@ Nunca inventés datos. Usá siempre las herramientas para consultar la informaci
           toolResult = await executeConsultarMantenimientos(functionArgs);
         } else if (functionName === "registrar_empleado") {
           toolResult = await executeRegistrarEmpleado(functionArgs);
+        } else if (functionName === "registrar_jornada") {
+          toolResult = await executeRegistrarJornada(functionArgs);
+        } else if (functionName === "actualizar_jornada") {
+          toolResult = await executeActualizarJornada(functionArgs);
+        } else if (functionName === "registrar_combustible_bot") {
+          toolResult = await executeRegistrarCombustible(functionArgs);
+        } else if (functionName === "registrar_mantenimiento_bot") {
+          toolResult = await executeRegistrarMantenimiento(functionArgs);
+        } else if (functionName === "actualizar_proyecto") {
+          toolResult = await executeActualizarProyecto(functionArgs);
         }
 
         messages.push({
@@ -961,5 +1076,165 @@ async function executeRegistrarEmpleado(args: { nombre: string; apellido: string
     return `✅ Empleado registrado: *${emp.nombre} ${emp.apellido}* (ID #${emp.id}) | DNI: ${emp.dni} | Cargo: ${emp.cargo || "-"}`;
   } catch (error: any) {
     return `❌ Error al registrar empleado: ${error.message}`;
+  }
+}
+
+async function executeRegistrarJornada(args: { nombre_empleado: string; nombre_obra: string; fecha?: string; hora_inicio?: string; hora_fin?: string; estado?: string }) {
+  try {
+    const hoy = new Date().toISOString().split("T")[0];
+    const t = `%${args.nombre_empleado.toLowerCase()}%`;
+    const [emp] = await db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
+      .from(empleadosTable).where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t))).limit(1);
+    if (!emp) return `❌ No encontré empleado con nombre "${args.nombre_empleado}".`;
+
+    const [jornada] = await db.insert(jornadasTable).values({
+      empleado_id: emp.id,
+      nombre_obra: args.nombre_obra,
+      fecha: args.fecha || hoy,
+      hora_inicio: args.hora_inicio || null,
+      hora_fin: args.hora_fin || null,
+      estado: args.estado || "activo",
+      empresa_id: 1,
+    }).returning();
+
+    return `✅ Jornada registrada: *${emp.nombre} ${emp.apellido}* en ${args.nombre_obra} | Fecha: ${jornada.fecha} | Estado: ${jornada.estado}${jornada.hora_inicio ? ` | Entrada: ${jornada.hora_inicio}` : ""}`;
+  } catch (error: any) {
+    return `❌ Error al registrar jornada: ${error.message}`;
+  }
+}
+
+async function executeActualizarJornada(args: { nombre_empleado: string; fecha?: string; hora_fin?: string; estado?: string }) {
+  try {
+    const hoy = new Date().toISOString().split("T")[0];
+    const t = `%${args.nombre_empleado.toLowerCase()}%`;
+    const [emp] = await db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
+      .from(empleadosTable).where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t))).limit(1);
+    if (!emp) return `❌ No encontré empleado con nombre "${args.nombre_empleado}".`;
+
+    const fecha = args.fecha || hoy;
+    const { set } = await import("drizzle-orm");
+    const updates: any = {};
+    if (args.hora_fin) updates.hora_fin = args.hora_fin;
+    if (args.estado) updates.estado = args.estado;
+
+    const [updated] = await db.update(jornadasTable)
+      .set(updates)
+      .where(and(eq(jornadasTable.empleado_id, emp.id), eq(jornadasTable.fecha, fecha)))
+      .returning();
+
+    if (!updated) return `No encontré jornada de ${emp.nombre} ${emp.apellido} para el ${fecha}.`;
+    return `✅ Jornada actualizada: *${emp.nombre} ${emp.apellido}* | ${fecha} | Estado: ${updated.estado}${updated.hora_fin ? ` | Salida: ${updated.hora_fin}` : ""}`;
+  } catch (error: any) {
+    return `❌ Error al actualizar jornada: ${error.message}`;
+  }
+}
+
+async function executeRegistrarCombustible(args: { nombre_maquina: string; nombre_empleado?: string; litros: number; importe?: number; estacion?: string; fecha?: string }) {
+  try {
+    const hoy = new Date().toISOString().split("T")[0];
+
+    const [maq] = await db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre })
+      .from(maquinasTable).where(ilike(maquinasTable.nombre, `%${args.nombre_maquina}%`)).limit(1);
+    if (!maq) return `❌ No encontré máquina llamada "${args.nombre_maquina}".`;
+
+    let empId = 1;
+    if (args.nombre_empleado) {
+      const t = `%${args.nombre_empleado.toLowerCase()}%`;
+      const [emp] = await db.select({ id: empleadosTable.id }).from(empleadosTable)
+        .where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t))).limit(1);
+      if (emp) empId = emp.id;
+    }
+
+    const [reg] = await db.insert(combustibleTable).values({
+      maquina_id: maq.id,
+      empleado_id: empId,
+      fecha: args.fecha || hoy,
+      litros: args.litros.toString(),
+      importe: args.importe ? args.importe.toString() : null,
+      estacion: args.estacion || null,
+      estado: "activo",
+      empresa_id: 1,
+    }).returning();
+
+    return `✅ Combustible registrado: *${maq.nombre}* | ${reg.litros}L${args.importe ? ` | $${Number(args.importe).toLocaleString("es-AR")}` : ""} | ${args.estacion || "Sin estación"} | Fecha: ${reg.fecha}`;
+  } catch (error: any) {
+    return `❌ Error al registrar combustible: ${error.message}`;
+  }
+}
+
+async function executeRegistrarMantenimiento(args: { nombre_maquina: string; tipo: string; descripcion?: string; proximo_service?: string; fecha?: string }) {
+  try {
+    const hoy = new Date().toISOString().split("T")[0];
+
+    const [maq] = await db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre })
+      .from(maquinasTable).where(ilike(maquinasTable.nombre, `%${args.nombre_maquina}%`)).limit(1);
+    if (!maq) return `❌ No encontré máquina llamada "${args.nombre_maquina}".`;
+
+    const [mant] = await db.insert(mantenimientosTable).values({
+      maquina_id: maq.id,
+      fecha: args.fecha || hoy,
+      tipo: args.tipo,
+      descripcion: args.descripcion || null,
+      proximo_service: args.proximo_service || null,
+      estado: "realizado",
+      empresa_id: 1,
+    }).returning();
+
+    return `✅ Mantenimiento registrado: *${maq.nombre}* | Tipo: ${mant.tipo}${mant.descripcion ? ` | ${mant.descripcion}` : ""}${mant.proximo_service ? ` | Próximo: ${mant.proximo_service}` : ""} | Fecha: ${mant.fecha}`;
+  } catch (error: any) {
+    return `❌ Error al registrar mantenimiento: ${error.message}`;
+  }
+}
+
+async function executeActualizarProyecto(args: { nombre_proyecto: string; nuevo_estado?: string; agregar_empleado?: string; quitar_empleado?: string; agregar_maquina?: string; quitar_maquina?: string }) {
+  try {
+    const [proy] = await db.select().from(proyectosTable)
+      .where(ilike(proyectosTable.lugar, `%${args.nombre_proyecto}%`)).limit(1);
+    if (!proy) return `❌ No encontré proyecto llamado "${args.nombre_proyecto}".`;
+
+    const updates: any = {};
+    const cambios: string[] = [];
+
+    if (args.nuevo_estado) {
+      updates.estado = args.nuevo_estado;
+      cambios.push(`Estado → ${args.nuevo_estado}`);
+    }
+
+    let empIds: number[] = (proy.empleados_asignados as number[]) || [];
+    let maqIds: number[] = (proy.maquinas_asignadas as number[]) || [];
+
+    if (args.agregar_empleado) {
+      const t = `%${args.agregar_empleado.toLowerCase()}%`;
+      const [emp] = await db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
+        .from(empleadosTable).where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t))).limit(1);
+      if (!emp) return `❌ No encontré empleado "${args.agregar_empleado}".`;
+      if (!empIds.includes(emp.id)) { empIds = [...empIds, emp.id]; cambios.push(`Asignado: ${emp.nombre} ${emp.apellido}`); }
+    }
+    if (args.quitar_empleado) {
+      const t = `%${args.quitar_empleado.toLowerCase()}%`;
+      const [emp] = await db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
+        .from(empleadosTable).where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t))).limit(1);
+      if (emp) { empIds = empIds.filter(id => id !== emp.id); cambios.push(`Desasignado: ${emp.nombre} ${emp.apellido}`); }
+    }
+    if (args.agregar_maquina) {
+      const [maq] = await db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre })
+        .from(maquinasTable).where(ilike(maquinasTable.nombre, `%${args.agregar_maquina}%`)).limit(1);
+      if (!maq) return `❌ No encontré máquina "${args.agregar_maquina}".`;
+      if (!maqIds.includes(maq.id)) { maqIds = [...maqIds, maq.id]; cambios.push(`Máquina asignada: ${maq.nombre}`); }
+    }
+    if (args.quitar_maquina) {
+      const [maq] = await db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre })
+        .from(maquinasTable).where(ilike(maquinasTable.nombre, `%${args.quitar_maquina}%`)).limit(1);
+      if (maq) { maqIds = maqIds.filter(id => id !== maq.id); cambios.push(`Máquina desasignada: ${maq.nombre}`); }
+    }
+
+    updates.empleados_asignados = empIds;
+    updates.maquinas_asignadas = maqIds;
+
+    await db.update(proyectosTable).set(updates).where(eq(proyectosTable.id, proy.id));
+
+    return `✅ Proyecto *${proy.lugar}* actualizado:\n${cambios.map(c => `• ${c}`).join("\n")}`;
+  } catch (error: any) {
+    return `❌ Error al actualizar proyecto: ${error.message}`;
   }
 }
