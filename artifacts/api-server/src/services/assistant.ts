@@ -1273,23 +1273,27 @@ async function executeActualizarProyecto(args: { nombre_proyecto: string; nuevo_
 
 async function executeCrearAccesoSistema(args: { nombre: string; apellido: string; dni: string; pin: string; rol?: string }) {
   try {
-    const usuarioExistente = await db.select().from(usuariosTable).where(eq(usuariosTable.usuario, args.dni));
+    const dniStr = String(args.dni);
+    const pinStr = String(args.pin);
+    const rolStr = args.rol ? String(args.rol) : "empleado";
+    
+    const usuarioExistente = await db.select().from(usuariosTable).where(eq(usuariosTable.usuario, dniStr));
     if (usuarioExistente.length > 0) {
-      return `❌ El usuario con DNI ${args.dni} ya tiene acceso al sistema.`;
+      return `❌ El usuario con DNI ${dniStr} ya tiene acceso al sistema.`;
     }
 
-    const pinHash = crypto.createHash("sha256").update(args.pin + "puffin-salt").digest("hex");
+    const pinHash = crypto.createHash("sha256").update(pinStr + "puffin-salt").digest("hex");
     
     await db.insert(usuariosTable).values({
-      nombre: args.nombre,
-      apellido: args.apellido,
-      usuario: args.dni,
+      nombre: String(args.nombre),
+      apellido: String(args.apellido),
+      usuario: dniStr,
       pin_hash: pinHash,
-      rol: args.rol || "empleado",
+      rol: rolStr,
       activo: true
     });
 
-    return `✅ Acceso al sistema creado para *${args.nombre} ${args.apellido}*.\nUsuario: ${args.dni}\nPIN: ${args.pin}\nRol: ${args.rol || "empleado"}`;
+    return `✅ Acceso al sistema creado para *${args.nombre} ${args.apellido}*.\nUsuario: ${dniStr}\nPIN: ${pinStr}\nRol: ${rolStr}`;
   } catch (error: any) {
     return `❌ Error al crear acceso al sistema: ${error.message}`;
   }
