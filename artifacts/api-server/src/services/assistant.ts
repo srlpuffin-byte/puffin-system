@@ -47,7 +47,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "consultar_inventario",
-      description: "Consulta máquinas/equipos. Busca por nombre, filtra por estado o tipo, ordena por primero/último ingresado.",
+      description: "Consulta máquinas/equipos e inventario. Muestra qué proyecto tiene asignada cada máquina (distribución). Úsala para: listar todas las máquinas, ver dónde está cada máquina/equipo, cómo están distribuidas las máquinas entre proyectos, buscar por nombre o tipo, filtrar por estado.",
       parameters: {
         type: "object",
         properties: {
@@ -116,14 +116,14 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "consultar_proyectos",
-      description: "Consulta proyectos/obras con sus empleados y máquinas asignadas. Puede buscar qué operarios o máquinas están en un proyecto específico.",
+      description: "Consulta proyectos/obras con sus empleados y máquinas asignadas. Úsala cuando el usuario pregunta: qué máquinas/equipos hay en un proyecto, cómo están distribuidas las máquinas, qué operarios o maquinaria tiene una obra, dónde está cada máquina, o hace una pregunta de seguimiento sobre el mismo proyecto que se mencionó antes (ej: 'y qué maquinaria?', 'y los equipos?', 'y las máquinas?'). Siempre usar incluir_asignaciones=true cuando pregunten por máquinas u operarios de un proyecto específico.",
       parameters: {
         type: "object",
         properties: {
           estado: { type: "string", description: "Filtrar por estado: activo, finalizado, pausado (opcional)" },
-          nombre: { type: "string", description: "Buscar por nombre/lugar del proyecto (opcional)" },
+          nombre: { type: "string", description: "Buscar por nombre/lugar del proyecto (opcional). Si el usuario hace una pregunta de seguimiento sin mencionar el proyecto, inferirlo del contexto de la conversación anterior." },
           orden: { type: "string", description: "primer, ultimo, mayor_ganancia (opcional)" },
-          incluir_asignaciones: { type: "boolean", description: "Si true, muestra los nombres de empleados y máquinas asignadas (default: false)" },
+          incluir_asignaciones: { type: "boolean", description: "Si true, muestra los nombres de empleados Y máquinas asignadas. Usar true siempre que se pregunte por máquinas, equipos u operarios de un proyecto." },
         },
         required: [],
       },
@@ -454,12 +454,32 @@ export async function handleWhatsAppMessage(from: string, text: string) {
   // Obtener historial de conversación
   const sesion = await obtenerSesion(senderPhone);
   
-  // Limpiar el historial para evitar errores de compatibilidad entre modelos (ej. Groq -> OpenAI)
-  // OpenAI es muy estricto con que cada tool_call tenga su tool_result.
+  // Reconstruir historial preservando pares tool_call/tool_result completos.
+  // Un tool_call sin su tool_result correspondiente rompe la API de OpenAI/Groq,
+  // por eso se filtran los pares incompletos pero se mantienen los completos.
   const historial = (sesion.messages as any[]) || [];
-  const historialFiltrado = historial.filter(m => 
-    !m.tool_calls && m.role !== "tool" // Evitamos conflictos de formato de herramientas viejas
-  );
+  const historialFiltrado: any[] = [];
+  for (let i = 0; i < historial.length; i++) {
+    const msg = historial[i];
+    if (msg.tool_calls) {
+      // Verificar que el siguiente mensaje sea el tool_result correspondiente
+      const toolIds = msg.tool_calls.map((tc: any) => tc.id);
+      const siguientes = historial.slice(i + 1, i + 1 + toolIds.length);
+      const tieneResultados = siguientes.every((s: any) => s.role === "tool" && toolIds.includes(s.tool_call_id));
+      if (tieneResultados) {
+        // Par completo: agregar el assistant + sus tool_results
+        historialFiltrado.push(msg);
+        for (let j = 0; j < toolIds.length; j++) {
+          historialFiltrado.push(historial[i + 1 + j]);
+        }
+        i += toolIds.length; // saltar los tool_results ya procesados
+      }
+      // Si el par está incompleto (tool_call sin result), lo descartamos
+    } else if (msg.role !== "tool") {
+      // Mensajes user/assistant normales siempre se incluyen
+      historialFiltrado.push(msg);
+    }
+  }
 
   // Agregar mensaje del usuario al historial
   historialFiltrado.push({ role: "user", content: text });
@@ -508,6 +528,7 @@ LO QUE PUEDO CONSULTAR (acceso total a la BD):
 
 REGLAS DE OPERACIÓN:
 - SIEMPRE usá las herramientas para buscar datos. Nunca inventés información.
+- CONTEXTO DE CONVERSACIÓN: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maquinaria?", "y los equipos?", "cuántos son?", "y las máquinas?"), SIEMPRE inferí el tema del mensaje anterior. Si antes se habló de un proyecto (ej: "Lipsa"), asumí que la pregunta siguiente sigue siendo sobre ese mismo proyecto. Usá el historial para no perder el hilo.
 - Para GASTOS: recolectá todos los datos, mostrá resumen con 📋 y esperá OK antes de guardar.
 - Para JORNADAS, COMBUSTIBLE, MANTENIMIENTOS: podés registrar directamente con los datos que te dan.
 - Para PROYECTOS: podés actualizar estado y asignaciones directamente.
@@ -522,7 +543,8 @@ Fecha de hoy: ${today} (${todayISO}).
 
 Podés consultar: empleados, proyectos, jornadas, máquinas, combustible, mantenimientos, gastos.
 NO podés registrar ni modificar datos. Si te piden eso, informá que solo los administradores pueden hacerlo.
-Nunca inventés datos. Usá siempre las herramientas disponibles.`;
+Nunca inventés datos. Usá siempre las herramientas disponibles.
+CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maquinaria?", "y los equipos?"), inferí el tema del mensaje anterior para responder correctamente.`;
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
@@ -909,15 +931,33 @@ async function executeConsultarInventario(termino?: string, estado?: string, ord
   if (orden === "primer") query = query.orderBy(asc(maquinasTable.id));
   else if (orden === "ultimo") query = query.orderBy(desc(maquinasTable.id));
   else if (orden === "nombre") query = query.orderBy(asc(maquinasTable.nombre));
-  const results = await query.limit(10);
+  const results = await query.limit(20);
   if (results.length === 0) return termino ? `No se encontraron máquinas para "${termino}".` : "No hay máquinas registradas.";
   if (orden === "primer" && !termino) {
     const m = results[0];
     return `La primera máquina ingresada fue *${m.nombre}* — Tipo: ${m.tipo} | Estado: ${m.estado} | Categoría: ${m.categoria}`;
   }
-  const lineas = results.map(r => `• ${r.nombre} (${r.tipo}) — Estado: ${r.estado} | Categoría: ${r.categoria}`);
+
+  // Obtener proyectos activos para saber dónde está cada máquina
+  const proyectosActivos = await db.select({ lugar: proyectosTable.lugar, maquinas_asignadas: proyectosTable.maquinas_asignadas })
+    .from(proyectosTable).where(eq(proyectosTable.estado, "activo"));
+
+  // Construir mapa: maquina_id -> nombre del proyecto
+  const maqProyMap: Record<number, string> = {};
+  for (const p of proyectosActivos) {
+    const ids = (p.maquinas_asignadas as number[]) || [];
+    for (const id of ids) {
+      maqProyMap[id] = p.lugar;
+    }
+  }
+
+  const lineas = results.map(r => {
+    const proyecto = maqProyMap[r.id] ? ` | 📍 ${maqProyMap[r.id]}` : " | 📍 Sin asignar";
+    return `• *${r.nombre}* (${r.tipo}) — ${r.estado} | ${r.categoria}${proyecto}`;
+  });
   return `${results.length} máquina(s):\n${lineas.join("\n")}`;
 }
+
 
 async function executeAnalizarGastos(args: { categoria?: string; proyecto?: string; desde?: string; hasta?: string; agrupar_por?: string; orden?: string; limite?: number; }) {
   const { gte, lte, between, ilike: ilikeOp, sum } = await import("drizzle-orm");
