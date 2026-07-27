@@ -166,13 +166,13 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "enviar_mensaje_whatsapp",
-      description: "Envía un mensaje de WhatsApp a un empleado, a un número, o a TODOS los empleados con número registrado en el sistema.",
+      description: "Envía un mensaje de WhatsApp. CRÍTICO: NUNCA uses 'todos=true' a menos que el usuario diga explícitamente 'a TODOS los empleados'. Si el usuario nombra una persona o un número específico, mandá SOLO a esa persona. SIEMPRE mostrá un resumen antes de enviar: 'Voy a enviar [mensaje] a [destinatario]. ¿Confirmás?' y esperá el OK del usuario.",
       parameters: {
         type: "object",
         properties: {
-          numero: { type: "string", description: "Número de teléfono (solo dígitos, ej: 3472629600). Omitir si se usa nombre_empleado o todos." },
-          nombre_empleado: { type: "string", description: "Nombre del empleado (opcional si se da número o todos)" },
-          todos: { type: "boolean", description: "Si true, envía el mensaje a TODOS los empleados con WhatsApp registrado en el sistema" },
+          numero: { type: "string", description: "Número de teléfono (solo dígitos, ej: 5493472629600). Usar si se da un número explícito." },
+          nombre_empleado: { type: "string", description: "Nombre del empleado destinatario. Usar si se nombra a una persona." },
+          todos: { type: "boolean", description: "SOLO true si el usuario dijo explícitamente 'a TODOS los empleados'. NO usar por defecto." },
           mensaje: { type: "string", description: "Texto del mensaje a enviar" },
         },
         required: ["mensaje"],
@@ -491,7 +491,10 @@ REGLA DE ORO PARA TODAS LAS ACCIONES DE ESCRITURA: NUNCA INVENTES DATOS. Si el u
 👤 Registrar nuevos empleados
 🔑 Crear accesos al sistema web (individual o masivo a todos los faltantes). CRÍTICO: Si te piden crear los usuarios de los operarios que faltan, DEBES llamar INMEDIATAMENTE a la herramienta crear_accesos_faltantes. NO intentes consultar los empleados primero ni calcular quién falta. La herramienta hace todo el trabajo por vos automáticamente.
 🏗️ Actualizar proyectos: estado, asignar/desasignar empleados y máquinas
-📲 Enviar mensajes de WhatsApp. CRÍTICO: Si te piden enviar un mensaje a TODOS o a varios empleados en general, DEBÉS usar enviar_mensaje_whatsapp con el parámetro todos=true. NO intentes enviar uno por uno llamando a la función repetidas veces.
+📲 Enviar mensajes de WhatsApp.
+  - Si el usuario nombra a UNA persona o da UN número: mandá SOLO a esa persona.
+  - Si el usuario dice 'a TODOS' explícitamente: usá todos=true.
+  - SIEMPRE antes de enviar, mostrá un resumen: 'Voy a enviar el siguiente mensaje a [destinatario]:\n«[mensaje]»\n¿Confirmás el envío?' Esperá el OK o NO antes de ejecutar.
 
 LO QUE PUEDO CONSULTAR (acceso total a la BD):
 👥 Empleados: teléfonos, DNI, cargos, carnet, contacto familiar
