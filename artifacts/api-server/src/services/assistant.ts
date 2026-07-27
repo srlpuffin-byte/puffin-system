@@ -407,22 +407,31 @@ export async function handleWhatsAppMessage(from: string, text: string) {
     senderPhone.endsWith(admin) || admin.endsWith(senderPhone.slice(-10))
   );
 
-  // Operarios no autorizados: acceso solo lectura. Admins: acceso total.
-  // Si el número no está ni en admins ni en empleados conocidos, ignorar.
-  // Por ahora: todos los que escriban son operarios o admins.
-
   if (!openai) {
     console.warn("API KEY de IA no configurada. Asistente deshabilitado.");
     await sendWhatsAppMessage(from, "Lo siento, el asistente no está configurado por el momento.");
     return;
   }
 
+  // Comando especial para limpiar historial (útil al cambiar de modelo)
+  if (text.trim().toLowerCase() === "reset") {
+    await db.update(whatsappSesionesTable).set({ messages: [] }).where(eq(whatsappSesionesTable.phone, senderPhone));
+    await sendWhatsAppMessage(from, "✅ Memoria borrada. Arrancamos de cero con el nuevo modelo.");
+    return;
+  }
+
   // Obtener historial de conversación
   const sesion = await obtenerSesion(senderPhone);
+  
+  // Limpiar el historial para evitar errores de compatibilidad entre modelos (ej. Groq -> OpenAI)
+  // OpenAI es muy estricto con que cada tool_call tenga su tool_result.
   const historial = (sesion.messages as any[]) || [];
+  const historialFiltrado = historial.filter(m => 
+    !m.tool_calls && m.role !== "tool" // Evitamos conflictos de formato de herramientas viejas
+  );
 
   // Agregar mensaje del usuario al historial
-  historial.push({ role: "user", content: text });
+  historialFiltrado.push({ role: "user", content: text });
 
   const today = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
   const todayISO = new Date().toISOString().split("T")[0];
@@ -480,7 +489,7 @@ Nunca inventés datos. Usá siempre las herramientas disponibles.`;
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
-    ...historial.slice(-MAX_HISTORY) as any[],
+    ...historialFiltrado.slice(-MAX_HISTORY) as any[],
   ];
 
   try {
@@ -496,7 +505,7 @@ Nunca inventés datos. Usá siempre las herramientas disponibles.`;
 
     if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
       // Agregar respuesta del asistente al historial
-      historial.push(responseMessage);
+      historialFiltrado.push(responseMessage);
       messages.push(responseMessage);
 
       for (const toolCall of responseMessage.tool_calls) {
@@ -547,7 +556,7 @@ Nunca inventés datos. Usá siempre las herramientas disponibles.`;
           role: "tool",
           content: toolResult,
         });
-        historial.push({
+        historialFiltrado.push({
           tool_call_id: toolCall.id,
           role: "tool",
           content: toolResult,
@@ -563,15 +572,15 @@ Nunca inventés datos. Usá siempre las herramientas disponibles.`;
       const finalContent = secondResponse.choices[0].message.content;
       if (finalContent) {
         await sendWhatsAppMessage(from, finalContent);
-        historial.push({ role: "assistant", content: finalContent });
+        historialFiltrado.push({ role: "assistant", content: finalContent });
       }
     } else if (responseMessage.content) {
       await sendWhatsAppMessage(from, responseMessage.content);
-      historial.push({ role: "assistant", content: responseMessage.content });
+      historialFiltrado.push({ role: "assistant", content: responseMessage.content });
     }
 
     // Guardar historial actualizado
-    await guardarSesion(senderPhone, historial);
+    await guardarSesion(senderPhone, historialFiltrado);
 
   } catch (error) {
     console.error("Error en asistente PUFFIN:", error);
