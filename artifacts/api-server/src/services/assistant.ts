@@ -28,25 +28,33 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "consultar_inventario",
-      description: "Consulta el inventario de máquinas o ítems, y en qué proyecto están asignados.",
+      description: "Consulta máquinas/equipos. Busca por nombre, filtra por estado o tipo, ordena por primero/último ingresado.",
       parameters: {
         type: "object",
         properties: {
-          termino: { type: "string", description: "Término de búsqueda (ej: 'Retroexcavadora', 'Camión')" },
+          termino: { type: "string", description: "Término de búsqueda por nombre/tipo (opcional)" },
+          estado: { type: "string", description: "Filtrar por estado: activo, inactivo, mantenimiento (opcional)" },
+          orden: { type: "string", description: "primer, ultimo, nombre (opcional)" },
         },
-        required: ["termino"],
+        required: [],
       },
     },
   },
   {
     type: "function",
     function: {
-      name: "consultar_gastos",
-      description: "Consulta los últimos gastos o egresos registrados.",
+      name: "analizar_gastos",
+      description: "Consulta y analiza gastos/egresos con sumas totales, agrupaciones por categoría o proyecto, filtros por fecha. Úsala para preguntas como: suma total, gasto mayor, gastos de un proyecto, gastos del mes, etc.",
       parameters: {
         type: "object",
         properties: {
-          categoria: { type: "string", description: "Categoría del gasto a filtrar (opcional)" },
+          categoria: { type: "string", description: "Filtrar por categoría (opcional)" },
+          proyecto: { type: "string", description: "Filtrar por proyecto/obra (centro de costos) (opcional)" },
+          desde: { type: "string", description: "Fecha inicio YYYY-MM-DD (opcional)" },
+          hasta: { type: "string", description: "Fecha fin YYYY-MM-DD (opcional)" },
+          agrupar_por: { type: "string", description: "Agrupar por: categoria, proyecto, mes (opcional)" },
+          orden: { type: "string", description: "primer, ultimo, mayor, menor (opcional)" },
+          limite: { type: "number", description: "Máximo registros (default: 15)" },
         },
         required: [],
       },
@@ -71,12 +79,14 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "consultar_empleados",
-      description: "Consulta información sobre los empleados: cantidad total, lista, datos de contacto, cargo, estado activo/inactivo.",
+      description: "Consulta empleados: total, primer/último en ingresar, carnet vencido, datos de contacto.",
       parameters: {
         type: "object",
         properties: {
-          termino: { type: "string", description: "Nombre o apellido a buscar (opcional, si no se da devuelve el resumen general)" },
-          solo_activos: { type: "boolean", description: "Si true, filtra solo empleados activos (default: false)" },
+          termino: { type: "string", description: "Nombre o apellido a buscar (opcional)" },
+          solo_activos: { type: "boolean", description: "Filtrar solo activos" },
+          orden: { type: "string", description: "primer (primero en ingresar), ultimo, nombre" },
+          carnet_vencido: { type: "boolean", description: "Si true, muestra empleados con carnet vencido o próximo a vencer" },
         },
         required: [],
       },
@@ -86,11 +96,13 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "consultar_proyectos",
-      description: "Consulta los proyectos/obras activos o históricos de la empresa, incluyendo estado, hectáreas y cobros.",
+      description: "Consulta proyectos/obras: estado, hectáreas, ganancia estimada, pagos, primer/último proyecto.",
       parameters: {
         type: "object",
         properties: {
           estado: { type: "string", description: "Filtrar por estado: activo, finalizado, pausado (opcional)" },
+          nombre: { type: "string", description: "Buscar por nombre/lugar del proyecto (opcional)" },
+          orden: { type: "string", description: "primer, ultimo, mayor_ganancia (opcional)" },
         },
         required: [],
       },
@@ -100,13 +112,15 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "consultar_jornadas",
-      description: "Consulta jornadas de trabajo: las activas en este momento, las del día de hoy, o busca por empleado/máquina.",
+      description: "Consulta jornadas de trabajo: activas ahora, del día, por empleado, rangos de fecha.",
       parameters: {
         type: "object",
         properties: {
-          estado: { type: "string", description: "Estado de la jornada: en_curso, finalizada (opcional)" },
-          nombre_empleado: { type: "string", description: "Nombre del empleado a buscar (opcional)" },
-          fecha: { type: "string", description: "Fecha a consultar en formato YYYY-MM-DD (opcional, default: hoy)" },
+          estado: { type: "string", description: "en_curso, finalizada (opcional)" },
+          nombre_empleado: { type: "string", description: "Nombre del empleado (opcional)" },
+          fecha: { type: "string", description: "Fecha YYYY-MM-DD (opcional, default: hoy)" },
+          desde: { type: "string", description: "Fecha inicio para rango YYYY-MM-DD (opcional)" },
+          hasta: { type: "string", description: "Fecha fin para rango YYYY-MM-DD (opcional)" },
         },
         required: [],
       },
@@ -305,15 +319,15 @@ Categorías de gasto disponibles: Combustible, Materiales, Servicios, Mantenimie
         let toolResult = "";
 
         if (functionName === "consultar_inventario") {
-          toolResult = await executeConsultarInventario(functionArgs.termino);
-        } else if (functionName === "consultar_gastos") {
-          toolResult = await executeConsultarGastos(functionArgs.categoria);
+          toolResult = await executeConsultarInventario(functionArgs.termino, functionArgs.estado, functionArgs.orden);
+        } else if (functionName === "consultar_gastos" || functionName === "analizar_gastos") {
+          toolResult = await executeAnalizarGastos(functionArgs);
         } else if (functionName === "consultar_empleados") {
-          toolResult = await executeConsultarEmpleados(functionArgs.termino, functionArgs.solo_activos);
+          toolResult = await executeConsultarEmpleados(functionArgs.termino, functionArgs.solo_activos, functionArgs.orden, functionArgs.carnet_vencido);
         } else if (functionName === "consultar_proyectos") {
-          toolResult = await executeConsultarProyectos(functionArgs.estado);
+          toolResult = await executeConsultarProyectos(functionArgs.estado, functionArgs.nombre, functionArgs.orden);
         } else if (functionName === "consultar_jornadas") {
-          toolResult = await executeConsultarJornadas(functionArgs.estado, functionArgs.nombre_empleado, functionArgs.fecha);
+          toolResult = await executeConsultarJornadas(functionArgs.estado, functionArgs.nombre_empleado, functionArgs.fecha, functionArgs.desde, functionArgs.hasta);
         } else if (functionName === "consultar_google_sheets") {
           toolResult = await executeConsultarSheets(functionArgs.pestana, functionArgs.rango);
         } else if (functionName === "enviar_imagen_vehiculo") {
@@ -398,17 +412,29 @@ async function executeEnviarMensaje(mensaje: string, numero?: string, nombreEmpl
   }
 }
 
-async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean) {
+async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean, orden?: string, carnetVencido?: boolean) {
   let query = db.select().from(empleadosTable).$dynamic();
   const conditions: any[] = [];
 
-  // FIX: el campo es 'estado' (texto), no 'activo' (boolean)
   if (soloActivos) conditions.push(eq(empleadosTable.estado, "activo"));
   if (termino) {
     const t = `%${termino.toLowerCase()}%`;
     conditions.push(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t)));
   }
+  if (carnetVencido) {
+    const hoy = new Date().toISOString().split("T")[0];
+    const en30 = new Date(Date.now() + 30 * 864e5).toISOString().split("T")[0];
+    const { lte } = await import("drizzle-orm");
+    conditions.push(lte(empleadosTable.vencimiento_carnet, en30));
+  }
   if (conditions.length) query = query.where(and(...conditions));
+
+  // Ordenamiento
+  const { asc } = await import("drizzle-orm");
+  if (orden === "primer") query = query.orderBy(asc(empleadosTable.fecha_ingreso));
+  else if (orden === "ultimo") query = query.orderBy(desc(empleadosTable.fecha_ingreso));
+  else if (orden === "nombre") query = query.orderBy(asc(empleadosTable.apellido));
+  else query = query.orderBy(asc(empleadosTable.id));
 
   const results = await query.limit(15);
 
@@ -416,34 +442,47 @@ async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean
     ? `No encontré empleados que coincidan con "${termino}".`
     : "No hay empleados registrados.";
 
-  if (!termino) {
-    const activos = results.filter(e => e.estado === "activo").length;
-    const lineas = results.map(e =>
-      `• ${e.nombre} ${e.apellido} — ${e.cargo || "Sin cargo"} | ${e.estado === "activo" ? "Activo" : "Inactivo"}`
-    );
-    return `Total: ${results.length} empleados (${activos} activos)\n${lineas.join("\n")}`;
+  const activos = results.filter(e => e.estado === "activo").length;
+
+  if (orden === "primer" && !termino) {
+    const e = results[0];
+    return `El primer empleado en ingresar fue *${e.nombre} ${e.apellido}* — Cargo: ${e.cargo || "-"} | Fecha ingreso: ${e.fecha_ingreso || "No registrada"} | Estado: ${e.estado}`;
   }
 
   const lineas = results.map(e =>
-    `• ${e.nombre} ${e.apellido} — Cargo: ${e.cargo || "-"} | Tel: ${e.telefono_whatsapp || "-"} | Estado: ${e.estado}`
+    `• ${e.nombre} ${e.apellido} — ${e.cargo || "Sin cargo"} | Ingreso: ${e.fecha_ingreso || "-"} | ${e.estado === "activo" ? "Activo" : "Inactivo"}${
+      carnetVencido && e.vencimiento_carnet ? ` | Carnet vence: ${e.vencimiento_carnet}` : ""
+    }`
   );
-  return lineas.join("\n");
+  return `Total: ${results.length} empleados (${activos} activos)\n${lineas.join("\n")}`;
 }
 
-async function executeConsultarProyectos(estado?: string) {
+async function executeConsultarProyectos(estado?: string, nombre?: string, orden?: string) {
   let query = db.select().from(proyectosTable).$dynamic();
-  if (estado) query = query.where(eq(proyectosTable.estado, estado));
-  const results = await query.orderBy(desc(proyectosTable.createdAt)).limit(10);
+  const conditions: any[] = [];
+  if (estado) conditions.push(eq(proyectosTable.estado, estado));
+  if (nombre) conditions.push(ilike(proyectosTable.lugar, `%${nombre}%`));
+  if (conditions.length) query = query.where(and(...conditions));
+
+  const { asc } = await import("drizzle-orm");
+  if (orden === "primer") query = query.orderBy(asc(proyectosTable.createdAt));
+  else if (orden === "mayor_ganancia") query = query.orderBy(desc(proyectosTable.ganancia_estimada));
+  else query = query.orderBy(desc(proyectosTable.createdAt));
+
+  const results = await query.limit(10);
 
   if (results.length === 0) return `No hay proyectos${estado ? ` con estado "${estado}"` : ""} registrados.`;
 
+  const totalCobrado = results.reduce((a, p) => a + Number(p.total_cobrado || 0), 0);
+  const gananciaTotal = results.reduce((a, p) => a + Number(p.ganancia_estimada || 0), 0);
+
   const lineas = results.map(p =>
-    `• ${p.lugar} — ${p.hectareas} ha | Estado: ${p.estado} | Pago: ${p.estado_pago} | Cobrado: $${Number(p.total_cobrado || 0).toLocaleString("es-AR")}`
+    `• ${p.lugar} — ${p.hectareas} ha | Estado: ${p.estado} | Ganancia estimada: $${Number(p.ganancia_estimada || 0).toLocaleString("es-AR")} | Cobrado: $${Number(p.total_cobrado || 0).toLocaleString("es-AR")} | Pago: ${p.estado_pago}`
   );
-  return `${results.length} proyecto(s):\n${lineas.join("\n")}`;
+  return `${results.length} proyecto(s) | Total cobrado: $${totalCobrado.toLocaleString("es-AR")} | Ganancia estimada total: $${gananciaTotal.toLocaleString("es-AR")}\n${lineas.join("\n")}`;
 }
 
-async function executeConsultarJornadas(estado?: string, nombreEmpleado?: string, fecha?: string) {
+async function executeConsultarJornadas(estado?: string, nombreEmpleado?: string, fecha?: string, desde?: string, hasta?: string) {
   const hoy = fecha || new Date().toISOString().split("T")[0];
 
   let empId: number | undefined;
@@ -457,38 +496,32 @@ async function executeConsultarJornadas(estado?: string, nombreEmpleado?: string
     empId = emp.id;
   }
 
-  let query = db
-    .select({
-      id: jornadasTable.id,
-      fecha: jornadasTable.fecha,
-      estado: jornadasTable.estado,
-      hora_inicio: jornadasTable.hora_inicio,
-      hora_fin: jornadasTable.hora_fin,
-      nombre_obra: jornadasTable.nombre_obra,
-      empleado_id: jornadasTable.empleado_id,
-    })
-    .from(jornadasTable)
-    .$dynamic();
+  let query = db.select({ id: jornadasTable.id, fecha: jornadasTable.fecha, estado: jornadasTable.estado,
+    hora_inicio: jornadasTable.hora_inicio, hora_fin: jornadasTable.hora_fin,
+    nombre_obra: jornadasTable.nombre_obra, empleado_id: jornadasTable.empleado_id })
+    .from(jornadasTable).$dynamic();
 
+  const { gte, lte, between } = await import("drizzle-orm");
   const conditions: any[] = [];
   if (estado) conditions.push(eq(jornadasTable.estado, estado));
   if (empId) conditions.push(eq(jornadasTable.empleado_id, empId));
-  if (!estado && !empId) conditions.push(eq(jornadasTable.fecha, hoy));
+  if (desde && hasta) conditions.push(between(jornadasTable.fecha, desde, hasta));
+  else if (desde) conditions.push(gte(jornadasTable.fecha, desde));
+  else if (hasta) conditions.push(lte(jornadasTable.fecha, hasta));
+  else if (!estado && !empId) conditions.push(eq(jornadasTable.fecha, hoy));
   if (conditions.length) query = query.where(and(...conditions));
 
-  const results = await query.orderBy(desc(jornadasTable.fecha)).limit(10);
+  const results = await query.orderBy(desc(jornadasTable.fecha)).limit(15);
 
   if (results.length === 0) return `No hay jornadas${estado ? ` "${estado}"` : ""} ${nombreEmpleado ? `para ${nombreEmpleado}` : `para hoy (${hoy})`}.`;
 
-  // Obtener nombres de empleados
   const empIds = [...new Set(results.map(j => j.empleado_id))];
   const empleados = await db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
-    .from(empleadosTable)
-    .where(or(...empIds.map(id => eq(empleadosTable.id, id))));
+    .from(empleadosTable).where(or(...empIds.map(id => eq(empleadosTable.id, id))));
   const empMap = Object.fromEntries(empleados.map(e => [e.id, `${e.nombre} ${e.apellido}`]));
 
   const lineas = results.map(j =>
-    `• [${j.fecha}] ${empMap[j.empleado_id] || `Emp#${j.empleado_id}`} — ${j.nombre_obra || "Sin obra"} | ${j.hora_inicio || "?"}–${j.hora_fin || "en curso"} | Estado: ${j.estado}`
+    `• [${j.fecha}] ${empMap[j.empleado_id] || `Emp#${j.empleado_id}`} — ${j.nombre_obra || "Sin obra"} | ${j.hora_inicio || "?"}–${j.hora_fin || "en curso"} | ${j.estado}`
   );
   return `${results.length} jornada(s):\n${lineas.join("\n")}`;
 }
@@ -530,32 +563,79 @@ async function executeConsultarSheets(pestana: string, rango?: string) {
   }
 }
 
-async function executeConsultarInventario(termino: string) {
-  const t = `%${termino.toLowerCase()}%`;
-  const results = await db.select().from(maquinasTable).where(
-    or(like(maquinasTable.nombre, t), like(maquinasTable.tipo, t))
-  ).limit(8);
-
-  if (results.length === 0) return `No se encontraron máquinas para "${termino}".`;
-
-  const lineas = results.map(r =>
-    `• ${r.nombre} (${r.tipo}) — Estado: ${r.estado} | Categoría: ${r.categoria}`
-  );
-  return `Resultados para "${termino}":\n${lineas.join("\n")}`;
+async function executeConsultarInventario(termino?: string, estado?: string, orden?: string) {
+  const { asc } = await import("drizzle-orm");
+  let query = db.select().from(maquinasTable).$dynamic();
+  const conditions: any[] = [];
+  if (termino) { const t = `%${termino.toLowerCase()}%`; conditions.push(or(ilike(maquinasTable.nombre, t), ilike(maquinasTable.tipo, t))); }
+  if (estado) conditions.push(eq(maquinasTable.estado, estado));
+  if (conditions.length) query = query.where(and(...conditions));
+  if (orden === "primer") query = query.orderBy(asc(maquinasTable.id));
+  else if (orden === "ultimo") query = query.orderBy(desc(maquinasTable.id));
+  else if (orden === "nombre") query = query.orderBy(asc(maquinasTable.nombre));
+  const results = await query.limit(10);
+  if (results.length === 0) return termino ? `No se encontraron máquinas para "${termino}".` : "No hay máquinas registradas.";
+  if (orden === "primer" && !termino) {
+    const m = results[0];
+    return `La primera máquina ingresada fue *${m.nombre}* — Tipo: ${m.tipo} | Estado: ${m.estado} | Categoría: ${m.categoria}`;
+  }
+  const lineas = results.map(r => `• ${r.nombre} (${r.tipo}) — Estado: ${r.estado} | Categoría: ${r.categoria}`);
+  return `${results.length} máquina(s):\n${lineas.join("\n")}`;
 }
 
-async function executeConsultarGastos(categoria?: string) {
-  let query = db.select().from(egresosTable).orderBy(desc(egresosTable.createdAt)).$dynamic();
-  if (categoria) query = query.where(like(egresosTable.categoria, `%${categoria}%`));
-  const results = await query.limit(8);
+async function executeAnalizarGastos(args: { categoria?: string; proyecto?: string; desde?: string; hasta?: string; agrupar_por?: string; orden?: string; limite?: number; }) {
+  const { gte, lte, between, ilike: ilikeOp, sum } = await import("drizzle-orm");
+  const limite = args.limite || 15;
 
-  if (results.length === 0) return "No hay gastos registrados" + (categoria ? ` en la categoría "${categoria}".` : ".");
+  let query = db.select().from(egresosTable).$dynamic();
+  const conditions: any[] = [];
 
-  const sum = results.reduce((acc, curr) => acc + Number(curr.monto || 0), 0);
+  if (args.categoria) conditions.push(ilikeOp(egresosTable.categoria, `%${args.categoria}%`));
+  if (args.proyecto) conditions.push(ilikeOp(egresosTable.centro_costos, `%${args.proyecto}%`));
+  if (args.desde && args.hasta) conditions.push(between(egresosTable.fecha, args.desde, args.hasta));
+  else if (args.desde) conditions.push(gte(egresosTable.fecha, args.desde));
+  else if (args.hasta) conditions.push(lte(egresosTable.fecha, args.hasta));
+  if (conditions.length) query = query.where(and(...conditions));
+
+  if (args.orden === "primer") query = query.orderBy(egresosTable.fecha);
+  else if (args.orden === "mayor") query = query.orderBy(desc(egresosTable.monto));
+  else if (args.orden === "menor") query = query.orderBy(egresosTable.monto);
+  else query = query.orderBy(desc(egresosTable.fecha));
+
+  const results = await query.limit(limite);
+
+  if (results.length === 0) return "No hay gastos con esos filtros.";
+
+  const total = results.reduce((a, r) => a + Number(r.monto || 0), 0);
+
+  // Agrupar si se pide
+  if (args.agrupar_por === "categoria") {
+    const grupos: Record<string, number> = {};
+    results.forEach(r => { grupos[r.categoria] = (grupos[r.categoria] || 0) + Number(r.monto || 0); });
+    const lineas = Object.entries(grupos).sort((a, b) => b[1] - a[1])
+      .map(([cat, monto]) => `• ${cat}: $${monto.toLocaleString("es-AR")}`);
+    return `*Gastos por categoría* (Total: $${total.toLocaleString("es-AR")}):\n${lineas.join("\n")}`;
+  }
+
+  if (args.agrupar_por === "proyecto") {
+    const grupos: Record<string, number> = {};
+    results.forEach(r => { const k = r.centro_costos || "Sin proyecto"; grupos[k] = (grupos[k] || 0) + Number(r.monto || 0); });
+    const lineas = Object.entries(grupos).sort((a, b) => b[1] - a[1])
+      .map(([proy, monto]) => `• ${proy}: $${monto.toLocaleString("es-AR")}`);
+    return `*Gastos por proyecto* (Total: $${total.toLocaleString("es-AR")}):\n${lineas.join("\n")}`;
+  }
+
+  if (args.agrupar_por === "mes") {
+    const grupos: Record<string, number> = {};
+    results.forEach(r => { const mes = r.fecha ? r.fecha.slice(0, 7) : "?"; grupos[mes] = (grupos[mes] || 0) + Number(r.monto || 0); });
+    const lineas = Object.entries(grupos).sort().map(([mes, monto]) => `• ${mes}: $${monto.toLocaleString("es-AR")}`);
+    return `*Gastos por mes* (Total: $${total.toLocaleString("es-AR")}):\n${lineas.join("\n")}`;
+  }
+
   const lineas = results.map(r =>
-    `• [${r.fecha}] ${r.concepto} — $${Number(r.monto).toLocaleString("es-AR")} (${r.categoria})`
+    `• [${r.fecha}] ${r.concepto} — $${Number(r.monto).toLocaleString("es-AR")} | ${r.categoria}${r.centro_costos ? ` | Proyecto: ${r.centro_costos}` : ""}`
   );
-  return `Últimos ${results.length} gastos (Total: $${sum.toLocaleString("es-AR")}):\n${lineas.join("\n")}`;
+  return `${results.length} gastos | *Total: $${total.toLocaleString("es-AR")}*\n${lineas.join("\n")}`;
 }
 
 async function executeEnviarImagenVehiculo(from: string, nombreMaquina: string, maquinaId?: number) {
