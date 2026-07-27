@@ -1294,3 +1294,5 @@ async function executeCrearAccesoSistema(args: { nombre: string; apellido: strin
     return `❌ Error al crear acceso al sistema: ${error.message}`;
   }
 }
+/ /   t r i g g e r   d e p l o y  
+ 
