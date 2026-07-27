@@ -183,7 +183,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "registrar_gasto",
-      description: "Registra un gasto/egreso en el sistema. Llamar SOLO cuando el usuario haya confirmado con 'OK' o 'sí' o 'confirmar'. Antes de llamar esta función, SIEMPRE mostrar un resumen detallado al usuario y pedir confirmación explícita.",
+      description: "Registra un gasto/egreso en el sistema. CRÍTICO: Si el usuario te pide cargar un gasto, pero no te da todos los datos obligatorios (Fecha, Categoría, Concepto, Monto), DEBÉS preguntarle cuáles son antes de usar esta herramienta. Una vez que tengas todo, mostrale un resumen detallado y pedí confirmación ('OK' o 'Sí') ANTES de llamar a la herramienta.",
       parameters: {
         type: "object",
         properties: {
@@ -485,7 +485,7 @@ LO QUE PUEDO HACER (acciones de escritura):
 📋 Registrar y actualizar jornadas de empleados
 ⚽ Registrar cargas de combustible por máquina
 🔧 Registrar mantenimientos y services de máquinas
-💰 Registrar gastos/egresos (con confirmación)
+💰 Registrar gastos/egresos. CRÍTICO: Para registrar un gasto necesitás sí o sí: Fecha, Categoría, Concepto y Monto. Si el administrador no te da alguno de estos datos, DEBÉS preguntárselo antes de registrar nada. Una vez que tengas todo, le mostrás un resumen y le pedís confirmación ("¿Guardo este gasto?").
 👤 Registrar nuevos empleados
 🔑 Crear accesos al sistema web (individual o masivo a todos los faltantes). CRÍTICO: Si te piden crear los usuarios de los operarios que faltan, DEBES llamar INMEDIATAMENTE a la herramienta crear_accesos_faltantes. NO intentes consultar los empleados primero ni calcular quién falta. La herramienta hace todo el trabajo por vos automáticamente.
 🏗️ Actualizar proyectos: estado, asignar/desasignar empleados y máquinas
