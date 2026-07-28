@@ -1110,12 +1110,24 @@ async function executeEnviarFotografia(from: string, tipo_entidad: string, busqu
 
     if (fotos.length === 0) return `No hay fotografías registradas de tipo "${tipoReal}" para "${b}".`;
 
+    let finalUrl = fotos[0].url;
+    
+    // Si la imagen está guardada en base64, subirla a Cloudinary primero para generar el link
+    if (finalUrl.startsWith("data:image/")) {
+      try {
+        const { uploadImage } = await import("./storage.js");
+        finalUrl = await uploadImage(`wa_foto_${Date.now()}.jpg`, finalUrl);
+      } catch (e) {
+        console.error("Error subiendo base64 a Cloudinary desde el asistente:", e);
+      }
+    }
+
     try {
-      await sendWhatsAppImage(from, fotos[0].url, `Imagen de ${b} (${tipoReal})`);
-      return `✅ Imagen enviada correctamente.`;
+      await sendWhatsAppImage(from, finalUrl, `Imagen de ${b} (${tipoReal})`);
+      return `✅ Imagen enviada correctamente a través del canal de WhatsApp. Adicionalmente, AQUÍ TIENES EL ENLACE PÚBLICO para que se lo envíes al usuario en tu mensaje de texto: ${finalUrl}`;
     } catch (sendErr: any) {
       console.error("[WhatsApp] Error en sendWhatsAppImage:", sendErr);
-      return `Ocurrió un error al intentar enviar la imagen a WhatsApp: ${sendErr.message}`;
+      return `Ocurrió un error al intentar enviar la imagen adjunta por WhatsApp, PERO la imagen sí existe. Dile al usuario que falló el adjunto y envíale este enlace público: ${finalUrl}`;
     }
 
   } catch (error: any) {
