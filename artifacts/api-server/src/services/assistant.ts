@@ -1123,6 +1123,9 @@ async function executeEnviarFotografia(from: string, tipo_entidad: string, busqu
     }
 
     try {
+      if (finalUrl.startsWith("data:image/")) {
+         return `✅ Ocurrió un error al intentar generar un enlace público para la imagen, por lo que no puedo enviarla por WhatsApp ni proporcionarte un link. Sin embargo, la imagen existe en la base de datos.`;
+      }
       await sendWhatsAppImage(from, finalUrl, `Imagen de ${b} (${tipoReal})`);
       return `✅ Imagen enviada correctamente a través del canal de WhatsApp. Adicionalmente, AQUÍ TIENES EL ENLACE PÚBLICO para que se lo envíes al usuario en tu mensaje de texto: ${finalUrl}`;
     } catch (sendErr: any) {
