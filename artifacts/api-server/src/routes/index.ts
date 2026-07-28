@@ -43,6 +43,16 @@ router.get("/sync-egresos-sheet", async (req, res) => {
   }
 });
 
+router.get("/debug-fotos", async (req, res) => {
+  try {
+    const { fotografiasTable } = await import("@workspace/db/schema");
+    const fotosList = await db.select().from(fotografiasTable).limit(50);
+    return res.json(fotosList);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 router.use(healthRouter);
 router.use("/auth", authRouter);
 import { whatsappRouter } from "./whatsapp";
