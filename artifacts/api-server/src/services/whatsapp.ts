@@ -59,8 +59,10 @@ export async function sendWhatsAppMessage(to: string, text: string): Promise<{ s
 
 
 export async function sendWhatsAppImage(to: string, imageUrl: string, caption?: string) {
+  const toFormatted = formatArgentinaPhone(to);
+  
   if (!WHATSAPP_ACCESS_TOKEN || WHATSAPP_ACCESS_TOKEN === "TODO_ACCESS_TOKEN") {
-    console.warn(`[WhatsApp] Simulando envío de imagen a ${to}: ${imageUrl}`);
+    console.warn(`[WhatsApp] Simulando envío de imagen a ${toFormatted}: ${imageUrl}`);
     return { status: "simulated" };
   }
 
@@ -69,7 +71,7 @@ export async function sendWhatsAppImage(to: string, imageUrl: string, caption?: 
   const payload = {
     messaging_product: "whatsapp",
     recipient_type: "individual",
-    to: to.replace(/[^0-9]/g, ""),
+    to: toFormatted,
     type: "image",
     image: { 
       link: imageUrl,
