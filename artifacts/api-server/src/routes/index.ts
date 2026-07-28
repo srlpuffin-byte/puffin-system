@@ -46,7 +46,7 @@ router.get("/sync-egresos-sheet", async (req, res) => {
 router.get("/clear-history", async (req, res) => {
   try {
     const { whatsappSesionesTable } = await import("@workspace/db/schema");
-    await db.update(whatsappSesionesTable).set({ historial: [] });
+    await db.update(whatsappSesionesTable).set({ messages: [] });
     return res.json({ success: true, message: "Historial limpiado correctamente." });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
