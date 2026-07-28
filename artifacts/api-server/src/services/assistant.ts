@@ -1210,12 +1210,23 @@ async function executeConsultarCombustible(args: { nombre_maquina?: string; nomb
     .where(or(...maqIds.map(id => eq(maquinasTable.id, id))));
   const maqMap = Object.fromEntries(maqs.map(m => [m.id, m.nombre]));
 
+  // Resolver nombres de empleados
+  const empIds = [...new Set(results.map(r => r.empleado_id).filter(id => id != null))] as number[];
+  let empMap: Record<number, string> = {};
+  if (empIds.length > 0) {
+    const emps = await db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable)
+      .where(or(...empIds.map(id => eq(empleadosTable.id, id))));
+    empMap = Object.fromEntries(emps.map(e => [e.id, `${e.nombre} ${e.apellido}`.trim()]));
+  }
+
   const totalLitros = results.reduce((a, r) => a + Number(r.litros || 0), 0);
   const totalImporte = results.reduce((a, r) => a + Number(r.importe || 0), 0);
 
-  const lineas = results.map(r =>
-    `• [${r.fecha}] ${maqMap[r.maquina_id] || `Máq#${r.maquina_id}`} — ${r.litros}L | $${Number(r.importe || 0).toLocaleString("es-AR")} | ${r.estacion || "-"}`
-  );
+  const lineas = results.map(r => {
+    const maqStr = maqMap[r.maquina_id] || `Máq#${r.maquina_id}`;
+    const empStr = r.empleado_id ? (empMap[r.empleado_id] || `Emp#${r.empleado_id}`) : "Sin operario";
+    return `• [${r.fecha}] ${maqStr} (Operario: ${empStr}) — ${r.litros}L | $${Number(r.importe || 0).toLocaleString("es-AR")} | ${r.estacion || "-"}`;
+  });
   return `${results.length} cargas | Total: ${totalLitros.toFixed(1)}L | $${totalImporte.toLocaleString("es-AR")}\n${lineas.join("\n")}`;
 }
 
