@@ -1063,49 +1063,65 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
 }
 
 async function executeEnviarFotografia(from: string, tipo_entidad: string, busqueda: string) {
-  const t = `%${busqueda.toLowerCase()}%`;
-  
-  let entidad_id: number | null = null;
-  let tipoReal = tipo_entidad.toLowerCase();
-
-  // Buscar en la tabla correspondiente según el tipo pedido
-  if (tipoReal.includes("maquina") || tipoReal.includes("vehiculo") || tipoReal.includes("chata")) {
-    const maq = await db.select().from(maquinasTable).where(ilike(maquinasTable.nombre, t)).limit(1);
-    if (maq.length === 0) return `No encontré ninguna máquina o vehículo coincidente con "${busqueda}".`;
-    entidad_id = maq[0].id;
-    tipoReal = "maquina";
-  } else if (tipoReal.includes("operario") || tipoReal.includes("empleado") || tipoReal.includes("dni") || tipoReal.includes("perfil")) {
-    const emp = await db.select().from(empleadosTable)
-      .where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t), ilike(empleadosTable.dni, t)))
-      .limit(1);
-    if (emp.length === 0) return `No encontré ningún operario coincidente con "${busqueda}".`;
-    entidad_id = emp[0].id;
+  try {
+    const b = busqueda || "";
+    const te = tipo_entidad || "";
     
-    // Identificar si piden DNI o foto general
-    tipoReal = tipoReal.includes("dni") ? "empleado_dni" : "empleado_perfil";
-  } else if (tipoReal.includes("comprobante") || tipoReal.includes("ticket") || tipoReal.includes("factura") || tipoReal.includes("gasto") || tipoReal.includes("egreso")) {
-    const egreso = await db.select().from(egresosTable)
-      .where(or(ilike(egresosTable.concepto, t), ilike(egresosTable.proveedor, t), ilike(egresosTable.categoria, t)))
-      .limit(1);
-    if (egreso.length === 0) return `No encontré ningún gasto/comprobante coincidente con "${busqueda}".`;
-    entidad_id = egreso[0].id;
-    tipoReal = "gasto"; // Asumimos que los tickets se guardan con entidad_tipo "gasto"
-  } else {
-    return `No reconozco el tipo de entidad "${tipo_entidad}". Debe ser maquina, operario, dni, o comprobante.`;
+    if (!b) return "Falta proporcionar el parámetro de búsqueda (ej: nombre de la máquina o DNI).";
+    if (!te) return "Falta proporcionar el tipo de entidad (maquina, operario, dni, comprobante).";
+
+    const t = `%${b.toLowerCase()}%`;
+    let entidad_id: number | null = null;
+    let tipoReal = te.toLowerCase();
+
+    // Buscar en la tabla correspondiente según el tipo pedido
+    if (tipoReal.includes("maquina") || tipoReal.includes("vehiculo") || tipoReal.includes("chata")) {
+      const maq = await db.select().from(maquinasTable).where(ilike(maquinasTable.nombre, t)).limit(1);
+      if (maq.length === 0) return `No encontré ninguna máquina o vehículo coincidente con "${b}".`;
+      entidad_id = maq[0].id;
+      tipoReal = "maquina";
+    } else if (tipoReal.includes("operario") || tipoReal.includes("empleado") || tipoReal.includes("dni") || tipoReal.includes("perfil")) {
+      const emp = await db.select().from(empleadosTable)
+        .where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t), ilike(empleadosTable.dni, t)))
+        .limit(1);
+      if (emp.length === 0) return `No encontré ningún operario coincidente con "${b}".`;
+      entidad_id = emp[0].id;
+      
+      // Identificar si piden DNI o foto general
+      tipoReal = tipoReal.includes("dni") ? "empleado_dni" : "empleado_perfil";
+    } else if (tipoReal.includes("comprobante") || tipoReal.includes("ticket") || tipoReal.includes("factura") || tipoReal.includes("gasto") || tipoReal.includes("egreso")) {
+      const egreso = await db.select().from(egresosTable)
+        .where(or(ilike(egresosTable.concepto, t), ilike(egresosTable.proveedor, t), ilike(egresosTable.categoria, t)))
+        .limit(1);
+      if (egreso.length === 0) return `No encontré ningún gasto/comprobante coincidente con "${b}".`;
+      entidad_id = egreso[0].id;
+      tipoReal = "gasto"; 
+    } else {
+      return `No reconozco el tipo de entidad "${te}". Debe ser maquina, operario, dni, o comprobante.`;
+    }
+
+    // Buscar la foto en la tabla fotografias
+    const fotos = await db.select().from(fotografiasTable).where(
+      and(
+        or(ilike(fotografiasTable.entidad_tipo, `%${tipoReal}%`), eq(fotografiasTable.entidad_tipo, te)), 
+        eq(fotografiasTable.entidad_id, entidad_id)
+      )
+    ).limit(1);
+
+    if (fotos.length === 0) return `No hay fotografías registradas de tipo "${tipoReal}" para "${b}".`;
+
+    try {
+      await sendWhatsAppImage(from, fotos[0].url, `Imagen de ${b} (${tipoReal})`);
+      return `✅ Imagen enviada correctamente.`;
+    } catch (sendErr: any) {
+      console.error("[WhatsApp] Error en sendWhatsAppImage:", sendErr);
+      return `Ocurrió un error al intentar enviar la imagen a WhatsApp: ${sendErr.message}`;
+    }
+
+  } catch (error: any) {
+    console.error("Excepción en executeEnviarFotografia:", error);
+    return `Ocurrió un error interno al buscar la fotografía: ${error.message}`;
   }
-
-  // Buscar la foto en la tabla fotografias
-  const fotos = await db.select().from(fotografiasTable).where(
-    and(
-      or(ilike(fotografiasTable.entidad_tipo, `%${tipoReal}%`), eq(fotografiasTable.entidad_tipo, tipo_entidad)), 
-      eq(fotografiasTable.entidad_id, entidad_id)
-    )
-  ).limit(1);
-
-  if (fotos.length === 0) return `No hay fotografías registradas de tipo "${tipoReal}" para "${busqueda}".`;
-
-  await sendWhatsAppImage(from, fotos[0].url, `Imagen de ${busqueda} (${tipoReal})`);
-  return `✅ Imagen enviada correctamente.`;
 }
 
 async function executeRegistrarGasto(args: {
