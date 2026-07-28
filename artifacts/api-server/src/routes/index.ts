@@ -45,9 +45,11 @@ router.get("/sync-egresos-sheet", async (req, res) => {
 
 router.get("/clear-history", async (req, res) => {
   try {
-    const { whatsappSesionesTable } = await import("@workspace/db/schema");
-    await db.update(whatsappSesionesTable).set({ messages: [] });
-    return res.json({ success: true, message: "Historial limpiado correctamente." });
+    const pg = await import("pg");
+    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+    await pool.query("UPDATE whatsapp_sesiones SET messages = '[]'::jsonb");
+    await pool.end();
+    return res.json({ success: true, message: "Historial limpiado correctamente mediante raw query." });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
