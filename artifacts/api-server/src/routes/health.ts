@@ -3,9 +3,11 @@ import { HealthCheckResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
-router.get("/healthz", (_req, res) => {
-  const data = HealthCheckResponse.parse({ status: "ok" });
-  res.json(data);
+router.get("/healthz", (req, res) => {
+  res.json({ 
+    status: "ok",
+    hasCloudinary: !!process.env.CLOUDINARY_URL 
+  });
 });
 
 export default router;
