@@ -100,3 +100,49 @@ export async function sendWhatsAppImage(to: string, imageUrl: string, caption?: 
     throw error;
   }
 }
+
+export async function downloadWhatsAppMedia(mediaId: string): Promise<string | null> {
+  if (!WHATSAPP_ACCESS_TOKEN || WHATSAPP_ACCESS_TOKEN === "TODO_ACCESS_TOKEN") {
+    console.warn(`[WhatsApp] Modo simulado: no se puede descargar el mediaId ${mediaId}`);
+    return null;
+  }
+
+  try {
+    // 1. Obtener la URL del medio
+    const url = `${WHATSAPP_API_URL}/${mediaId}`;
+    const urlRes = await fetch(url, {
+      headers: { "Authorization": `Bearer ${WHATSAPP_ACCESS_TOKEN}` }
+    });
+
+    if (!urlRes.ok) {
+      console.error(`[WhatsApp] Error obteniendo URL del media ${mediaId}:`, await urlRes.text());
+      return null;
+    }
+
+    const mediaData = await urlRes.json();
+    const mediaUrl = mediaData.url;
+
+    if (!mediaUrl) return null;
+
+    // 2. Descargar el binario del medio
+    const mediaRes = await fetch(mediaUrl, {
+      headers: { "Authorization": `Bearer ${WHATSAPP_ACCESS_TOKEN}` }
+    });
+
+    if (!mediaRes.ok) {
+      console.error(`[WhatsApp] Error descargando binario del media ${mediaId}:`, await mediaRes.text());
+      return null;
+    }
+
+    const arrayBuffer = await mediaRes.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
+    
+    // Suponemos que es jpeg para WhatsApp, aunque podría ser otro
+    const mimeType = mediaData.mime_type || "image/jpeg";
+    
+    return `data:${mimeType};base64,${base64}`;
+  } catch (error) {
+    console.error(`[WhatsApp] Excepción al descargar media ${mediaId}:`, error);
+    return null;
+  }
+}

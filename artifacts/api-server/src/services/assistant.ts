@@ -152,12 +152,12 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "enviar_fotografia",
-      description: "Obtiene y envía por WhatsApp la foto de una máquina, un operario o un documento (DNI/carnet).",
+      description: "Obtiene y envía por WhatsApp la foto de una máquina, un operario, un DNI o un comprobante/ticket de gasto.",
       parameters: {
         type: "object",
         properties: {
-          tipo_entidad: { type: "string", description: "Tipo: maquina, operario, dni" },
-          busqueda: { type: "string", description: "Nombre, DNI o identificador de la entidad a buscar" },
+          tipo_entidad: { type: "string", description: "Tipo: maquina, operario, dni, comprobante" },
+          busqueda: { type: "string", description: "Nombre, DNI o identificador (ej: 'ferreteria', concepto del gasto) de la entidad a buscar" },
         },
         required: ["tipo_entidad", "busqueda"],
       },
@@ -458,7 +458,7 @@ async function guardarSesion(phone: string, messages: any[], estado: string = "i
   }
 }
 
-export async function handleWhatsAppMessage(from: string, text: string) {
+export async function handleWhatsAppMessage(from: string, text: string, imageBase64?: string) {
   const senderPhone = from.replace(/[^0-9]/g, "");
 
   const isAdmin = ADMIN_PHONES.some(admin =>
@@ -509,7 +509,17 @@ export async function handleWhatsAppMessage(from: string, text: string) {
   }
 
   // Agregar mensaje del usuario al historial
-  historialFiltrado.push({ role: "user", content: text });
+  if (imageBase64) {
+    historialFiltrado.push({ 
+      role: "user", 
+      content: [
+        { type: "text", text: text },
+        { type: "image_url", image_url: { url: imageBase64 } }
+      ] 
+    });
+  } else {
+    historialFiltrado.push({ role: "user", content: text });
+  }
 
   const today = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
   const todayISO = new Date().toISOString().split("T")[0];
@@ -527,6 +537,8 @@ Rol: *ADMINISTRADOR* — acceso y control total del sistema.
 Fecha de hoy: ${today} (${todayISO}).
 
 SOY EL EMPLEADO ADMINISTRATIVO DIGITAL DE PUFFIN. CRÍTICO: TENÉS ACCESO A TODO EL SISTEMA Y A TODA LA INFORMACIÓN. Nunca respondas "no puedo hacerlo", "no tengo esa información" o "no tengo acceso". Estás obligado a usar tus herramientas para investigar, consultar y resolver lo que el administrador te pida. Funciono como un colaborador humano inteligente, prolijo y sin errores: pienso, interpreto los datos y ejecuto.
+
+REGLA DE VISIÓN (MULTIMODALIDAD): Ahora tenés la capacidad de "ver" imágenes. Si el usuario te envía una captura de pantalla del sistema, un comprobante o un ticket, analizalo visualmente. Usá la información de la imagen (texto, números, errores en pantalla) para responder a su consulta, diagnosticar el problema o registrar el gasto.
 
 LO QUE PUEDO HACER (acciones de escritura):
 REGLA DE ORO 1 - DOBLE VALIDACIÓN: Para acciones masivas o destructivas (ej: enviar un mensaje a TODOS, borrar duplicados, asignar muchas máquinas), SIEMPRE armá un resumen claro y pedí confirmación expresa ("¿Confirmás que proceda?", "Sí, dale") ANTES de invocar la herramienta.
@@ -550,7 +562,7 @@ LO QUE PUEDO CONSULTAR (acceso total a la BD):
 📅 Jornadas: quién trabajó, dónde, cuándo, horarios.
 💰 Gastos, ⚽ Combustible, 🔧 Mantenimientos.
 📈 Resumen Operativo Diario: Si piden el resumen de hoy, ejecutá la herramienta correspondiente y mostralo limpio.
-📸 Fotografías: Si piden imagen de chata, operario o DNI, USÁ LA HERRAMIENTA 'enviar_fotografia'.
+📸 Fotografías y Comprobantes: Si piden imagen de chata, operario, DNI, o comprobante/ticket de gasto, USÁ LA HERRAMIENTA 'enviar_fotografia'.
 📊 Google Sheets: cualquier dato en las planillas (tus acciones de escritura ya sincronizan solas).
 
 REGLAS DE OPERACIÓN:
@@ -1071,12 +1083,18 @@ async function executeEnviarFotografia(from: string, tipo_entidad: string, busqu
     
     // Identificar si piden DNI o foto general
     tipoReal = tipoReal.includes("dni") ? "empleado_dni" : "empleado_perfil";
+  } else if (tipoReal.includes("comprobante") || tipoReal.includes("ticket") || tipoReal.includes("factura") || tipoReal.includes("gasto") || tipoReal.includes("egreso")) {
+    const egreso = await db.select().from(egresosTable)
+      .where(or(ilike(egresosTable.concepto, t), ilike(egresosTable.proveedor, t), ilike(egresosTable.categoria, t)))
+      .limit(1);
+    if (egreso.length === 0) return `No encontré ningún gasto/comprobante coincidente con "${busqueda}".`;
+    entidad_id = egreso[0].id;
+    tipoReal = "gasto"; // Asumimos que los tickets se guardan con entidad_tipo "gasto"
   } else {
-    return `No reconozco el tipo de entidad "${tipo_entidad}". Debe ser maquina, operario o dni.`;
+    return `No reconozco el tipo de entidad "${tipo_entidad}". Debe ser maquina, operario, dni, o comprobante.`;
   }
 
   // Buscar la foto en la tabla fotografias
-  // Si piden foto de operario, también buscamos 'empleado_perfil' o genérica
   const fotos = await db.select().from(fotografiasTable).where(
     and(
       or(ilike(fotografiasTable.entidad_tipo, `%${tipoReal}%`), eq(fotografiasTable.entidad_tipo, tipo_entidad)), 
