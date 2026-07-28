@@ -43,6 +43,83 @@ router.get("/sync-egresos-sheet", async (req, res) => {
   }
 });
 
+router.get("/cleanup-empleados", async (req, res) => {
+  try {
+    const { empleadosTable, fotografiasTable, jornadasTable, documentosTable, alertasTable } = await import("@workspace/db/schema");
+    const { eq, and } = await import("drizzle-orm");
+    const { syncAllSheets } = await import("../services/sync-sheets.js");
+
+    const empList = await db.select().from(empleadosTable);
+    const fotosList = await db.select().from(fotografiasTable).where(eq(fotografiasTable.entidad_tipo, "empleado"));
+    
+    // Agrupar por nombre y apellido
+    const grupos: Record<string, typeof empList> = {};
+    for (const emp of empList) {
+      const key = `${(emp.nombre || "").trim().toLowerCase()}|||${(emp.apellido || "").trim().toLowerCase()}`;
+      if (!grupos[key]) grupos[key] = [];
+      grupos[key].push(emp);
+    }
+
+    const paraEliminar: number[] = [];
+    const logs: string[] = [];
+
+    const FAKE_DNIS = ["12345678", "23456789", "34567890", "45678901", "99999999", "00000000", "11111111", ""];
+
+    for (const [key, emps] of Object.entries(grupos)) {
+      if (emps.length > 1) {
+        const scored = emps.map(emp => {
+          let score = 0;
+          const fotos = fotosList.filter(f => f.entidad_id === emp.id);
+          
+          if (fotos.length > 0) score += 1000;
+          
+          const dni = (emp.dni || "").trim();
+          const dniEsFalso = FAKE_DNIS.includes(dni) || dni.length < 7 || /^(\d)\1+$/.test(dni);
+          if (!dniEsFalso) score += 200;
+          else score -= 500;
+
+          if (emp.cargo) score += 20;
+          if (emp.telefono_whatsapp) score += 20;
+          if (emp.fecha_ingreso) score += 15;
+          if (emp.email) score += 10;
+          if (emp.contacto_emergencia_nombre) score += 10;
+          
+          return { emp, score, fotos: fotos.length };
+        });
+
+        scored.sort((a, b) => b.score - a.score);
+
+        const mejor = scored[0];
+        logs.push(`CONSERVAR: ID=${mejor.emp.id} | DNI=${mejor.emp.dni} | Fotos=${mejor.fotos} | Score=${mejor.score}`);
+
+        for (let i = 1; i < scored.length; i++) {
+          const otro = scored[i];
+          logs.push(`ELIMINAR: ID=${otro.emp.id} | DNI=${otro.emp.dni} | Fotos=${otro.fotos} | Score=${otro.score}`);
+          paraEliminar.push(otro.emp.id);
+        }
+      }
+    }
+
+    if (req.query.execute === "true") {
+      for (const id of paraEliminar) {
+        await db.delete(jornadasTable).where(eq(jornadasTable.empleado_id, id));
+        await db.delete(fotografiasTable).where(and(eq(fotografiasTable.entidad_id, id), eq(fotografiasTable.entidad_tipo, "empleado")));
+        await db.delete(documentosTable).where(and(eq(documentosTable.entidad_id, id), eq(documentosTable.entidad_tipo, "empleado")));
+        await db.delete(alertasTable).where(and(eq(alertasTable.entidad_id, id), eq(alertasTable.entidad_tipo, "empleado")));
+        await db.delete(empleadosTable).where(eq(empleadosTable.id, id));
+      }
+      if (paraEliminar.length > 0) {
+        await syncAllSheets();
+      }
+      return res.json({ success: true, message: `Eliminados ${paraEliminar.length} duplicados y sincronizado con Google Sheets.`, logs });
+    } else {
+      return res.json({ success: true, message: `Modo simulación. Se eliminarían ${paraEliminar.length} duplicados. Para ejecutar, añade ?execute=true`, logs });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
 router.use(healthRouter);
 router.use("/auth", authRouter);
 import { whatsappRouter } from "./whatsapp";
