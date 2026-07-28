@@ -58,9 +58,25 @@ export async function sendWhatsAppMessage(to: string, text: string): Promise<{ s
 }
 
 
+import { uploadImage } from "./storage.js";
+
 export async function sendWhatsAppImage(to: string, imageUrl: string, caption?: string) {
   const toFormatted = formatArgentinaPhone(to);
   
+  let finalUrl = imageUrl;
+  
+  // Si la imagen es un base64 directo, WhatsApp la va a rechazar. 
+  // Intentamos subirla a Cloudinary al vuelo para obtener una URL pública.
+  if (finalUrl.startsWith("data:image/")) {
+    try {
+      console.log(`[WhatsApp] Transformando imagen Base64 a URL pública...`);
+      finalUrl = await uploadImage(`wa_foto_${Date.now()}.jpg`, finalUrl);
+    } catch (e) {
+      console.error("[WhatsApp] Error subiendo imagen base64 a Cloudinary:", e);
+      // Fallback: dejaremos que falle en la API de WhatsApp, pero registramos el error.
+    }
+  }
+
   if (!WHATSAPP_ACCESS_TOKEN || WHATSAPP_ACCESS_TOKEN === "TODO_ACCESS_TOKEN") {
     console.warn(`[WhatsApp] Simulando envío de imagen a ${toFormatted}: ${imageUrl}`);
     return { status: "simulated" };
@@ -74,7 +90,7 @@ export async function sendWhatsAppImage(to: string, imageUrl: string, caption?: 
     to: toFormatted,
     type: "image",
     image: { 
-      link: imageUrl,
+      link: finalUrl,
       ...(caption ? { caption } : {})
     }
   };
