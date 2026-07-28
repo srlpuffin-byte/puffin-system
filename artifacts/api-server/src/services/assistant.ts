@@ -53,6 +53,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         properties: {
           termino: { type: "string", description: "Término de búsqueda por nombre/tipo (opcional)" },
           estado: { type: "string", description: "Filtrar por estado: activo, inactivo, mantenimiento (opcional)" },
+          categoria: { type: "string", description: "Filtrar por categoría: maquinaria, inventario (opcional)" },
           orden: { type: "string", description: "primer, ultimo, nombre (opcional)" },
         },
         required: [],
@@ -102,7 +103,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       parameters: {
         type: "object",
         properties: {
-          termino: { type: "string", description: "Nombre o apellido a buscar (opcional)" },
+          termino: { type: "string", description: "Nombre, apellido o DNI a buscar (opcional)" },
           solo_activos: { type: "boolean", description: "Filtrar solo activos" },
           orden: { type: "string", description: "primer (primero en ingresar), ultimo, nombre" },
           carnet_vencido: { type: "boolean", description: "Si true, muestra empleados con carnet vencido o próximo a vencer" },
@@ -116,14 +117,14 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "consultar_proyectos",
-      description: "Consulta proyectos/obras con sus empleados y máquinas asignadas. Úsala cuando el usuario pregunta: qué máquinas/equipos hay en un proyecto, cómo están distribuidas las máquinas, qué operarios o maquinaria tiene una obra, dónde está cada máquina, o hace una pregunta de seguimiento sobre el mismo proyecto que se mencionó antes (ej: 'y qué maquinaria?', 'y los equipos?', 'y las máquinas?'). Siempre usar incluir_asignaciones=true cuando pregunten por máquinas u operarios de un proyecto específico.",
+      description: "Consulta proyectos/obras con sus empleados y máquinas asignadas. Úsala cuando el usuario pregunta: qué máquinas/equipos hay en un proyecto, cómo están distribuidas las máquinas, qué operarios o maquinaria tiene una obra, dónde está cada máquina. Siempre usar incluir_asignaciones=true cuando pregunten por distribución de máquinas u operarios.",
       parameters: {
         type: "object",
         properties: {
           estado: { type: "string", description: "Filtrar por estado: activo, finalizado, pausado (opcional)" },
-          nombre: { type: "string", description: "Buscar por nombre/lugar del proyecto (opcional). Si el usuario hace una pregunta de seguimiento sin mencionar el proyecto, inferirlo del contexto de la conversación anterior." },
+          nombre: { type: "string", description: "Buscar por nombre/lugar del proyecto (opcional)." },
           orden: { type: "string", description: "primer, ultimo, mayor_ganancia (opcional)" },
-          incluir_asignaciones: { type: "boolean", description: "Si true, muestra los nombres de empleados Y máquinas asignadas. Usar true siempre que se pregunte por máquinas, equipos u operarios de un proyecto." },
+          incluir_asignaciones: { type: "boolean", description: "Si true, muestra los nombres de empleados Y máquinas asignadas. Usar true siempre que se pregunte por máquinas, equipos u operarios." },
         },
         required: [],
       },
@@ -150,15 +151,15 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
-      name: "enviar_imagen_vehiculo",
-      description: "Obtiene y envía por WhatsApp la foto de una máquina o vehículo específico.",
+      name: "enviar_fotografia",
+      description: "Obtiene y envía por WhatsApp la foto de una máquina, un operario o un documento (DNI/carnet).",
       parameters: {
         type: "object",
         properties: {
-          nombre_maquina: { type: "string", description: "Nombre de la máquina o vehículo" },
-          maquina_id: { type: "number", description: "ID interno de la máquina (opcional)" },
+          tipo_entidad: { type: "string", description: "Tipo: maquina, operario, dni" },
+          busqueda: { type: "string", description: "Nombre, DNI o identificador de la entidad a buscar" },
         },
-        required: ["nombre_maquina"],
+        required: ["tipo_entidad", "busqueda"],
       },
     },
   },
@@ -166,13 +167,13 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "enviar_mensaje_whatsapp",
-      description: "Envía un mensaje de WhatsApp. CRÍTICO: NUNCA uses 'todos=true' a menos que el usuario diga explícitamente 'a TODOS los empleados'. Si el usuario nombra una persona o un número específico, mandá SOLO a esa persona. SIEMPRE mostrá un resumen antes de enviar: 'Voy a enviar [mensaje] a [destinatario]. ¿Confirmás?' y esperá el OK del usuario.",
+      description: "Envía un mensaje de WhatsApp. Si el usuario dice 'mandale a todos' o similar, usá 'todos=true' sin dudar. De lo contrario, usá nombre o número.",
       parameters: {
         type: "object",
         properties: {
-          numero: { type: "string", description: "Número de teléfono (solo dígitos, ej: 5493472629600). Usar si se da un número explícito." },
-          nombre_empleado: { type: "string", description: "Nombre del empleado destinatario. Usar si se nombra a una persona." },
-          todos: { type: "boolean", description: "SOLO true si el usuario dijo explícitamente 'a TODOS los empleados'. NO usar por defecto." },
+          numero: { type: "string", description: "Número de teléfono (solo dígitos)." },
+          nombre_empleado: { type: "string", description: "Nombre del empleado destinatario." },
+          todos: { type: "boolean", description: "Setear a true si el usuario pide enviar mensaje masivo a todos." },
           mensaje: { type: "string", description: "Texto del mensaje a enviar" },
         },
         required: ["mensaje"],
@@ -376,6 +377,32 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "limpiar_operarios_duplicados",
+      description: "Busca operarios con el mismo nombre y DNI, conserva el que tenga más información y elimina los duplicados redundantes.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "resumen_operativo",
+      description: "Genera el reporte/resumen del día: incluye gastos, horas trabajadas, combustible cargado y mantenimientos.",
+      parameters: {
+        type: "object",
+        properties: {
+          fecha: { type: "string", description: "Fecha YYYY-MM-DD (default: hoy)" }
+        },
+        required: [],
+      },
+    },
+  }
 ];
 
 
@@ -499,39 +526,36 @@ Hablás en español rioplatense, de forma profesional, clara y concisa.
 Rol: *ADMINISTRADOR* — acceso y control total del sistema.
 Fecha de hoy: ${today} (${todayISO}).
 
-SOY EL EMPLEADO ADMINISTRATIVO DIGITAL DE PUFFIN. El administrador puede pedirme cualquier cosa y yo la ejecuto en el sistema. Funciono como un colaborador humano: pienso, interpreto, consulto los datos y realizo las operaciones.
+SOY EL EMPLEADO ADMINISTRATIVO DIGITAL DE PUFFIN. CRÍTICO: TENÉS ACCESO A TODO EL SISTEMA Y A TODA LA INFORMACIÓN. Nunca respondas "no puedo hacerlo", "no tengo esa información" o "no tengo acceso". Estás obligado a usar tus herramientas para investigar, consultar y resolver lo que el administrador te pida. Funciono como un colaborador humano inteligente, prolijo y sin errores: pienso, interpreto los datos y ejecuto.
 
 LO QUE PUEDO HACER (acciones de escritura):
-REGLA DE ORO PARA TODAS LAS ACCIONES DE ESCRITURA: NUNCA INVENTES DATOS. Si el usuario te pide registrar algo (gasto, empleado, jornada, combustible, mantenimiento) pero no te da todos los datos requeridos, DEBÉS preguntarle los datos faltantes de forma amigable ANTES de registrarlo en el sistema. Siempre mostrá un resumen final y pedí confirmación antes de guardar.
+REGLA DE ORO 1 - DOBLE VALIDACIÓN: Para acciones masivas o destructivas (ej: enviar un mensaje a TODOS, borrar duplicados, asignar muchas máquinas), SIEMPRE armá un resumen claro y pedí confirmación expresa ("¿Confirmás que proceda?", "Sí, dale") ANTES de invocar la herramienta.
+REGLA DE ORO 2 - DATOS FALTANTES: Nunca tires error si falta un dato. Sé proactivo. Si te piden registrar algo y falta un dato obligatorio (ej: importe de un gasto), preguntá amablemente ("Perfecto, ¿qué importe le pongo?") antes de llamar a la herramienta.
+REGLA DE ORO 3 - TOLERANCIA A ERRORES: Si el usuario escribe mal un nombre ("Salvatiera"), sé lo bastante inteligente como para buscar la versión correcta ("Salvatierra") usando coincidencias parciales. Nunca digas "no lo encuentro" a la primera de cambio.
 
 📋 Registrar y actualizar jornadas de empleados
 ⚽ Registrar cargas de combustible por máquina
 🔧 Registrar mantenimientos y services de máquinas
-💰 Registrar gastos/egresos. CRÍTICO: Para registrar un gasto necesitás sí o sí: Fecha, Categoría, Concepto y Monto. Si el administrador no te da alguno de estos datos, DEBÉS preguntárselo antes de registrar nada. Una vez que tengas todo, le mostrás un resumen y le pedís confirmación ("¿Guardo este gasto?").
+💰 Registrar gastos/egresos. (Preguntá por Fecha, Categoría, Concepto y Monto si no te los dan).
 👤 Registrar nuevos empleados
-🔑 Crear accesos al sistema web (individual o masivo a todos los faltantes). CRÍTICO: Si te piden crear los usuarios de los operarios que faltan, DEBES llamar INMEDIATAMENTE a la herramienta crear_accesos_faltantes. NO intentes consultar los empleados primero ni calcular quién falta. La herramienta hace todo el trabajo por vos automáticamente.
+🔑 Crear accesos al sistema web (individual o masivo a todos los faltantes). Usa la herramienta específica sin intentar calcular nada antes.
 🏗️ Actualizar proyectos: estado, asignar/desasignar empleados y máquinas
-📲 Enviar mensajes de WhatsApp.
-  - Si el usuario nombra a UNA persona o da UN número: mandá SOLO a esa persona.
-  - Si el usuario dice 'a TODOS' explícitamente: usá todos=true.
-  - SIEMPRE antes de enviar, mostrá un resumen: 'Voy a enviar el siguiente mensaje a [destinatario]:\n«[mensaje]»\n¿Confirmás el envío?' Esperá el OK o NO antes de ejecutar.
+📲 Enviar mensajes de WhatsApp. Si dicen "mandale a todos", usá 'todos=true' sin dudarlo, pero con DOBLE VALIDACIÓN antes.
+🧹 Limpiar duplicados: detectar y borrar operarios repetidos. DOBLE VALIDACIÓN requerida.
 
 LO QUE PUEDO CONSULTAR (acceso total a la BD):
-👥 Empleados: teléfonos, DNI, cargos, carnet, contacto familiar
-🛠️ Máquinas: estado, tipo, asignaciones a proyectos
-🏗️ Proyectos: empleados y máquinas asignadas, pagos, ganancia
-📅 Jornadas: quién trabajó, dónde, cuándo, horarios
-💰 Gastos: monto, categoría, proveedor, proyecto
-⚽ Combustible: cargas por máquina, litros, importes
-🔧 Mantenimientos: servicios realizados, próximos services
-📊 Google Sheets: cualquier dato en las planillas
+👥 Empleados: DNI (distinguí homónimos con ID o DNI), cargos, teléfono, asignación a proyectos.
+🛠️ Máquinas/Inventario: estado, tipo, asignaciones a obras. Separación clara de maquinarias vs inventario menor.
+🏗️ Proyectos/Distribución Global: Cuando pidan distribución global o "cómo están asignados todos", extraé el reporte completo cruzando empleados, máquinas y proyectos, sin excusas.
+📅 Jornadas: quién trabajó, dónde, cuándo, horarios.
+💰 Gastos, ⚽ Combustible, 🔧 Mantenimientos.
+📈 Resumen Operativo Diario: Si piden el resumen de hoy, ejecutá la herramienta correspondiente y mostralo limpio.
+📸 Fotografías: Si piden imagen de chata, operario o DNI, USÁ LA HERRAMIENTA 'enviar_fotografia'.
+📊 Google Sheets: cualquier dato en las planillas (tus acciones de escritura ya sincronizan solas).
 
 REGLAS DE OPERACIÓN:
 - SIEMPRE usá las herramientas para buscar datos. Nunca inventés información.
-- CONTEXTO DE CONVERSACIÓN: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maquinaria?", "y los equipos?", "cuántos son?", "y las máquinas?"), SIEMPRE inferí el tema del mensaje anterior. Si antes se habló de un proyecto (ej: "Lipsa"), asumí que la pregunta siguiente sigue siendo sobre ese mismo proyecto. Usá el historial para no perder el hilo.
-- Para GASTOS: recolectá todos los datos, mostrá resumen con 📋 y esperá OK antes de guardar.
-- Para JORNADAS, COMBUSTIBLE, MANTENIMIENTOS: podés registrar directamente con los datos que te dan.
-- Para PROYECTOS: podés actualizar estado y asignaciones directamente.
+- CONTEXTO DE CONVERSACIÓN: Si el usuario hace una pregunta de seguimiento corta, inferí el tema del mensaje anterior.
 - Cuando no encontrés algo, decilo claramente.
 - Respondé siempre de forma concisa y profesional.
 
@@ -575,7 +599,7 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
         let toolResult = "";
 
         if (functionName === "consultar_inventario") {
-          toolResult = await executeConsultarInventario(functionArgs.termino, functionArgs.estado, functionArgs.orden);
+          toolResult = await executeConsultarInventario(functionArgs.termino, functionArgs.estado, functionArgs.orden, functionArgs.categoria);
         } else if (functionName === "consultar_gastos" || functionName === "analizar_gastos") {
           toolResult = await executeAnalizarGastos(functionArgs);
         } else if (functionName === "consultar_empleados") {
@@ -586,8 +610,8 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
           toolResult = await executeConsultarJornadas(functionArgs.estado, functionArgs.nombre_empleado, functionArgs.fecha, functionArgs.desde, functionArgs.hasta);
         } else if (functionName === "consultar_google_sheets") {
           toolResult = await executeConsultarSheets(functionArgs.pestana, functionArgs.rango);
-        } else if (functionName === "enviar_imagen_vehiculo") {
-          toolResult = await executeEnviarImagenVehiculo(from, functionArgs.nombre_maquina, functionArgs.maquina_id);
+        } else if (functionName === "enviar_fotografia") {
+          toolResult = await executeEnviarFotografia(from, functionArgs.tipo_entidad, functionArgs.busqueda);
         } else if (functionName === "enviar_mensaje_whatsapp") {
           toolResult = await executeEnviarMensaje(functionArgs.mensaje, functionArgs.numero, functionArgs.nombre_empleado, functionArgs.todos);
         } else if (functionName === "registrar_gasto") {
@@ -612,6 +636,10 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
           toolResult = await executeCrearAccesoSistema(functionArgs);
         } else if (functionName === "crear_accesos_faltantes") {
           toolResult = await executeCrearAccesosFaltantes();
+        } else if (functionName === "limpiar_operarios_duplicados") {
+          toolResult = await executeLimpiarOperariosDuplicados();
+        } else if (functionName === "resumen_operativo") {
+          toolResult = await executeResumenOperativo(functionArgs.fecha);
         }
 
         messages.push({
@@ -721,7 +749,7 @@ async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean
   if (soloActivos) conditions.push(eq(empleadosTable.estado, "activo"));
   if (termino) {
     const t = `%${termino.toLowerCase()}%`;
-    conditions.push(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t)));
+    conditions.push(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t), ilike(empleadosTable.dni, t)));
   }
   if (carnetVencido) {
     const en30 = new Date(Date.now() + 30 * 864e5).toISOString().split("T")[0];
@@ -757,30 +785,37 @@ async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean
 
   if (orden === "primer" && !termino) {
     const e = results[0];
-    return `El primer empleado en ingresar fue *${e.nombre} ${e.apellido}* — Cargo: ${e.cargo || "-"} | Fecha ingreso: ${e.fecha_ingreso || "No registrada"} | Estado: ${e.estado}`;
+    return `El primer empleado en ingresar fue *${e.nombre} ${e.apellido}* (ID #${e.id}) — Cargo: ${e.cargo || "-"} | Fecha ingreso: ${e.fecha_ingreso || "No registrada"} | Estado: ${e.estado}`;
   }
 
-  // Si se busca por nombre, mostrar info completa incluyendo teléfono
+  // Obtener asignaciones de proyectos
+  const proyectosActivos = await db.select({ lugar: proyectosTable.lugar, empleados_asignados: proyectosTable.empleados_asignados })
+    .from(proyectosTable).where(eq(proyectosTable.estado, "activo"));
+  const empProyMap: Record<number, string> = {};
+  for (const p of proyectosActivos) {
+    const ids = (p.empleados_asignados as number[]) || [];
+    for (const id of ids) empProyMap[id] = p.lugar;
+  }
+
+  // Si se busca por nombre/DNI, mostrar info completa
   if (termino) {
-    const lineas = results.slice(0, 10).map(e =>
-      `👤 *${e.nombre} ${e.apellido}*
+    const lineas = results.slice(0, 10).map(e => {
+      const proy = empProyMap[e.id] ? `📍 Obra actual: ${empProyMap[e.id]}` : `📍 Obra actual: Sin asignar`;
+      return `👤 ID #${e.id}: *${e.nombre} ${e.apellido}*
    • Cargo: ${e.cargo || "-"}
-   • Teléfono: ${e.telefono || "-"}
-   • WhatsApp: ${e.telefono_whatsapp || "-"}
+   • Tel: ${e.telefono_whatsapp || e.telefono || "-"}
    • DNI: ${e.dni || "-"}
    • Estado: ${e.estado}
    • Ingreso: ${e.fecha_ingreso || "-"}
-   • Venc. carnet: ${e.vencimiento_carnet || "-"}
-   • Contacto familiar: ${e.contacto_familiar_nombre || "-"} (${e.contacto_familiar_telefono || "-"})`
-    );
+   • ${proy}`;
+    });
     return lineas.join("\n\n");
   }
 
-  const lineas = results.slice(0, 15).map(e =>
-    `• ${e.nombre} ${e.apellido} — ${e.cargo || "Sin cargo"} | Tel: ${e.telefono_whatsapp || e.telefono || "No registrado"} | ${e.estado === "activo" ? "Activo" : "Inactivo"}${
-      carnetVencido && e.vencimiento_carnet ? ` | Carnet vence: ${e.vencimiento_carnet}` : ""
-    }`
-  );
+  const lineas = results.slice(0, 15).map(e => {
+    const proy = empProyMap[e.id] ? ` | 📍 ${empProyMap[e.id]}` : "";
+    return `• ID #${e.id}: ${e.nombre} ${e.apellido} (DNI ${e.dni}) — ${e.cargo || "Sin cargo"} | Tel: ${e.telefono_whatsapp || e.telefono || "-"} | ${e.estado === "activo" ? "Activo" : "Inactivo"}${proy}`;
+  });
   return `Total: ${results.length} empleados (${activos} activos)\n${lineas.join("\n")}`;
 }
 
@@ -796,7 +831,7 @@ async function executeConsultarProyectos(estado?: string, nombre?: string, orden
   else if (orden === "mayor_ganancia") query = query.orderBy(desc(proyectosTable.ganancia_estimada));
   else query = query.orderBy(desc(proyectosTable.createdAt));
 
-  const results = await query.limit(10);
+  const results = await query.limit(50);
 
   if (results.length === 0) return `No hay proyectos${estado ? ` con estado "${estado}"` : ""} registrados.`;
 
@@ -921,17 +956,18 @@ async function executeConsultarSheets(pestana: string, rango?: string) {
   }
 }
 
-async function executeConsultarInventario(termino?: string, estado?: string, orden?: string) {
+async function executeConsultarInventario(termino?: string, estado?: string, orden?: string, categoria?: string) {
   const { asc } = await import("drizzle-orm");
   let query = db.select().from(maquinasTable).$dynamic();
   const conditions: any[] = [];
   if (termino) { const t = `%${termino.toLowerCase()}%`; conditions.push(or(ilike(maquinasTable.nombre, t), ilike(maquinasTable.tipo, t))); }
   if (estado) conditions.push(eq(maquinasTable.estado, estado));
+  if (categoria) conditions.push(ilike(maquinasTable.categoria, `%${categoria}%`));
   if (conditions.length) query = query.where(and(...conditions));
   if (orden === "primer") query = query.orderBy(asc(maquinasTable.id));
   else if (orden === "ultimo") query = query.orderBy(desc(maquinasTable.id));
   else if (orden === "nombre") query = query.orderBy(asc(maquinasTable.nombre));
-  const results = await query.limit(20);
+  const results = await query.limit(50);
   if (results.length === 0) return termino ? `No se encontraron máquinas para "${termino}".` : "No hay máquinas registradas.";
   if (orden === "primer" && !termino) {
     const m = results[0];
@@ -1014,23 +1050,44 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
   return `${results.length} gastos | *Total: $${total.toLocaleString("es-AR")}*\n${lineas.join("\n")}`;
 }
 
-async function executeEnviarImagenVehiculo(from: string, nombreMaquina: string, maquinaId?: number) {
-  let maqId = maquinaId;
-  if (!maqId) {
-    const t = `%${nombreMaquina.toLowerCase()}%`;
-    const maq = await db.select().from(maquinasTable).where(like(maquinasTable.nombre, t)).limit(1);
-    if (maq.length === 0) return `No encontré ninguna máquina llamada "${nombreMaquina}".`;
-    maqId = maq[0].id;
+async function executeEnviarFotografia(from: string, tipo_entidad: string, busqueda: string) {
+  const t = `%${busqueda.toLowerCase()}%`;
+  
+  let entidad_id: number | null = null;
+  let tipoReal = tipo_entidad.toLowerCase();
+
+  // Buscar en la tabla correspondiente según el tipo pedido
+  if (tipoReal.includes("maquina") || tipoReal.includes("vehiculo") || tipoReal.includes("chata")) {
+    const maq = await db.select().from(maquinasTable).where(ilike(maquinasTable.nombre, t)).limit(1);
+    if (maq.length === 0) return `No encontré ninguna máquina o vehículo coincidente con "${busqueda}".`;
+    entidad_id = maq[0].id;
+    tipoReal = "maquina";
+  } else if (tipoReal.includes("operario") || tipoReal.includes("empleado") || tipoReal.includes("dni") || tipoReal.includes("perfil")) {
+    const emp = await db.select().from(empleadosTable)
+      .where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t), ilike(empleadosTable.dni, t)))
+      .limit(1);
+    if (emp.length === 0) return `No encontré ningún operario coincidente con "${busqueda}".`;
+    entidad_id = emp[0].id;
+    
+    // Identificar si piden DNI o foto general
+    tipoReal = tipoReal.includes("dni") ? "empleado_dni" : "empleado_perfil";
+  } else {
+    return `No reconozco el tipo de entidad "${tipo_entidad}". Debe ser maquina, operario o dni.`;
   }
 
+  // Buscar la foto en la tabla fotografias
+  // Si piden foto de operario, también buscamos 'empleado_perfil' o genérica
   const fotos = await db.select().from(fotografiasTable).where(
-    and(eq(fotografiasTable.entidad_tipo, "maquina"), eq(fotografiasTable.entidad_id, maqId))
+    and(
+      or(ilike(fotografiasTable.entidad_tipo, `%${tipoReal}%`), eq(fotografiasTable.entidad_tipo, tipo_entidad)), 
+      eq(fotografiasTable.entidad_id, entidad_id)
+    )
   ).limit(1);
 
-  if (fotos.length === 0) return `La máquina "${nombreMaquina}" no tiene fotos registradas.`;
+  if (fotos.length === 0) return `No hay fotografías registradas de tipo "${tipoReal}" para "${busqueda}".`;
 
-  await sendWhatsAppImage(from, fotos[0].url, `Imagen de ${nombreMaquina}`);
-  return `Imagen de "${nombreMaquina}" enviada correctamente.`;
+  await sendWhatsAppImage(from, fotos[0].url, `Imagen de ${busqueda} (${tipoReal})`);
+  return `✅ Imagen enviada correctamente.`;
 }
 
 async function executeRegistrarGasto(args: {
@@ -1163,6 +1220,10 @@ async function executeRegistrarEmpleado(args: { nombre: string; apellido: string
       fecha_ingreso: args.fecha_ingreso || null,
       estado: "activo",
     }).returning();
+
+    // Sincronizar
+    try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
+
     return `✅ Empleado registrado: *${emp.nombre} ${emp.apellido}* (ID #${emp.id}) | DNI: ${emp.dni} | Cargo: ${emp.cargo || "-"}`;
   } catch (error: any) {
     return `❌ Error al registrar empleado: ${error.message}`;
@@ -1186,6 +1247,9 @@ async function executeRegistrarJornada(args: { nombre_empleado: string; nombre_o
       estado: args.estado || "activo",
       empresa_id: 1,
     }).returning();
+
+    // Sincronizar
+    try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
 
     return `✅ Jornada registrada: *${emp.nombre} ${emp.apellido}* en ${args.nombre_obra} | Fecha: ${jornada.fecha} | Estado: ${jornada.estado}${jornada.hora_inicio ? ` | Entrada: ${jornada.hora_inicio}` : ""}`;
   } catch (error: any) {
@@ -1213,6 +1277,10 @@ async function executeActualizarJornada(args: { nombre_empleado: string; fecha?:
       .returning();
 
     if (!updated) return `No encontré jornada de ${emp.nombre} ${emp.apellido} para el ${fecha}.`;
+
+    // Sincronizar
+    try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
+
     return `✅ Jornada actualizada: *${emp.nombre} ${emp.apellido}* | ${fecha} | Estado: ${updated.estado}${updated.hora_fin ? ` | Salida: ${updated.hora_fin}` : ""}`;
   } catch (error: any) {
     return `❌ Error al actualizar jornada: ${error.message}`;
@@ -1246,6 +1314,9 @@ async function executeRegistrarCombustible(args: { nombre_maquina: string; nombr
       empresa_id: 1,
     }).returning();
 
+    // Sincronizar
+    try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
+
     return `✅ Combustible registrado: *${maq.nombre}* | ${reg.litros}L${args.importe ? ` | $${Number(args.importe).toLocaleString("es-AR")}` : ""} | ${args.estacion || "Sin estación"} | Fecha: ${reg.fecha}`;
   } catch (error: any) {
     return `❌ Error al registrar combustible: ${error.message}`;
@@ -1269,6 +1340,9 @@ async function executeRegistrarMantenimiento(args: { nombre_maquina: string; tip
       estado: "realizado",
       empresa_id: 1,
     }).returning();
+
+    // Sincronizar
+    try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
 
     return `✅ Mantenimiento registrado: *${maq.nombre}* | Tipo: ${mant.tipo}${mant.descripcion ? ` | ${mant.descripcion}` : ""}${mant.proximo_service ? ` | Próximo: ${mant.proximo_service}` : ""} | Fecha: ${mant.fecha}`;
   } catch (error: any) {
@@ -1322,6 +1396,9 @@ async function executeActualizarProyecto(args: { nombre_proyecto: string; nuevo_
     updates.maquinas_asignadas = maqIds;
 
     await db.update(proyectosTable).set(updates).where(eq(proyectosTable.id, proy.id));
+
+    // Sincronizar
+    try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
 
     return `✅ Proyecto *${proy.lugar}* actualizado:\n${cambios.map(c => `• ${c}`).join("\n")}`;
   } catch (error: any) {
@@ -1389,5 +1466,88 @@ async function executeCrearAccesosFaltantes() {
     return `✅ ¡Listo! Creé acceso masivo para los ${creados} operarios que faltaban. Se usó su DNI como usuario y su DNI como PIN para todos.`;
   } catch (error: any) {
     return `❌ Error al crear accesos masivos: ${error.message}`;
+  }
+}
+
+async function executeLimpiarOperariosDuplicados() {
+  try {
+    const todos = await db.select().from(empleadosTable);
+    
+    // Agrupar por nombre+apellido (o dni si existe)
+    const grupos: Record<string, typeof todos> = {};
+    for (const e of todos) {
+      const key = e.dni ? e.dni : `${e.nombre.toLowerCase()}_${e.apellido.toLowerCase()}`;
+      if (!grupos[key]) grupos[key] = [];
+      grupos[key].push(e);
+    }
+
+    let eliminados = 0;
+    const detalles: string[] = [];
+
+    for (const key of Object.keys(grupos)) {
+      const lista = grupos[key];
+      if (lista.length > 1) {
+        // Ordenar: el que tenga más campos llenos gana
+        lista.sort((a, b) => {
+          const scoreA = Object.values(a).filter(v => v !== null && v !== "").length;
+          const scoreB = Object.values(b).filter(v => v !== null && v !== "").length;
+          return scoreB - scoreA;
+        });
+
+        const ganador = lista[0];
+        const aEliminar = lista.slice(1);
+        
+        for (const e of aEliminar) {
+          await db.delete(empleadosTable).where(eq(empleadosTable.id, e.id));
+          eliminados++;
+          detalles.push(`Eliminado ID #${e.id} (${e.nombre} ${e.apellido}) -> Conservado ID #${ganador.id}`);
+        }
+      }
+    }
+
+    if (eliminados === 0) return "✅ No se detectaron operarios duplicados en el sistema.";
+    
+    return `✅ Limpieza completada. Se eliminaron ${eliminados} registros duplicados:\n${detalles.map(d => `• ${d}`).join("\n")}`;
+  } catch (error: any) {
+    return `❌ Error al limpiar duplicados: ${error.message}`;
+  }
+}
+
+async function executeResumenOperativo(fechaReq?: string) {
+  try {
+    const fecha = fechaReq || new Date().toISOString().split("T")[0];
+    const { sum, and, eq, gte, lte } = await import("drizzle-orm");
+
+    // Jornadas
+    const jornadas = await db.select().from(jornadasTable).where(eq(jornadasTable.fecha, fecha));
+    const totalJornadas = jornadas.length;
+    const completadas = jornadas.filter(j => j.estado === "completado").length;
+
+    // Egresos (Gastos)
+    const egresos = await db.select().from(egresosTable).where(eq(egresosTable.fecha, fecha));
+    const totalGasto = egresos.reduce((a, e) => a + Number(e.monto || 0), 0);
+
+    // Combustible
+    const combustible = await db.select().from(combustibleTable).where(eq(combustibleTable.fecha, fecha));
+    const totalLitros = combustible.reduce((a, c) => a + Number(c.litros || 0), 0);
+
+    // Mantenimientos
+    const mantenimientos = await db.select().from(mantenimientosTable).where(eq(mantenimientosTable.fecha, fecha));
+
+    // Incidentes
+    const { incidentesTable } = await import("@workspace/db/schema");
+    const incidentes = await db.select().from(incidentesTable).where(eq(incidentesTable.fecha, fecha));
+
+    return `📈 *RESUMEN OPERATIVO - ${fecha}*
+
+👷 *Personal*: ${totalJornadas} operarios trabajando (${completadas} completaron su turno).
+💰 *Gastos*: $${totalGasto.toLocaleString("es-AR")} registrados hoy (${egresos.length} egresos).
+⚽ *Combustible*: ${totalLitros.toFixed(1)} L cargados hoy (${combustible.length} cargas).
+🔧 *Mantenimientos*: ${mantenimientos.length} service(s) realizados.
+🚨 *Incidentes*: ${incidentes.length > 0 ? `${incidentes.length} incidente(s) registrado(s)` : "Ningún incidente"}.
+
+(Podés pedirme detalles específicos de cualquiera de estos puntos).`;
+  } catch (error: any) {
+    return `❌ Error al generar resumen operativo: ${error.message}`;
   }
 }
