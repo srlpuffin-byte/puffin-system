@@ -47,14 +47,28 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "consultar_inventario",
-      description: "Consulta máquinas/equipos e inventario. Muestra qué proyecto tiene asignada cada máquina (distribución). Úsala para: listar todas las máquinas, ver dónde está cada máquina/equipo, cómo están distribuidas las máquinas entre proyectos, buscar por nombre o tipo, filtrar por estado.",
+      description: "Consulta máquinas/equipos e inventario menor. IMPORTANTE: Si el usuario pide 'inventario' o 'herramientas menores', usá categoria='inventario'. Si pide 'máquinas' o 'maquinaria pesada', usá categoria='maquinaria'. Si pide 'todo' o no especifica, dejá categoria vacío. Muestra qué proyecto tiene asignada cada máquina (distribución).",
       parameters: {
         type: "object",
         properties: {
           termino: { type: "string", description: "Término de búsqueda por nombre/tipo (opcional)" },
-          estado: { type: "string", description: "Filtrar por estado: activo, inactivo, mantenimiento (opcional)" },
-          categoria: { type: "string", description: "Filtrar por categoría: maquinaria, inventario (opcional)" },
+          estado: { type: "string", description: "Filtrar por estado: activa, inactiva, mantenimiento (opcional)" },
+          categoria: { type: "string", description: "OBLIGATORIO cuando el usuario dice 'inventario' o 'máquinas'. Valores: 'maquinaria' o 'inventario'. Dejá vacío solo si piden todo junto." },
           orden: { type: "string", description: "primer, ultimo, nombre (opcional)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_rastreo",
+      description: "Consulta la ubicación y velocidad en tiempo real de los vehículos/máquinas con GPS satelital (Xpert Satcom). Úsala cuando pregunten: dónde está una máquina, a qué velocidad va, si está encendida, ubicación de los vehículos, rastreo GPS.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre_maquina: { type: "string", description: "Nombre de la máquina a buscar (opcional, si se omite muestra todas)" },
         },
         required: [],
       },
@@ -557,13 +571,15 @@ REGLA DE ORO 3 - TOLERANCIA A ERRORES: Si el usuario escribe mal un nombre ("Sal
 
 LO QUE PUEDO CONSULTAR (acceso total a la BD):
 👥 Empleados: DNI (distinguí homónimos con ID o DNI), cargos, teléfono, asignación a proyectos.
-🛠️ Máquinas/Inventario: estado, tipo, asignaciones a obras. Separación clara de maquinarias vs inventario menor.
+🛠️ Máquinas: Si piden 'máquinas' o 'maquinaria' usá categoria='maquinaria'. Estado, tipo, asignaciones a obras.
+🧰 Inventario menor: Si piden 'inventario' o 'herramientas' usá categoria='inventario'. Son items como vibradores, motobombas, grupos electrógenos, herramientas.
 🏗️ Proyectos/Distribución Global: Cuando pidan distribución global o "cómo están asignados todos", extraé el reporte completo cruzando empleados, máquinas y proyectos, sin excusas.
 📅 Jornadas: quién trabajó, dónde, cuándo, horarios.
 💰 Gastos, ⚽ Combustible, 🔧 Mantenimientos.
 📈 Resumen Operativo Diario: Si piden el resumen de hoy, ejecutá la herramienta correspondiente y mostralo limpio.
 📸 Fotografías y Comprobantes: Si piden imagen de chata, operario, DNI, o comprobante/ticket de gasto, USÁ LA HERRAMIENTA 'enviar_fotografia'.
 📊 Google Sheets: cualquier dato en las planillas (tus acciones de escritura ya sincronizan solas).
+📡 Rastreo Satelital GPS: Podés consultar la ubicación en tiempo real, velocidad y estado (encendido/apagado) de cualquier vehículo con GPS. Usá la herramienta 'consultar_rastreo'.
 
 REGLAS DE OPERACIÓN:
 - SIEMPRE usá las herramientas para buscar datos. Nunca inventés información.
@@ -652,6 +668,8 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
           toolResult = await executeLimpiarOperariosDuplicados();
         } else if (functionName === "resumen_operativo") {
           toolResult = await executeResumenOperativo(functionArgs.fecha);
+        } else if (functionName === "consultar_rastreo") {
+          toolResult = await executeConsultarRastreo(functionArgs.nombre_maquina);
         }
 
         messages.push({
@@ -1003,7 +1021,61 @@ async function executeConsultarInventario(termino?: string, estado?: string, ord
     const proyecto = maqProyMap[r.id] ? ` | 📍 ${maqProyMap[r.id]}` : " | 📍 Sin asignar";
     return `• *${r.nombre}* (${r.tipo}) — ${r.estado} | ${r.categoria}${proyecto}`;
   });
-  return `${results.length} máquina(s):\n${lineas.join("\n")}`;
+  const tipoLabel = categoria === "inventario" ? "item(s) de inventario" : categoria === "maquinaria" ? "maquinaria(s)" : "máquina(s)/inventario";
+  return `${results.length} ${tipoLabel}:\n${lineas.join("\n")}`;
+}
+
+async function executeConsultarRastreo(nombreMaquina?: string) {
+  try {
+    const { SatcomClient } = await import("./satcom.js");
+    const { isNotNull } = await import("drizzle-orm");
+    
+    // Get all machines with GPS linked
+    let maquinasQuery = db.select().from(maquinasTable).where(isNotNull(maquinasTable.satcom_id)).$dynamic();
+    const maquinas = await maquinasQuery;
+    
+    if (maquinas.length === 0) return "No hay vehículos vinculados al sistema de rastreo GPS.";
+    
+    const devices = await SatcomClient.getDevices();
+    if (devices.length === 0) return "No se pudo conectar con el sistema de rastreo satelital.";
+    
+    // If searching for a specific machine
+    let filteredMaquinas = maquinas;
+    if (nombreMaquina) {
+      const t = nombreMaquina.toLowerCase();
+      filteredMaquinas = maquinas.filter(m => 
+        m.nombre.toLowerCase().includes(t) || 
+        m.tipo.toLowerCase().includes(t) ||
+        (m.patente && m.patente.toLowerCase().includes(t))
+      );
+      if (filteredMaquinas.length === 0) return `No se encontró ningún vehículo con GPS que coincida con "${nombreMaquina}".`;
+    }
+    
+    // Get positions for all relevant devices
+    const positionIds = filteredMaquinas
+      .map(m => devices.find(d => d.id === m.satcom_id)?.positionId)
+      .filter((id): id is number => !!id);
+    
+    const positions = positionIds.length > 0 ? await SatcomClient.getPositionsBulk(positionIds) : [];
+    const positionsMap = new Map(positions.map(p => [p.id, p]));
+    
+    const lineas = filteredMaquinas.map(m => {
+      const device = devices.find(d => d.id === m.satcom_id);
+      const position = device ? positionsMap.get(device.positionId) : null;
+      const velocidad = position ? Math.round(position.speed * 1.852) : 0;
+      const encendido = position?.attributes?.ignition ? "🟢 Encendido" : "🔴 Apagado";
+      const lat = position?.latitude?.toFixed(5) || "?";
+      const lng = position?.longitude?.toFixed(5) || "?";
+      const gmapsLink = position ? `https://maps.google.com/?q=${position.latitude},${position.longitude}` : "";
+      
+      return `• *${m.nombre}* (${m.tipo})\n  ${encendido} | 🚗 ${velocidad} km/h\n  📍 ${gmapsLink || "Sin posición"}`;
+    });
+    
+    return `📡 Rastreo GPS — ${filteredMaquinas.length} vehículo(s):\n\n${lineas.join("\n\n")}`;
+  } catch (e: any) {
+    console.error("Error en consultar_rastreo:", e);
+    return "Error al consultar el sistema de rastreo satelital. Intentá de nuevo en unos segundos.";
+  }
 }
 
 
