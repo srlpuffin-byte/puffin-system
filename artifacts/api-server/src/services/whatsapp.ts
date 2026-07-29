@@ -49,7 +49,7 @@ export async function sendWhatsAppMessage(to: string, text: string): Promise<{ s
     }
 
     console.log(`[WhatsApp] ✅ Enviado a ${toFormatted}`);
-    const data = await res.json();
+    const data = await res.json() as any;
     return data;
   } catch (error) {
     console.error(`[WhatsApp] Excepción enviando a ${toFormatted}:`, error);
@@ -137,7 +137,7 @@ export async function downloadWhatsAppMedia(mediaId: string): Promise<string | n
       return null;
     }
 
-    const mediaData = await urlRes.json();
+    const mediaData = await urlRes.json() as any;
     const mediaUrl = mediaData.url;
 
     if (!mediaUrl) return null;

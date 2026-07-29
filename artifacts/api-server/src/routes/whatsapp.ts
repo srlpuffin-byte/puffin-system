@@ -78,7 +78,7 @@ whatsappRouter.post("/", async (req, res) => {
       }
 
       console.log(`[Webhook] Mensaje entrante de ${from} (tipo: ${msgType}): ${msgBody}`);
-      await handleWhatsAppMessage(from, msgBody, imageBase64);
+      await handleWhatsAppMessage(from, msgBody || "", imageBase64);
 
     } catch (error) {
       console.error("[Webhook] Error procesando mensaje:", error);

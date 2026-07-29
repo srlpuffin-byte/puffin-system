@@ -10,6 +10,7 @@ import {
   combustibleTable,
   mantenimientosTable,
   usuariosTable,
+  jornadasTable,
 } from "@workspace/db/schema";
 import { eq, like, or, and, desc, ilike, notInArray } from "drizzle-orm";
 import crypto from "crypto";
@@ -89,6 +90,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           agrupar_por: { type: "string", description: "Agrupar por: categoria, proyecto, mes (opcional)" },
           orden: { type: "string", description: "primer, ultimo, mayor, menor (opcional)" },
           limite: { type: "number", description: "Máximo registros (default: 15)" },
+          fecha_registro: { type: "string", description: "Fecha de carga/creación en el sistema YYYY-MM-DD. Usar SOLO si preguntan qué egresos se agregaron/cargaron hoy al sistema." },
         },
         required: [],
       },
@@ -157,6 +159,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           fecha: { type: "string", description: "Fecha YYYY-MM-DD (opcional, default: hoy)" },
           desde: { type: "string", description: "Fecha inicio para rango YYYY-MM-DD (opcional)" },
           hasta: { type: "string", description: "Fecha fin para rango YYYY-MM-DD (opcional)" },
+          fecha_registro: { type: "string", description: "Fecha de registro/creación en el sistema YYYY-MM-DD. Usar SOLO si preguntan qué jornadas se agregaron/cargaron hoy al sistema." },
         },
         required: [],
       },
@@ -227,6 +230,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           nombre_empleado: { type: "string", description: "Nombre del empleado (opcional)" },
           desde: { type: "string", description: "Fecha inicio YYYY-MM-DD (opcional)" },
           hasta: { type: "string", description: "Fecha fin YYYY-MM-DD (opcional)" },
+          fecha_registro: { type: "string", description: "Fecha de registro/creación en el sistema YYYY-MM-DD. Usar SOLO si preguntan qué cargas se agregaron/cargaron hoy al sistema." },
         },
         required: [],
       },
@@ -635,7 +639,7 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
         } else if (functionName === "consultar_proyectos") {
           toolResult = await executeConsultarProyectos(functionArgs.estado, functionArgs.nombre, functionArgs.orden, functionArgs.incluir_asignaciones);
         } else if (functionName === "consultar_jornadas") {
-          toolResult = await executeConsultarJornadas(functionArgs.estado, functionArgs.nombre_empleado, functionArgs.fecha, functionArgs.desde, functionArgs.hasta);
+          toolResult = await executeConsultarJornadas(functionArgs.estado, functionArgs.nombre_empleado, functionArgs.fecha, functionArgs.desde, functionArgs.hasta, functionArgs.fecha_registro);
         } else if (functionName === "consultar_google_sheets") {
           toolResult = await executeConsultarSheets(functionArgs.pestana, functionArgs.rango);
         } else if (functionName === "enviar_fotografia") {
@@ -905,7 +909,7 @@ async function executeConsultarProyectos(estado?: string, nombre?: string, orden
   return resumen + lineas.join("\n");
 }
 
-async function executeConsultarJornadas(estado?: string, nombreEmpleado?: string, fecha?: string, desde?: string, hasta?: string) {
+async function executeConsultarJornadas(estado?: string, nombreEmpleado?: string, fecha?: string, desde?: string, hasta?: string, fecha_registro?: string) {
   const hoy = fecha || new Date().toISOString().split("T")[0];
 
   let empId: number | undefined;
@@ -921,7 +925,7 @@ async function executeConsultarJornadas(estado?: string, nombreEmpleado?: string
 
   let query = db.select({ id: jornadasTable.id, fecha: jornadasTable.fecha, estado: jornadasTable.estado,
     hora_inicio: jornadasTable.hora_inicio, hora_fin: jornadasTable.hora_fin,
-    nombre_obra: jornadasTable.nombre_obra, empleado_id: jornadasTable.empleado_id })
+    nombre_obra: jornadasTable.nombre_obra, empleado_id: jornadasTable.empleado_id, createdAt: jornadasTable.createdAt })
     .from(jornadasTable).$dynamic();
 
   const { gte, lte, between } = await import("drizzle-orm");
@@ -931,7 +935,14 @@ async function executeConsultarJornadas(estado?: string, nombreEmpleado?: string
   if (desde && hasta) conditions.push(between(jornadasTable.fecha, desde, hasta));
   else if (desde) conditions.push(gte(jornadasTable.fecha, desde));
   else if (hasta) conditions.push(lte(jornadasTable.fecha, hasta));
-  else if (!estado && !empId) conditions.push(eq(jornadasTable.fecha, hoy));
+  else if (!estado && !empId && !fecha_registro) conditions.push(eq(jornadasTable.fecha, hoy));
+
+  if (fecha_registro) {
+    const start = new Date(fecha_registro + "T00:00:00");
+    const end = new Date(fecha_registro + "T23:59:59");
+    conditions.push(between(jornadasTable.createdAt, start, end));
+  }
+
   if (conditions.length) query = query.where(and(...conditions));
 
   const results = await query.orderBy(desc(jornadasTable.fecha)).limit(15);
@@ -1079,9 +1090,9 @@ async function executeConsultarRastreo(nombreMaquina?: string) {
 }
 
 
-async function executeAnalizarGastos(args: { categoria?: string; proyecto?: string; desde?: string; hasta?: string; agrupar_por?: string; orden?: string; limite?: number; }) {
-  const { gte, lte, between, ilike: ilikeOp, sum } = await import("drizzle-orm");
-  const limite = args.limite || 15;
+async function executeAnalizarGastos(args: { categoria?: string; proyecto?: string; desde?: string; hasta?: string; agrupar_por?: string; orden?: string; limite?: number; fecha_registro?: string; }) {
+  const { gte, lte, between, ilike: ilikeOp } = await import("drizzle-orm");
+  const limite = Number(args.limite) || 15;
 
   let query = db.select().from(egresosTable).$dynamic();
   const conditions: any[] = [];
@@ -1091,6 +1102,13 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
   if (args.desde && args.hasta) conditions.push(between(egresosTable.fecha, args.desde, args.hasta));
   else if (args.desde) conditions.push(gte(egresosTable.fecha, args.desde));
   else if (args.hasta) conditions.push(lte(egresosTable.fecha, args.hasta));
+
+  if (args.fecha_registro) {
+    const start = new Date(args.fecha_registro + "T00:00:00");
+    const end = new Date(args.fecha_registro + "T23:59:59");
+    conditions.push(between(egresosTable.createdAt, start, end));
+  }
+
   if (conditions.length) query = query.where(and(...conditions));
 
   if (args.orden === "primer") query = query.orderBy(egresosTable.fecha);
@@ -1098,16 +1116,16 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
   else if (args.orden === "menor") query = query.orderBy(egresosTable.monto);
   else query = query.orderBy(desc(egresosTable.fecha));
 
-  const results = await query.limit(limite);
+  const allResults = await query;
 
-  if (results.length === 0) return "No hay gastos con esos filtros.";
+  if (allResults.length === 0) return "No hay gastos con esos filtros.";
 
-  const total = results.reduce((a, r) => a + Number(r.monto || 0), 0);
+  const total = allResults.reduce((a, r) => a + Number(r.monto || 0), 0);
 
   // Agrupar si se pide
   if (args.agrupar_por === "categoria") {
     const grupos: Record<string, number> = {};
-    results.forEach(r => { grupos[r.categoria] = (grupos[r.categoria] || 0) + Number(r.monto || 0); });
+    allResults.forEach(r => { grupos[r.categoria] = (grupos[r.categoria] || 0) + Number(r.monto || 0); });
     const lineas = Object.entries(grupos).sort((a, b) => b[1] - a[1])
       .map(([cat, monto]) => `• ${cat}: $${monto.toLocaleString("es-AR")}`);
     return `*Gastos por categoría* (Total: $${total.toLocaleString("es-AR")}):\n${lineas.join("\n")}`;
@@ -1115,7 +1133,7 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
 
   if (args.agrupar_por === "proyecto") {
     const grupos: Record<string, number> = {};
-    results.forEach(r => { const k = r.centro_costos || "Sin proyecto"; grupos[k] = (grupos[k] || 0) + Number(r.monto || 0); });
+    allResults.forEach(r => { const k = r.centro_costos || "Sin proyecto"; grupos[k] = (grupos[k] || 0) + Number(r.monto || 0); });
     const lineas = Object.entries(grupos).sort((a, b) => b[1] - a[1])
       .map(([proy, monto]) => `• ${proy}: $${monto.toLocaleString("es-AR")}`);
     return `*Gastos por proyecto* (Total: $${total.toLocaleString("es-AR")}):\n${lineas.join("\n")}`;
@@ -1123,15 +1141,16 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
 
   if (args.agrupar_por === "mes") {
     const grupos: Record<string, number> = {};
-    results.forEach(r => { const mes = r.fecha ? r.fecha.slice(0, 7) : "?"; grupos[mes] = (grupos[mes] || 0) + Number(r.monto || 0); });
+    allResults.forEach(r => { const mes = r.fecha ? r.fecha.slice(0, 7) : "?"; grupos[mes] = (grupos[mes] || 0) + Number(r.monto || 0); });
     const lineas = Object.entries(grupos).sort().map(([mes, monto]) => `• ${mes}: $${monto.toLocaleString("es-AR")}`);
     return `*Gastos por mes* (Total: $${total.toLocaleString("es-AR")}):\n${lineas.join("\n")}`;
   }
 
+  const results = allResults.slice(0, limite);
   const lineas = results.map(r =>
     `• [${r.fecha}] ${r.concepto} — $${Number(r.monto).toLocaleString("es-AR")} | ${r.categoria}${r.centro_costos ? ` | Proyecto: ${r.centro_costos}` : ""}`
   );
-  return `${results.length} gastos | *Total: $${total.toLocaleString("es-AR")}*\n${lineas.join("\n")}`;
+  return `${allResults.length} gastos | *Total: $${total.toLocaleString("es-AR")}*\n${lineas.join("\n")}${allResults.length > limite ? `\n_(Mostrando primeros ${limite})_` : ""}`;
 }
 
 async function executeEnviarFotografia(from: string, tipo_entidad: string, busqueda: string) {
@@ -1247,7 +1266,7 @@ async function executeRegistrarGasto(args: {
   }
 }
 
-async function executeConsultarCombustible(args: { nombre_maquina?: string; nombre_empleado?: string; desde?: string; hasta?: string }) {
+async function executeConsultarCombustible(args: { nombre_maquina?: string; nombre_empleado?: string; desde?: string; hasta?: string; fecha_registro?: string; }) {
   const { gte, lte, between } = await import("drizzle-orm");
 
   // Resolver IDs si se dan nombres
@@ -1274,6 +1293,13 @@ async function executeConsultarCombustible(args: { nombre_maquina?: string; nomb
   if (args.desde && args.hasta) conditions.push(between(combustibleTable.fecha, args.desde, args.hasta));
   else if (args.desde) conditions.push(gte(combustibleTable.fecha, args.desde));
   else if (args.hasta) conditions.push(lte(combustibleTable.fecha, args.hasta));
+
+  if (args.fecha_registro) {
+    const start = new Date(args.fecha_registro + "T00:00:00");
+    const end = new Date(args.fecha_registro + "T23:59:59");
+    conditions.push(between(combustibleTable.createdAt, start, end));
+  }
+
   query = query.where(and(...conditions)).orderBy(desc(combustibleTable.fecha)).limit(20);
 
   const results = await query;
@@ -1398,7 +1424,6 @@ async function executeActualizarJornada(args: { nombre_empleado: string; fecha?:
     if (!emp) return `❌ No encontré empleado con nombre "${args.nombre_empleado}".`;
 
     const fecha = args.fecha || hoy;
-    const { set } = await import("drizzle-orm");
     const updates: any = {};
     if (args.hora_fin) updates.hora_fin = args.hora_fin;
     if (args.estado) updates.estado = args.estado;
