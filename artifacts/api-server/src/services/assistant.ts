@@ -89,7 +89,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           hasta: { type: "string", description: "Fecha fin YYYY-MM-DD (opcional)" },
           agrupar_por: { type: "string", description: "Agrupar por: categoria, proyecto, mes (opcional)" },
           orden: { type: "string", description: "primer, ultimo, mayor, menor (opcional)" },
-          limite: { type: "number", description: "Máximo registros (default: 15)" },
+          limite: { type: "number", description: "Máximo registros (default: 200)" },
           fecha_registro: { type: "string", description: "Fecha de carga/creación en el sistema YYYY-MM-DD. Usar SOLO si preguntan qué egresos se agregaron/cargaron hoy al sistema." },
         },
         required: [],
@@ -798,7 +798,7 @@ async function executeConsultarEmpleados(termino?: string, soloActivos?: boolean
   else if (orden === "nombre") query = query.orderBy(asc(empleadosTable.apellido));
   else query = query.orderBy(asc(empleadosTable.id));
 
-  let results = await query.limit(50);
+  let results = await query.limit(200);
 
   // Filtrar empleados sin proyecto activo
   if (sinProyecto) {
@@ -865,7 +865,7 @@ async function executeConsultarProyectos(estado?: string, nombre?: string, orden
   else if (orden === "mayor_ganancia") query = query.orderBy(desc(proyectosTable.ganancia_estimada));
   else query = query.orderBy(desc(proyectosTable.createdAt));
 
-  const results = await query.limit(50);
+  const results = await query.limit(200);
 
   if (results.length === 0) return `No hay proyectos${estado ? ` con estado "${estado}"` : ""} registrados.`;
 
@@ -945,7 +945,7 @@ async function executeConsultarJornadas(estado?: string, nombreEmpleado?: string
 
   if (conditions.length) query = query.where(and(...conditions));
 
-  const results = await query.orderBy(desc(jornadasTable.fecha)).limit(15);
+  const results = await query.orderBy(desc(jornadasTable.fecha)).limit(200);
 
   if (results.length === 0) return `No hay jornadas${estado ? ` "${estado}"` : ""} ${nombreEmpleado ? `para ${nombreEmpleado}` : `para hoy (${hoy})`}.`;
 
@@ -1008,7 +1008,7 @@ async function executeConsultarInventario(termino?: string, estado?: string, ord
   if (orden === "primer") query = query.orderBy(asc(maquinasTable.id));
   else if (orden === "ultimo") query = query.orderBy(desc(maquinasTable.id));
   else if (orden === "nombre") query = query.orderBy(asc(maquinasTable.nombre));
-  const results = await query.limit(50);
+  const results = await query.limit(200);
   if (results.length === 0) return termino ? `No se encontraron máquinas para "${termino}".` : "No hay máquinas registradas.";
   if (orden === "primer" && !termino) {
     const m = results[0];
@@ -1092,7 +1092,7 @@ async function executeConsultarRastreo(nombreMaquina?: string) {
 
 async function executeAnalizarGastos(args: { categoria?: string; proyecto?: string; desde?: string; hasta?: string; agrupar_por?: string; orden?: string; limite?: number; fecha_registro?: string; }) {
   const { gte, lte, between, ilike: ilikeOp } = await import("drizzle-orm");
-  const limite = Number(args.limite) || 15;
+  const limite = Number(args.limite) || 500;
 
   let query = db.select().from(egresosTable).$dynamic();
   const conditions: any[] = [];
@@ -1300,7 +1300,7 @@ async function executeConsultarCombustible(args: { nombre_maquina?: string; nomb
     conditions.push(between(combustibleTable.createdAt, start, end));
   }
 
-  query = query.where(and(...conditions)).orderBy(desc(combustibleTable.fecha)).limit(20);
+  query = query.where(and(...conditions)).orderBy(desc(combustibleTable.fecha)).limit(200);
 
   const results = await query;
   if (results.length === 0) return "No hay registros de combustible con esos filtros.";
@@ -1350,7 +1350,7 @@ async function executeConsultarMantenimientos(args: { nombre_maquina?: string; t
   else if (args.desde) conditions.push(gte(mantenimientosTable.fecha, args.desde));
   else if (args.hasta) conditions.push(lte(mantenimientosTable.fecha, args.hasta));
   if (conditions.length) query = query.where(and(...conditions));
-  query = query.orderBy(desc(mantenimientosTable.fecha)).limit(15);
+  query = query.orderBy(desc(mantenimientosTable.fecha)).limit(200);
 
   const results = await query;
   if (results.length === 0) return "No hay registros de mantenimiento con esos filtros.";
@@ -1404,6 +1404,7 @@ async function executeRegistrarJornada(args: { nombre_empleado: string; nombre_o
       hora_fin: args.hora_fin || null,
       estado: args.estado || "activo",
       empresa_id: 1,
+      maquina_id: 1,
     }).returning();
 
     // Sincronizar
