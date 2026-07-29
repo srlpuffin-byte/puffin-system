@@ -8,6 +8,7 @@ import { PlayCircle, Square, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { IniciarJornadaDialog } from "@/components/forms/iniciar-jornada-dialog";
 import { FinalizarJornadaDialog } from "@/components/forms/finalizar-jornada-dialog";
+import { VerJornadaDialog } from "@/components/forms/ver-jornada-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
 
 export function Jornadas() {
@@ -16,6 +17,7 @@ export function Jornadas() {
   const [jornadaAFinalizar, setJornadaAFinalizar] = useState<{
     id: number; empleado_nombre?: string; maquina_nombre?: string; horometro_inicio?: number | null;
   } | null>(null);
+  const [jornadaAVer, setJornadaAVer] = useState<any | null>(null);
 
   const exportColumns = [
     { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy") : "-" },
@@ -74,7 +76,7 @@ export function Jornadas() {
                     <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay jornadas registradas.</TableCell></TableRow>
                   ) : (
                     jornadas?.map((jor: any) => (
-                      <TableRow key={jor.id}>
+                      <TableRow key={jor.id} className="cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setJornadaAVer(jor)}>
                         <TableCell className="font-medium">
                           {jor.fecha ? format(new Date(jor.fecha), "dd/MM/yyyy") : "-"}
                         </TableCell>
@@ -105,12 +107,15 @@ export function Jornadas() {
                               <Button
                                 variant="destructive"
                                 size="sm"
-                                onClick={() => setJornadaAFinalizar({
-                                  id: jor.id,
-                                  empleado_nombre: jor.empleado_nombre,
-                                  maquina_nombre: jor.maquina_nombre,
-                                  horometro_inicio: jor.horometro_inicio,
-                                })}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setJornadaAFinalizar({
+                                    id: jor.id,
+                                    empleado_nombre: jor.empleado_nombre,
+                                    maquina_nombre: jor.maquina_nombre,
+                                    horometro_inicio: jor.horometro_inicio,
+                                  });
+                                }}
                               >
                                 <Square className="mr-2 h-4 w-4" />
                                 Finalizar
@@ -133,7 +138,7 @@ export function Jornadas() {
                 <div className="text-center py-8 text-muted-foreground">No hay jornadas registradas.</div>
               ) : (
                 jornadas?.map((jor: any) => (
-                  <div key={jor.id} className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors">
+                  <div key={jor.id} className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setJornadaAVer(jor)}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-col">
                         <span className="font-semibold text-base text-primary leading-tight">{jor.empleado_nombre}</span>
@@ -176,12 +181,15 @@ export function Jornadas() {
                         <Button
                           variant="destructive"
                           className="w-full h-10"
-                          onClick={() => setJornadaAFinalizar({
-                            id: jor.id,
-                            empleado_nombre: jor.empleado_nombre,
-                            maquina_nombre: jor.maquina_nombre,
-                            horometro_inicio: jor.horometro_inicio,
-                          })}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setJornadaAFinalizar({
+                              id: jor.id,
+                              empleado_nombre: jor.empleado_nombre,
+                              maquina_nombre: jor.maquina_nombre,
+                              horometro_inicio: jor.horometro_inicio,
+                            });
+                          }}
                         >
                           <Square className="mr-2 h-4 w-4" /> Finalizar Jornada
                         </Button>
@@ -207,6 +215,12 @@ export function Jornadas() {
           horometroInicio={jornadaAFinalizar.horometro_inicio}
         />
       )}
+
+      <VerJornadaDialog 
+        open={!!jornadaAVer} 
+        onOpenChange={(o) => { if (!o) setJornadaAVer(null); }} 
+        jornada={jornadaAVer} 
+      />
     </div>
   );
 }
