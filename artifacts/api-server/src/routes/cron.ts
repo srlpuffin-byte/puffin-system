@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { empleadosTable, maquinasTable, alertasTable } from "@workspace/db/schema";
 import { eq, or, and, isNotNull, sql } from "drizzle-orm";
-import { sendWhatsAppMessage } from "../services/whatsapp.js";
+import { sendWhatsAppMessage, sendWhatsAppTemplate } from "../services/whatsapp.js";
 
 export const cronRouter = Router();
 
@@ -270,4 +270,76 @@ cronRouter.get("/jornadas-sin-finalizar", async (req, res) => {
     console.error("Error en cron jornadas-sin-finalizar:", error);
     return res.status(500).json({ error: error.message });
   }
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// CRON / ACCIÓN MANUAL: Comunicado de accesos — envío masivo de plantilla
+// Plantilla: comunicado_accesos_bot  |  Idioma: es_AR
+//
+// POST /api/cron/comunicado-accesos?token=TU_TOKEN
+//
+// Envía la plantilla aprobada "comunicado_accesos_bot" a los números fijos
+// definidos en DESTINATARIOS_COMUNICADO_ACCESOS.
+// ──────────────────────────────────────────────────────────────────────────────
+
+const DESTINATARIOS_COMUNICADO_ACCESOS: string[] = [
+  "54 9 3731 64-0096",
+  "3644-809238",
+  "54 9 3825 57-6185",
+  "54 9 3731 66-9317",
+  "54 9 3731 66-0415",
+  "54 9 3731 62-8275",
+  "5493846446198",
+  "54 9 364 428-6331",
+  "5493731658349",
+  "5493572408227",
+  "3873107479",
+  "3873107479",
+  "3472629600",
+  "3525 64-8277",
+  "3572665637",
+  "3572400877",
+  "3572538345",
+];
+
+cronRouter.post("/comunicado-accesos", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1] || req.query.token;
+
+  if (token !== CRON_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const TEMPLATE_NAME = "comunicado_accesos_bot";
+  const LANGUAGE_CODE = "es_AR";
+  const DELAY_MS = 1000; // 1 segundo entre envíos para respetar rate-limits de Meta
+
+  const resultados: { numero: string; estado: "ok" | "error"; detalle?: string }[] = [];
+
+  for (const numero of DESTINATARIOS_COMUNICADO_ACCESOS) {
+    try {
+      await sendWhatsAppTemplate(numero, TEMPLATE_NAME, LANGUAGE_CODE);
+      resultados.push({ numero, estado: "ok" });
+      console.log(`[Comunicado] ✅ Enviado a ${numero}`);
+    } catch (e: any) {
+      const detalle = e?.message || String(e);
+      resultados.push({ numero, estado: "error", detalle });
+      console.error(`[Comunicado] ❌ Error enviando a ${numero}:`, detalle);
+    }
+
+    // Delay entre envíos para no saturar la API de Meta
+    await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+  }
+
+  const exitosos = resultados.filter((r) => r.estado === "ok").length;
+  const fallidos = resultados.filter((r) => r.estado === "error").length;
+
+  return res.json({
+    success: true,
+    template: TEMPLATE_NAME,
+    total: resultados.length,
+    exitosos,
+    fallidos,
+    resultados,
+    ejecutado_a: new Date().toISOString(),
+  });
 });

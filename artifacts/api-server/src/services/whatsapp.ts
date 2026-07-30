@@ -119,6 +119,75 @@ export async function sendWhatsAppImage(to: string, imageUrl: string, caption?: 
   }
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Envío de mensajes usando plantillas aprobadas por Meta (WhatsApp Business API)
+// ──────────────────────────────────────────────────────────────────────────────
+
+export interface TemplateParameter {
+  type: "text";
+  text: string;
+}
+
+export async function sendWhatsAppTemplate(
+  to: string,
+  templateName: string,
+  languageCode: string = "es_AR",
+  bodyParameters: TemplateParameter[] = []
+): Promise<{ status: string; error?: string }> {
+  const toFormatted = formatArgentinaPhone(to);
+
+  if (!WHATSAPP_ACCESS_TOKEN || WHATSAPP_ACCESS_TOKEN === "TODO_ACCESS_TOKEN") {
+    console.warn(`[WhatsApp] Simulando envío de template "${templateName}" a ${toFormatted}`);
+    return { status: "simulated" };
+  }
+
+  const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_ID}/messages`;
+
+  const components: object[] = [];
+  if (bodyParameters.length > 0) {
+    components.push({
+      type: "body",
+      parameters: bodyParameters,
+    });
+  }
+
+  const payload = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: toFormatted,
+    type: "template",
+    template: {
+      name: templateName,
+      language: { code: languageCode },
+      ...(components.length > 0 ? { components } : {}),
+    },
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[WhatsApp] Error enviando template "${templateName}" a ${toFormatted}:`, errText);
+      throw new Error(`WhatsApp API error: ${res.status} ${errText}`);
+    }
+
+    console.log(`[WhatsApp] ✅ Template "${templateName}" enviado a ${toFormatted}`);
+    const data = await res.json() as any;
+    return data;
+  } catch (error) {
+    console.error(`[WhatsApp] Excepción enviando template "${templateName}" a ${toFormatted}:`, error);
+    throw error;
+  }
+}
+
 export async function downloadWhatsAppMedia(mediaId: string): Promise<string | null> {
   if (!WHATSAPP_ACCESS_TOKEN || WHATSAPP_ACCESS_TOKEN === "TODO_ACCESS_TOKEN") {
     console.warn(`[WhatsApp] Modo simulado: no se puede descargar el mediaId ${mediaId}`);
