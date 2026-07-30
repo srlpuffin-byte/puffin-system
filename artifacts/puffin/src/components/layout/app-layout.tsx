@@ -247,7 +247,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           if (user?.rol?.toLowerCase() === "empleado") {
             if (group.label === "Operación") {
               filteredItems = group.items.filter(item => 
-                item.href !== "/operarios" && item.href !== "/maquinas" && item.href !== "/proyectos"
+                item.href !== "/operarios" && item.href !== "/maquinas"
               );
             } else if (group.label === "Mantenimiento") {
               filteredItems = group.items.filter(item =>
@@ -260,6 +260,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             } else if (group.label === "Principal") {
               filteredItems = [
                 ...group.items,
+                { icon: Map, label: "Mi Proyecto", href: "/proyectos" },
                 { icon: UserCog, label: "Mis Datos", href: "/mis-datos" }
               ];
             }
