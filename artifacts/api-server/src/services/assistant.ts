@@ -1092,13 +1092,18 @@ async function executeConsultarRastreo(nombreMaquina?: string) {
 
 async function executeAnalizarGastos(args: { categoria?: string; proyecto?: string; desde?: string; hasta?: string; agrupar_por?: string; orden?: string; limite?: number; fecha_registro?: string; }) {
   const { gte, lte, between, ilike: ilikeOp } = await import("drizzle-orm");
-  const limite = Number(args.limite) || 500;
+  // Límite generoso: la IA siempre ve TODOS los registros para calcular totales correctos.
+  // Solo se trunca el listado de líneas individuales que se le muestran al usuario.
+  const limiteDisplay = Number(args.limite) || 500;
 
   let query = db.select().from(egresosTable).$dynamic();
   const conditions: any[] = [];
 
   if (args.categoria) conditions.push(ilikeOp(egresosTable.categoria, `%${args.categoria}%`));
-  if (args.proyecto) conditions.push(ilikeOp(egresosTable.centro_costos, `%${args.proyecto}%`));
+  if (args.proyecto) {
+    // Buscar en centro_costos con tolerancia a variantes del nombre
+    conditions.push(ilikeOp(egresosTable.centro_costos, `%${args.proyecto}%`));
+  }
   if (args.desde && args.hasta) conditions.push(between(egresosTable.fecha, args.desde, args.hasta));
   else if (args.desde) conditions.push(gte(egresosTable.fecha, args.desde));
   else if (args.hasta) conditions.push(lte(egresosTable.fecha, args.hasta));
@@ -1116,11 +1121,16 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
   else if (args.orden === "menor") query = query.orderBy(egresosTable.monto);
   else query = query.orderBy(desc(egresosTable.fecha));
 
+  // CRÍTICO: traer TODOS los registros sin límite para que los totales y agrupaciones sean exactos
   const allResults = await query;
 
-  if (allResults.length === 0) return "No hay gastos con esos filtros.";
+  if (allResults.length === 0) return `No hay gastos con esos filtros.${args.proyecto ? ` (buscado en proyecto/centro de costos: "${args.proyecto}")` : ""}`;
 
   const total = allResults.reduce((a, r) => a + Number(r.monto || 0), 0);
+  const totalCount = allResults.length;
+
+  // Cabecera siempre incluye el total real para que el bot no subestime
+  const cabecera = `📊 TOTAL REAL EN EL SISTEMA: ${totalCount} gasto(s) | Suma: $${total.toLocaleString("es-AR")}${args.proyecto ? ` (Proyecto: ${args.proyecto})` : ""}\n`;
 
   // Agrupar si se pide
   if (args.agrupar_por === "categoria") {
@@ -1128,7 +1138,7 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
     allResults.forEach(r => { grupos[r.categoria] = (grupos[r.categoria] || 0) + Number(r.monto || 0); });
     const lineas = Object.entries(grupos).sort((a, b) => b[1] - a[1])
       .map(([cat, monto]) => `• ${cat}: $${monto.toLocaleString("es-AR")}`);
-    return `*Gastos por categoría* (Total: $${total.toLocaleString("es-AR")}):\n${lineas.join("\n")}`;
+    return cabecera + `*Gastos por categoría*:\n${lineas.join("\n")}`;
   }
 
   if (args.agrupar_por === "proyecto") {
@@ -1136,22 +1146,24 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
     allResults.forEach(r => { const k = r.centro_costos || "Sin proyecto"; grupos[k] = (grupos[k] || 0) + Number(r.monto || 0); });
     const lineas = Object.entries(grupos).sort((a, b) => b[1] - a[1])
       .map(([proy, monto]) => `• ${proy}: $${monto.toLocaleString("es-AR")}`);
-    return `*Gastos por proyecto* (Total: $${total.toLocaleString("es-AR")}):\n${lineas.join("\n")}`;
+    return cabecera + `*Gastos por proyecto*:\n${lineas.join("\n")}`;
   }
 
   if (args.agrupar_por === "mes") {
     const grupos: Record<string, number> = {};
     allResults.forEach(r => { const mes = r.fecha ? r.fecha.slice(0, 7) : "?"; grupos[mes] = (grupos[mes] || 0) + Number(r.monto || 0); });
     const lineas = Object.entries(grupos).sort().map(([mes, monto]) => `• ${mes}: $${monto.toLocaleString("es-AR")}`);
-    return `*Gastos por mes* (Total: $${total.toLocaleString("es-AR")}):\n${lineas.join("\n")}`;
+    return cabecera + `*Gastos por mes*:\n${lineas.join("\n")}`;
   }
 
-  const results = allResults.slice(0, limite);
+  const results = allResults.slice(0, limiteDisplay);
   const lineas = results.map(r =>
     `• [${r.fecha}] ${r.concepto} — $${Number(r.monto).toLocaleString("es-AR")} | ${r.categoria}${r.centro_costos ? ` | Proyecto: ${r.centro_costos}` : ""}`
   );
-  return `${allResults.length} gastos | *Total: $${total.toLocaleString("es-AR")}*\n${lineas.join("\n")}${allResults.length > limite ? `\n_(Mostrando primeros ${limite})_` : ""}`;
+  const truncNote = totalCount > limiteDisplay ? `\n⚠️ Mostrando ${limiteDisplay} de ${totalCount} registros. El TOTAL REAL es $${total.toLocaleString("es-AR")} con ${totalCount} gastos.` : "";
+  return cabecera + lineas.join("\n") + truncNote;
 }
+
 
 async function executeEnviarFotografia(from: string, tipo_entidad: string, busqueda: string) {
   try {

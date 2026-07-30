@@ -235,7 +235,7 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
                 <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-muted-foreground/30 rounded-lg cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors">
                   <ImagePlus className="h-6 w-6 text-muted-foreground/50" />
                   <span className="text-[10px] text-muted-foreground mt-1">Agregar</span>
-                  <input ref={fileInputRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={handleFileChange} />
+                   <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} />
                 </label>
               </div>
             )}
@@ -246,7 +246,7 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
                   <p className="text-sm font-medium text-foreground/80">Agregar fotos</p>
                   <p className="text-xs text-muted-foreground">Tomar foto o seleccionar de la galería</p>
                 </div>
-                <input ref={fileInputRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={handleFileChange} />
+                <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} />
               </label>
             )}
           </div>

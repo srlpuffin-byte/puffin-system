@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { useGetIncidentes, getGetIncidentesQueryKey, useGetMe } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, CheckCircle2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, CheckCircle2, Eye, ImageOff } from "lucide-react";
 import { format } from "date-fns";
 import { ReportarIncidenteDialog } from "@/components/forms/reportar-incidente-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
@@ -20,10 +21,126 @@ const TIPO_LABELS: Record<string, string> = {
   otro: "Otro",
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Modal de detalle para el administrador
+// ─────────────────────────────────────────────────────────────────────────────
+interface Incidente {
+  id: number;
+  tipo?: string | null;
+  descripcion?: string | null;
+  fecha?: string | null;
+  estado?: string | null;
+  maquina_nombre?: string | null;
+  empleado_nombre?: string | null;
+}
+
+function IncidenteDetalleDialog({ incidente, open, onOpenChange }: {
+  incidente: Incidente | null;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const { data: fotos, isLoading: loadingFotos } = useQuery({
+    queryKey: ["fotografias", "incidente", incidente?.id],
+    queryFn: () =>
+      apiFetch<{ id: number; url: string; descripcion?: string | null }[]>(
+        `/fotografias?entidad_tipo=incidente&entidad_id=${incidente!.id}`
+      ),
+    enabled: open && !!incidente?.id,
+  });
+
+  if (!incidente) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-destructive">
+            <span className="text-xl">⚠️</span>
+            {TIPO_LABELS[incidente.tipo || ""] || incidente.tipo}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-1">
+          {/* Info principal */}
+          <div className="grid grid-cols-2 gap-3 text-sm bg-slate-50 border rounded-lg p-3">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] uppercase text-muted-foreground font-semibold">Fecha</span>
+              <span className="font-medium">
+                {incidente.fecha ? format(new Date(incidente.fecha), "dd/MM/yyyy HH:mm") : "-"}
+              </span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] uppercase text-muted-foreground font-semibold">Estado</span>
+              <Badge
+                variant={incidente.estado === "resuelto" ? "default" : "destructive"}
+                className={incidente.estado === "resuelto" ? "bg-green-600 w-fit" : "w-fit"}
+              >
+                {incidente.estado?.toUpperCase()}
+              </Badge>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] uppercase text-muted-foreground font-semibold">Máquina</span>
+              <span className="font-medium">{incidente.maquina_nombre || "—"}</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] uppercase text-muted-foreground font-semibold">Operario</span>
+              <span className="font-medium">{incidente.empleado_nombre || "—"}</span>
+            </div>
+          </div>
+
+          {/* Descripción */}
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase text-muted-foreground font-semibold">Descripción</p>
+            <p className="text-sm text-slate-800 leading-relaxed bg-white border rounded-lg p-3">
+              {incidente.descripcion || "Sin descripción."}
+            </p>
+          </div>
+
+          {/* Fotos */}
+          <div className="space-y-2">
+            <p className="text-[10px] uppercase text-muted-foreground font-semibold">
+              Fotografías del incidente
+            </p>
+            {loadingFotos ? (
+              <div className="text-sm text-muted-foreground py-4 text-center">Cargando fotos...</div>
+            ) : fotos && fotos.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2">
+                {fotos.map((f) => (
+                  <a key={f.id} href={f.url} target="_blank" rel="noopener noreferrer" className="block">
+                    <div className="relative rounded-lg overflow-hidden border aspect-video bg-muted hover:opacity-90 transition-opacity">
+                      <img
+                        src={f.url}
+                        alt={f.descripcion || "Foto incidente"}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {f.descripcion && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{f.descripcion}</p>
+                    )}
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 py-6 text-muted-foreground border rounded-lg bg-slate-50">
+                <ImageOff className="h-8 w-8 opacity-30" />
+                <p className="text-xs">No se adjuntaron fotos a este incidente.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Página principal
+// ─────────────────────────────────────────────────────────────────────────────
 export function Incidentes() {
   const { data: incidentes, isLoading } = useGetIncidentes();
   const [openDialog, setOpenDialog] = useState(false);
   const [resolvingId, setResolvingId] = useState<number | null>(null);
+  const [selectedIncidente, setSelectedIncidente] = useState<Incidente | null>(null);
   const { data: user } = useGetMe();
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";
   const queryClient = useQueryClient();
@@ -58,11 +175,11 @@ export function Incidentes() {
         <h1 className="text-3xl font-bold tracking-tight text-primary">Registro de Incidentes</h1>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           {incidentes && (
-            <ExportButtons 
-              data={incidentes} 
-              columns={exportColumns} 
-              filename="Reporte_Incidentes" 
-              title="Reporte de Incidentes" 
+            <ExportButtons
+              data={incidentes}
+              columns={exportColumns}
+              filename="Reporte_Incidentes"
+              title="Reporte de Incidentes"
             />
           )}
           <Button className="bg-destructive hover:bg-destructive/90 flex-1 sm:flex-none" onClick={() => setOpenDialog(true)}>
@@ -96,7 +213,7 @@ export function Incidentes() {
                     <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No hay incidentes registrados.</TableCell></TableRow>
                   ) : (
                     incidentes?.map((inc) => (
-                      <TableRow key={inc.id}>
+                      <TableRow key={inc.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIncidente(inc as Incidente)}>
                         <TableCell className="font-medium">
                           {inc.fecha ? format(new Date(inc.fecha), "dd/MM/yyyy HH:mm") : "-"}
                         </TableCell>
@@ -116,18 +233,28 @@ export function Incidentes() {
                             {inc.estado?.toUpperCase()}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
-                          {!isEmpleado && inc.estado !== "resuelto" && (
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
-                              onClick={() => handleResolver(inc.id)}
-                              disabled={resolvingId === inc.id}
+                              onClick={() => setSelectedIncidente(inc as Incidente)}
+                              title="Ver detalle"
                             >
-                              <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
-                              Resolver
+                              <Eye className="h-4 w-4 text-slate-500" />
                             </Button>
-                          )}
+                            {!isEmpleado && inc.estado !== "resuelto" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleResolver(inc.id)}
+                                disabled={resolvingId === inc.id}
+                              >
+                                <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
+                                Resolver
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -144,7 +271,11 @@ export function Incidentes() {
                 <div className="text-center py-8 text-muted-foreground">No hay incidentes registrados.</div>
               ) : (
                 incidentes?.map((inc) => (
-                  <div key={inc.id} className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors">
+                  <div
+                    key={inc.id}
+                    className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors cursor-pointer"
+                    onClick={() => setSelectedIncidente(inc as Incidente)}
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-col">
                         <span className="font-semibold text-base text-destructive leading-tight">{TIPO_LABELS[inc.tipo || ""] || inc.tipo}</span>
@@ -167,23 +298,32 @@ export function Incidentes() {
                     </div>
 
                     <div className="text-sm">
-                      <p className="text-slate-800 line-clamp-3">{inc.descripcion}</p>
+                      <p className="text-slate-800 line-clamp-2">{inc.descripcion}</p>
                     </div>
 
-                    {!isEmpleado && inc.estado !== "resuelto" && (
-                      <div className="mt-2 pt-2 border-t flex justify-end">
+                    <div className="mt-1 pt-2 border-t flex items-center justify-between">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-600 h-8 px-2"
+                        onClick={(e) => { e.stopPropagation(); setSelectedIncidente(inc as Incidente); }}
+                      >
+                        <Eye className="mr-1.5 h-3.5 w-3.5" />
+                        Ver detalle y fotos
+                      </Button>
+                      {!isEmpleado && inc.estado !== "resuelto" && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleResolver(inc.id)}
+                          onClick={(e) => { e.stopPropagation(); handleResolver(inc.id); }}
                           disabled={resolvingId === inc.id}
                           className="text-green-700 border-green-200 hover:bg-green-50 h-8"
                         >
                           <CheckCircle2 className="mr-2 h-4 w-4" />
                           Marcar Resuelto
                         </Button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 ))
               )}
@@ -193,6 +333,12 @@ export function Incidentes() {
       </Card>
 
       <ReportarIncidenteDialog open={openDialog} onOpenChange={setOpenDialog} />
+
+      <IncidenteDetalleDialog
+        incidente={selectedIncidente}
+        open={!!selectedIncidente}
+        onOpenChange={(v) => { if (!v) setSelectedIncidente(null); }}
+      />
     </div>
   );
 }
