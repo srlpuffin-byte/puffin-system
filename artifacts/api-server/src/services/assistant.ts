@@ -11,10 +11,29 @@ import {
   mantenimientosTable,
   usuariosTable,
   jornadasTable,
+  auditoriaTable,
 } from "@workspace/db/schema";
 import { eq, like, or, and, desc, ilike, notInArray } from "drizzle-orm";
 import crypto from "crypto";
 import { sendWhatsAppImage, sendWhatsAppMessage } from "./whatsapp.js";
+
+// ─── Helper de auditoría para acciones del bot ──────────────────────────────
+async function auditarBot(accion: string, entidad: string, entidad_id?: number | null, valor_nuevo?: object) {
+  try {
+    await db.insert(auditoriaTable).values({
+      accion,
+      entidad,
+      entidad_id: entidad_id ?? null,
+      valor_nuevo: valor_nuevo ?? null,
+      usuario_id: null,          // Sin usuario web (acción del bot)
+      ip: "whatsapp",
+      dispositivo: "WhatsApp Bot",
+    });
+  } catch (e) {
+    // No bloquear el flujo si falla la auditoría
+    console.warn("[Auditoría] No se pudo registrar acción del bot:", (e as any)?.message);
+  }
+}
 
 const groqApiKey = process.env.GROQ_API_KEY;
 const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -1265,6 +1284,9 @@ async function executeRegistrarGasto(args: {
       observaciones: args.observaciones || null,
     }).returning();
 
+    // Auditoría
+    await auditarBot("CREACION", "egresos", egreso.id, { fecha: args.fecha, categoria: args.categoria, concepto: args.concepto, monto: args.monto, centro_costos: args.centro_costos });
+
     // Intentar sincronizar con Google Sheets (no bloquear si falla)
     try {
       const { syncAllSheets } = await import("./sync-sheets.js");
@@ -1391,6 +1413,9 @@ async function executeRegistrarEmpleado(args: { nombre: string; apellido: string
       estado: "activo",
     }).returning();
 
+    // Auditoría
+    await auditarBot("CREACION", "empleados", emp.id, { nombre: emp.nombre, apellido: emp.apellido, dni: emp.dni, cargo: emp.cargo });
+
     // Sincronizar
     try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
 
@@ -1418,6 +1443,9 @@ async function executeRegistrarJornada(args: { nombre_empleado: string; nombre_o
       empresa_id: 1,
       maquina_id: 1,
     }).returning();
+
+    // Auditoría
+    await auditarBot("CREACION", "jornadas", jornada.id, { empleado: `${emp.nombre} ${emp.apellido}`, obra: args.nombre_obra, fecha: jornada.fecha });
 
     // Sincronizar
     try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
@@ -1447,6 +1475,9 @@ async function executeActualizarJornada(args: { nombre_empleado: string; fecha?:
       .returning();
 
     if (!updated) return `No encontré jornada de ${emp.nombre} ${emp.apellido} para el ${fecha}.`;
+
+    // Auditoría
+    await auditarBot("MODIFICACION", "jornadas", updated.id, { empleado: `${emp.nombre} ${emp.apellido}`, fecha, estado: updated.estado, hora_fin: updated.hora_fin });
 
     // Sincronizar
     try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
@@ -1484,6 +1515,9 @@ async function executeRegistrarCombustible(args: { nombre_maquina: string; nombr
       empresa_id: 1,
     }).returning();
 
+    // Auditoría
+    await auditarBot("CREACION", "combustible", reg.id, { maquina: maq.nombre, litros: args.litros, importe: args.importe, fecha: reg.fecha });
+
     // Sincronizar
     try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
 
@@ -1510,6 +1544,9 @@ async function executeRegistrarMantenimiento(args: { nombre_maquina: string; tip
       estado: "realizado",
       empresa_id: 1,
     }).returning();
+
+    // Auditoría
+    await auditarBot("CREACION", "mantenimientos", mant.id, { maquina: maq.nombre, tipo: mant.tipo, descripcion: mant.descripcion, fecha: mant.fecha });
 
     // Sincronizar
     try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
@@ -1567,6 +1604,9 @@ async function executeActualizarProyecto(args: { nombre_proyecto: string; nuevo_
 
     await db.update(proyectosTable).set(updates).where(eq(proyectosTable.id, proy.id));
 
+    // Auditoría
+    await auditarBot("MODIFICACION", "proyectos", proy.id, { proyecto: proy.lugar, cambios });
+
     // Sincronizar
     try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
 
@@ -1597,6 +1637,9 @@ async function executeCrearAccesoSistema(args: { nombre: string; apellido: strin
       rol: rolStr,
       activo: true
     });
+
+    // Auditoría
+    await auditarBot("CREACION", "usuarios", null, { nombre: args.nombre, apellido: args.apellido, usuario: dniStr, rol: rolStr });
 
     return `✅ Acceso al sistema creado para *${args.nombre} ${args.apellido}*.\nUsuario: ${dniStr}\nPIN: ${pinStr}\nRol: ${rolStr}`;
   } catch (error: any) {

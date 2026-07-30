@@ -72,7 +72,7 @@ export async function syncAllSheets() {
     // 1. Egresos
     const egresos = await db.select().from(egresosTable).orderBy(desc(egresosTable.fecha));
     await syncTableToSheet(sheetsClient, SHEET_ID, "Egresos", 0, egresos, e => [
-      e.id, e.fecha, e.categoria, e.concepto, e.proveedor || "", Number(e.monto), e.metodo_pago || "", e.comprobante ? "SI" : "NO", e.centro_costos || "", e.observaciones || ""
+      e.id, e.fecha, e.categoria, e.concepto, e.proveedor || "", parseFloat(e.monto as any) || 0, e.metodo_pago || "", e.comprobante ? "SI" : "NO", e.centro_costos || "", e.observaciones || ""
     ]);
 
     // 2. Maquinarias
@@ -109,9 +109,9 @@ export async function syncAllSheets() {
       return [
         p.id, 
         p.lugar, 
-        p.hectareas, 
-        p.precio_hectarea, 
-        p.ganancia_estimada, 
+        parseFloat(p.hectareas as any) || 0, 
+        parseFloat(p.precio_hectarea as any) || 0, 
+        parseFloat(p.ganancia_estimada as any) || 0, 
         "", // F
         "", // G
         p.estado || "activo", // H
