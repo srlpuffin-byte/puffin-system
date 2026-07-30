@@ -133,6 +133,18 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "auditar_egresos_sheets",
+      description: "Corrobora y compara el monto total de egresos guardados en el sistema (base de datos) contra el monto total en Google Sheets (pestaña Egresos). Úsala cuando el usuario pida corroborar, verificar totales o pida el total general de egresos.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "consultar_empleados",
       description: "Consulta empleados: total, primer/último en ingresar, carnet vencido, empleados sin asignar a proyectos, datos de contacto.",
       parameters: {
@@ -601,7 +613,7 @@ LO QUE PUEDO CONSULTAR (acceso total a la BD):
 💰 Gastos, ⚽ Combustible, 🔧 Mantenimientos.
 📈 Resumen Operativo Diario: Si piden el resumen de hoy, ejecutá la herramienta correspondiente y mostralo limpio.
 📸 Fotografías y Comprobantes: Si piden imagen de chata, operario, DNI, o comprobante/ticket de gasto, USÁ LA HERRAMIENTA 'enviar_fotografia'.
-📊 Google Sheets: cualquier dato en las planillas (tus acciones de escritura ya sincronizan solas).
+📊 Google Sheets: cualquier dato en las planillas (tus acciones de escritura ya sincronizan solas). SI TE PIDEN EL TOTAL GENERAL DE EGRESOS o CORROBORAR, usá 'auditar_egresos_sheets' para comparar DB vs Sheets.
 📡 Rastreo Satelital GPS: Podés consultar la ubicación en tiempo real, velocidad y estado (encendido/apagado) de cualquier vehículo con GPS. Usá la herramienta 'consultar_rastreo'.
 
 REGLAS DE OPERACIÓN:
@@ -653,6 +665,8 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
           toolResult = await executeConsultarInventario(functionArgs.termino, functionArgs.estado, functionArgs.orden, functionArgs.categoria);
         } else if (functionName === "consultar_gastos" || functionName === "analizar_gastos") {
           toolResult = await executeAnalizarGastos(functionArgs);
+        } else if (functionName === "auditar_egresos_sheets") {
+          toolResult = await executeAuditarEgresosSheets();
         } else if (functionName === "consultar_empleados") {
           toolResult = await executeConsultarEmpleados(functionArgs.termino, functionArgs.solo_activos, functionArgs.orden, functionArgs.carnet_vencido, functionArgs.sin_proyecto);
         } else if (functionName === "consultar_proyectos") {
@@ -1015,6 +1029,83 @@ async function executeConsultarSheets(pestana: string, rango?: string) {
     return `Error al leer Google Sheets (pestaña: ${pestana}): ${error.message}`;
   }
 }
+
+async function executeAuditarEgresosSheets() {
+  const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+  const credsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+
+  if (!SHEET_ID || !credsJson) {
+    return "Google Sheets no está configurado en el servidor.";
+  }
+
+  try {
+    const { google } = await import("googleapis");
+    const credentials = JSON.parse(credsJson);
+    const auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    });
+    const sheets = google.sheets({ version: "v4", auth });
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `Egresos!A:Z`,
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length <= 1) return `La pestaña Egresos está vacía en Google Sheets.`;
+
+    let totalSheets = 0;
+    let countSheets = 0;
+    
+    // Asumimos que la columna F (index 5) es Monto según sync-sheets.ts
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length < 6) continue;
+      
+      // Parsear la celda F (monto). Podría tener símbolos o comas.
+      let montoStr = row[5] || "0";
+      montoStr = montoStr.replace(/[^0-9,-]+/g, "").replace(",", ".");
+      const monto = parseFloat(montoStr);
+      
+      if (!isNaN(monto)) {
+        totalSheets += monto;
+        countSheets++;
+      }
+    }
+
+    // Obtener total en la DB
+    const todosLosEgresos = await db.select().from(egresosTable);
+    const totalDb = todosLosEgresos.reduce((a, e) => a + Number(e.monto || 0), 0);
+    const countDb = todosLosEgresos.length;
+
+    const coincidenCount = countSheets === countDb;
+    const diferenciaAbs = Math.abs(totalSheets - totalDb);
+    const coincidenMonto = diferenciaAbs < 1; // Tolerancia de 1 peso por redondeos
+
+    let mensaje = `🔍 *AUDITORÍA DE EGRESOS* 🔍\n\n`;
+    mensaje += `🗄️ *Sistema Puffin (Base de Datos):*\n`;
+    mensaje += `   - Registros: ${countDb}\n`;
+    mensaje += `   - Monto total: $${totalDb.toLocaleString("es-AR")}\n\n`;
+    
+    mensaje += `📊 *Google Sheets (Pestaña Egresos):*\n`;
+    mensaje += `   - Filas procesadas: ${countSheets}\n`;
+    mensaje += `   - Monto total: $${totalSheets.toLocaleString("es-AR")}\n\n`;
+
+    if (coincidenCount && coincidenMonto) {
+      mensaje += `✅ *RESULTADO*: ¡Todo está perfectamente sincronizado! La base de datos y Google Sheets coinciden exactamente en monto y cantidad de registros.`;
+    } else {
+      mensaje += `⚠️ *RESULTADO*: Hay una discrepancia.\n`;
+      if (!coincidenCount) mensaje += `   - Diferencia de ${Math.abs(countDb - countSheets)} registro(s).\n`;
+      if (!coincidenMonto) mensaje += `   - Diferencia monetaria de $${diferenciaAbs.toLocaleString("es-AR")}.\n`;
+      mensaje += `\nRecomiendo revisar manualmente el Sheets o usar el sistema para volver a forzar una sincronización.`;
+    }
+
+    return mensaje;
+  } catch (error: any) {
+    return `Error al auditar Google Sheets: ${error.message}`;
+  }
+}
+
 
 async function executeConsultarInventario(termino?: string, estado?: string, orden?: string, categoria?: string) {
   const { asc } = await import("drizzle-orm");
