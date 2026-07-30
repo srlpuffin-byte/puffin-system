@@ -137,6 +137,7 @@ router.put("/:id", async (req, res) => {
     if (dominio !== undefined) updateData.dominio = dominio;
     if (chasis !== undefined) updateData.chasis = chasis;
     if (motor !== undefined) updateData.motor = motor;
+    if (categoria !== undefined) updateData.categoria = categoria;
     
     if (filtro_tipo !== undefined) updateData.filtro_tipo = filtro_tipo;
     if (filtro_codigo !== undefined) updateData.filtro_codigo = filtro_codigo;
