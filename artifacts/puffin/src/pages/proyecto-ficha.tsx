@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useParams, Link } from "wouter";
 import { useGetProyecto, useDeletePago } from "@/hooks/use-proyectos";
-import { useGetEmpleados, useGetMaquinas, useGetEgresos } from "@workspace/api-client-react";
+import { useGetEmpleados, useGetMaquinas, useGetEgresos, useGetMe } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,8 @@ export function ProyectoFicha() {
   const { data: empleados } = useGetEmpleados();
   const { data: maquinas } = useGetMaquinas();
   const { data: todosLosEgresos } = useGetEgresos();
+  const { data: me } = useGetMe();
+  const isEmpleado = me?.rol?.toLowerCase() === "empleado";
   const deletePagoMut = useDeletePago();
 
   const handleDeletePago = async (pagoId: string) => {
@@ -83,8 +85,9 @@ export function ProyectoFicha() {
         </div>
       </div>
 
-      {/* Financiero resumen */}
-      <Card className="border-2 border-slate-200 bg-slate-50">
+      {/* Financiero resumen - Solo admin */}
+      {!isEmpleado && (
+        <Card className="border-2 border-slate-200 bg-slate-50">
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <CardTitle className="text-lg">Resumen Financiero del Proyecto</CardTitle>
@@ -157,28 +160,31 @@ export function ProyectoFicha() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Columna izquierda: datos + personal + maquinaria */}
         <div className="space-y-6">
-          {/* Datos comerciales */}
-          <Card>
-            <CardHeader><CardTitle>Datos Comerciales</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Activity className="h-4 w-4" /> Hectáreas
-                </p>
-                <p className="font-medium text-lg">{parseFloat(proyecto.hectareas).toLocaleString("es-AR")} Has.</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" /> Precio por Hectárea
-                </p>
-                <p className="font-medium text-lg">USD ${parseFloat(proyecto.precio_hectarea).toLocaleString("es-AR")}</p>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Datos comerciales - Solo admin */}
+          {!isEmpleado && (
+            <Card>
+              <CardHeader><CardTitle>Datos Comerciales</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Activity className="h-4 w-4" /> Hectáreas
+                  </p>
+                  <p className="font-medium text-lg">{parseFloat(proyecto.hectareas).toLocaleString("es-AR")} Has.</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" /> Precio por Hectárea
+                  </p>
+                  <p className="font-medium text-lg">USD ${parseFloat(proyecto.precio_hectarea).toLocaleString("es-AR")}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Personal */}
           <Card>
@@ -264,8 +270,9 @@ export function ProyectoFicha() {
           </Card>
         </div>
 
-        {/* Columna derecha: gastos del proyecto */}
-        <div className="lg:col-span-2">
+        {/* Columna derecha: gastos del proyecto - Solo admin */}
+        {!isEmpleado && (
+          <div className="lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -473,6 +480,7 @@ export function ProyectoFicha() {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
     </div>
   );

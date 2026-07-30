@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useGetProyectos, useDeleteProyecto, type Proyecto } from "@/hooks/use-proyectos";
-import { useGetEmpleados, useGetMaquinas } from "@workspace/api-client-react";
+import { useGetEmpleados, useGetMaquinas, useGetMe } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,6 +23,8 @@ export function Proyectos() {
   const deleteMut = useDeleteProyecto();
   const { data: empleados } = useGetEmpleados();
   const { data: maquinas } = useGetMaquinas();
+  const { data: user } = useGetMe();
+  const isEmpleado = user?.rol?.toLowerCase() === "empleado";
 
   const handleDelete = async (id: number) => {
     if (!confirm("¿Estás seguro de eliminar este proyecto?")) return;
@@ -121,14 +123,18 @@ export function Proyectos() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Proyectos y Presupuestos</h1>
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-          <Button variant="outline" className="border-green-600 text-green-700 hover:bg-green-50" onClick={handleDownloadCSV}>
-            <Download className="mr-2 h-4 w-4" />
-            Descargar Excel
-          </Button>
-          <Button className="bg-primary flex-1 sm:flex-none" onClick={() => setOpenDialog(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nuevo Proyecto
-          </Button>
+          {!isEmpleado && (
+            <>
+              <Button variant="outline" className="border-green-600 text-green-700 hover:bg-green-50" onClick={handleDownloadCSV}>
+                <Download className="mr-2 h-4 w-4" />
+                Descargar Excel
+              </Button>
+              <Button className="bg-primary flex-1 sm:flex-none" onClick={() => setOpenDialog(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nuevo Proyecto
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -154,7 +160,7 @@ export function Proyectos() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Lugar</TableHead>
-                    <TableHead>Datos Comerciales / Pagos</TableHead>
+                    {!isEmpleado && <TableHead>Datos Comerciales / Pagos</TableHead>}
                     <TableHead>Asignaciones</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
@@ -177,22 +183,24 @@ export function Proyectos() {
                             Creado: {format(new Date(p.createdAt), "dd/MM/yyyy")}
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1 text-sm">
-                            <span className="flex items-center gap-1 text-slate-600">
-                              <Activity className="h-3 w-3" /> {parseFloat(p.hectareas).toLocaleString('es-AR')} Has. a ${parseFloat(p.precio_hectarea).toLocaleString('es-AR')}
-                            </span>
-                            <span className="flex items-center gap-1 font-semibold text-green-700">
-                              <DollarSign className="h-3 w-3" /> Total: ${parseFloat(p.ganancia_estimada || "0").toLocaleString('es-AR', {minimumFractionDigits: 2})}
-                            </span>
-                            <span className="flex items-center gap-1 text-xs font-medium text-slate-500 mt-1">
-                              Pagado: ${parseFloat(p.total_cobrado || "0").toLocaleString('es-AR', {minimumFractionDigits: 2})}
-                            </span>
-                            <span className="flex items-center gap-1 text-xs font-semibold text-amber-600">
-                              Saldo: ${(parseFloat(p.ganancia_estimada || "0") - parseFloat(p.total_cobrado || "0")).toLocaleString('es-AR', {minimumFractionDigits: 2})}
-                            </span>
-                          </div>
-                        </TableCell>
+                        {!isEmpleado && (
+                          <TableCell>
+                            <div className="flex flex-col gap-1 text-sm">
+                              <span className="flex items-center gap-1 text-slate-600">
+                                <Activity className="h-3 w-3" /> {parseFloat(p.hectareas).toLocaleString('es-AR')} Has. a ${parseFloat(p.precio_hectarea).toLocaleString('es-AR')}
+                              </span>
+                              <span className="flex items-center gap-1 font-semibold text-green-700">
+                                <DollarSign className="h-3 w-3" /> Total: ${parseFloat(p.ganancia_estimada || "0").toLocaleString('es-AR', {minimumFractionDigits: 2})}
+                              </span>
+                              <span className="flex items-center gap-1 text-xs font-medium text-slate-500 mt-1">
+                                Pagado: ${parseFloat(p.total_cobrado || "0").toLocaleString('es-AR', {minimumFractionDigits: 2})}
+                              </span>
+                              <span className="flex items-center gap-1 text-xs font-semibold text-amber-600">
+                                Saldo: ${(parseFloat(p.ganancia_estimada || "0") - parseFloat(p.total_cobrado || "0")).toLocaleString('es-AR', {minimumFractionDigits: 2})}
+                              </span>
+                            </div>
+                          </TableCell>
+                        )}
                         <TableCell>
                           <div className="flex flex-col gap-1 text-xs">
                             <div className="flex items-start gap-1">
@@ -223,15 +231,17 @@ export function Proyectos() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setPagoProyecto(p)}
-                              className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
-                              title="Registrar pago o cobro"
-                            >
-                              <DollarSign className="w-4 h-4" />
-                            </Button>
+                            {!isEmpleado && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setPagoProyecto(p)}
+                                className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
+                                title="Registrar pago o cobro"
+                              >
+                                <DollarSign className="w-4 h-4" />
+                              </Button>
+                            )}
                             <Link href={`/proyectos/${p.id}`}>
                               <Button
                                 variant="ghost"
@@ -242,24 +252,28 @@ export function Proyectos() {
                                 <Eye className="w-4 h-4" />
                               </Button>
                             </Link>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setEditProyecto(p)}
-                              className="h-8 w-8 text-blue-600 hover:bg-blue-50"
-                              title="Editar proyecto"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(p.id)}
-                              className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                              title="Eliminar proyecto"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {!isEmpleado && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setEditProyecto(p)}
+                                  className="h-8 w-8 text-blue-600 hover:bg-blue-50"
+                                  title="Editar proyecto"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDelete(p.id)}
+                                  className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                  title="Eliminar proyecto"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -294,20 +308,22 @@ export function Proyectos() {
                       </Badge>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-sm bg-slate-50 p-2 rounded border">
-                      <div className="flex flex-col">
-                        <span className="text-xs text-muted-foreground">Dimensiones</span>
-                        <span className="font-medium">{parseFloat(p.hectareas).toLocaleString('es-AR')} Has.</span>
+                    {!isEmpleado && (
+                      <div className="grid grid-cols-2 gap-2 text-sm bg-slate-50 p-2 rounded border">
+                        <div className="flex flex-col">
+                          <span className="text-xs text-muted-foreground">Dimensiones</span>
+                          <span className="font-medium">{parseFloat(p.hectareas).toLocaleString('es-AR')} Has.</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs text-muted-foreground">Precio/Ha</span>
+                          <span className="font-medium">${parseFloat(p.precio_hectarea).toLocaleString('es-AR')}</span>
+                        </div>
+                        <div className="col-span-2 flex justify-between border-t pt-2 mt-1">
+                          <span className="text-xs text-muted-foreground">Ganancia Est.</span>
+                          <span className="font-semibold text-green-700">${parseFloat(p.ganancia_estimada || "0").toLocaleString('es-AR', {minimumFractionDigits: 2})}</span>
+                        </div>
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs text-muted-foreground">Precio/Ha</span>
-                        <span className="font-medium">${parseFloat(p.precio_hectarea).toLocaleString('es-AR')}</span>
-                      </div>
-                      <div className="col-span-2 flex justify-between border-t pt-2 mt-1">
-                        <span className="text-xs text-muted-foreground">Ganancia Est.</span>
-                        <span className="font-semibold text-green-700">${parseFloat(p.ganancia_estimada || "0").toLocaleString('es-AR', {minimumFractionDigits: 2})}</span>
-                      </div>
-                    </div>
+                    )}
 
                     <div className="flex flex-col gap-2 text-xs">
                       <div className="flex items-start gap-2">
@@ -330,12 +346,16 @@ export function Proyectos() {
                           <Eye className="w-4 h-4 mr-2" /> Ver detalles
                         </Button>
                       </Link>
-                      <Button variant="outline" onClick={() => setEditProyecto(p)} className="h-9 w-12 p-0 text-blue-600 border-blue-200 hover:bg-blue-50">
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button variant="outline" onClick={() => handleDelete(p.id)} className="h-9 w-12 p-0 text-destructive border-destructive/20 hover:bg-destructive/10">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {!isEmpleado && (
+                        <>
+                          <Button variant="outline" onClick={() => setEditProyecto(p)} className="h-9 w-12 p-0 text-blue-600 border-blue-200 hover:bg-blue-50">
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button variant="outline" onClick={() => handleDelete(p.id)} className="h-9 w-12 p-0 text-destructive border-destructive/20 hover:bg-destructive/10">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { proyectosTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { proyectosTable, usuariosTable, empleadosTable } from "@workspace/db/schema";
+import { eq, or, and } from "drizzle-orm";
 import { updateOrAppendToSheet } from "../services/sheets.js";
 
 const router = Router();
@@ -45,7 +45,31 @@ router.get("/sync-sheet", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const proyectos = await db.select().from(proyectosTable).orderBy(proyectosTable.createdAt);
+    let proyectos = await db.select().from(proyectosTable).orderBy(proyectosTable.createdAt);
+    
+    if (req.user?.rol === "empleado") {
+      const [user] = await db.select().from(usuariosTable).where(eq(usuariosTable.id, req.user.id)).limit(1);
+      const [emp] = await db.select().from(empleadosTable)
+        .where(or(
+          eq(empleadosTable.dni, user.usuario),
+          and(eq(empleadosTable.nombre, user.nombre), eq(empleadosTable.apellido, user.apellido))
+        )).limit(1);
+      
+      const empId = emp?.id;
+      
+      proyectos = proyectos.filter(p => {
+        const asignados = p.empleados_asignados as number[] | null;
+        return asignados && empId && asignados.includes(empId);
+      }).map(p => ({
+        ...p,
+        precio_hectarea: "0",
+        ganancia_estimada: "0",
+        total_cobrado: "0",
+        estado_pago: "oculto",
+        pagos_historial: [],
+      }));
+    }
+    
     return res.json(proyectos);
   } catch (err: any) {
     req.log.error(err);
@@ -89,8 +113,33 @@ router.post("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [proyecto] = await db.select().from(proyectosTable).where(eq(proyectosTable.id, id)).limit(1);
+    let [proyecto] = await db.select().from(proyectosTable).where(eq(proyectosTable.id, id)).limit(1);
     if (!proyecto) return res.status(404).json({ error: "Proyecto no encontrado" });
+
+    if (req.user?.rol === "empleado") {
+      const [user] = await db.select().from(usuariosTable).where(eq(usuariosTable.id, req.user.id)).limit(1);
+      const [emp] = await db.select().from(empleadosTable)
+        .where(or(
+          eq(empleadosTable.dni, user.usuario),
+          and(eq(empleadosTable.nombre, user.nombre), eq(empleadosTable.apellido, user.apellido))
+        )).limit(1);
+      
+      const empId = emp?.id;
+      const asignados = proyecto.empleados_asignados as number[] | null;
+      if (!asignados || !empId || !asignados.includes(empId)) {
+        return res.status(403).json({ error: "No tienes permiso para ver este proyecto" });
+      }
+      
+      proyecto = {
+        ...proyecto,
+        precio_hectarea: "0",
+        ganancia_estimada: "0",
+        total_cobrado: "0",
+        estado_pago: "oculto",
+        pagos_historial: [],
+      };
+    }
+
     return res.json(proyecto);
   } catch (err: any) {
     req.log.error(err);
