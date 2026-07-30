@@ -28,9 +28,10 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   maquinaIdFija?: number;
   empleadoIdFijo?: number;
+  editData?: any;
 }
 
-export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, empleadoIdFijo }: Props) {
+export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, empleadoIdFijo, editData }: Props) {
   const queryClient = useQueryClient();
   const createMut = useCreateIncidente();
   const uploadMut = useUploadFotografia();
@@ -46,6 +47,7 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
     tipo: "",
     descripcion: "",
   });
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const [fotos, setFotos] = useState<{ base64: string; name: string; preview: string }[]>([]);
   const [maquinaSearch, setMaquinaSearch] = useState("");
@@ -57,8 +59,24 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
     if (!open) {
       setFotos([]);
       setMaquinaSearch("");
+    } else {
+      if (editData) {
+        setForm({
+          empleado_id: editData.empleado_id?.toString() || "",
+          maquina_id: editData.maquina_id?.toString() || "",
+          tipo: editData.tipo || "",
+          descripcion: editData.descripcion || "",
+        });
+      } else {
+        setForm({
+          empleado_id: empleadoIdFijo?.toString() || "",
+          maquina_id: maquinaIdFija?.toString() || "",
+          tipo: "",
+          descripcion: "",
+        });
+      }
     }
-  }, [open]);
+  }, [open, editData, empleadoIdFijo, maquinaIdFija]);
 
   useEffect(() => {
     if (isEmpleado && user && empleados?.length) {
@@ -92,6 +110,30 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
     e.preventDefault();
     if (!form.tipo || !form.descripcion) {
       toast.error("Tipo y descripción son obligatorios");
+      return;
+    }
+
+    if (editData?.id) {
+      setIsUpdating(true);
+      try {
+        const { apiFetch } = await import("@/lib/api");
+        await apiFetch(`/incidentes/${editData.id}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            tipo: form.tipo,
+            descripcion: form.descripcion,
+            empleado_id: form.empleado_id ? parseInt(form.empleado_id) : undefined,
+            maquina_id: form.maquina_id ? parseInt(form.maquina_id) : undefined,
+          }),
+        });
+        toast.success("Incidente actualizado correctamente");
+        queryClient.invalidateQueries({ queryKey: getGetIncidentesQueryKey() });
+        onOpenChange(false);
+      } catch (err: any) {
+        toast.error("Error al actualizar incidente");
+      } finally {
+        setIsUpdating(false);
+      }
       return;
     }
 
@@ -144,7 +186,7 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-destructive flex items-center gap-2">
-            <span className="text-xl">⚠️</span> Reportar Incidente
+            <span className="text-xl">⚠️</span> {editData ? "Editar Incidente" : "Reportar Incidente"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
@@ -253,8 +295,8 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" variant="destructive" disabled={createMut.isPending}>
-              {createMut.isPending ? "Reportando..." : "Reportar Incidente"}
+            <Button type="submit" variant="destructive" disabled={createMut.isPending || isUpdating}>
+              {createMut.isPending || isUpdating ? "Guardando..." : (editData ? "Guardar Cambios" : "Reportar Incidente")}
             </Button>
           </DialogFooter>
         </form>

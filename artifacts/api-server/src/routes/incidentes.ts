@@ -69,28 +69,57 @@ router.put("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
-    const { estado } = req.body;
-    if (!estado) return res.status(400).json({ error: "Estado es requerido" });
+    const { estado, tipo, descripcion, empleado_id, maquina_id } = req.body;
+    
+    const updateData: Record<string, any> = {};
+    if (estado !== undefined) updateData.estado = estado;
+    if (tipo !== undefined) updateData.tipo = tipo;
+    if (descripcion !== undefined) updateData.descripcion = descripcion;
+    if (empleado_id !== undefined) updateData.empleado_id = empleado_id;
+    if (maquina_id !== undefined) updateData.maquina_id = maquina_id;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
 
     const [incidente] = await db
       .update(incidentesTable)
-      .set({ estado })
+      .set(updateData)
       .where(eq(incidentesTable.id, id))
       .returning();
 
     if (!incidente) return res.status(404).json({ error: "Incidente no encontrado" });
 
-    await db.insert(actividadTable).values({
-      tipo: "incidente",
-      descripcion: `Incidente marcado como ${estado}: ${incidente.tipo}`,
-      entidad_tipo: "incidente",
-      entidad_id: incidente.id,
-    });
+    if (estado) {
+      await db.insert(actividadTable).values({
+        tipo: "incidente",
+        descripcion: `Incidente marcado como ${estado}: ${incidente.tipo}`,
+        entidad_tipo: "incidente",
+        entidad_id: incidente.id,
+      });
+    }
 
     return res.json(incidente);
   } catch (err: any) {
     req.log?.error(err);
     return res.status(500).json({ error: "Error al actualizar incidente: " + (err?.message || "Error interno") });
+  }
+});
+
+router.delete("/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+    
+    const [existing] = await db.select().from(incidentesTable).where(eq(incidentesTable.id, id));
+    if (!existing) return res.status(404).json({ error: "Incidente no encontrado" });
+
+    await db.delete(incidentesTable).where(eq(incidentesTable.id, id));
+    
+    return res.json({ success: true });
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al eliminar incidente: " + (err?.message || "Error interno") });
   }
 });
 

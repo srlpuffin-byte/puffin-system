@@ -11,6 +11,9 @@ import { Plus, CheckCircle2, Eye, ImageOff } from "lucide-react";
 import { format } from "date-fns";
 import { ReportarIncidenteDialog } from "@/components/forms/reportar-incidente-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal, Trash2, Pencil } from "lucide-react";
+import { toast } from "sonner";
 
 const TIPO_LABELS: Record<string, string> = {
   rotura: "Rotura",
@@ -141,9 +144,21 @@ export function Incidentes() {
   const [openDialog, setOpenDialog] = useState(false);
   const [resolvingId, setResolvingId] = useState<number | null>(null);
   const [selectedIncidente, setSelectedIncidente] = useState<Incidente | null>(null);
+  const [editingIncidente, setEditingIncidente] = useState<Incidente | null>(null);
   const { data: user } = useGetMe();
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";
   const queryClient = useQueryClient();
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("¿Estás seguro de que deseas eliminar este incidente de forma permanente?")) return;
+    try {
+      await apiFetch(`/incidentes/${id}`, { method: "DELETE" });
+      toast.success("Incidente eliminado correctamente");
+      queryClient.invalidateQueries({ queryKey: getGetIncidentesQueryKey() });
+    } catch (err: any) {
+      toast.error("Error al eliminar el incidente");
+    }
+  };
 
   const handleResolver = async (id: number) => {
     try {
@@ -235,14 +250,6 @@ export function Incidentes() {
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setSelectedIncidente(inc as Incidente)}
-                              title="Ver detalle"
-                            >
-                              <Eye className="h-4 w-4 text-slate-500" />
-                            </Button>
                             {!isEmpleado && inc.estado !== "resuelto" && (
                               <Button
                                 variant="outline"
@@ -254,6 +261,28 @@ export function Incidentes() {
                                 Resolver
                               </Button>
                             )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setSelectedIncidente(inc as Incidente)} className="cursor-pointer">
+                                  <Eye className="mr-2 h-4 w-4" /> Ver detalle
+                                </DropdownMenuItem>
+                                {!isEmpleado && (
+                                  <>
+                                    <DropdownMenuItem onClick={() => setEditingIncidente(inc as Incidente)} className="cursor-pointer">
+                                      <Pencil className="mr-2 h-4 w-4" /> Editar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDelete(inc.id)} className="cursor-pointer text-red-600 focus:text-red-600">
+                                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -309,20 +338,40 @@ export function Incidentes() {
                         onClick={(e) => { e.stopPropagation(); setSelectedIncidente(inc as Incidente); }}
                       >
                         <Eye className="mr-1.5 h-3.5 w-3.5" />
-                        Ver detalle y fotos
+                        Ver detalle
                       </Button>
-                      {!isEmpleado && inc.estado !== "resuelto" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); handleResolver(inc.id); }}
-                          disabled={resolvingId === inc.id}
-                          className="text-green-700 border-green-200 hover:bg-green-50 h-8"
-                        >
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Marcar Resuelto
-                        </Button>
-                      )}
+                      
+                      <div className="flex items-center gap-1">
+                        {!isEmpleado && inc.estado !== "resuelto" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => { e.stopPropagation(); handleResolver(inc.id); }}
+                            disabled={resolvingId === inc.id}
+                            className="text-green-700 border-green-200 hover:bg-green-50 h-8 px-2"
+                          >
+                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                            Resolver
+                          </Button>
+                        )}
+                        {!isEmpleado && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingIncidente(inc as Incidente); }} className="cursor-pointer">
+                                <Pencil className="mr-2 h-4 w-4" /> Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(inc.id); }} className="cursor-pointer text-red-600 focus:text-red-600">
+                                <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))
@@ -333,6 +382,13 @@ export function Incidentes() {
       </Card>
 
       <ReportarIncidenteDialog open={openDialog} onOpenChange={setOpenDialog} />
+      {editingIncidente && (
+        <ReportarIncidenteDialog 
+          open={!!editingIncidente} 
+          onOpenChange={(v) => { if (!v) setEditingIncidente(null); }} 
+          editData={editingIncidente} 
+        />
+      )}
 
       <IncidenteDetalleDialog
         incidente={selectedIncidente}
