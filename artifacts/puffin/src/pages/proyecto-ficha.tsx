@@ -43,10 +43,12 @@ export function ProyectoFicha() {
   const assignedInventario = maquinas?.filter(m => proyecto.maquinas_asignadas?.includes(m.id) && m.categoria === "inventario") || [];
 
   // Filtrar egresos de este proyecto (por nombre de lugar en centro_costos)
-  const egresosProyecto = todosLosEgresos?.filter(eg =>
-    eg.centro_costos?.toLowerCase().includes(proyecto.lugar.toLowerCase()) ||
-    proyecto.lugar.toLowerCase().includes((eg.centro_costos || "").toLowerCase())
-  ) || [];
+  const egresosProyecto = todosLosEgresos?.filter(eg => {
+    const cc = (eg.centro_costos || "").trim().toLowerCase();
+    if (!cc) return false;
+    const lugar = proyecto.lugar.toLowerCase();
+    return cc.includes(lugar) || lugar.includes(cc);
+  }) || [];
 
   // Totales
   const totalGastosARS = egresosProyecto.reduce((sum, eg) => sum + parseFloat(eg.monto?.toString() || "0"), 0);

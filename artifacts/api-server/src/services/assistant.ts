@@ -103,7 +103,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         type: "object",
         properties: {
           categoria: { type: "string", description: "Filtrar por categoría (opcional)" },
-          proyecto: { type: "string", description: "Filtrar por proyecto/obra (centro de costos) (opcional)" },
+          proyecto: { type: "string", description: "Filtrar por proyecto/obra (usar solo la palabra clave más distintiva, ej: 'Broglia' en vez de 'Campo Broglia') (opcional)" },
           desde: { type: "string", description: "Fecha inicio YYYY-MM-DD (opcional)" },
           hasta: { type: "string", description: "Fecha fin YYYY-MM-DD (opcional)" },
           agrupar_por: { type: "string", description: "Agrupar por: categoria, proyecto, mes (opcional)" },
