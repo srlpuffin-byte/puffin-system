@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { maquinasTable, fotografiasTable } from "@workspace/db";
+import { maquinasTable, fotografiasTable, proyectosTable } from "@workspace/db";
 import { eq, and, or, ilike, inArray } from "drizzle-orm";
 import { updateOrAppendToSheet } from "../services/sheets.js";
 
@@ -62,6 +62,8 @@ router.get("/", async (req, res) => {
   // Get fotos for the maquinas
   const maquinasIds = maquinas.map(m => m.id);
   let fotografiasMap = new Map();
+  let maquinasProyectoMap = new Map();
+
   if (maquinasIds.length > 0) {
     const fotografias = await db
       .select()
@@ -72,13 +74,28 @@ router.get("/", async (req, res) => {
         fotografiasMap.set(f.entidad_id, f.url);
       }
     });
+
+    const proyectos = await db.select({ 
+      id: proyectosTable.id, 
+      lugar: proyectosTable.lugar, 
+      maquinas_asignadas: proyectosTable.maquinas_asignadas 
+    }).from(proyectosTable).where(eq(proyectosTable.estado, "activo"));
+
+    proyectos.forEach(p => {
+      if (p.maquinas_asignadas) {
+        p.maquinas_asignadas.forEach((mId: number) => {
+          maquinasProyectoMap.set(mId, { id: p.id, lugar: p.lugar });
+        });
+      }
+    });
   }
 
   return res.json(maquinas.map(m => ({ 
     ...m, 
     horometro: Number(m.horometro), 
     kilometros: Number(m.kilometros),
-    imagen_url: fotografiasMap.get(m.id) || null
+    imagen_url: fotografiasMap.get(m.id) || null,
+    proyecto: maquinasProyectoMap.get(m.id) || null
   })));
 });
 

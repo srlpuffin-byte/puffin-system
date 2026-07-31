@@ -101,6 +101,7 @@ export function Maquinas() {
     { header: "Modelo", key: "modelo" },
     { header: "Patente/Dominio", key: "patente" },
     { header: "Horómetro", key: "horometro" },
+    { header: "Proyecto", key: "proyecto", formatter: (v: any) => v?.lugar || "Sin asignar" },
     { header: "Estado", key: "estado", formatter: (v: string) => v?.toUpperCase() }
   ];
 
@@ -197,15 +198,16 @@ export function Maquinas() {
                     <TableHead>Nombre</TableHead>
                     <TableHead>Tipo</TableHead>
                     {activeTab === "maquinaria" && <TableHead>Horómetro/Km</TableHead>}
+                    <TableHead>Proyecto</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={7} className="text-center py-8">Cargando maquinaria...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando maquinaria...</TableCell></TableRow>
                   ) : maquinas?.length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No se encontraron resultados.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No se encontraron resultados.</TableCell></TableRow>
                   ) : (
                     maquinas?.map((maq) => (
                       <TableRow key={maq.id}>
@@ -227,6 +229,15 @@ export function Maquinas() {
                             {maq.kilometros ? `${maq.kilometros} km` : ""}
                           </TableCell>
                         )}
+                        <TableCell>
+                          {(maq as any).proyecto ? (
+                            <Link href={`/proyectos/${(maq as any).proyecto.id}`} className="text-blue-600 hover:underline">
+                              {(maq as any).proyecto.lugar}
+                            </Link>
+                          ) : (
+                            <span className="text-muted-foreground text-sm italic">Sin asignar</span>
+                          )}
+                        </TableCell>
                         <TableCell>{estadoBadge(maq.estado)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-3">
@@ -313,6 +324,17 @@ export function Maquinas() {
                         )}
                       </div>
                     )}
+
+                    <div className="flex items-center gap-2 mt-1 px-1">
+                      <span className="text-xs text-muted-foreground font-medium">Proyecto:</span>
+                      {(maq as any).proyecto ? (
+                        <Link href={`/proyectos/${(maq as any).proyecto.id}`} className="text-xs text-blue-600 hover:underline">
+                          {(maq as any).proyecto.lugar}
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">Sin asignar</span>
+                      )}
+                    </div>
 
                     <div className="flex flex-wrap items-center justify-between gap-2 mt-1">
                       {activeTab === "maquinaria" && (!maq.marca || !maq.modelo || !maq.anio || (!maq.patente && !maq.dominio) || !maq.motor || !maq.chasis || !maq.filtro_tipo || !maq.filtro_codigo) && (
