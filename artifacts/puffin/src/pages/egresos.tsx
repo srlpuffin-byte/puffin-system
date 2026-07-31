@@ -34,6 +34,22 @@ export function Egresos() {
   const { mutate: updateEgresoMut, isPending: isUpdating } = (import("@workspace/api-client-react") as any)?.useUpdateEgreso ? (import("@workspace/api-client-react") as any).useUpdateEgreso() : { mutate: (a: any, b: any) => {}, isPending: false };
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  // ── Filtros ──────────────────────────────────────────────────────────────
+  const [filterProyecto, setFilterProyecto] = useState("todos");
+  const [filterCategoria, setFilterCategoria] = useState("todos");
+  const [filterMetodo, setFilterMetodo] = useState("todos");
+  const [filterSearch, setFilterSearch] = useState("");
+
+  const egresosFiltrados = (egresos || []).filter((eg: any) => {
+    if (filterProyecto !== "todos" && eg.centro_costos !== filterProyecto) return false;
+    if (filterCategoria !== "todos" && eg.categoria !== filterCategoria) return false;
+    if (filterMetodo !== "todos" && eg.metodo_pago !== filterMetodo) return false;
+    if (filterSearch && !eg.concepto?.toLowerCase().includes(filterSearch.toLowerCase())) return false;
+    return true;
+  });
+  const hasFilters = filterProyecto !== "todos" || filterCategoria !== "todos" || filterMetodo !== "todos" || filterSearch !== "";
+  const clearFilters = () => { setFilterProyecto("todos"); setFilterCategoria("todos"); setFilterMetodo("todos"); setFilterSearch(""); };
+
   // Helper: fecha local sin conversión UTC
   const localToday = () => {
     const d = new Date();
@@ -120,7 +136,7 @@ export function Egresos() {
     }
   };
 
-  const total = egresos?.reduce((acc, curr) => acc + Number(curr.monto || 0), 0) || 0;
+  const total = egresosFiltrados.reduce((acc, curr: any) => acc + Number(curr.monto || 0), 0);
 
   const handleSyncSheets = async () => {
     try {
@@ -189,15 +205,66 @@ export function Egresos() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Egresos</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {hasFilters ? "Total Filtrado" : "Total Egresos"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
               ${total.toLocaleString("es-AR")}
             </div>
+            {hasFilters && (
+              <p className="text-xs text-muted-foreground mt-1">{egresosFiltrados.length} de {egresos?.length || 0} registros</p>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Filtros */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
+              <input
+                type="search"
+                placeholder="Buscar concepto..."
+                className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                value={filterSearch}
+                onChange={e => setFilterSearch(e.target.value)}
+              />
+            </div>
+            <Select value={filterProyecto} onValueChange={setFilterProyecto}>
+              <SelectTrigger className="w-[200px]"><SelectValue placeholder="Proyecto" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los proyectos</SelectItem>
+                <SelectItem value="General">General (sin proyecto)</SelectItem>
+                {proyectos?.map(p => <SelectItem key={p.id} value={p.lugar}>{p.lugar}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterCategoria} onValueChange={setFilterCategoria}>
+              <SelectTrigger className="w-[170px]"><SelectValue placeholder="Categoría" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas las categorías</SelectItem>
+                {CATEGORIAS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterMetodo} onValueChange={setFilterMetodo}>
+              <SelectTrigger className="w-[160px]"><SelectValue placeholder="Método de pago" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los métodos</SelectItem>
+                <SelectItem value="Efectivo">Efectivo</SelectItem>
+                <SelectItem value="Transferencia">Transferencia</SelectItem>
+                <SelectItem value="Tarjeta">Tarjeta</SelectItem>
+              </SelectContent>
+            </Select>
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground h-9">
+                ✕ Limpiar filtros
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="p-4">
@@ -220,10 +287,10 @@ export function Egresos() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando egresos...</TableCell></TableRow>
-                  ) : egresos?.length === 0 ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay egresos registrados.</TableCell></TableRow>
+                    egresosFiltrados.length === 0 ? (
+                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay egresos con los filtros seleccionados.</TableCell></TableRow>
                   ) : (
-                    egresos?.map((eg: any) => (
+                    egresosFiltrados.map((eg: any) => (
                       <TableRow key={eg.id}>
                         <TableCell className="font-medium">
                           {(eg.fecha || "").substring(0, 10).split("-").reverse().join("/")}
@@ -307,10 +374,10 @@ export function Egresos() {
             <div className="md:hidden divide-y">
               {isLoading ? (
                 <div className="text-center py-8">Cargando egresos...</div>
-              ) : egresos?.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">No hay egresos registrados.</div>
+                egresosFiltrados.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No hay egresos con los filtros seleccionados.</div>
               ) : (
-                egresos?.map((eg: any) => (
+                egresosFiltrados.map((eg: any) => (
                   <div key={eg.id} className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-col">
