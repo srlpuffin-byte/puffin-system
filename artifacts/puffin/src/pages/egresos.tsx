@@ -287,7 +287,7 @@ export function Egresos() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando egresos...</TableCell></TableRow>
-                    egresosFiltrados.length === 0 ? (
+                  ) : egresosFiltrados.length === 0 ? (
                     <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay egresos con los filtros seleccionados.</TableCell></TableRow>
                   ) : (
                     egresosFiltrados.map((eg: any) => (
@@ -374,7 +374,7 @@ export function Egresos() {
             <div className="md:hidden divide-y">
               {isLoading ? (
                 <div className="text-center py-8">Cargando egresos...</div>
-                egresosFiltrados.length === 0 ? (
+              ) : egresosFiltrados.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No hay egresos con los filtros seleccionados.</div>
               ) : (
                 egresosFiltrados.map((eg: any) => (
