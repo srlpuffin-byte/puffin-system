@@ -48,11 +48,17 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
     });
   });
 
-  // Máquinas: mantener lógica de exclusión (una máquina no puede estar en dos lugares)
-  const maquinasEnUso = new Set(proyectos?.filter(p => p.estado === "activo" && p.id !== proyecto?.id).flatMap(p => p.maquinas_asignadas || []));
+  // Mapear en qué proyecto activo está cada máquina (excluyendo el proyecto actual)
+  const maquinaProyectos = new Map<number, string[]>();
+  proyectos?.filter(p => p.estado === "activo" && p.id !== proyecto?.id).forEach(p => {
+    (p.maquinas_asignadas || []).forEach(maqId => {
+      const prev = maquinaProyectos.get(Number(maqId)) || [];
+      maquinaProyectos.set(Number(maqId), [...prev, p.lugar]);
+    });
+  });
 
   const empleados = empleadosData;
-  const maquinas = maquinasData?.filter(maq => !maquinasEnUso.has(maq.id));
+  const maquinas = maquinasData;
 
   // Cargar datos del proyecto al abrir
   useEffect(() => {
@@ -258,10 +264,29 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
                               <HoverCardTrigger asChild>
                                 <label
                                   htmlFor={`edit-maq-${maq.id}`}
-                                  className="text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 py-1"
+                                  className="text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 py-1 flex flex-col gap-1"
                                 >
-                                  {maq.nombre} {maq.marca ? `- ${maq.marca} ${maq.modelo || ''}` : ''}
-                                  <span className="text-xs text-muted-foreground ml-1">· {maq.patente || maq.dominio || "S/P"}</span>
+                                  <span>
+                                    {maq.nombre} {maq.marca ? `- ${maq.marca} ${maq.modelo || ''}` : ''}
+                                    <span className="text-xs text-muted-foreground ml-1">· {maq.patente || maq.dominio || "S/P"}</span>
+                                  </span>
+                                  <span className="flex flex-wrap gap-1">
+                                    {maq.estado === "mantenimiento" && (
+                                      <span className="inline-flex items-center text-[10px] font-semibold bg-red-100 text-red-800 border border-red-300 px-1.5 py-0.5 rounded-full">
+                                        Mantenimiento
+                                      </span>
+                                    )}
+                                    {maq.estado === "detenida" && (
+                                      <span className="inline-flex items-center text-[10px] font-semibold bg-slate-100 text-slate-800 border border-slate-300 px-1.5 py-0.5 rounded-full">
+                                        Detenida
+                                      </span>
+                                    )}
+                                    {(maquinaProyectos.get(maq.id) || []).map((lugar, i) => (
+                                      <span key={i} className="inline-flex items-center text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded-full">
+                                        En: {lugar.length > 22 ? lugar.slice(0, 22) + "…" : lugar}
+                                      </span>
+                                    ))}
+                                  </span>
                                 </label>
                               </HoverCardTrigger>
                               <HoverCardContent side="right" className="w-64 p-0 overflow-hidden shadow-lg border-2 border-primary/20 bg-white z-50">
@@ -308,10 +333,29 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
                               <HoverCardTrigger asChild>
                                 <label
                                   htmlFor={`edit-maq-${maq.id}`}
-                                  className="text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 py-1"
+                                  className="text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 py-1 flex flex-col gap-1"
                                 >
-                                  {maq.nombre}
-                                  <span className="text-xs text-muted-foreground ml-1">· {maq.codigo || maq.tipo}</span>
+                                  <span>
+                                    {maq.nombre}
+                                    <span className="text-xs text-muted-foreground ml-1">· {maq.codigo || maq.tipo}</span>
+                                  </span>
+                                  <span className="flex flex-wrap gap-1">
+                                    {maq.estado === "mantenimiento" && (
+                                      <span className="inline-flex items-center text-[10px] font-semibold bg-red-100 text-red-800 border border-red-300 px-1.5 py-0.5 rounded-full">
+                                        Mantenimiento
+                                      </span>
+                                    )}
+                                    {maq.estado === "detenida" && (
+                                      <span className="inline-flex items-center text-[10px] font-semibold bg-slate-100 text-slate-800 border border-slate-300 px-1.5 py-0.5 rounded-full">
+                                        Detenida
+                                      </span>
+                                    )}
+                                    {(maquinaProyectos.get(maq.id) || []).map((lugar, i) => (
+                                      <span key={i} className="inline-flex items-center text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded-full">
+                                        En: {lugar.length > 22 ? lugar.slice(0, 22) + "…" : lugar}
+                                      </span>
+                                    ))}
+                                  </span>
                                 </label>
                               </HoverCardTrigger>
                               <HoverCardContent side="right" className="w-64 p-0 overflow-hidden shadow-lg border-2 border-primary/20 bg-white z-50">
