@@ -4,6 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { RegistrarCargaDialog } from "@/components/forms/registrar-carga-dialog";
@@ -21,6 +23,9 @@ export function Combustible() {
   const [openDialog, setOpenDialog] = useState(false);
   const [cargaParaEditar, setCargaParaEditar] = useState<RegistroCombustible | null>(null);
   const deleteMut = useDeleteCombustible();
+
+  const [openFotoDialog, setOpenFotoDialog] = useState(false);
+  const [fotoUrlToView, setFotoUrlToView] = useState<string | null>(null);
 
   const handleDelete = (id: number) => {
     if (confirm("¿Estás seguro de que deseas eliminar este registro?")) {
@@ -151,15 +156,8 @@ export function Combustible() {
                           {reg.kilometraje ? `${Number(reg.kilometraje).toLocaleString()} km` : "-"}
                         </TableCell>
                         <TableCell className="text-center">
-                          {/* @ts-ignore */}
                           {reg.foto_url ? (
-                            <a 
-                              {...{href: reg.foto_url as string, target: "_blank", rel: "noopener noreferrer"}}
-                              className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                              title="Ver Comprobante"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-                            </a>
+                            <Badge variant="default" className="bg-green-600 hover:bg-green-700 cursor-pointer" onClick={() => { setFotoUrlToView(reg.foto_url as string); setOpenFotoDialog(true); }}>Ver Foto</Badge>
                           ) : (
                             <span className="text-xs text-muted-foreground">-</span>
                           )}
@@ -223,6 +221,15 @@ export function Combustible() {
                       <span>Precio unitario: <span className="font-medium text-slate-700">{reg.precio ? `$${Number(reg.precio).toLocaleString()}` : "-"}</span></span>
                       <span>Uso: <span className="font-medium text-slate-700">{reg.kilometraje ? `${Number(reg.kilometraje).toLocaleString()} km/h` : "-"}</span></span>
                     </div>
+
+                    <div className="flex justify-between items-center text-xs mt-1 border-t pt-2">
+                      <span className="text-muted-foreground">Comprobante:</span>
+                      {reg.foto_url ? (
+                        <Badge variant="default" className="bg-green-600 hover:bg-green-700 cursor-pointer text-[10px] px-1 py-0" onClick={() => { setFotoUrlToView(reg.foto_url as string); setOpenFotoDialog(true); }}>Ver Foto</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-[10px] px-1 py-0">NO</Badge>
+                      )}
+                    </div>
                   </div>
                 ))
               )}
@@ -233,6 +240,22 @@ export function Combustible() {
 
       <RegistrarCargaDialog open={openDialog} onOpenChange={setOpenDialog} />
       <EditarCargaDialog open={!!cargaParaEditar} onOpenChange={(open) => !open && setCargaParaEditar(null)} carga={cargaParaEditar} />
+      
+      {/* Dialog para Ver Foto */}
+      <Dialog open={openFotoDialog} onOpenChange={setOpenFotoDialog}>
+        <DialogContent className="sm:max-w-[600px] bg-white p-1">
+          <div className="relative bg-slate-950 flex items-center justify-center min-h-[300px] rounded-md overflow-hidden">
+            {fotoUrlToView ? (
+              <img src={fotoUrlToView} alt="Comprobante" className="max-w-full max-h-[80vh] object-contain" />
+            ) : (
+              <div className="text-slate-400">Cargando...</div>
+            )}
+            <Button variant="ghost" className="absolute top-2 right-2 text-white bg-black/50 hover:bg-black/80" onClick={() => setOpenFotoDialog(false)}>
+              ✕ Cerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
