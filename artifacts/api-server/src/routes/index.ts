@@ -65,6 +65,48 @@ router.get("/debug-fotos", async (req, res) => {
   }
 });
 
+// DEBUG TEMPORAL - REMOVER DESPUÉS
+router.get("/debug-proyectos-map", async (req, res) => {
+  try {
+    const { proyectosTable } = await import("@workspace/db/schema");
+    const proyectos = await db.select({ 
+      id: proyectosTable.id, 
+      lugar: proyectosTable.lugar, 
+      maquinas_asignadas: proyectosTable.maquinas_asignadas 
+    }).from(proyectosTable);
+
+    const mapEntries: any[] = [];
+    proyectos.forEach((p: any) => {
+      if (p.maquinas_asignadas && Array.isArray(p.maquinas_asignadas)) {
+        p.maquinas_asignadas.forEach((mId: any) => {
+          mapEntries.push({ 
+            proyectoId: p.id, 
+            lugar: p.lugar, 
+            maquinaIdRaw: mId, 
+            maquinaIdType: typeof mId, 
+            maquinaIdAsNumber: Number(mId) 
+          });
+        });
+      }
+    });
+
+    return res.json({ 
+      totalProyectos: proyectos.length,
+      proyectos: proyectos.map((p: any) => ({
+        id: p.id,
+        lugar: p.lugar,
+        maquinas_asignadas: p.maquinas_asignadas,
+        type: typeof p.maquinas_asignadas,
+        isArray: Array.isArray(p.maquinas_asignadas),
+        length: Array.isArray(p.maquinas_asignadas) ? p.maquinas_asignadas.length : 0
+      })),
+      mapEntries 
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
 router.use(healthRouter);
 router.use("/auth", authRouter);
 import { whatsappRouter } from "./whatsapp";
