@@ -223,10 +223,12 @@ export function Proyectos() {
                                    className={p.estado === "activo" ? "bg-green-600 hover:bg-green-700 text-center" : "text-center"}>
                               {p.estado.toUpperCase()}
                             </Badge>
-                            <Badge variant={p.estado_pago === "saldado" ? "default" : "outline"} 
-                                   className={`text-center ${p.estado_pago === "saldado" ? "bg-blue-600" : p.estado_pago === "parcial" ? "text-amber-600 border-amber-600" : "text-slate-500 border-slate-300"}`}>
-                              Pago: {p.estado_pago?.toUpperCase()}
-                            </Badge>
+                            {!isEmpleado && (
+                              <Badge variant={p.estado_pago === "saldado" ? "default" : "outline"} 
+                                     className={`text-center ${p.estado_pago === "saldado" ? "bg-blue-600" : p.estado_pago === "parcial" ? "text-amber-600 border-amber-600" : "text-slate-500 border-slate-300"}`}>
+                                Pago: {p.estado_pago?.toUpperCase()}
+                              </Badge>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="text-right">

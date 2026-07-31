@@ -65,7 +65,6 @@ router.get("/", async (req, res) => {
         precio_hectarea: "0",
         ganancia_estimada: "0",
         total_cobrado: "0",
-        estado_pago: "oculto",
         pagos_historial: [],
       }));
     }
@@ -135,7 +134,6 @@ router.get("/:id", async (req, res) => {
         precio_hectarea: "0",
         ganancia_estimada: "0",
         total_cobrado: "0",
-        estado_pago: "oculto",
         pagos_historial: [],
       };
     }
