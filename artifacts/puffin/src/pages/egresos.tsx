@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useGetEgresos, useCreateEgreso, useGetEmpleados, useGetMaquinas } from "@workspace/api-client-react";
+import { useGetEgresos, useCreateEgreso, useGetEmpleados, useGetMaquinas, getGetEgresosQueryKey } from "@workspace/api-client-react";
 import { useGetProyectos } from "@/hooks/use-proyectos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -45,7 +45,7 @@ export function Egresos() {
       });
       if (!res.ok) throw new Error("Error al eliminar");
       toast.success("Egreso eliminado correctamente");
-      queryClient.invalidateQueries({ queryKey: ["getEgresos"] });
+      queryClient.invalidateQueries({ queryKey: getGetEgresosQueryKey() });
     } catch (e) {
       toast.error("Error al eliminar el egreso");
     } finally {
