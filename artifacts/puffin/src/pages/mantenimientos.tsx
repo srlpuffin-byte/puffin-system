@@ -21,6 +21,13 @@ export function Mantenimientos() {
   const [openDialog, setOpenDialog] = useState(false);
   const [editData, setEditData] = useState<any>(null);
 
+  // Pendientes primero, luego el resto por fecha desc
+  const sortedMantenimientos = [...(mantenimientos || [])].sort((a, b) => {
+    if (a.estado === "pendiente" && b.estado !== "pendiente") return -1;
+    if (a.estado !== "pendiente" && b.estado === "pendiente") return 1;
+    return 0;
+  });
+
   const handleEstadoChange = (id: number, nuevoEstado: string) => {
     toast.loading("Actualizando estado...", { id: `update-${id}` });
     updateEstadoMut.mutate(
@@ -101,7 +108,7 @@ export function Mantenimientos() {
                   ) : mantenimientos?.length === 0 ? (
                     <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay mantenimientos registrados.</TableCell></TableRow>
                   ) : (
-                    mantenimientos?.map((mant) => (
+                    sortedMantenimientos?.map((mant) => (
                       <TableRow key={mant.id}>
                         <TableCell className="font-medium">
                           {mant.fecha ? format(new Date(mant.fecha + 'T12:00:00'), "dd/MM/yyyy") : "-"}
@@ -150,7 +157,7 @@ export function Mantenimientos() {
               ) : mantenimientos?.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No hay mantenimientos registrados.</div>
               ) : (
-                mantenimientos?.map((mant) => (
+                sortedMantenimientos?.map((mant) => (
                   <div key={mant.id} className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-col">

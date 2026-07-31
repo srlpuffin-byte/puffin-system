@@ -149,6 +149,13 @@ export function Incidentes() {
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";
   const queryClient = useQueryClient();
 
+  // Activos (no resueltos) primero
+  const sortedIncidentes = [...(incidentes || [])].sort((a, b) => {
+    if (a.estado !== "resuelto" && b.estado === "resuelto") return -1;
+    if (a.estado === "resuelto" && b.estado !== "resuelto") return 1;
+    return 0;
+  });
+
   const handleDelete = async (id: number) => {
     if (!window.confirm("¿Estás seguro de que deseas eliminar este incidente de forma permanente?")) return;
     try {
@@ -227,7 +234,7 @@ export function Incidentes() {
                   ) : incidentes?.length === 0 ? (
                     <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No hay incidentes registrados.</TableCell></TableRow>
                   ) : (
-                    incidentes?.map((inc) => (
+                    sortedIncidentes?.map((inc) => (
                       <TableRow key={inc.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIncidente(inc as Incidente)}>
                         <TableCell className="font-medium">
                           {inc.fecha ? format(new Date(inc.fecha), "dd/MM/yyyy HH:mm") : "-"}
@@ -299,7 +306,7 @@ export function Incidentes() {
               ) : incidentes?.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No hay incidentes registrados.</div>
               ) : (
-                incidentes?.map((inc) => (
+                sortedIncidentes?.map((inc) => (
                   <div
                     key={inc.id}
                     className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors cursor-pointer"
