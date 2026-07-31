@@ -1362,7 +1362,7 @@ async function executeRegistrarGasto(args: {
   metodo_pago?: string;
   centro_costos?: string;
   observaciones?: string;
-}) {
+}, imgUrl?: string | null) {
   try {
     const [egreso] = await db.insert(egresosTable).values({
       fecha: args.fecha,
@@ -1371,13 +1371,23 @@ async function executeRegistrarGasto(args: {
       monto: args.monto.toString(),
       proveedor: args.proveedor || null,
       metodo_pago: args.metodo_pago || null,
-      comprobante: false,
+      comprobante: !!imgUrl,
       centro_costos: args.centro_costos || null,
       observaciones: args.observaciones || null,
     }).returning();
 
+    if (imgUrl && egreso && egreso.id) {
+      await db.insert(fotografiasTable).values({
+        empresa_id: 1,
+        entidad_tipo: "egreso",
+        entidad_id: egreso.id,
+        url: imgUrl,
+        descripcion: "Comprobante cargado por WhatsApp",
+      });
+    }
+
     // Auditoría
-    await auditarBot("CREACION", "egresos", egreso.id, { fecha: args.fecha, categoria: args.categoria, concepto: args.concepto, monto: args.monto, centro_costos: args.centro_costos });
+    await auditarBot("CREACION", "egresos", egreso.id, { fecha: args.fecha, categoria: args.categoria, concepto: args.concepto, monto: args.monto, centro_costos: args.centro_costos, comprobante: !!imgUrl });
 
     // Intentar sincronizar con Google Sheets (no bloquear si falla)
     try {
