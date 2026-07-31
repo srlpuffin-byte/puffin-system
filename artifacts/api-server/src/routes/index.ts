@@ -97,7 +97,7 @@ router.use("/productividad", requireAuth, adminAuditMiddleware, productividadRou
 router.use("/ia", requireAuth, adminAuditMiddleware, iaRouter);
 router.use("/auditoria", requireAuth, adminAuditMiddleware, auditoriaRouter);
 router.use("/backups", requireAuth, adminAuditMiddleware, backupsRouter);
-router.use("/fotografias", requireAuth, adminAuditMiddleware, fotografiasRouter);
+router.use("/fotografias", requireAuth, fotografiasRouter);
 router.use("/egresos", requireAuth, adminAuditMiddleware, egresosRouter);
 router.use("/search", requireAuth, adminAuditMiddleware, searchRouter);
 router.use("/cierres", requireAuth, adminAuditMiddleware, cierresRouter);

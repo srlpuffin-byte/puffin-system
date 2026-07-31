@@ -126,9 +126,27 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
             maquina_id: form.maquina_id ? parseInt(form.maquina_id) : undefined,
           }),
         });
+
+        if (fotos.length > 0 && editData.id) {
+          toast.loading("Subiendo fotos...", { id: "uploading-inc-photos" });
+          await Promise.all(fotos.map(f =>
+            uploadMut.mutateAsync({
+              data: {
+                entidad_tipo: "incidente",
+                entidad_id: editData.id,
+                base64Data: f.base64,
+                filename: f.name,
+                descripcion: "Foto incidente"
+              }
+            }).catch(() => {})
+          ));
+          toast.dismiss("uploading-inc-photos");
+        }
+
         toast.success("Incidente actualizado correctamente");
         queryClient.invalidateQueries({ queryKey: getGetIncidentesQueryKey() });
         onOpenChange(false);
+        setFotos([]);
       } catch (err: any) {
         toast.error("Error al actualizar incidente");
       } finally {
