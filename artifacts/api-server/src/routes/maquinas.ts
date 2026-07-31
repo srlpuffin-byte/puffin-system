@@ -6,6 +6,41 @@ import { updateOrAppendToSheet } from "../services/sheets.js";
 
 const router = Router();
 
+// DEBUG TEMPORAL - Remover después de diagnosticar
+router.get("/debug-proyectos-map", async (req, res) => {
+  const proyectos = await db.select({ 
+    id: proyectosTable.id, 
+    lugar: proyectosTable.lugar, 
+    maquinas_asignadas: proyectosTable.maquinas_asignadas 
+  }).from(proyectosTable);
+
+  const mapEntries: any[] = [];
+  proyectos.forEach(p => {
+    if (p.maquinas_asignadas && Array.isArray(p.maquinas_asignadas)) {
+      p.maquinas_asignadas.forEach((mId: any) => {
+        mapEntries.push({ 
+          proyectoId: p.id, 
+          lugar: p.lugar, 
+          maquinaIdRaw: mId, 
+          maquinaIdType: typeof mId, 
+          maquinaIdAsNumber: Number(mId) 
+        });
+      });
+    }
+  });
+
+  return res.json({ 
+    proyectos: proyectos.map(p => ({
+      id: p.id,
+      lugar: p.lugar,
+      maquinas_asignadas: p.maquinas_asignadas,
+      maquinas_asignadas_type: typeof p.maquinas_asignadas,
+      isArray: Array.isArray(p.maquinas_asignadas)
+    })),
+    mapEntries 
+  });
+});
+
 router.get("/sync-sheet", async (req, res) => {
   const { google } = await import("googleapis");
   const SHEET_ID = process.env.GOOGLE_SHEET_ID;
