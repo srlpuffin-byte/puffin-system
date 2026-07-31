@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { proyectosTable, usuariosTable, empleadosTable } from "@workspace/db/schema";
-import { eq, or, and } from "drizzle-orm";
+import { eq, or, and, neq } from "drizzle-orm";
 import { updateOrAppendToSheet } from "../services/sheets.js";
 
 const router = Router();
@@ -97,6 +97,19 @@ router.post("/", async (req, res) => {
       estado: estado || "activo",
     }).returning();
 
+    if (maquinas_asignadas && Array.isArray(maquinas_asignadas) && maquinas_asignadas.length > 0) {
+      const otrosProyectos = await db.select().from(proyectosTable).where(neq(proyectosTable.id, proyecto.id));
+      for (const p of otrosProyectos) {
+        if (p.maquinas_asignadas && Array.isArray(p.maquinas_asignadas)) {
+          const mAsig = maquinas_asignadas.map(m => Number(m));
+          const nuevasMaquinas = p.maquinas_asignadas.filter(m => !mAsig.includes(Number(m)));
+          if (nuevasMaquinas.length !== p.maquinas_asignadas.length) {
+            await db.update(proyectosTable).set({ maquinas_asignadas: nuevasMaquinas }).where(eq(proyectosTable.id, p.id));
+          }
+        }
+      }
+    }
+
     import("../services/sync-sheets.js").then(({ syncAllSheets }) => {
       syncAllSheets().catch(console.error);
     });
@@ -163,6 +176,19 @@ router.put("/:id", async (req, res) => {
     if (estado_pago !== undefined) updateData.estado_pago = estado_pago;
     if (total_cobrado !== undefined) updateData.total_cobrado = total_cobrado.toString();
     if (pagos_historial !== undefined) updateData.pagos_historial = pagos_historial;
+
+    if (maquinas_asignadas !== undefined && Array.isArray(maquinas_asignadas) && maquinas_asignadas.length > 0) {
+      const otrosProyectos = await db.select().from(proyectosTable).where(neq(proyectosTable.id, id));
+      for (const p of otrosProyectos) {
+        if (p.maquinas_asignadas && Array.isArray(p.maquinas_asignadas)) {
+          const mAsig = maquinas_asignadas.map((m: any) => Number(m));
+          const nuevasMaquinas = p.maquinas_asignadas.filter(m => !mAsig.includes(Number(m)));
+          if (nuevasMaquinas.length !== p.maquinas_asignadas.length) {
+            await db.update(proyectosTable).set({ maquinas_asignadas: nuevasMaquinas }).where(eq(proyectosTable.id, p.id));
+          }
+        }
+      }
+    }
 
     // Recalcular ganancia si se actualiza alguno de los factores
     if (hectareas !== undefined || precio_hectarea !== undefined) {
