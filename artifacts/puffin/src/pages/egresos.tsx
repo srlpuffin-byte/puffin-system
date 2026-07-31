@@ -57,6 +57,13 @@ export function Egresos() {
   };
 
   const [form, setForm] = useState({
+  const [openFotoDialog, setOpenFotoDialog] = useState(false);
+  const [fotoUrlToView, setFotoUrlToView] = useState<string | null>(null);
+
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [fotoBase64, setFotoBase64] = useState<string | null>(null);
+
+  const [form, setForm] = useState({
     fecha: localToday(),
     concepto: "",
     categoria: "Otros",
@@ -68,6 +75,19 @@ export function Egresos() {
   });
 
   const set = (field: string, val: any) => setForm(prev => ({ ...prev, [field]: val }));
+
+  const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFotoFile(file);
+      setForm(prev => ({ ...prev, comprobante: true }));
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setFotoBase64(ev.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const openEdit = (egreso: any) => {
     setEditingId(egreso.id);
@@ -86,6 +106,8 @@ export function Egresos() {
 
   const resetForm = () => {
     setEditingId(null);
+    setFotoFile(null);
+    setFotoBase64(null);
     setForm({ fecha: localToday(), concepto: "", categoria: "Otros", monto: "", metodo_pago: "Efectivo", centro_costos: "General", observaciones: "", comprobante: false });
   };
 
@@ -112,7 +134,14 @@ export function Egresos() {
       // Import dinámico porque lo agregamos manual
       import("@workspace/api-client-react").then(api => {
         if (api.updateEgreso) {
-          api.updateEgreso(editingId, payload as any).then(() => {
+          api.updateEgreso(editingId, payload as any).then(async () => {
+            if (fotoBase64) {
+              await fetch("/api/fotografias", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("puffin_token")}` },
+                body: JSON.stringify({ entidad_tipo: "egreso", entidad_id: editingId, filename: fotoFile?.name, base64Data: fotoBase64, descripcion: "Comprobante web" })
+              });
+            }
             toast.success("Egreso actualizado");
             queryClient.invalidateQueries({ queryKey: ["getEgresos"] });
             setOpenDialog(false);
@@ -124,7 +153,20 @@ export function Egresos() {
       createMut.mutate(
         { data: payload as any },
         {
-          onSuccess: () => {
+          onSuccess: async (data: any) => {
+            // El backend devuelve el egreso creado. Si hay foto, la subimos
+            if (fotoBase64 && data && data.id) {
+              try {
+                await fetch("/api/fotografias", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("puffin_token")}` },
+                  body: JSON.stringify({ entidad_tipo: "egreso", entidad_id: data.id, filename: fotoFile?.name, base64Data: fotoBase64, descripcion: "Comprobante web" })
+                });
+              } catch (e) {
+                console.error("Error subiendo foto", e);
+                toast.error("El gasto se guardó, pero hubo un error al subir la foto.");
+              }
+            }
             toast.success("Egreso registrado y sincronizado con Google Sheets");
             queryClient.invalidateQueries({ queryKey: ["getEgresos"] });
             setOpenDialog(false);
@@ -182,8 +224,25 @@ export function Egresos() {
     toast.success("Excel descargado");
   };
 
+  const handleVerFoto = async (egresoId: number) => {
+    try {
+      const res = await fetch(`/api/fotografias?entidad_tipo=egreso&entidad_id=${egresoId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("puffin_token")}` }
+      });
+      const data = await res.json();
+      if (data && data.length > 0) {
+        setFotoUrlToView(data[0].url);
+        setOpenFotoDialog(true);
+      } else {
+        toast.info("Este egreso está marcado con comprobante pero no se encontró la imagen en el servidor.");
+      }
+    } catch (e) {
+      toast.error("Error al obtener la imagen");
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Gastos / Egresos</h1>
         <div className="flex items-center gap-2 flex-wrap">
@@ -354,9 +413,11 @@ export function Egresos() {
                           ${eg.monto.toLocaleString("es-AR")}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={eg.comprobante ? "default" : "secondary"}>
-                            {eg.comprobante ? "SI" : "NO"}
-                          </Badge>
+                          {eg.comprobante ? (
+                            <Badge variant="default" className="bg-green-600 hover:bg-green-700 cursor-pointer" onClick={() => handleVerFoto(eg.id)}>Ver Foto</Badge>
+                          ) : (
+                            <Badge variant="secondary">NO</Badge>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="sm" onClick={() => openEdit(eg)}>
@@ -389,6 +450,14 @@ export function Egresos() {
 
                     <div className="flex flex-col gap-1">
                       <span className="font-medium text-sm leading-snug">{eg.concepto}</span>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-muted-foreground">Comprobante:</span>
+                        {eg.comprobante ? (
+                          <Badge variant="default" className="bg-green-600 hover:bg-green-700 cursor-pointer text-[10px] px-1 py-0" onClick={() => handleVerFoto(eg.id)}>Ver Foto</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px] px-1 py-0">NO</Badge>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 mt-1">
                         {eg.centro_costos && (
                           <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
@@ -400,9 +469,6 @@ export function Egresos() {
                     </div>
 
                     <div className="flex items-center justify-between mt-2 pt-2 border-t">
-                      <Badge variant={eg.comprobante ? "default" : "secondary"} className="text-[10px]">
-                        {eg.comprobante ? "Con comprobante" : "Sin comprobante"}
-                      </Badge>
                       <Button variant="outline" size="sm" onClick={() => openEdit(eg)} className="h-8 text-xs">
                         Editar
                       </Button>
@@ -427,6 +493,23 @@ export function Egresos() {
             <DialogTitle>{editingId ? "Editar Egreso" : "Registrar Nuevo Egreso"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Adjuntar Comprobante (Opcional)</Label>
+                  <div className="text-xs text-muted-foreground">Subí una foto del ticket o factura.</div>
+                </div>
+                <Switch checked={form.comprobante} onCheckedChange={c => set("comprobante", c)} />
+              </div>
+              <div className="flex items-center gap-3">
+                <input type="file" accept="image/*" onChange={handleFotoChange} className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+              </div>
+              {fotoBase64 && (
+                <div className="mt-2 h-32 relative rounded-md overflow-hidden border">
+                  <img src={fotoBase64} alt="Vista previa" className="object-contain w-full h-full bg-slate-50" />
+                </div>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>Fecha</Label>
@@ -497,14 +580,7 @@ export function Egresos() {
                 </Select>
               </div>
             </div>
-            <div className="flex items-center space-x-2 pt-2">
-              <Switch 
-                id="comprobante" 
-                checked={form.comprobante} 
-                onCheckedChange={v => set("comprobante", v)} 
-              />
-              <Label htmlFor="comprobante">¿Tiene comprobante?</Label>
-            </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>Cancelar</Button>
               <Button type="submit" className="bg-primary" disabled={createMut.isPending || isUpdating}>
@@ -552,6 +628,21 @@ export function Egresos() {
           </div>
         </div>
       )}
+      {/* Dialog para Ver Foto */}
+      <Dialog open={openFotoDialog} onOpenChange={setOpenFotoDialog}>
+        <DialogContent className="sm:max-w-[600px] bg-white p-1">
+          <div className="relative bg-slate-950 flex items-center justify-center min-h-[300px] rounded-md overflow-hidden">
+            {fotoUrlToView ? (
+              <img src={fotoUrlToView} alt="Comprobante" className="max-w-full max-h-[80vh] object-contain" />
+            ) : (
+              <div className="text-slate-400">Cargando...</div>
+            )}
+            <Button variant="ghost" className="absolute top-2 right-2 text-white bg-black/50 hover:bg-black/80" onClick={() => setOpenFotoDialog(false)}>
+              ✕ Cerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
