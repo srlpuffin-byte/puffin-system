@@ -15,11 +15,30 @@ async function syncTableToSheet(sheetsClient: any, SHEET_ID: string, tabName: st
     const existingIds = new Map();
     for (let i = 0; i < rows.length; i++) {
       const idVal = rows[i][idColIndex];
-      if (idVal) existingIds.set(idVal.toString(), i + 1); // 1-indexed row number in Google Sheets
+      // Skip header (i=0) if it doesn't have a numeric/valid ID, though the check handles it.
+      if (idVal && i > 0) existingIds.set(idVal.toString(), i + 1); // 1-indexed row number in Google Sheets
     }
     
     const updates: any[] = [];
     const missing: any[] = [];
+    
+    // 1. Identificar registros en Sheets que ya NO están en la base de datos (zombies)
+    const dbIds = new Set(dbRecords.map(r => r.id.toString()));
+    const rangesToClear: string[] = [];
+    
+    for (const [idStr, rowNum] of existingIds.entries()) {
+      if (!dbIds.has(idStr)) {
+        rangesToClear.push(`${tabName}!A${rowNum}:Z${rowNum}`);
+      }
+    }
+    
+    if (rangesToClear.length > 0) {
+      await sheetsClient.spreadsheets.values.batchClear({
+        spreadsheetId: SHEET_ID,
+        requestBody: { ranges: rangesToClear }
+      });
+      logger.info(`Cleared ${rangesToClear.length} deleted rows (zombies) in ${tabName}`);
+    }
     
     for (const record of dbRecords) {
       const rowData = mapRow(record);
