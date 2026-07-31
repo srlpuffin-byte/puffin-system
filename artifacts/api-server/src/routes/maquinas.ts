@@ -79,12 +79,12 @@ router.get("/", async (req, res) => {
       id: proyectosTable.id, 
       lugar: proyectosTable.lugar, 
       maquinas_asignadas: proyectosTable.maquinas_asignadas 
-    }).from(proyectosTable).where(eq(proyectosTable.estado, "activo"));
+    }).from(proyectosTable);
 
     proyectos.forEach(p => {
-      if (p.maquinas_asignadas) {
-        p.maquinas_asignadas.forEach((mId: number) => {
-          maquinasProyectoMap.set(mId, { id: p.id, lugar: p.lugar });
+      if (p.maquinas_asignadas && Array.isArray(p.maquinas_asignadas)) {
+        p.maquinas_asignadas.forEach((mId: any) => {
+          maquinasProyectoMap.set(Number(mId), { id: p.id, lugar: p.lugar });
         });
       }
     });
@@ -95,7 +95,7 @@ router.get("/", async (req, res) => {
     horometro: Number(m.horometro), 
     kilometros: Number(m.kilometros),
     imagen_url: fotografiasMap.get(m.id) || null,
-    proyecto: maquinasProyectoMap.get(m.id) || null
+    proyecto: maquinasProyectoMap.get(Number(m.id)) || null
   })));
 });
 
