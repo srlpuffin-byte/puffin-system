@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import { db } from "@workspace/db";
-import { maquinasTable, empleadosTable, proyectosTable, egresosTable, jornadasTable, combustibleTable, mantenimientosTable } from "@workspace/db/schema";
+import { maquinasTable, empleadosTable, proyectosTable, egresosTable, jornadasTable, combustibleTable, mantenimientosTable, auditoriaTable, usuariosTable } from "@workspace/db/schema";
 import { desc } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 
@@ -178,6 +178,24 @@ export async function syncAllSheets() {
         m.tipo,
         m.descripcion || "",
         m.proximo_service || ""
+      ];
+    });
+
+    // 8. Auditoria
+    const auditoria = await db.select().from(auditoriaTable).orderBy(desc(auditoriaTable.createdAt)).limit(1000);
+    const usuariosList = await db.select({ id: usuariosTable.id, nombre: usuariosTable.nombre }).from(usuariosTable);
+    await syncTableToSheet(sheetsClient, SHEET_ID, "Auditoria_Admin", 0, [...auditoria].reverse(), a => {
+      const usuario = a.usuario_id ? usuariosList.find(u => u.id === a.usuario_id) : null;
+      return [
+        a.id,
+        a.createdAt ? new Date(a.createdAt).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }) : "",
+        usuario ? usuario.nombre : (a.dispositivo === "WhatsApp Bot" ? "Pia (Asistente)" : "Sistema"),
+        a.accion || "",
+        a.entidad || "",
+        a.entidad_id ?? "",
+        a.ip || "",
+        a.dispositivo || "",
+        a.valor_nuevo ? JSON.stringify(a.valor_nuevo) : "",
       ];
     });
 
