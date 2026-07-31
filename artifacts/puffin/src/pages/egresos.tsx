@@ -56,7 +56,6 @@ export function Egresos() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  const [form, setForm] = useState({
   const [openFotoDialog, setOpenFotoDialog] = useState(false);
   const [fotoUrlToView, setFotoUrlToView] = useState<string | null>(null);
 
