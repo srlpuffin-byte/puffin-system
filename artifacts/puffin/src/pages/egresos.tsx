@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Plus, Download, RefreshCw, Users, Tractor } from "lucide-react";
+import { Plus, Download, RefreshCw, Users, Tractor, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Switch } from "@/components/ui/switch";
@@ -33,6 +33,25 @@ export function Egresos() {
   // As a workaround since useUpdateEgreso might need manual import or fallback
   const { mutate: updateEgresoMut, isPending: isUpdating } = (import("@workspace/api-client-react") as any)?.useUpdateEgreso ? (import("@workspace/api-client-react") as any).useUpdateEgreso() : { mutate: (a: any, b: any) => {}, isPending: false };
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("¿Estás seguro de que querés eliminar este egreso? Esta acción no se puede deshacer.")) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/egresos/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("puffin_token")}` }
+      });
+      if (!res.ok) throw new Error("Error al eliminar");
+      toast.success("Egreso eliminado correctamente");
+      queryClient.invalidateQueries({ queryKey: ["getEgresos"] });
+    } catch (e) {
+      toast.error("Error al eliminar el egreso");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   // ── Filtros ──────────────────────────────────────────────────────────────
   const [filterProyecto, setFilterProyecto] = useState("todos");
@@ -418,9 +437,10 @@ export function Egresos() {
                             <Badge variant="secondary">NO</Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(eg)}>
-                            Editar
+                        <TableCell className="text-right space-x-1">
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(eg)}>Editar</Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(eg.id)} disabled={deletingId === eg.id} className="text-red-500 hover:text-red-600 hover:bg-red-50">
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -470,6 +490,9 @@ export function Egresos() {
                     <div className="flex items-center justify-between mt-2 pt-2 border-t">
                       <Button variant="outline" size="sm" onClick={() => openEdit(eg)} className="h-8 text-xs">
                         Editar
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(eg.id)} disabled={deletingId === eg.id} className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-50">
+                        <Trash2 className="h-3 w-3 mr-1" /> Eliminar
                       </Button>
                     </div>
                   </div>

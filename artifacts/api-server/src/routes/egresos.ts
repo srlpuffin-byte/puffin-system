@@ -87,4 +87,16 @@ router.put("/:id", async (req, res) => {
   return res.json({ ...egreso, monto: Number(egreso.monto) });
 });
 
+router.delete("/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+  const [deleted] = await db.delete(egresosTable).where(eq(egresosTable.id, id)).returning();
+  if (!deleted) return res.status(404).json({ error: "Egreso no encontrado" });
+
+  syncAllSheets().catch(console.error);
+
+  return res.json({ success: true, id });
+});
+
 export default router;
