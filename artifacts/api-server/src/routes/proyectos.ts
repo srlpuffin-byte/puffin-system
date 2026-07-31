@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { proyectosTable, usuariosTable, empleadosTable } from "@workspace/db/schema";
-import { eq, or, and, neq } from "drizzle-orm";
+import { eq, or, and, ne } from "drizzle-orm";
 import { updateOrAppendToSheet } from "../services/sheets.js";
 
 const router = Router();
@@ -98,7 +98,7 @@ router.post("/", async (req, res) => {
     }).returning();
 
     if (maquinas_asignadas && Array.isArray(maquinas_asignadas) && maquinas_asignadas.length > 0) {
-      const otrosProyectos = await db.select().from(proyectosTable).where(neq(proyectosTable.id, proyecto.id));
+      const otrosProyectos = await db.select().from(proyectosTable).where(ne(proyectosTable.id, proyecto.id));
       for (const p of otrosProyectos) {
         if (p.maquinas_asignadas && Array.isArray(p.maquinas_asignadas)) {
           const mAsig = maquinas_asignadas.map(m => Number(m));
