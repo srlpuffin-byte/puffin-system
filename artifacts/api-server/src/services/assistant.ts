@@ -231,7 +231,25 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "adjuntar_comprobante",
+      description: "Adjunta la foto/imagen que se acaba de enviar a un egreso/gasto YA EXISTENTE en la base de datos. Usar cuando el usuario envía una imagen y pide agregarla a un egreso ya creado. Busca el egreso por concepto, proyecto, monto o fecha.",
+      parameters: {
+        type: "object",
+        properties: {
+          concepto: { type: "string", description: "Concepto o descripción parcial del egreso al que adjuntar la foto (opcional)" },
+          monto: { type: "number", description: "Monto del egreso al que adjuntar la foto (opcional)" },
+          fecha: { type: "string", description: "Fecha del egreso en formato YYYY-MM-DD (opcional)" },
+          centro_costos: { type: "string", description: "Proyecto/obra del egreso (opcional)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "registrar_gasto",
+
       description: "Registra un gasto/egreso en el sistema. CRÍTICO: Si el usuario te pide cargar un gasto, pero no te da todos los datos obligatorios (Fecha, Categoría, Concepto, Monto), DEBÉS preguntarle cuáles son antes de usar esta herramienta. Una vez que tengas todo, mostrale un resumen detallado y pedí confirmación ('OK' o 'Sí') ANTES de llamar a la herramienta.",
       parameters: {
         type: "object",
@@ -708,6 +726,12 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
           toolResult = await executeResumenOperativo(functionArgs.fecha);
         } else if (functionName === "consultar_rastreo") {
           toolResult = await executeConsultarRastreo(functionArgs.nombre_maquina);
+        } else if (functionName === "adjuntar_comprobante") {
+          const imgUrl = sesion.datos_pendientes?.ultima_imagen_url || null;
+          toolResult = await executeAdjuntarComprobante(functionArgs, imgUrl);
+          if (imgUrl && sesion.datos_pendientes) {
+            sesion.datos_pendientes.ultima_imagen_url = null;
+          }
         }
 
         messages.push({
@@ -1276,7 +1300,62 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
 }
 
 
+// ==========================================
+// ADJUNTAR COMPROBANTE A EGRESO EXISTENTE
+// ==========================================
+async function executeAdjuntarComprobante(args: {
+  concepto?: string;
+  monto?: number;
+  fecha?: string;
+  centro_costos?: string;
+}, imgUrl?: string | null) {
+  try {
+    if (!imgUrl) {
+      return `❌ No tengo ninguna imagen disponible para adjuntar. Por favor, enviame primero la foto del comprobante junto con el pedido de adjuntarla.`;
+    }
+
+    const { ilike, and, eq, desc } = await import("drizzle-orm");
+    let query = db.select().from(egresosTable).$dynamic();
+    const conditions: any[] = [];
+
+    if (args.concepto) conditions.push(ilike(egresosTable.concepto, `%${args.concepto}%`));
+    if (args.centro_costos) conditions.push(ilike(egresosTable.centro_costos, `%${args.centro_costos}%`));
+    if (args.monto) conditions.push(eq(egresosTable.monto, args.monto.toString()));
+    if (args.fecha) conditions.push(ilike(egresosTable.fecha, `%${args.fecha}%`));
+
+    if (conditions.length) query = query.where(and(...conditions));
+    const resultados = await query.orderBy(desc(egresosTable.id)).limit(5);
+
+    if (!resultados.length) {
+      return `❌ No encontré ningún egreso con los datos que me pasaste. ¿Podés darme más datos? (Concepto, monto, fecha, proyecto)`;
+    }
+
+    // Tomar el más reciente
+    const egreso = resultados[0];
+
+    // Insertar fotografía
+    await db.insert(fotografiasTable).values({
+      empresa_id: 1,
+      entidad_tipo: "egreso",
+      entidad_id: egreso.id,
+      url: imgUrl,
+      descripcion: "Comprobante adjuntado por WhatsApp",
+    });
+
+    // Marcar comprobante en el egreso
+    await db.update(egresosTable).set({ comprobante: true }).where(eq(egresosTable.id, egreso.id));
+
+    await auditarBot("Actualizar", "Egreso", egreso.id, { comprobante: true });
+
+    return `✅ ¡Comprobante adjuntado correctamente al egreso #${egreso.id} "${egreso.concepto}" por $${Number(egreso.monto).toLocaleString("es-AR")}! Ya podés verlo en la web apretando el botón verde "Ver Foto" en la tabla de Gastos.`;
+  } catch (error: any) {
+    console.error("Error adjuntando comprobante:", error);
+    return `❌ Error al adjuntar el comprobante: ${error.message}`;
+  }
+}
+
 async function executeEnviarFotografia(from: string, tipo_entidad: string, busqueda: string) {
+
   try {
     const b = busqueda || "";
     const te = tipo_entidad || "";
