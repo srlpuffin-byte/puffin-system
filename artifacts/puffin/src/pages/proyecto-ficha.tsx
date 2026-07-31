@@ -70,17 +70,17 @@ export function ProyectoFicha() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <Link href="/proyectos">
-          <Button variant="outline" size="icon"><ChevronLeft className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" className="flex-shrink-0"><ChevronLeft className="h-4 w-4" /></Button>
         </Link>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-primary flex flex-wrap items-center gap-2">
             {proyecto.lugar}
             {estadoBadge(proyecto.estado)}
           </h1>
-          <p className="text-muted-foreground flex items-center gap-1 mt-1">
-            <MapPin className="h-4 w-4" /> Proyecto ID: {proyecto.id} • Creado el {format(new Date(proyecto.createdAt), "dd/MM/yyyy")}
+          <p className="text-muted-foreground flex items-center gap-1 mt-1 text-xs sm:text-sm">
+            <MapPin className="h-3 w-3 flex-shrink-0" /> Proyecto ID: {proyecto.id} • Creado el {format(new Date(proyecto.createdAt), "dd/MM/yyyy")}
           </p>
         </div>
       </div>
@@ -193,18 +193,25 @@ export function ProyectoFicha() {
                 <Users className="h-4 w-4 text-blue-600" /> Personal Asignado
               </CardTitle>
             </CardHeader>
-            <CardContent>
+          <CardContent>
               {assignedEmpleados.length === 0 ? (
                 <p className="text-muted-foreground italic text-sm">Sin empleados asignados.</p>
               ) : (
                 <div className="space-y-2">
                   {assignedEmpleados.map(e => (
-                    <Link key={e.id} href={`/operarios/${e.id}`}>
-                      <div className="flex items-center justify-between p-2 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group text-sm">
+                    isEmpleado ? (
+                      <div key={e.id} className="flex items-center gap-3 py-3 px-2 border rounded-lg text-sm">
+                        <Users className="h-4 w-4 text-blue-500 flex-shrink-0" />
                         <span className="font-medium">{e.nombre} {e.apellido}</span>
-                        <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
-                    </Link>
+                    ) : (
+                      <Link key={e.id} href={`/operarios/${e.id}`}>
+                        <div className="flex items-center justify-between p-2 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group text-sm">
+                          <span className="font-medium">{e.nombre} {e.apellido}</span>
+                          <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </Link>
+                    )
                   ))}
                 </div>
               )}
