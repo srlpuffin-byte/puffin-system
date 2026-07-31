@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { incidentesTable, empleadosTable, maquinasTable, actividadTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { sendWhatsAppMessage } from "../services/whatsapp.js";
 
 const router = Router();
 
@@ -57,6 +58,9 @@ router.post("/", async (req, res) => {
       entidad_tipo: "incidente",
       entidad_id: incidente.id,
     });
+
+    const msj = `⚠️ *Nuevo Incidente Reportado*\nTipo: ${tipo}\nDescripción: ${descripcion}\nFecha: ${today}`;
+    sendWhatsAppMessage("3572400877", msj).catch(e => console.error("Error mandando WA de incidente", e));
 
     return res.status(201).json({ ...incidente, empleado_nombre: null, maquina_nombre: null });
   } catch (err: any) {

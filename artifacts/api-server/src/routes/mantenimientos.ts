@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { mantenimientosTable, maquinasTable, actividadTable, empleadosTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { getEmpleadoIdForUser } from "../lib/auth-helpers";
+import { sendWhatsAppMessage } from "../services/whatsapp.js";
 
 const router = Router();
 
@@ -71,6 +72,9 @@ router.post("/", async (req, res) => {
       entidad_tipo: "mantenimiento",
       entidad_id: mantenimiento.id,
     });
+
+    const msj = `🔧 *Nuevo Mantenimiento Registrado*\nMáquina: ${maquinaNombre}\nTipo: ${tipo}\nDescripción: ${descripcion || "Sin descripción"}\nFecha: ${today}`;
+    sendWhatsAppMessage("3572400877", msj).catch(e => console.error("Error mandando WA de mantenimiento", e));
 
     return res.status(201).json({ ...mantenimiento, maquina_nombre: "Maquinaria", horas: mantenimiento.horas ? Number(mantenimiento.horas) : null });
   } catch (err: any) {
