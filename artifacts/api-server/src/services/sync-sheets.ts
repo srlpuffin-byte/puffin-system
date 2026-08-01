@@ -203,18 +203,17 @@ export async function syncAllSheets() {
     // 8. Auditoria
     const auditoria = await db.select().from(auditoriaTable).orderBy(desc(auditoriaTable.createdAt)).limit(1000);
     const usuariosList = await db.select({ id: usuariosTable.id, nombre: usuariosTable.nombre }).from(usuariosTable);
-    await syncTableToSheet(sheetsClient, SHEET_ID, "Auditoria_Admin", 0, [...auditoria].reverse(), a => {
+    
+    // idColIndex = 5 (Columna F) para no interferir con las columnas del usuario
+    await syncTableToSheet(sheetsClient, SHEET_ID, "Auditoria_Admin", 5, [...auditoria].reverse(), a => {
       const usuario = a.usuario_id ? usuariosList.find(u => u.id === a.usuario_id) : null;
       return [
-        a.id,
-        a.createdAt ? new Date(a.createdAt).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }) : "",
-        usuario ? usuario.nombre : (a.dispositivo === "WhatsApp Bot" ? "Pia (Asistente)" : "Sistema"),
-        a.accion || "",
-        a.entidad || "",
-        a.entidad_id ?? "",
-        a.ip || "",
-        a.dispositivo || "",
-        a.valor_nuevo ? JSON.stringify(a.valor_nuevo) : "",
+        a.createdAt ? new Date(a.createdAt).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }) : "", // A: Fecha y Hora
+        usuario ? usuario.nombre : (a.dispositivo === "WhatsApp Bot" ? "Pia (Asistente)" : "Sistema"), // B: Administrador
+        a.accion || "", // C: Acción
+        a.entidad || "", // D: Sección
+        a.valor_nuevo ? JSON.stringify(a.valor_nuevo) : "", // E: Detalles
+        a.id // F: ID (usado por el script para no borrar filas)
       ];
     });
 
