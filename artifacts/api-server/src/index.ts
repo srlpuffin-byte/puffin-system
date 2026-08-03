@@ -1,6 +1,9 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startSpeedMonitor } from "./services/speed-monitor.js";
+import { db } from "@workspace/db";
+import { egresosTable } from "@workspace/db/schema";
+import { inArray, sql } from "drizzle-orm";
 
 const rawPort = process.env["PORT"];
 
