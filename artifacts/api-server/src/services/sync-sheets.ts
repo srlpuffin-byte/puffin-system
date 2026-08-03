@@ -6,73 +6,40 @@ import { logger } from "../lib/logger.js";
 
 async function syncTableToSheet(sheetsClient: any, SHEET_ID: string, tabName: string, idColIndex: number, dbRecords: any[], mapRow: (record: any) => any[]) {
   try {
+    // Full-rewrite strategy: leer la fila de cabecera existente, limpiar todo y reescribir.
+    // Esto elimina por completo el problema de filas zombie, números de fila desactualizados
+    // y duplicados causados por el approach anterior de batchClear + append.
     const response = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `${tabName}!A1:Z1`,
+    });
+
+    // Preservar la fila de cabecera si existe
+    const headerRow = response.data.values?.[0] || null;
+
+    // Limpiar toda la hoja
+    await sheetsClient.spreadsheets.values.clear({
       spreadsheetId: SHEET_ID,
       range: `${tabName}!A:Z`,
     });
-    
-    const rows = response.data.values || [];
-    const existingIds = new Map();
-    for (let i = 0; i < rows.length; i++) {
-      const idVal = rows[i][idColIndex];
-      // Skip header (i=0) if it doesn't have a numeric/valid ID, though the check handles it.
-      if (idVal && i > 0) existingIds.set(idVal.toString(), i + 1); // 1-indexed row number in Google Sheets
+
+    if (dbRecords.length === 0 && !headerRow) {
+      logger.info(`No records to sync for ${tabName}, sheet cleared.`);
+      return;
     }
-    
-    const updates: any[] = [];
-    const missing: any[] = [];
-    
-    // 1. Identificar registros en Sheets que ya NO están en la base de datos (zombies)
-    const dbIds = new Set(dbRecords.map(r => r.id.toString()));
-    const rangesToClear: string[] = [];
-    
-    for (const [idStr, rowNum] of existingIds.entries()) {
-      if (!dbIds.has(idStr)) {
-        rangesToClear.push(`${tabName}!A${rowNum}:Z${rowNum}`);
-      }
-    }
-    
-    if (rangesToClear.length > 0) {
-      await sheetsClient.spreadsheets.values.batchClear({
-        spreadsheetId: SHEET_ID,
-        requestBody: { ranges: rangesToClear }
-      });
-      logger.info(`Cleared ${rangesToClear.length} deleted rows (zombies) in ${tabName}`);
-    }
-    
-    for (const record of dbRecords) {
-      const rowData = mapRow(record);
-      const idStr = record.id.toString();
-      if (existingIds.has(idStr)) {
-        const rowNum = existingIds.get(idStr);
-        updates.push({
-          range: `${tabName}!A${rowNum}`,
-          values: [rowData]
-        });
-      } else {
-        missing.push(rowData);
-      }
-    }
-    
-    if (updates.length > 0) {
-      await sheetsClient.spreadsheets.values.batchUpdate({
-        spreadsheetId: SHEET_ID,
-        requestBody: {
-          valueInputOption: "USER_ENTERED",
-          data: updates
-        }
-      });
-      logger.info(`Updated ${updates.length} existing rows in ${tabName}`);
-    }
-    
-    if (missing.length > 0) {
-      await sheetsClient.spreadsheets.values.append({
+
+    // Construir el bloque de datos completo
+    const dataRows = dbRecords.map(record => mapRow(record));
+    const allValues = headerRow ? [headerRow, ...dataRows] : dataRows;
+
+    if (allValues.length > 0) {
+      await sheetsClient.spreadsheets.values.update({
         spreadsheetId: SHEET_ID,
         range: `${tabName}!A1`,
         valueInputOption: "USER_ENTERED",
-        requestBody: { values: missing }
+        requestBody: { values: allValues },
       });
-      logger.info(`Appended ${missing.length} missing rows to ${tabName}`);
+      logger.info(`Full-rewrite sync completed for ${tabName}: ${dataRows.length} rows written.`);
     }
   } catch (error: any) {
     logger.error(`Error syncing table to ${tabName}: ${error?.message}`);

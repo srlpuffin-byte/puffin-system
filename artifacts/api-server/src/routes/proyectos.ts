@@ -178,7 +178,7 @@ router.put("/:id", async (req, res) => {
     if (pagos_historial !== undefined) updateData.pagos_historial = pagos_historial;
 
     if (maquinas_asignadas !== undefined && Array.isArray(maquinas_asignadas) && maquinas_asignadas.length > 0) {
-      const otrosProyectos = await db.select().from(proyectosTable).where(neq(proyectosTable.id, id));
+      const otrosProyectos = await db.select().from(proyectosTable).where(ne(proyectosTable.id, id));
       for (const p of otrosProyectos) {
         if (p.maquinas_asignadas && Array.isArray(p.maquinas_asignadas)) {
           const mAsig = maquinas_asignadas.map((m: any) => Number(m));

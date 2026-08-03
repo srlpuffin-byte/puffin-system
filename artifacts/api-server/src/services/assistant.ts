@@ -1443,6 +1443,29 @@ async function executeRegistrarGasto(args: {
   observaciones?: string;
 }, imgUrl?: string | null) {
   try {
+    // Idempotencia: evitar duplicados si el usuario confirma dos veces o Meta reintenta el webhook.
+    // Si existe un egreso con la misma fecha, concepto y monto creado en los últimos 60 segundos,
+    // devolvemos el ID existente sin crear uno nuevo.
+    const { gte: gteOp } = await import("drizzle-orm");
+    const hace60seg = new Date(Date.now() - 60_000);
+    const [existente] = await db
+      .select()
+      .from(egresosTable)
+      .where(
+        and(
+          eq(egresosTable.fecha, args.fecha),
+          eq(egresosTable.concepto, args.concepto),
+          eq(egresosTable.monto, args.monto.toString()),
+          gteOp(egresosTable.createdAt, hace60seg)
+        )
+      )
+      .limit(1);
+
+    if (existente) {
+      console.warn(`[Idempotencia] Egreso duplicado detectado (ID #${existente.id}), ignorando segunda inserción.`);
+      return `✅ Gasto ya registrado (ID #${existente.id}). Monto: $${Number(args.monto).toLocaleString("es-AR")} — ${args.concepto}.`;
+    }
+
     const [egreso] = await db.insert(egresosTable).values({
       fecha: args.fecha,
       categoria: args.categoria,
