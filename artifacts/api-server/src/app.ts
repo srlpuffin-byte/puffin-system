@@ -141,12 +141,21 @@ app.get("/api/cleanup-dups", async (req, res) => {
       await syncAllSheets();
     }
 
-    res.json({ message: "Limpieza finalizada", totalEliminados: eliminados, stats });
+    return res.json({ message: "Limpieza finalizada", totalEliminados: eliminados, stats });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
 app.use("/api", router);
+
+// Global Error Handler para asegurar respuestas JSON (Express 5 pasa los errores acá automáticamente)
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error(err);
+  res.status(err.status || 500).json({
+    error: err.message || "Error interno del servidor",
+    details: process.env.NODE_ENV === "development" ? err.stack : undefined
+  });
+});
 
 export default app;

@@ -727,10 +727,10 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
         } else if (functionName === "consultar_rastreo") {
           toolResult = await executeConsultarRastreo(functionArgs.nombre_maquina);
         } else if (functionName === "adjuntar_comprobante") {
-          const imgUrl = sesion.datos_pendientes?.ultima_imagen_url || null;
+          const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
           toolResult = await executeAdjuntarComprobante(functionArgs, imgUrl);
           if (imgUrl && sesion.datos_pendientes) {
-            sesion.datos_pendientes.ultima_imagen_url = null;
+            (sesion.datos_pendientes as any).ultima_imagen_url = null;
           }
         }
 
