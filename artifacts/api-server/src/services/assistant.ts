@@ -424,7 +424,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         properties: {
           tipo: { type: "string", description: "empleado o maquina" },
           nombre_entidad: { type: "string", description: "Nombre del empleado o máquina a mover (ej: Sebas Prueba, Retroexcavadora 1)" },
-          nombre_proyecto: { type: "string", description: "Nombre del proyecto destino (ej: Lipsa, Campo Broglia). Si se pasa 'ninguno', solo se desasigna de donde estuviera." },
+          nombre_proyecto: { type: "string", description: "Nombre del proyecto destino (ej: Lipsa, Campo Broglia). Si el usuario pide desasignarlo, sacarlo o dejarlo sin proyecto, pasá exactamente la palabra 'ninguno'." },
         },
         required: ["tipo", "nombre_entidad", "nombre_proyecto"],
       },
@@ -600,6 +600,8 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
         { type: "image_url", image_url: { url: imageBase64 } }
       ] 
     });
+    sesion.datos_pendientes = { ...(typeof sesion.datos_pendientes === "object" ? sesion.datos_pendientes : {}), ultima_imagen_url: imageBase64 };
+
   } else {
     historialFiltrado.push({ role: "user", content: text });
   }
@@ -621,7 +623,12 @@ Fecha de hoy: ${today} (${todayISO}).
 
 SOY EL EMPLEADO ADMINISTRATIVO DIGITAL DE PUFFIN. CRÍTICO: TENÉS ACCESO A TODO EL SISTEMA Y A TODA LA INFORMACIÓN. Nunca respondas "no puedo hacerlo", "no tengo esa información" o "no tengo acceso". Estás obligado a usar tus herramientas para investigar, consultar y resolver lo que el administrador te pida. Funciono como un colaborador humano inteligente, prolijo y sin errores: pienso, interpreto los datos y ejecuto.
 
-REGLA DE VISIÓN (MULTIMODALIDAD): Ahora tenés la capacidad de "ver" imágenes. Si el usuario te envía una captura de pantalla del sistema, un comprobante o un ticket, analizalo visualmente. Usá la información de la imagen (texto, números, errores en pantalla) para responder a su consulta, diagnosticar el problema o registrar el gasto.
+REGLA DE VISIÓN (MULTIMODALIDAD): Tenés la capacidad de "ver" imágenes. Si el usuario te envía una captura de pantalla del sistema, un comprobante o un ticket, analizalo visualmente para responder, diagnosticar o registrar el gasto.
+REGLA DE IMAGEN CON EGRESO (MUY IMPORTANTE):
+- Si el usuario te manda una imagen (ticket/comprobante) JUNTO con el pedido de registrar un gasto: extraé los datos del ticket (concepto, monto, fecha), pedí confirmación y al guardar el gasto con 'registrar_gasto', la imagen se adjuntará automáticamente.
+- Si el usuario te manda PRIMERO la imagen sola (sin pedirte nada): guardá mentalmente que hay una imagen disponible. Preguntale "¿Querés registrar este comprobante como gasto?" o "¿A qué egreso lo adjunto?". La imagen quedará guardada en sesión hasta que la uses.
+- Si el usuario te manda la imagen y pide adjuntarla a un EGRESO YA EXISTENTE: usá 'adjuntar_comprobante' con el concepto/monto/fecha que te diga.
+- NUNCA digas que no podés adjuntar la imagen. Siempre que llegue una imagen, ella queda disponible en sesión para usarla en el siguiente paso.
 
 LO QUE PUEDO HACER (acciones de escritura):
 REGLA DE ORO 1 - DOBLE VALIDACIÓN: Para CUALQUIER registro o modificación (cargar combustible, guardar gastos, registrar jornadas, nuevos empleados, mantenimientos o mandar mensajes), SIEMPRE armá un resumen claro con los datos que entendiste y pedí confirmación expresa (ej: "¿Está todo correcto para registrarlo?", "¿Confirmás que lo guarde?") ANTES de invocar la herramienta. NUNCA guardes nada en el sistema a la primera pasada.
@@ -715,7 +722,11 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
         } else if (functionName === "enviar_mensaje_whatsapp") {
           toolResult = await executeEnviarMensaje(functionArgs.mensaje, functionArgs.numero, functionArgs.nombre_empleado, functionArgs.todos);
         } else if (functionName === "registrar_gasto") {
-          toolResult = await executeRegistrarGasto(functionArgs);
+          const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
+          toolResult = await executeRegistrarGasto(functionArgs, imgUrl);
+          if (imgUrl && sesion.datos_pendientes) {
+            (sesion.datos_pendientes as any).ultima_imagen_url = null;
+          }
         } else if (functionName === "consultar_combustible") {
           toolResult = await executeConsultarCombustible(functionArgs);
         } else if (functionName === "consultar_mantenimientos") {
@@ -780,8 +791,8 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
       historialFiltrado.push({ role: "assistant", content: responseMessage.content });
     }
 
-    // Guardar historial actualizado
-    await guardarSesion(senderPhone, historialFiltrado);
+    // Guardar historial actualizado manteniendo los datos pendientes
+    await guardarSesion(senderPhone, historialFiltrado, "idle", sesion.datos_pendientes);
 
   } catch (error) {
     console.error("Error en asistente PUFFIN:", error);
@@ -1807,21 +1818,24 @@ async function executeMoverEntidadProyecto(args: { tipo: string; nombre_entidad:
 
     for (const proy of proyectosActivos) {
       if (args.tipo === "empleado") {
-        const empIds = (proy.empleados_asignados as number[]) || [];
-        if (empIds.includes(entidadId)) {
-          await db.update(proyectosTable).set({ empleados_asignados: empIds.filter(id => id !== entidadId) }).where(eq(proyectosTable.id, proy.id));
+        const empIds = (proy.empleados_asignados || []).map(Number);
+        if (empIds.includes(Number(entidadId))) {
+          const newEmpIds = empIds.filter(id => Number(id) !== Number(entidadId));
+          await db.update(proyectosTable).set({ empleados_asignados: newEmpIds }).where(eq(proyectosTable.id, proy.id));
           quitadoDe.push(proy.lugar);
         }
       } else {
-        const maqIds = (proy.maquinas_asignadas as number[]) || [];
-        if (maqIds.includes(entidadId)) {
-          await db.update(proyectosTable).set({ maquinas_asignadas: maqIds.filter(id => id !== entidadId) }).where(eq(proyectosTable.id, proy.id));
+        const maqIds = (proy.maquinas_asignadas || []).map(Number);
+        if (maqIds.includes(Number(entidadId))) {
+          const newMaqIds = maqIds.filter(id => Number(id) !== Number(entidadId));
+          await db.update(proyectosTable).set({ maquinas_asignadas: newMaqIds }).where(eq(proyectosTable.id, proy.id));
           quitadoDe.push(proy.lugar);
         }
       }
     }
 
-    if (args.nombre_proyecto.toLowerCase() === "ninguno") {
+    const dest = args.nombre_proyecto.toLowerCase().trim();
+    if (dest === "ninguno" || dest.includes("ningun") || dest.includes("ningún") || dest === "nada" || dest === "") {
       try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
       return `✅ ${args.tipo === "empleado" ? "Empleado" : "Máquina"} ${entidadNombreStr} desasignado/a de: ${quitadoDe.join(", ") || "ningún proyecto"}.`;
     }
@@ -1834,14 +1848,14 @@ async function executeMoverEntidadProyecto(args: { tipo: string; nombre_entidad:
     }
 
     if (args.tipo === "empleado") {
-      const empIds = (targetProy.empleados_asignados as number[]) || [];
-      if (!empIds.includes(entidadId)) {
-        await db.update(proyectosTable).set({ empleados_asignados: [...empIds, entidadId] }).where(eq(proyectosTable.id, targetProy.id));
+      const empIds = (targetProy.empleados_asignados || []).map(Number);
+      if (!empIds.includes(Number(entidadId))) {
+        await db.update(proyectosTable).set({ empleados_asignados: [...empIds, Number(entidadId)] }).where(eq(proyectosTable.id, targetProy.id));
       }
     } else {
-      const maqIds = (targetProy.maquinas_asignadas as number[]) || [];
-      if (!maqIds.includes(entidadId)) {
-        await db.update(proyectosTable).set({ maquinas_asignadas: [...maqIds, entidadId] }).where(eq(proyectosTable.id, targetProy.id));
+      const maqIds = (targetProy.maquinas_asignadas || []).map(Number);
+      if (!maqIds.includes(Number(entidadId))) {
+        await db.update(proyectosTable).set({ maquinas_asignadas: [...maqIds, Number(entidadId)] }).where(eq(proyectosTable.id, targetProy.id));
       }
     }
 
