@@ -82,7 +82,7 @@ router.post("/", async (req, res) => {
     // Async append to Google Sheets
     appendToSheet("Combustible", [
       today,
-      new Date().toLocaleTimeString("es-AR"),
+      new Date().toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hour12: false }),
       maquinaNombre,
       `${empleado?.nombre} ${empleado?.apellido}`,
       litros,

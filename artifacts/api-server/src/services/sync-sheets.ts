@@ -1,7 +1,7 @@
 import { google } from "googleapis";
 import { db } from "@workspace/db";
-import { maquinasTable, empleadosTable, proyectosTable, egresosTable, jornadasTable, combustibleTable, mantenimientosTable, auditoriaTable, usuariosTable } from "@workspace/db/schema";
-import { desc } from "drizzle-orm";
+import { maquinasTable, empleadosTable, proyectosTable, egresosTable, jornadasTable, combustibleTable, mantenimientosTable, auditoriaTable, usuariosTable, fotografiasTable } from "@workspace/db/schema";
+import { desc, eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 
 async function syncTableToSheet(sheetsClient: any, SHEET_ID: string, tabName: string, idColIndex: number, dbRecords: any[], mapRow: (record: any) => any[]) {
@@ -126,8 +126,6 @@ export async function syncAllSheets() {
 
     // 6. Combustible
     const combustible = await db.select().from(combustibleTable).orderBy(combustibleTable.id);
-    const { fotografiasTable } = await import("@workspace/db/schema");
-    const { eq } = await import("drizzle-orm");
     const fotografiasComb = await db.select().from(fotografiasTable).where(eq(fotografiasTable.entidad_tipo, "combustible"));
 
     await syncTableToSheet(sheetsClient, SHEET_ID, "Combustible", 9, combustible, c => {
@@ -168,7 +166,7 @@ export async function syncAllSheets() {
     });
 
     // 8. Auditoria
-    const auditoria = await db.select().from(auditoriaTable).orderBy(desc(auditoriaTable.createdAt)).limit(1000);
+    const auditoria = await db.select().from(auditoriaTable).orderBy(desc(auditoriaTable.createdAt)).limit(10000);
     const usuariosList = await db.select({ id: usuariosTable.id, nombre: usuariosTable.nombre }).from(usuariosTable);
     
     // idColIndex = 5 (Columna F) para no interferir con las columnas del usuario

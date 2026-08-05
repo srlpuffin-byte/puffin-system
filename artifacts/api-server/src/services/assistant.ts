@@ -417,6 +417,22 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "mover_entidad_proyecto",
+      description: "Mueve un empleado o una máquina a un proyecto. Automáticamente lo desasigna de sus proyectos anteriores y lo asigna al nuevo. CRÍTICO: debes pedir confirmación antes de llamar a esta función.",
+      parameters: {
+        type: "object",
+        properties: {
+          tipo: { type: "string", description: "empleado o maquina" },
+          nombre_entidad: { type: "string", description: "Nombre del empleado o máquina a mover (ej: Sebas Prueba, Retroexcavadora 1)" },
+          nombre_proyecto: { type: "string", description: "Nombre del proyecto destino (ej: Lipsa, Campo Broglia). Si se pasa 'ninguno', solo se desasigna de donde estuviera." },
+        },
+        required: ["tipo", "nombre_entidad", "nombre_proyecto"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "crear_acceso_sistema",
       description: "Crea un usuario web. CRÍTICO: Requiere nombre, apellido, DNI y PIN. Si falta alguno, pregúntale al usuario primero.",
       parameters: {
@@ -592,7 +608,7 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
   const todayISO = new Date().toISOString().split("T")[0];
 
   // Herramientas disponibles según rol
-  const WRITE_TOOLS = ["registrar_gasto", "registrar_empleado", "enviar_mensaje_whatsapp", "registrar_jornada", "actualizar_jornada", "registrar_combustible_bot", "registrar_mantenimiento_bot", "actualizar_proyecto", "crear_acceso_sistema", "crear_accesos_faltantes"];
+  const WRITE_TOOLS = ["registrar_gasto", "registrar_empleado", "enviar_mensaje_whatsapp", "registrar_jornada", "actualizar_jornada", "registrar_combustible_bot", "registrar_mantenimiento_bot", "actualizar_proyecto", "mover_entidad_proyecto", "crear_acceso_sistema", "crear_accesos_faltantes"];
   const toolsParaRol = isAdmin ? tools : tools.filter(
     (t: any) => !WRITE_TOOLS.includes(t.function.name)
   );
@@ -619,7 +635,7 @@ REGLA DE ORO 4 - CÁLCULOS MATEMÁTICOS Y EXTRACCIÓN: Si el usuario te pide sum
 💰 Registrar gastos/egresos. (Preguntá por Fecha, Categoría, Concepto y Monto si no te los dan).
 👤 Registrar nuevos empleados
 🔑 Crear accesos al sistema web (individual o masivo a todos los faltantes). Usa la herramienta específica sin intentar calcular nada antes.
-🏗️ Actualizar proyectos: estado, asignar/desasignar empleados y máquinas
+🏗️ Actualizar proyectos / Mover recursos: Mover empleados y máquinas usando 'mover_entidad_proyecto' (mucho mejor que actualizar_proyecto).
 📲 Enviar mensajes de WhatsApp. Si dicen "mandale a todos", usá 'todos=true' sin dudarlo, pero con DOBLE VALIDACIÓN antes.
 🧹 Limpiar duplicados: detectar y borrar operarios repetidos. DOBLE VALIDACIÓN requerida.
 
@@ -716,6 +732,8 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
           toolResult = await executeRegistrarMantenimiento(functionArgs);
         } else if (functionName === "actualizar_proyecto") {
           toolResult = await executeActualizarProyecto(functionArgs);
+        } else if (functionName === "mover_entidad_proyecto") {
+          toolResult = await executeMoverEntidadProyecto(functionArgs);
         } else if (functionName === "crear_acceso_sistema") {
           toolResult = await executeCrearAccesoSistema(functionArgs);
         } else if (functionName === "crear_accesos_faltantes") {
@@ -1758,6 +1776,87 @@ async function executeRegistrarMantenimiento(args: { nombre_maquina: string; tip
     return `✅ Mantenimiento registrado: *${maq.nombre}* | Tipo: ${mant.tipo}${mant.descripcion ? ` | ${mant.descripcion}` : ""}${mant.proximo_service ? ` | Próximo: ${mant.proximo_service}` : ""} | Fecha: ${mant.fecha}`;
   } catch (error: any) {
     return `❌ Error al registrar mantenimiento: ${error.message}`;
+  }
+}
+
+async function executeMoverEntidadProyecto(args: { tipo: string; nombre_entidad: string; nombre_proyecto: string }) {
+  try {
+    const term = args.nombre_entidad.toLowerCase().trim();
+    let entidadId: number;
+    let entidadNombreStr: string;
+
+    if (args.tipo === "empleado") {
+      const empleados = await db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable);
+      const emp = empleados.find(e => `${e.nombre} ${e.apellido}`.toLowerCase().includes(term));
+      if (!emp) return `❌ No encontré empleado "${args.nombre_entidad}".`;
+      entidadId = emp.id;
+      entidadNombreStr = `${emp.nombre} ${emp.apellido}`;
+    } else if (args.tipo === "maquina") {
+      const maquinas = await db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre }).from(maquinasTable);
+      const maq = maquinas.find(m => m.nombre.toLowerCase().includes(term));
+      if (!maq) return `❌ No encontré máquina "${args.nombre_entidad}".`;
+      entidadId = maq.id;
+      entidadNombreStr = maq.nombre;
+    } else {
+      return `❌ Tipo inválido: debe ser 'empleado' o 'maquina'.`;
+    }
+
+    // 1. Quitar de todos los proyectos activos
+    const proyectosActivos = await db.select().from(proyectosTable).where(eq(proyectosTable.estado, "activo"));
+    let quitadoDe: string[] = [];
+
+    for (const proy of proyectosActivos) {
+      if (args.tipo === "empleado") {
+        const empIds = (proy.empleados_asignados as number[]) || [];
+        if (empIds.includes(entidadId)) {
+          await db.update(proyectosTable).set({ empleados_asignados: empIds.filter(id => id !== entidadId) }).where(eq(proyectosTable.id, proy.id));
+          quitadoDe.push(proy.lugar);
+        }
+      } else {
+        const maqIds = (proy.maquinas_asignadas as number[]) || [];
+        if (maqIds.includes(entidadId)) {
+          await db.update(proyectosTable).set({ maquinas_asignadas: maqIds.filter(id => id !== entidadId) }).where(eq(proyectosTable.id, proy.id));
+          quitadoDe.push(proy.lugar);
+        }
+      }
+    }
+
+    if (args.nombre_proyecto.toLowerCase() === "ninguno") {
+      try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
+      return `✅ ${args.tipo === "empleado" ? "Empleado" : "Máquina"} ${entidadNombreStr} desasignado/a de: ${quitadoDe.join(", ") || "ningún proyecto"}.`;
+    }
+
+    // 2. Asignar al nuevo proyecto
+    const targetProy = proyectosActivos.find(p => p.lugar.toLowerCase().includes(args.nombre_proyecto.toLowerCase().trim()));
+    if (!targetProy) {
+      // Revertir de ser necesario o simplemente dejar desasignado
+      return `⚠️ Se desasignó de ${quitadoDe.join(", ")}, pero NO se encontró el proyecto destino "${args.nombre_proyecto}".`;
+    }
+
+    if (args.tipo === "empleado") {
+      const empIds = (targetProy.empleados_asignados as number[]) || [];
+      if (!empIds.includes(entidadId)) {
+        await db.update(proyectosTable).set({ empleados_asignados: [...empIds, entidadId] }).where(eq(proyectosTable.id, targetProy.id));
+      }
+    } else {
+      const maqIds = (targetProy.maquinas_asignadas as number[]) || [];
+      if (!maqIds.includes(entidadId)) {
+        await db.update(proyectosTable).set({ maquinas_asignadas: [...maqIds, entidadId] }).where(eq(proyectosTable.id, targetProy.id));
+      }
+    }
+
+    await auditarBot("MODIFICACION", "proyectos", targetProy.id, { 
+      accion: `Mover ${args.tipo}`,
+      entidad: entidadNombreStr,
+      proyecto_destino: targetProy.lugar,
+      proyectos_anteriores: quitadoDe
+    });
+
+    try { const { syncAllSheets } = await import("./sync-sheets.js"); syncAllSheets().catch(console.error); } catch (_) {}
+
+    return `✅ ${args.tipo === "empleado" ? "Empleado" : "Máquina"} *${entidadNombreStr}* movido/a con éxito al proyecto *${targetProy.lugar}*. (Antes estaba en: ${quitadoDe.join(", ") || "ningún lado"}).`;
+  } catch (error: any) {
+    return `❌ Error al mover: ${error.message}`;
   }
 }
 

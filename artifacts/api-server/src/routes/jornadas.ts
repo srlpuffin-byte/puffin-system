@@ -86,8 +86,8 @@ router.post("/iniciar", async (req, res) => {
       }
     }
 
-    const today = new Date().toISOString().split("T")[0];
-    const horaInicio = new Date().toTimeString().slice(0, 5);
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); // YYYY-MM-DD format
+    const horaInicio = new Date().toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hour12: false });
 
     const [jornada] = await db.insert(jornadasTable).values({
       empleado_id, maquina_id,
@@ -149,7 +149,7 @@ router.post("/:id/finalizar", async (req, res) => {
     const { horometro_fin, km_fin, problemas, estado_equipo_fin, foto_tablero_fin, combustible_nivel, aceite_estado, danos_choques } = req.body;
     if (horometro_fin === undefined) return res.status(400).json({ error: "Horómetro final requerido" });
 
-    const horaFin = new Date().toTimeString().slice(0, 5);
+    const horaFin = new Date().toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hour12: false });
 
     const [jornada] = await db
       .update(jornadasTable)
