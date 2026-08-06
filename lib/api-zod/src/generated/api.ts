@@ -591,6 +591,68 @@ export const FinalizarJornadaResponse = zod.object({
 
 
 /**
+ * @summary Actualizar jornada
+ */
+export const UpdateJornadaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateJornadaBody = zod.object({
+  "empleado_id": zod.number().optional(),
+  "maquina_id": zod.number().optional(),
+  "fecha": zod.string().optional(),
+  "hora_inicio": zod.string().optional(),
+  "hora_fin": zod.string().optional(),
+  "horometro_inicio": zod.number().optional(),
+  "horometro_fin": zod.number().optional(),
+  "km_inicio": zod.number().optional(),
+  "km_fin": zod.number().optional(),
+  "estado": zod.enum(['en_curso', 'finalizada', 'anulada']).optional()
+})
+
+export const UpdateJornadaResponse = zod.object({
+  "id": zod.number(),
+  "empresa_id": zod.number().optional(),
+  "empleado_id": zod.number(),
+  "maquina_id": zod.number(),
+  "empleado_nombre": zod.string().optional(),
+  "maquina_nombre": zod.string().optional(),
+  "fecha": zod.string(),
+  "hora_inicio": zod.string().nullish(),
+  "hora_fin": zod.string().nullish(),
+  "km_inicio": zod.number().nullish(),
+  "km_fin": zod.number().nullish(),
+  "horometro_inicio": zod.number().nullish(),
+  "horometro_fin": zod.number().nullish(),
+  "checklist_previo": zod.string().nullish(),
+  "checklist_ok": zod.string().nullish(),
+  "foto_tablero_inicio": zod.string().nullish(),
+  "foto_tablero_fin": zod.string().nullish(),
+  "observaciones": zod.string().nullish(),
+  "problemas": zod.string().nullish(),
+  "estado": zod.enum(['en_curso', 'finalizada']),
+  "horas_trabajadas": zod.number().nullish(),
+  "nombre_obra": zod.string().nullish(),
+  "descripcion_trabajo": zod.string().nullish(),
+  "combustible_nivel": zod.string().nullish(),
+  "aceite_estado": zod.string().nullish(),
+  "danos_choques": zod.string().nullish()
+})
+
+
+/**
+ * @summary Eliminar jornada
+ */
+export const DeleteJornadaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteJornadaResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
  * @summary Obtener fotografías de una entidad
  */
 export const GetFotografiasQueryParams = zod.object({

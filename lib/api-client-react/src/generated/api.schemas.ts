@@ -363,6 +363,28 @@ export interface FinalizarJornadaInput {
   danos_choques?: string;
 }
 
+export type UpdateJornadaInputEstado = typeof UpdateJornadaInputEstado[keyof typeof UpdateJornadaInputEstado];
+
+
+export const UpdateJornadaInputEstado = {
+  en_curso: 'en_curso',
+  finalizada: 'finalizada',
+  anulada: 'anulada',
+} as const;
+
+export interface UpdateJornadaInput {
+  empleado_id?: number;
+  maquina_id?: number;
+  fecha?: string;
+  hora_inicio?: string;
+  hora_fin?: string;
+  horometro_inicio?: number;
+  horometro_fin?: number;
+  km_inicio?: number;
+  km_fin?: number;
+  estado?: UpdateJornadaInputEstado;
+}
+
 export type RegistroAuditoriaValorAnterior = { [key: string]: unknown };
 
 export type RegistroAuditoriaValorNuevo = { [key: string]: unknown };

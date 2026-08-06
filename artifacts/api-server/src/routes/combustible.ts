@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { combustibleTable, empleadosTable, maquinasTable, actividadTable } from "@workspace/db";
+import { combustibleTable, empleadosTable, maquinasTable, actividadTable, fotografiasTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { appendToSheet } from "../services/sheets.js";
 
@@ -25,7 +25,6 @@ router.get("/", async (req, res) => {
   if (conditions.length) query = query.where(and(...conditions));
 
   const registros = await query.orderBy(combustibleTable.fecha);
-  const { fotografiasTable } = await import("@workspace/db/schema");
   const fotografias = await db.select().from(fotografiasTable).where(eq(fotografiasTable.entidad_tipo, "combustible"));
 
   const enriched = await Promise.all(registros.map(async r => {

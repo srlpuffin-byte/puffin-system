@@ -409,6 +409,49 @@ paths:
               schema:
                 $ref: "#/components/schemas/Jornada"
 
+  /jornadas/{id}:
+    put:
+      operationId: updateJornada
+      tags: [jornadas]
+      summary: Actualizar jornada
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateJornadaInput"
+      responses:
+        "200":
+          description: Jornada actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Jornada"
+    delete:
+      operationId: deleteJornada
+      tags: [jornadas]
+      summary: Eliminar jornada
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Jornada eliminada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+
   /fotografias:
     get:
       operationId: getFotografias
@@ -1460,6 +1503,31 @@ components:
           type: string
         danos_choques:
           type: string
+
+    UpdateJornadaInput:
+      type: object
+      properties:
+        empleado_id:
+          type: integer
+        maquina_id:
+          type: integer
+        fecha:
+          type: string
+        hora_inicio:
+          type: string
+        hora_fin:
+          type: string
+        horometro_inicio:
+          type: number
+        horometro_fin:
+          type: number
+        km_inicio:
+          type: number
+        km_fin:
+          type: number
+        estado:
+          type: string
+          enum: [en_curso, finalizada, anulada]
 
     RegistroAuditoria:
       type: object

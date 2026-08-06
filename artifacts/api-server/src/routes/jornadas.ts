@@ -270,4 +270,75 @@ router.post("/:id/finalizar", async (req, res) => {
   }
 });
 
+router.put("/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+    
+    // Solo administradores o creadores deberían poder editar, pero por reglas de negocio, 
+    // en este sistema las ediciones de jornadas están reservadas para administradores.
+    if (req.user?.rol?.toLowerCase() === "empleado") {
+      return res.status(403).json({ error: "No tienes permisos para editar jornadas." });
+    }
+
+    const { 
+      empleado_id, maquina_id, fecha, hora_inicio, hora_fin, 
+      horometro_inicio, horometro_fin, km_inicio, km_fin, estado 
+    } = req.body;
+
+    const [jornadaActualizada] = await db
+      .update(jornadasTable)
+      .set({
+        empleado_id,
+        maquina_id,
+        fecha,
+        hora_inicio,
+        hora_fin,
+        horometro_inicio: horometro_inicio?.toString(),
+        horometro_fin: horometro_fin?.toString(),
+        km_inicio: km_inicio?.toString(),
+        km_fin: km_fin?.toString(),
+        estado
+      })
+      .where(eq(jornadasTable.id, id))
+      .returning();
+
+    if (!jornadaActualizada) {
+      return res.status(404).json({ error: "Jornada no encontrada" });
+    }
+
+    const enriched = await enrichJornada(jornadaActualizada);
+    return res.json(enriched);
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al actualizar jornada: " + (err?.message || "Error interno") });
+  }
+});
+
+router.delete("/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+    // Solo administradores pueden eliminar jornadas
+    if (req.user?.rol?.toLowerCase() === "empleado") {
+      return res.status(403).json({ error: "No tienes permisos para eliminar jornadas." });
+    }
+
+    const [deleted] = await db
+      .delete(jornadasTable)
+      .where(eq(jornadasTable.id, id))
+      .returning();
+
+    if (!deleted) {
+      return res.status(404).json({ error: "Jornada no encontrada" });
+    }
+
+    return res.json({ success: true, message: "Jornada eliminada" });
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al eliminar jornada: " + (err?.message || "Error interno") });
+  }
+});
+
 export default router;

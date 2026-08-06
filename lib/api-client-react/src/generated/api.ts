@@ -71,6 +71,7 @@ import type {
   SearchResults,
   SesionData,
   SuccessResponse,
+  UpdateJornadaInput,
   UpdateMantenimientoEstadoInput,
   UploadFotografiaInput,
   Usuario
@@ -1441,6 +1442,147 @@ export const useFinalizarJornada = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getFinalizarJornadaMutationOptions(options));
+    }
+
+export const getUpdateJornadaUrl = (id: number,) => {
+
+
+
+
+  return `/api/jornadas/${id}`
+}
+
+/**
+ * @summary Actualizar jornada
+ */
+export const updateJornada = async (id: number,
+    updateJornadaInput: UpdateJornadaInput, options?: RequestInit): Promise<Jornada> => {
+
+  return customFetch<Jornada>(getUpdateJornadaUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateJornadaInput)
+  }
+);}
+
+
+
+
+export const getUpdateJornadaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateJornada>>, TError,{id: number;data: BodyType<UpdateJornadaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateJornada>>, TError,{id: number;data: BodyType<UpdateJornadaInput>}, TContext> => {
+
+const mutationKey = ['updateJornada'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateJornada>>, {id: number;data: BodyType<UpdateJornadaInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateJornada(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateJornadaMutationResult = NonNullable<Awaited<ReturnType<typeof updateJornada>>>
+    export type UpdateJornadaMutationBody = BodyType<UpdateJornadaInput>
+    export type UpdateJornadaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Actualizar jornada
+ */
+export const useUpdateJornada = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateJornada>>, TError,{id: number;data: BodyType<UpdateJornadaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateJornada>>,
+        TError,
+        {id: number;data: BodyType<UpdateJornadaInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateJornadaMutationOptions(options));
+    }
+
+export const getDeleteJornadaUrl = (id: number,) => {
+
+
+
+
+  return `/api/jornadas/${id}`
+}
+
+/**
+ * @summary Eliminar jornada
+ */
+export const deleteJornada = async (id: number, options?: RequestInit): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getDeleteJornadaUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteJornadaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteJornada>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteJornada>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteJornada'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteJornada>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteJornada(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteJornadaMutationResult = NonNullable<Awaited<ReturnType<typeof deleteJornada>>>
+
+    export type DeleteJornadaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Eliminar jornada
+ */
+export const useDeleteJornada = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteJornada>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteJornada>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteJornadaMutationOptions(options));
     }
 
 export const getGetFotografiasUrl = (params: GetFotografiasParams,) => {

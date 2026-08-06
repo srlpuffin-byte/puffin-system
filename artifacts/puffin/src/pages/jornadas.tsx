@@ -1,23 +1,32 @@
 import React, { useState } from "react";
-import { useGetJornadas } from "@workspace/api-client-react";
+import { useGetJornadas, useDeleteJornada, useGetMe } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlayCircle, Square, MapPin } from "lucide-react";
+import { PlayCircle, Square, MapPin, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { IniciarJornadaDialog } from "@/components/forms/iniciar-jornada-dialog";
 import { FinalizarJornadaDialog } from "@/components/forms/finalizar-jornada-dialog";
 import { VerJornadaDialog } from "@/components/forms/ver-jornada-dialog";
+import { EditarJornadaDialog } from "@/components/forms/editar-jornada-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 export function Jornadas() {
+  const queryClient = useQueryClient();
   const { data: jornadas, isLoading } = useGetJornadas();
+  const { data: user } = useGetMe();
+  const isAdmin = user?.rol?.toLowerCase() !== "empleado";
+  const deleteMut = useDeleteJornada();
   const [openIniciar, setOpenIniciar] = useState(false);
   const [jornadaAFinalizar, setJornadaAFinalizar] = useState<{
     id: number; empleado_nombre?: string; maquina_nombre?: string; horometro_inicio?: number | null;
   } | null>(null);
   const [jornadaAVer, setJornadaAVer] = useState<any | null>(null);
+  const [jornadaAEditar, setJornadaAEditar] = useState<any | null>(null);
+  const [jornadaAEliminar, setJornadaAEliminar] = useState<any | null>(null);
 
   const exportColumns = [
     { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy") : "-" },
@@ -121,6 +130,28 @@ export function Jornadas() {
                                 Finalizar
                               </Button>
                             )}
+                            {isAdmin && (
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                                  title="Editar jornada"
+                                  onClick={(e) => { e.stopPropagation(); setJornadaAEditar(jor); }}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                  title="Eliminar jornada"
+                                  onClick={(e) => { e.stopPropagation(); setJornadaAEliminar(jor); }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -195,6 +226,26 @@ export function Jornadas() {
                         </Button>
                       </div>
                     )}
+                    {isAdmin && (
+                      <div className="mt-2 pt-2 border-t flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={(e) => { e.stopPropagation(); setJornadaAEditar(jor); }}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" /> Editar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-destructive hover:bg-destructive/10 border-destructive/30"
+                          onClick={(e) => { e.stopPropagation(); setJornadaAEliminar(jor); }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -221,6 +272,54 @@ export function Jornadas() {
         onOpenChange={(o) => { if (!o) setJornadaAVer(null); }} 
         jornada={jornadaAVer} 
       />
+
+      <EditarJornadaDialog
+        open={!!jornadaAEditar}
+        onOpenChange={(o) => { if (!o) setJornadaAEditar(null); }}
+        jornada={jornadaAEditar}
+      />
+
+      {/* Diálogo de confirmación de eliminación */}
+      {jornadaAEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-background rounded-xl border border-white/10 shadow-2xl p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-bold text-white mb-2">Eliminar Jornada</h3>
+            <p className="text-white/70 text-sm mb-6">
+              ¿Estás seguro que querés eliminar la jornada de <strong>{jornadaAEliminar.empleado_nombre}</strong> del {jornadaAEliminar.fecha ? format(new Date(jornadaAEliminar.fecha), "dd/MM/yyyy") : "-"}? Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="ghost"
+                onClick={() => setJornadaAEliminar(null)}
+                className="text-white/70 hover:text-white hover:bg-white/10"
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={deleteMut.isPending}
+                onClick={() => {
+                  deleteMut.mutate(
+                    { id: jornadaAEliminar.id },
+                    {
+                      onSuccess: () => {
+                        queryClient.invalidateQueries({ queryKey: ["jornadas"] });
+                        toast.success("Jornada eliminada");
+                        setJornadaAEliminar(null);
+                      },
+                      onError: (err: any) => {
+                        toast.error(err?.response?.data?.error || "Error al eliminar jornada");
+                      },
+                    }
+                  );
+                }}
+              >
+                {deleteMut.isPending ? "Eliminando..." : "Eliminar"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

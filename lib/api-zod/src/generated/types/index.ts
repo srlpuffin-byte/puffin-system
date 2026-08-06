@@ -84,6 +84,8 @@ export * from './reporteResumen';
 export * from './searchResults';
 export * from './sesionData';
 export * from './successResponse';
+export * from './updateJornadaInput';
+export * from './updateJornadaInputEstado';
 export * from './updateMantenimientoEstadoInput';
 export * from './updateMantenimientoEstadoInputEstado';
 export * from './uploadFotografiaInput';

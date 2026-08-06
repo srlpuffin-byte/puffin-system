@@ -167,18 +167,73 @@ export async function syncAllSheets() {
 
     // 8. Auditoria
     const auditoria = await db.select().from(auditoriaTable).orderBy(desc(auditoriaTable.createdAt)).limit(10000);
-    const usuariosList = await db.select({ id: usuariosTable.id, nombre: usuariosTable.nombre }).from(usuariosTable);
+    const usuariosList = await db.select({ id: usuariosTable.id, nombre: usuariosTable.nombre, apellido: usuariosTable.apellido }).from(usuariosTable);
     
     // idColIndex = 5 (Columna F) para no interferir con las columnas del usuario
     await syncTableToSheet(sheetsClient, SHEET_ID, "Auditoria_Admin", 5, [...auditoria].reverse(), a => {
       const usuario = a.usuario_id ? usuariosList.find(u => u.id === a.usuario_id) : null;
+      
+      // Formatear acción en español legible
+      let accionLabel = a.accion || "";
+      if (a.accion === "CREACION") accionLabel = "Agregó";
+      else if (a.accion === "ELIMINACION") accionLabel = "Eliminó";
+      else if (a.accion === "MODIFICACION") accionLabel = "Modificó";
+
+      // Nombre del administrador
+      const adminName = usuario
+        ? `${usuario.nombre} ${usuario.apellido || ""}`.trim()
+        : (a.dispositivo === "WhatsApp Bot" ? "Pia (Asistente)" : "Sistema");
+
+      // Generar detalle legible comparando valor anterior vs nuevo
+      let detalles = "";
+      if (a.accion === "ELIMINACION") {
+        detalles = `Eliminó el registro ID: ${a.entidad_id || "N/A"}`;
+        if (a.valor_anterior && typeof a.valor_anterior === "object") {
+          const rec = a.valor_anterior as any;
+          if (rec.nombre) detalles += ` (${rec.nombre})`;
+          else if (rec.empleado_id) detalles += ` (empleado_id: ${rec.empleado_id})`;
+        }
+      } else if (a.accion === "CREACION") {
+        if (a.valor_nuevo && typeof a.valor_nuevo === "object") {
+          const rec = a.valor_nuevo as any;
+          // Extraer campos relevantes y omitir fotos base64 y campos de sistema
+          const skip = new Set(["foto_ticket", "foto_surtidor", "foto_tablero_inicio", "foto_tablero_fin", "pin_hash", "checklist_previo"]);
+          const parts = Object.entries(rec)
+            .filter(([k, v]) => !skip.has(k) && v !== undefined && v !== null && v !== "")
+            .map(([k, v]) => `${k}: "${v}"`)
+            .join(" | ");
+          detalles = parts.length > 0 ? parts : "Sin datos";
+        }
+      } else if (a.accion === "MODIFICACION") {
+        if (a.valor_anterior && a.valor_nuevo && typeof a.valor_nuevo === "object") {
+          const oldRec = a.valor_anterior as any;
+          const newRec = a.valor_nuevo as any;
+          const skip = new Set(["foto_ticket", "foto_surtidor", "foto_tablero_inicio", "foto_tablero_fin", "pin_hash", "checklist_previo"]);
+          const changes: string[] = [];
+          for (const key of Object.keys(newRec)) {
+            if (skip.has(key)) continue;
+            if (newRec[key] !== undefined && String(oldRec[key]) !== String(newRec[key])) {
+              changes.push(`Cambió "${key}" de "${oldRec[key]}" a "${newRec[key]}"`);
+            }
+          }
+          detalles = changes.length > 0
+            ? `ID Modificado: ${a.entidad_id}. ` + changes.join(" | ")
+            : `ID Modificado: ${a.entidad_id}. Sin cambios detectables.`;
+        } else {
+          detalles = `ID Modificado: ${a.entidad_id || "N/A"}`;
+        }
+      }
+
+      // Truncar si es muy largo
+      if (detalles.length > 1000) detalles = detalles.substring(0, 997) + "...";
+
       return [
         a.createdAt ? new Date(a.createdAt).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }) : "", // A: Fecha y Hora
-        usuario ? usuario.nombre : (a.dispositivo === "WhatsApp Bot" ? "Pia (Asistente)" : "Sistema"), // B: Administrador
-        a.accion || "", // C: Acción
+        adminName, // B: Administrador
+        accionLabel, // C: Acción
         a.entidad || "", // D: Sección
-        a.valor_nuevo ? JSON.stringify(a.valor_nuevo) : "", // E: Detalles
-        a.id // F: ID (usado por el script para no borrar filas)
+        detalles, // E: Detalles legibles
+        a.id // F: ID
       ];
     });
 
