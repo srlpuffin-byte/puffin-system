@@ -114,7 +114,7 @@ export function EditarJornadaDialog({ open, onOpenChange, jornada }: Props) {
             <div className="space-y-2">
               <Label className="text-white/70">Máquina *</Label>
               <ComboboxMaquina
-                maquinas={maquinas || []}
+                maquinas={(maquinas || []).filter(m => m.categoria !== "inventario")}
                 value={form.maquina_id}
                 onChange={(val) => set("maquina_id", val)}
               />
