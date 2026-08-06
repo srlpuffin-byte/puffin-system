@@ -57,9 +57,10 @@ export function ComboboxMaquina({
   }, [proyectos]);
 
   const filtered = React.useMemo(() => {
-    if (!search.trim()) return maquinas;
+    const list = maquinas.filter(m => m.categoria !== "inventario");
+    if (!search.trim()) return list;
     const q = search.toLowerCase();
-    return maquinas.filter(m =>
+    return list.filter(m =>
       m.nombre.toLowerCase().includes(q) ||
       (m.patente || "").toLowerCase().includes(q) ||
       (m.dominio || "").toLowerCase().includes(q) ||
@@ -104,8 +105,8 @@ export function ComboboxMaquina({
     return (
       <>
         {triggerButton}
-        <Sheet open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSearch(""); }}>
-          <SheetContent side="bottom" className="h-[75vh] flex flex-col p-0">
+        <Sheet open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSearch(""); }} modal={false}>
+          <SheetContent side="bottom" className="h-[75vh] flex flex-col p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
             <SheetHeader className="px-4 pt-4 pb-2 border-b">
               <SheetTitle className="text-base flex items-center gap-2">
                 <Tractor className="h-4 w-4" /> Seleccionar máquina
@@ -204,7 +205,7 @@ export function ComboboxMaquina({
           <CommandList className="max-h-[40vh]">
             <CommandEmpty>No se encontró ninguna máquina.</CommandEmpty>
             <CommandGroup>
-              {maquinas.map((m) => {
+              {maquinas.filter(m => m.categoria !== "inventario").map((m) => {
                 const lugarProyecto = proyectosMap.get(m.id);
                 const isSelected = value === m.id.toString();
                 return (
