@@ -1349,8 +1349,22 @@ async function executeAdjuntarComprobante(args: {
 
     if (args.concepto) conditions.push(ilike(egresosTable.concepto, `%${args.concepto}%`));
     if (args.centro_costos) conditions.push(ilike(egresosTable.centro_costos, `%${args.centro_costos}%`));
-    if (args.monto) conditions.push(eq(egresosTable.monto, args.monto.toString()));
-    if (args.fecha) conditions.push(ilike(egresosTable.fecha, `%${args.fecha}%`));
+    // Comparación tolerante de monto: buscar como substring en el campo monto para evitar problemas de formato numérico
+    if (args.monto) {
+      const montoStr = Math.round(args.monto).toString();
+      conditions.push(ilike(egresosTable.monto, `%${montoStr}%`));
+    }
+    if (args.fecha) {
+      // Búsqueda por fecha exacta o parcial
+      conditions.push(ilike(egresosTable.fecha, `%${args.fecha}%`));
+    }
+
+    // Si no hay filtros específicos, buscar el egreso más reciente de los últimos 5 minutos
+    if (!conditions.length) {
+      const { gte: gteOp } = await import("drizzle-orm");
+      const hace5min = new Date(Date.now() - 5 * 60 * 1000);
+      conditions.push(gteOp(egresosTable.createdAt, hace5min));
+    }
 
     if (conditions.length) query = query.where(and(...conditions));
     const resultados = await query.orderBy(desc(egresosTable.id)).limit(5);
