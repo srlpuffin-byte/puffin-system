@@ -2,6 +2,7 @@ import express, { type Express } from "express";
 import path from "path";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import compression from "compression";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { deduplicatePOSTs } from "./middlewares/deduplicate";
@@ -28,6 +29,7 @@ app.use(
   }),
 );
 app.use(cors());
+app.use(compression());
 app.use(express.json({ limit: "50mb" }));
 app.use(deduplicatePOSTs);
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));

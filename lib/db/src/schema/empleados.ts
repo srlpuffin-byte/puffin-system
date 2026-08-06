@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, date, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, date, boolean, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -20,7 +20,9 @@ export const empleadosTable = pgTable("empleados", {
   recibir_alertas_whatsapp: boolean("recibir_alertas_whatsapp").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  estadoIdx: index("emp_estado_idx").on(table.estado),
+}));
 
 export const insertEmpleadoSchema = createInsertSchema(empleadosTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertEmpleado = z.infer<typeof insertEmpleadoSchema>;

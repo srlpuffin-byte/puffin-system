@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, numeric, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, numeric, timestamp, date, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -31,7 +31,10 @@ export const maquinasTable = pgTable("maquinas", {
   vencimiento_vtv: date("vencimiento_vtv"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  estadoIdx: index("estado_idx").on(table.estado),
+  categoriaIdx: index("categoria_idx").on(table.categoria),
+}));
 
 export const insertMaquinaSchema = createInsertSchema(maquinasTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertMaquina = z.infer<typeof insertMaquinaSchema>;

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, numeric, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, numeric, timestamp, date, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -32,7 +32,11 @@ export const jornadasTable = pgTable("jornadas", {
   estado: text("estado").notNull().default("en_curso"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  empleadoIdx: index("empleado_idx").on(table.empleado_id),
+  maquinaIdx: index("maquina_idx").on(table.maquina_id),
+  fechaIdx: index("fecha_idx").on(table.fecha),
+}));
 
 export const insertJornadaSchema = createInsertSchema(jornadasTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertJornada = z.infer<typeof insertJornadaSchema>;

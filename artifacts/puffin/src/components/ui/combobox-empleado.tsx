@@ -155,7 +155,7 @@ export function ComboboxEmpleado({
 
   // ─── DESKTOP: Popover + HoverCard ────────────────────────────────────────────
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"

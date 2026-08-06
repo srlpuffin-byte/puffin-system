@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -10,7 +10,9 @@ export const fotografiasTable = pgTable("fotografias", {
   url: text("url").notNull(),
   descripcion: text("descripcion"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  entidadIdx: index("entidad_idx").on(table.entidad_tipo, table.entidad_id),
+}));
 
 export const insertFotografiaSchema = createInsertSchema(fotografiasTable).omit({ id: true, createdAt: true });
 export type InsertFotografia = z.infer<typeof insertFotografiaSchema>;
