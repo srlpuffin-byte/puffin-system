@@ -1343,20 +1343,19 @@ async function executeAdjuntarComprobante(args: {
       return `❌ No tengo ninguna imagen disponible para adjuntar. Por favor, enviame primero la foto del comprobante junto con el pedido de adjuntarla.`;
     }
 
-    const { ilike, and, eq, desc } = await import("drizzle-orm");
+    const { ilike, and, eq, desc, sql } = await import("drizzle-orm");
     let query = db.select().from(egresosTable).$dynamic();
     const conditions: any[] = [];
 
     if (args.concepto) conditions.push(ilike(egresosTable.concepto, `%${args.concepto}%`));
     if (args.centro_costos) conditions.push(ilike(egresosTable.centro_costos, `%${args.centro_costos}%`));
-    // Comparación tolerante de monto: buscar como substring en el campo monto para evitar problemas de formato numérico
+    // monto es numeric en PostgreSQL — no se puede usar ilike. Comparamos casteando a texto.
     if (args.monto) {
-      const montoStr = Math.round(args.monto).toString();
-      conditions.push(ilike(egresosTable.monto, `%${montoStr}%`));
+      conditions.push(sql`${egresosTable.monto}::text LIKE ${'%' + Math.round(args.monto).toString() + '%'}`);
     }
     if (args.fecha) {
-      // Búsqueda por fecha exacta o parcial
-      conditions.push(ilike(egresosTable.fecha, `%${args.fecha}%`));
+      // fecha es date en PostgreSQL — usamos eq con string ISO (YYYY-MM-DD)
+      conditions.push(eq(egresosTable.fecha, args.fecha));
     }
 
     // Si no hay filtros específicos, buscar el egreso más reciente de los últimos 5 minutos
