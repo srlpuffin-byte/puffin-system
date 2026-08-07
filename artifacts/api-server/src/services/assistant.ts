@@ -1343,36 +1343,61 @@ async function executeAdjuntarComprobante(args: {
       return `❌ No tengo ninguna imagen disponible para adjuntar. Por favor, enviame primero la foto del comprobante junto con el pedido de adjuntarla.`;
     }
 
-    const { ilike, and, eq, desc, sql } = await import("drizzle-orm");
-    let query = db.select().from(egresosTable).$dynamic();
-    const conditions: any[] = [];
+    const { ilike, and, eq, desc, sql, gte: gteOp } = await import("drizzle-orm");
 
-    if (args.concepto) conditions.push(ilike(egresosTable.concepto, `%${args.concepto}%`));
-    if (args.centro_costos) conditions.push(ilike(egresosTable.centro_costos, `%${args.centro_costos}%`));
-    // monto es numeric en PostgreSQL — no se puede usar ilike. Comparamos casteando a texto.
-    if (args.monto) {
-      conditions.push(sql`${egresosTable.monto}::text LIKE ${'%' + Math.round(args.monto).toString() + '%'}`);
-    }
-    if (args.fecha) {
-      // fecha es date en PostgreSQL — usamos eq con string ISO (YYYY-MM-DD)
-      conditions.push(eq(egresosTable.fecha, args.fecha));
-    }
+    // ── Búsqueda en cascada (de más específica a más tolerante) ──────────────
+    let resultados: (typeof egresosTable.$inferSelect)[] = [];
 
-    // Si no hay filtros específicos, buscar el egreso más reciente de los últimos 5 minutos
-    if (!conditions.length) {
-      const { gte: gteOp } = await import("drizzle-orm");
-      const hace5min = new Date(Date.now() - 5 * 60 * 1000);
-      conditions.push(gteOp(egresosTable.createdAt, hace5min));
+    // 1️⃣ Intento con TODOS los filtros disponibles (AND estricto)
+    {
+      const conditions: any[] = [];
+      if (args.concepto) conditions.push(ilike(egresosTable.concepto, `%${args.concepto}%`));
+      if (args.centro_costos) conditions.push(ilike(egresosTable.centro_costos, `%${args.centro_costos}%`));
+      if (args.monto) conditions.push(sql`${egresosTable.monto}::text LIKE ${'%' + Math.round(args.monto).toString() + '%'}`);
+      if (args.fecha) conditions.push(eq(egresosTable.fecha, args.fecha));
+      if (conditions.length) {
+        resultados = await db.select().from(egresosTable)
+          .where(and(...conditions))
+          .orderBy(desc(egresosTable.id))
+          .limit(5);
+      }
     }
 
-    if (conditions.length) query = query.where(and(...conditions));
-    const resultados = await query.orderBy(desc(egresosTable.id)).limit(5);
+    // 2️⃣ Fallback: solo por concepto (ignora monto/fecha que pueden estar mal formateados)
+    if (!resultados.length && args.concepto) {
+      resultados = await db.select().from(egresosTable)
+        .where(ilike(egresosTable.concepto, `%${args.concepto}%`))
+        .orderBy(desc(egresosTable.id))
+        .limit(5);
+    }
+
+    // 3️⃣ Fallback: solo por monto y/o fecha
+    if (!resultados.length && (args.monto || args.fecha)) {
+      const conditions: any[] = [];
+      if (args.monto) conditions.push(sql`${egresosTable.monto}::text LIKE ${'%' + Math.round(args.monto).toString() + '%'}`);
+      if (args.fecha) conditions.push(eq(egresosTable.fecha, args.fecha));
+      if (conditions.length) {
+        resultados = await db.select().from(egresosTable)
+          .where(and(...conditions))
+          .orderBy(desc(egresosTable.id))
+          .limit(5);
+      }
+    }
+
+    // 4️⃣ Último recurso: egreso más reciente (últimos 10 minutos)
+    if (!resultados.length) {
+      const hace10min = new Date(Date.now() - 10 * 60 * 1000);
+      resultados = await db.select().from(egresosTable)
+        .where(gteOp(egresosTable.createdAt, hace10min))
+        .orderBy(desc(egresosTable.id))
+        .limit(1);
+    }
 
     if (!resultados.length) {
       return `❌ No encontré ningún egreso con los datos que me pasaste. ¿Podés darme más datos? (Concepto, monto, fecha, proyecto)`;
     }
 
-    // Tomar el más reciente
+    // Tomar el más reciente entre los encontrados
     const egreso = resultados[0];
 
     // Insertar fotografía
