@@ -1659,6 +1659,19 @@ async function executeRegistrarGasto(args: {
       return `✅ Gasto ya registrado (ID #${existente.id}). Monto: $${Number(args.monto).toLocaleString("es-AR")} — ${args.concepto}.`;
     }
 
+    // Resolver nombre completo del proyecto desde la BD si se proporcionó centro_costos
+    let centroCostosResuelto = args.centro_costos || null;
+    if (args.centro_costos) {
+      const t = `%${args.centro_costos.toLowerCase()}%`;
+      const [proyecto] = await db.select({ lugar: proyectosTable.lugar })
+        .from(proyectosTable)
+        .where(ilike(proyectosTable.lugar, t))
+        .limit(1);
+      if (proyecto) {
+        centroCostosResuelto = proyecto.lugar;
+      }
+    }
+
     const [egreso] = await db.insert(egresosTable).values({
       fecha: args.fecha,
       categoria: args.categoria,
@@ -1667,7 +1680,7 @@ async function executeRegistrarGasto(args: {
       proveedor: args.proveedor || null,
       metodo_pago: args.metodo_pago || null,
       comprobante: !!imgUrl,
-      centro_costos: args.centro_costos || null,
+      centro_costos: centroCostosResuelto,
       observaciones: args.observaciones || null,
     }).returning();
 
