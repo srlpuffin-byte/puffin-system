@@ -119,6 +119,79 @@ export async function sendWhatsAppImage(to: string, imageUrl: string, caption?: 
   }
 }
 
+export async function uploadMediaToWhatsApp(buffer: Buffer, mimeType: string, filename: string): Promise<string> {
+  const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_ID}/media`;
+  
+  const formData = new FormData();
+  formData.append("messaging_product", "whatsapp");
+  formData.append("file", new Blob([new Uint8Array(buffer)], { type: mimeType }), filename);
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error(`[WhatsApp] Error subiendo media:`, errText);
+    throw new Error(`WhatsApp API error (upload): ${res.status} ${errText}`);
+  }
+
+  const data = await res.json() as { id: string };
+  return data.id;
+}
+
+export async function sendWhatsAppDocument(to: string, buffer: Buffer, filename: string, mimeType: string = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
+  const toFormatted = formatArgentinaPhone(to);
+
+  if (!WHATSAPP_ACCESS_TOKEN || WHATSAPP_ACCESS_TOKEN === "TODO_ACCESS_TOKEN") {
+    console.warn(`[WhatsApp] Simulando envío de documento a ${toFormatted}: ${filename}`);
+    return { status: "simulated" };
+  }
+
+  try {
+    // 1. Subir archivo a WhatsApp
+    const mediaId = await uploadMediaToWhatsApp(buffer, mimeType, filename);
+
+    // 2. Enviar el mensaje con el document id
+    const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_ID}/messages`;
+    
+    const payload = {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: toFormatted,
+      type: "document",
+      document: { 
+        id: mediaId,
+        filename: filename
+      }
+    };
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`Error enviando documento de WhatsApp a ${to}:`, errText);
+      throw new Error(`WhatsApp API error: ${res.status} ${errText}`);
+    }
+
+    return await res.json();
+  } catch (error) {
+    console.error(`Excepción enviando documento de WhatsApp a ${to}:`, error);
+    throw error;
+  }
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Envío de mensajes usando plantillas aprobadas por Meta (WhatsApp Business API)
 // ──────────────────────────────────────────────────────────────────────────────

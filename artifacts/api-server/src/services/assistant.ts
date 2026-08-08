@@ -12,10 +12,13 @@ import {
   usuariosTable,
   jornadasTable,
   auditoriaTable,
+  incidentesTable,
+  alertasTable,
+  documentosTable,
 } from "@workspace/db/schema";
 import { eq, like, or, and, desc, ilike, notInArray } from "drizzle-orm";
 import crypto from "crypto";
-import { sendWhatsAppImage, sendWhatsAppMessage } from "./whatsapp.js";
+import { sendWhatsAppImage, sendWhatsAppMessage, sendWhatsAppDocument } from "./whatsapp.js";
 
 // ─── Helper de auditoría para acciones del bot ──────────────────────────────
 async function auditarBot(accion: string, entidad: string, entidad_id?: number | null, valor_nuevo?: object) {
@@ -485,6 +488,106 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         required: [],
       },
     },
+  },
+  {
+    type: "function",
+    function: {
+      name: "actualizar_fotografia",
+      description: "Guarda la imagen/foto enviada por el usuario como la foto de perfil o avatar de un empleado o máquina. CRÍTICO: El usuario debe haber enviado una foto inmediatamente antes. Busca la entidad por su nombre/DNI.",
+      parameters: {
+        type: "object",
+        properties: {
+          tipo_entidad: { type: "string", description: "Tipo de entidad: empleado, maquina" },
+          busqueda: { type: "string", description: "Nombre o DNI del empleado o máquina (ej: 'sebas', 'retroexcavadora')" },
+        },
+        required: ["tipo_entidad", "busqueda"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "generar_excel_gastos",
+      description: "Genera un archivo Excel (.xlsx) con los gastos/egresos y lo envía como documento por WhatsApp. Útil cuando el usuario pide un Excel, reporte descargable o planilla de gastos de un mes o proyecto.",
+      parameters: {
+        type: "object",
+        properties: {
+          desde: { type: "string", description: "Fecha de inicio YYYY-MM-DD" },
+          hasta: { type: "string", description: "Fecha de fin YYYY-MM-DD" },
+          proyecto: { type: "string", description: "Filtrar por proyecto (opcional)" },
+          categoria: { type: "string", description: "Filtrar por categoría (opcional)" }
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ejecutar_consulta_sql_lectura",
+      description: "Ejecuta una consulta SQL SELECT cruda en la base de datos PostgreSQL. Úsala cuando necesites cruzar datos o responder preguntas complejas que las otras herramientas no cubren. Tablas principales: empleados(id, nombre, apellido, dni, estado), proyectos(id, nombre, estado), maquinas(id, nombre, categoria, estado), egresos(id, fecha, categoria, concepto, monto, centro_costos), jornadas(id, empleado_id, proyecto_id, fecha, estado, hora_inicio, hora_fin), combustible(id, maquina_id, empleado_id, fecha, litros, importe), incidentes(id, fecha, tipo, descripcion, gravedad). IMPORTANTE: Solo se permiten sentencias SELECT.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "La consulta SQL SELECT a ejecutar" }
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "registrar_incidente",
+      description: "Registra un incidente, accidente o rotura. CRÍTICO: Si faltan datos obligatorios (descripción, fecha, tipo), pregunta primero.",
+      parameters: {
+        type: "object",
+        properties: {
+          descripcion: { type: "string", description: "Descripción detallada del incidente" },
+          tipo: { type: "string", description: "Tipo: accidente, rotura, robo, otro" },
+          fecha: { type: "string", description: "Fecha YYYY-MM-DD" },
+          entidad_tipo: { type: "string", description: "empleado o maquina (opcional)" },
+          busqueda_entidad: { type: "string", description: "Nombre de la entidad involucrada (opcional)" }
+        },
+        required: ["descripcion", "tipo", "fecha"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "registrar_alerta",
+      description: "Registra una alerta (aviso importante, sanción o recordatorio).",
+      parameters: {
+        type: "object",
+        properties: {
+          descripcion: { type: "string", description: "Descripción de la alerta" },
+          tipo: { type: "string", description: "Tipo de alerta" },
+          prioridad: { type: "string", description: "Prioridad: alta, media, baja" },
+          entidad_tipo: { type: "string", description: "empleado o maquina (opcional)" },
+          busqueda_entidad: { type: "string", description: "Nombre de la entidad (opcional)" }
+        },
+        required: ["descripcion", "tipo", "prioridad"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "registrar_documento",
+      description: "Registra un documento y su vencimiento (licencia, seguro, vtv).",
+      parameters: {
+        type: "object",
+        properties: {
+          tipo: { type: "string", description: "Tipo de documento (licencia, seguro, vtv, etc)" },
+          descripcion: { type: "string", description: "Descripción breve" },
+          fecha_vencimiento: { type: "string", description: "Fecha de vencimiento YYYY-MM-DD" },
+          entidad_tipo: { type: "string", description: "empleado o maquina" },
+          busqueda_entidad: { type: "string", description: "Nombre del empleado o máquina" }
+        },
+        required: ["tipo", "fecha_vencimiento", "entidad_tipo", "busqueda_entidad"],
+      },
+    },
   }
 ];
 
@@ -610,7 +713,7 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
   const todayISO = new Date().toISOString().split("T")[0];
 
   // Herramientas disponibles según rol
-  const WRITE_TOOLS = ["registrar_gasto", "registrar_empleado", "enviar_mensaje_whatsapp", "registrar_jornada", "actualizar_jornada", "registrar_combustible_bot", "registrar_mantenimiento_bot", "actualizar_proyecto", "mover_entidad_proyecto", "crear_acceso_sistema", "crear_accesos_faltantes"];
+  const WRITE_TOOLS = ["registrar_gasto", "registrar_empleado", "enviar_mensaje_whatsapp", "registrar_jornada", "actualizar_jornada", "registrar_combustible_bot", "registrar_mantenimiento_bot", "actualizar_proyecto", "mover_entidad_proyecto", "crear_acceso_sistema", "crear_accesos_faltantes", "actualizar_fotografia", "registrar_incidente", "registrar_alerta", "registrar_documento"];
   const toolsParaRol = isAdmin ? tools : tools.filter(
     (t: any) => !WRITE_TOOLS.includes(t.function.name)
   );
@@ -654,9 +757,14 @@ LO QUE PUEDO CONSULTAR (acceso total a la BD):
 📅 Jornadas: quién trabajó, dónde, cuándo, horarios.
 💰 Gastos, ⚽ Combustible, 🔧 Mantenimientos.
 📈 Resumen Operativo Diario: Si piden el resumen de hoy, ejecutá la herramienta correspondiente y mostralo limpio.
-📸 Fotografías y Comprobantes: Si piden imagen de chata, operario, DNI, o comprobante/ticket de gasto, USÁ LA HERRAMIENTA 'enviar_fotografia'.
+📸 Fotografías y Comprobantes: Si piden imagen de chata, operario, DNI, o comprobante/ticket de gasto, USÁ LA HERRAMIENTA 'enviar_fotografia'. Si te mandan una foto para asignarla a un empleado o máquina, usá 'actualizar_fotografia'.
 📊 Google Sheets: cualquier dato en las planillas (tus acciones de escritura ya sincronizan solas). SI TE PIDEN EL TOTAL GENERAL DE EGRESOS o CORROBORAR, usá 'auditar_egresos_sheets' para comparar DB vs Sheets.
 📡 Rastreo Satelital GPS: Podés consultar la ubicación en tiempo real, velocidad y estado (encendido/apagado) de cualquier vehículo con GPS. Usá la herramienta 'consultar_rastreo'.
+📑 Excel de Gastos: Si el usuario pide un Excel, planilla o reporte descargable de gastos, usá 'generar_excel_gastos'.
+🔍 Consulta SQL Avanzada: Si ninguna herramienta cubre la pregunta, usá 'ejecutar_consulta_sql_lectura' para hacer un SELECT directo. Tablas: empleados, proyectos, maquinas, egresos, jornadas, combustible, incidentes, alertas, documentos, fotografias, mantenimientos.
+🚨 Incidentes: Usá 'registrar_incidente' para cargar accidentes, roturas o robos.
+🔔 Alertas: Usá 'registrar_alerta' para crear avisos o sanciones.
+📋 Documentos/Vencimientos: Usá 'registrar_documento' para cargar licencias, seguros, VTV.
 
 REGLAS DE OPERACIÓN:
 - SIEMPRE usá las herramientas para buscar datos. Nunca inventés información.
@@ -761,6 +869,24 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
           if (imgUrl && sesion.datos_pendientes) {
             (sesion.datos_pendientes as any).ultima_imagen_url = null;
           }
+        } else if (functionName === "actualizar_fotografia") {
+          const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
+          toolResult = await executeActualizarFotografia(functionArgs.tipo_entidad, functionArgs.busqueda, imgUrl);
+          if (imgUrl && sesion.datos_pendientes) {
+            (sesion.datos_pendientes as any).ultima_imagen_url = null;
+          }
+        } else if (functionName === "generar_excel_gastos") {
+          toolResult = await executeGenerarExcelGastos(from, functionArgs);
+        } else if (functionName === "ejecutar_consulta_sql_lectura") {
+          toolResult = await executeConsultaSQL(functionArgs.query);
+        } else if (functionName === "registrar_incidente") {
+          const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
+          toolResult = await executeRegistrarIncidente(functionArgs, imgUrl);
+          if (imgUrl && sesion.datos_pendientes) (sesion.datos_pendientes as any).ultima_imagen_url = null;
+        } else if (functionName === "registrar_alerta") {
+          toolResult = await executeRegistrarAlerta(functionArgs);
+        } else if (functionName === "registrar_documento") {
+          toolResult = await executeRegistrarDocumento(functionArgs);
         }
 
         messages.push({
@@ -2117,5 +2243,200 @@ async function executeResumenOperativo(fechaReq?: string) {
 (Podés pedirme detalles específicos de cualquiera de estos puntos).`;
   } catch (error: any) {
     return `❌ Error al generar resumen operativo: ${error.message}`;
+  }
+}
+
+async function executeActualizarFotografia(tipo: string, busqueda: string, imgUrl?: string | null) {
+  try {
+    if (!imgUrl) return "❌ No encontré ninguna imagen disponible. El usuario debe enviar la foto junto al mensaje.";
+    
+    const { ilike, or } = await import("drizzle-orm");
+    let entidad_id = -1;
+    let nombre_entidad = "";
+    const t = `%${busqueda.toLowerCase()}%`;
+
+    if (tipo === "empleado" || tipo === "operario") {
+      const [emp] = await db.select().from(empleadosTable)
+        .where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t), ilike(empleadosTable.dni, t)))
+        .limit(1);
+      if (!emp) return `No encontré ningún empleado que coincida con "${busqueda}".`;
+      entidad_id = emp.id;
+      nombre_entidad = `${emp.nombre} ${emp.apellido}`;
+      tipo = "empleado";
+    } else if (tipo === "maquina" || tipo === "maquinaria") {
+      const [maq] = await db.select().from(maquinasTable)
+        .where(ilike(maquinasTable.nombre, t))
+        .limit(1);
+      if (!maq) return `No encontré ninguna máquina que coincida con "${busqueda}".`;
+      entidad_id = maq.id;
+      nombre_entidad = maq.nombre;
+      tipo = "maquina";
+    } else {
+      return `Tipo de entidad no soportado para actualizar fotografía: ${tipo}`;
+    }
+
+    await db.insert(fotografiasTable).values({
+      empresa_id: 1,
+      entidad_tipo: tipo,
+      entidad_id,
+      url: imgUrl,
+      descripcion: `Foto de perfil de ${nombre_entidad}`,
+    });
+    
+    await auditarBot("Actualizar", "Fotografia", entidad_id, { tipo, nombre_entidad });
+
+    return `✅ ¡Foto guardada exitosamente en el perfil de ${nombre_entidad}! Ya se puede ver en el sistema web.`;
+  } catch (error: any) {
+    console.error("Error actualizando fotografía:", error);
+    return `❌ Ocurrió un error al guardar la foto: ${error.message}`;
+  }
+}
+
+async function executeGenerarExcelGastos(from: string, args: { desde?: string, hasta?: string, proyecto?: string, categoria?: string }) {
+  try {
+    const { eq, and, gte, lte, ilike } = await import("drizzle-orm");
+    const xlsx = await import("xlsx");
+    
+    let conditions = [];
+    if (args.desde) conditions.push(gte(egresosTable.fecha, args.desde));
+    if (args.hasta) conditions.push(lte(egresosTable.fecha, args.hasta));
+    if (args.proyecto) conditions.push(ilike(egresosTable.centro_costos, `%${args.proyecto}%`));
+    if (args.categoria) conditions.push(ilike(egresosTable.categoria, `%${args.categoria}%`));
+    
+    const gastos = await db.select().from(egresosTable)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(egresosTable.fecha);
+      
+    if (gastos.length === 0) return "No se encontraron gastos para generar el Excel.";
+    
+    const data = gastos.map(g => ({
+      Fecha: g.fecha,
+      Categoría: g.categoria,
+      Concepto: g.concepto,
+      Monto: Number(g.monto),
+      Proyecto: g.centro_costos || "-",
+      Proveedor: g.proveedor || "-",
+      "Método de Pago": g.metodo_pago || "-"
+    }));
+    
+    const ws = xlsx.utils.json_to_sheet(data);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, "Gastos");
+    
+    const buffer = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
+    const filename = `Gastos_${args.desde || "historico"}_${args.hasta || "hoy"}.xlsx`;
+    
+    await sendWhatsAppDocument(from, buffer, filename);
+    return `✅ Archivo Excel '${filename}' generado y enviado exitosamente con ${gastos.length} registros.`;
+  } catch (error: any) {
+    console.error("Error generando Excel:", error);
+    return `❌ Ocurrió un error al generar el Excel: ${error.message}`;
+  }
+}
+
+async function executeConsultaSQL(query: string) {
+  try {
+    const { sql } = await import("drizzle-orm");
+    if (!query.toLowerCase().trim().startsWith("select")) {
+      return "❌ Error: Solo se permiten consultas SELECT por seguridad.";
+    }
+    const { rows } = await db.execute(sql.raw(query));
+    if (rows.length === 0) return "La consulta no devolvió resultados.";
+    let res = JSON.stringify(rows.slice(0, 50));
+    if (rows.length > 50) res += `\n... (mostrando 50 de ${rows.length} resultados)`;
+    return res;
+  } catch (error: any) {
+    console.error("Error en consulta SQL:", error);
+    return `❌ Error en consulta SQL: ${error.message}`;
+  }
+}
+
+async function resolveEntity(tipo: string, busqueda: string) {
+  const { ilike, or } = await import("drizzle-orm");
+  const t = `%${busqueda.toLowerCase()}%`;
+  if (tipo === "empleado" || tipo === "operario") {
+    const [emp] = await db.select().from(empleadosTable)
+      .where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t), ilike(empleadosTable.dni, t))).limit(1);
+    if (emp) return { id: emp.id, nombre: `${emp.nombre} ${emp.apellido}`, tipo: "empleado" };
+  } else if (tipo === "maquina" || tipo === "maquinaria") {
+    const [maq] = await db.select().from(maquinasTable).where(ilike(maquinasTable.nombre, t)).limit(1);
+    if (maq) return { id: maq.id, nombre: maq.nombre, tipo: "maquina" };
+  }
+  return null;
+}
+
+async function executeRegistrarIncidente(args: any, imgUrl?: string | null) {
+  try {
+    let empId = null;
+    let maqId = null;
+    if (args.entidad_tipo && args.busqueda_entidad) {
+      const ent = await resolveEntity(args.entidad_tipo, args.busqueda_entidad);
+      if (!ent) return `❌ No encontré ninguna entidad que coincida con "${args.busqueda_entidad}".`;
+      if (ent.tipo === "empleado") empId = ent.id;
+      if (ent.tipo === "maquina") maqId = ent.id;
+    }
+    
+    await db.insert(incidentesTable).values({
+      empresa_id: 1,
+      empleado_id: empId,
+      maquina_id: maqId,
+      tipo: args.tipo,
+      descripcion: args.descripcion,
+      fecha: args.fecha,
+      foto_url: imgUrl || null,
+    });
+    
+    return `✅ Incidente de tipo "${args.tipo}" registrado exitosamente para la fecha ${args.fecha}.`;
+  } catch (error: any) {
+    return `❌ Error al registrar incidente: ${error.message}`;
+  }
+}
+
+async function executeRegistrarAlerta(args: any) {
+  try {
+    let entId = null;
+    let entNombre = null;
+    let entTipo = null;
+    if (args.entidad_tipo && args.busqueda_entidad) {
+      const ent = await resolveEntity(args.entidad_tipo, args.busqueda_entidad);
+      if (!ent) return `❌ No encontré ninguna entidad que coincida con "${args.busqueda_entidad}".`;
+      entId = ent.id;
+      entNombre = ent.nombre;
+      entTipo = ent.tipo;
+    }
+    
+    await db.insert(alertasTable).values({
+      empresa_id: 1,
+      tipo: args.tipo,
+      prioridad: args.prioridad,
+      descripcion: args.descripcion,
+      entidad_tipo: entTipo,
+      entidad_id: entId,
+      entidad_nombre: entNombre,
+    });
+    
+    return `✅ Alerta de prioridad "${args.prioridad}" registrada exitosamente.`;
+  } catch (error: any) {
+    return `❌ Error al registrar alerta: ${error.message}`;
+  }
+}
+
+async function executeRegistrarDocumento(args: any) {
+  try {
+    const ent = await resolveEntity(args.entidad_tipo, args.busqueda_entidad);
+    if (!ent) return `❌ No encontré ninguna entidad que coincida con "${args.busqueda_entidad}".`;
+    
+    await db.insert(documentosTable).values({
+      empresa_id: 1,
+      tipo: args.tipo,
+      descripcion: args.descripcion || "",
+      entidad_tipo: ent.tipo,
+      entidad_id: ent.id,
+      fecha_vencimiento: args.fecha_vencimiento,
+    });
+    
+    return `✅ Documento "${args.tipo}" registrado para ${ent.nombre}. Vencimiento: ${args.fecha_vencimiento}.`;
+  } catch (error: any) {
+    return `❌ Error al registrar documento: ${error.message}`;
   }
 }
