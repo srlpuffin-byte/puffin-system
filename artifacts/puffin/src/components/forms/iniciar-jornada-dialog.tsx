@@ -263,19 +263,21 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label>Tipo de trabajo</Label>
-                  <Select value={form.tipo_trabajo} onValueChange={v => set("tipo_trabajo", v)}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="desmonte">Desmonte</SelectItem>
-                      <SelectItem value="movimiento_suelo">Movimiento de suelo</SelectItem>
-                      <SelectItem value="transporte">Transporte</SelectItem>
-                      <SelectItem value="compactacion">Compactación</SelectItem>
-                      <SelectItem value="nivelacion">Nivelación</SelectItem>
-                      <SelectItem value="excavacion">Excavación</SelectItem>
-                      <SelectItem value="mantenimiento_vial">Mantenimiento vial</SelectItem>
-                      <SelectItem value="otro">Otro</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <select
+                    value={form.tipo_trabajo}
+                    onChange={e => set("tipo_trabajo", e.target.value)}
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Seleccionar tipo</option>
+                    <option value="desmonte">Desmonte</option>
+                    <option value="movimiento_suelo">Movimiento de suelo</option>
+                    <option value="transporte">Transporte</option>
+                    <option value="compactacion">Compactación</option>
+                    <option value="nivelacion">Nivelación</option>
+                    <option value="excavacion">Excavación</option>
+                    <option value="mantenimiento_vial">Mantenimiento vial</option>
+                    <option value="otro">Otro</option>
+                  </select>
                 </div>
               </div>
               <div className="flex justify-end pt-4">
@@ -324,26 +326,22 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
 
               <div className="space-y-2 pt-4 border-t">
                 <Label>Resultado de la Inspección *</Label>
-                <Select value={form.estado_equipo} onValueChange={v => set("estado_equipo", v)} required>
-                  <SelectTrigger className={
+                <select
+                  value={form.estado_equipo}
+                  onChange={e => set("estado_equipo", e.target.value)}
+                  required
+                  className={`w-full h-10 px-3 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-ring ${
                     form.estado_equipo === "apto" ? "border-green-500 text-green-700 bg-green-50" :
                     form.estado_equipo === "apto_observaciones" ? "border-yellow-500 text-yellow-700 bg-yellow-50" :
-                    form.estado_equipo === "no_apto" ? "border-red-500 text-red-700 bg-red-50" : ""
-                  }>
-                    <SelectValue placeholder="Seleccione el estado final..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="apto">
-                      <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-500"/> Equipo apto para trabajar</div>
-                    </SelectItem>
-                    <SelectItem value="apto_observaciones">
-                      <div className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-yellow-500"/> Equipo apto con observaciones</div>
-                    </SelectItem>
-                    <SelectItem value="no_apto">
-                      <div className="flex items-center gap-2"><XCircle className="w-4 h-4 text-red-500"/> Equipo NO APTO para trabajar</div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                    form.estado_equipo === "no_apto" ? "border-red-500 text-red-700 bg-red-50" :
+                    "border-input bg-background"
+                  }`}
+                >
+                  <option value="">Seleccione el estado final...</option>
+                  <option value="apto">✅ Equipo apto para trabajar</option>
+                  <option value="apto_observaciones">⚠️ Equipo apto con observaciones</option>
+                  <option value="no_apto">❌ Equipo NO APTO para trabajar</option>
+                </select>
                 {form.estado_equipo === "no_apto" && (
                   <p className="text-sm text-red-600 font-medium mt-1 flex items-center gap-1">
                     <AlertTriangle className="w-4 h-4" /> ¡Atención! Se generará una alerta roja automáticamente.
