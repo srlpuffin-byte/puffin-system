@@ -437,7 +437,7 @@ export function Gps() {
         {/* Map */}
         <div className={`
           ${mobileView === "mapa" ? "flex" : "hidden"} sm:flex
-          flex-1 flex-col relative
+          flex-1 flex-col relative z-0
         `} style={{ minHeight: 0 }}>
           <SatcomMap points={mapPoints} activePointId={selectedId} height="100%" />
           <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-3 border text-xs space-y-1.5 z-[1000]">
