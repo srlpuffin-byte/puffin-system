@@ -192,6 +192,10 @@ export function MobilePickerSheet({
             flexDirection: "column",
             justifyContent: "flex-end",
           }}
+          // Stop propagation so Radix Dialog doesn't intercept touch events
+          onTouchMove={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           {/* Backdrop */}
           <div
