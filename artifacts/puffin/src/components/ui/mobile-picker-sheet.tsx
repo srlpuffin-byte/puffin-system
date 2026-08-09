@@ -59,13 +59,11 @@ export function MobilePickerSheet({
   }
 
   const handleOpen = () => {
-    // Force blur any active element so keyboard closes first
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
     setSearch("");
-    // Small delay so keyboard fully closes before sheet opens
-    setTimeout(() => setOpen(true), 100);
+    setTimeout(() => setOpen(true), 80);
   };
 
   const handleSelect = (val: string) => {
@@ -80,6 +78,17 @@ export function MobilePickerSheet({
     setOpen(false);
     setSearch("");
   };
+
+  const handleClose = () => {
+    setOpen(false);
+    setSearch("");
+  };
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => searchRef.current?.focus(), 300);
+    }
+  }, [open]);
 
   const renderOption = (opt: PickerOption, currentValue: string, onSelect: (val: string) => void) => {
     const isSelected = opt.value === currentValue;
@@ -102,60 +111,33 @@ export function MobilePickerSheet({
           WebkitTapHighlightColor: "transparent",
         }}
       >
-        {/* Avatar */}
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: "50%",
-            overflow: "hidden",
-            flexShrink: 0,
-            background: "#e5e7eb",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 13,
-            fontWeight: 600,
-            color: "#6b7280",
-          }}
-        >
+        <div style={{
+          width: 40, height: 40, borderRadius: "50%", overflow: "hidden",
+          flexShrink: 0, background: "#e5e7eb", display: "flex",
+          alignItems: "center", justifyContent: "center",
+          fontSize: 13, fontWeight: 600, color: "#6b7280",
+        }}>
           {opt.avatarUrl ? (
-            <img
-              src={opt.avatarUrl}
-              alt={opt.label}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
+            <img src={opt.avatarUrl} alt={opt.label} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
             <span>{opt.initials || opt.label.slice(0, 2).toUpperCase()}</span>
           )}
         </div>
-
-        {/* Text */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{
-            margin: 0,
-            fontSize: 15,
+            margin: 0, fontSize: 15,
             fontWeight: isSelected ? 600 : 400,
             color: isSelected ? "#1d4ed8" : "#111827",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}>
-            {opt.label}
-          </p>
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>{opt.label}</p>
           {opt.sublabel && (
-            <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
-              {opt.sublabel}
-            </p>
+            <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>{opt.sublabel}</p>
           )}
         </div>
-
-        {/* Check */}
         {isSelected && (
           <div style={{
-            width: 20, height: 20, borderRadius: "50%",
-            background: "#3b82f6", display: "flex",
-            alignItems: "center", justifyContent: "center", flexShrink: 0,
+            width: 20, height: 20, borderRadius: "50%", background: "#3b82f6",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>
             <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>✓</span>
           </div>
@@ -164,83 +146,42 @@ export function MobilePickerSheet({
     );
   };
 
-  const handleClose = () => {
-    setOpen(false);
-    setSearch("");
-  };
-
-  // Lock body scroll when open
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-      // Focus search input after animation
-      setTimeout(() => searchRef.current?.focus(), 300);
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => { document.body.style.overflow = ""; };
-  }, [open]);
-
-  // Render the sheet directly (no portal) so it stays inside the Radix Dialog
-  // event tree - this is critical for iOS touch events to work correctly.
-  const sheet = open ? (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "flex-end",
-      }}
-    >
+  // Render via portal to document.body so it escapes any stacking context.
+  // The parent Dialog must have modal={false} for iOS touch events to work.
+  const sheet = open ? ReactDOM.createPortal(
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 99999,
+      display: "flex", flexDirection: "column", justifyContent: "flex-end",
+    }}>
       {/* Backdrop */}
       <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundColor: "rgba(0,0,0,0.5)",
-        }}
+        style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)" }}
         onClick={handleClose}
       />
 
       {/* Sheet */}
-      <div
-        style={{
-          position: "relative",
-          backgroundColor: "white",
-          borderTopLeftRadius: 16,
-          borderTopRightRadius: 16,
-          maxHeight: "80dvh",
-          display: "flex",
-          flexDirection: "column",
-          boxShadow: "0 -4px 32px rgba(0,0,0,0.15)",
-        }}
-      >
+      <div style={{
+        position: "relative",
+        backgroundColor: "white",
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        maxHeight: "80vh",
+        display: "flex",
+        flexDirection: "column",
+        boxShadow: "0 -4px 32px rgba(0,0,0,0.15)",
+      }}>
         {/* Handle + Close */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "12px 16px 8px",
-            borderBottom: "1px solid #e5e7eb",
-            flexShrink: 0,
-          }}
-        >
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 16px 8px", borderBottom: "1px solid #e5e7eb", flexShrink: 0,
+        }}>
           <div style={{ width: 40, height: 4, backgroundColor: "#d1d5db", borderRadius: 4, margin: "0 auto" }} />
           <button
             type="button"
             onClick={handleClose}
             style={{
-              position: "absolute",
-              right: 12,
-              top: 12,
-              padding: 4,
-              borderRadius: 8,
-              border: "none",
-              background: "none",
-              cursor: "pointer",
+              position: "absolute", right: 12, top: 12, padding: 4,
+              borderRadius: 8, border: "none", background: "none", cursor: "pointer",
             }}
           >
             <X style={{ width: 20, height: 20, color: "#6b7280" }} />
@@ -248,16 +189,10 @@ export function MobilePickerSheet({
         </div>
 
         {/* Search */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 16px",
-            borderBottom: "1px solid #e5e7eb",
-            flexShrink: 0,
-          }}
-        >
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8,
+          padding: "8px 16px", borderBottom: "1px solid #e5e7eb", flexShrink: 0,
+        }}>
           <Search style={{ width: 16, height: 16, color: "#9ca3af", flexShrink: 0 }} />
           <input
             ref={searchRef}
@@ -266,41 +201,31 @@ export function MobilePickerSheet({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{
-              flex: 1,
-              border: "none",
-              outline: "none",
-              fontSize: 14,
-              color: "#111827",
-              background: "transparent",
+              flex: 1, border: "none", outline: "none",
+              fontSize: 14, color: "#111827", background: "transparent",
             }}
           />
           {search && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }}
-            >
+            <button type="button" onClick={() => setSearch("")}
+              style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }}>
               <X style={{ width: 14, height: 14, color: "#9ca3af" }} />
             </button>
           )}
         </div>
 
-        {/* List — explicitly overflow-y: scroll for iOS Safari */}
-        <div
-          style={{
-            overflowY: "scroll",
-            WebkitOverflowScrolling: "touch" as any,
-            flex: "1 1 0",
-            minHeight: 0,
-            overscrollBehavior: "contain",
-          }}
-        >
+        {/* Scrollable list — overflow-y: scroll is mandatory for iOS Safari */}
+        <div style={{
+          overflowY: "scroll",
+          WebkitOverflowScrolling: "touch" as any,
+          flex: "1 1 0",
+          minHeight: 0,
+          overscrollBehavior: "contain",
+        }}>
           {isLoading ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 16px", gap: 12 }}>
               <div style={{
                 width: 36, height: 36, borderRadius: "50%",
-                border: "3px solid #e5e7eb",
-                borderTopColor: "#3b82f6",
+                border: "3px solid #e5e7eb", borderTopColor: "#3b82f6",
                 animation: "spin 0.8s linear infinite",
               }} />
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -331,7 +256,8 @@ export function MobilePickerSheet({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   ) : null;
 
   return (
@@ -350,14 +276,12 @@ export function MobilePickerSheet({
       >
         {selected ? (
           <>
-            <div
-              style={{
-                width: 28, height: 28, borderRadius: "50%", overflow: "hidden",
-                flexShrink: 0, background: "#e5e7eb", display: "flex",
-                alignItems: "center", justifyContent: "center",
-                fontSize: 11, fontWeight: 600, color: "#6b7280",
-              }}
-            >
+            <div style={{
+              width: 28, height: 28, borderRadius: "50%", overflow: "hidden",
+              flexShrink: 0, background: "#e5e7eb", display: "flex",
+              alignItems: "center", justifyContent: "center",
+              fontSize: 11, fontWeight: 600, color: "#6b7280",
+            }}>
               {selected.avatarUrl ? (
                 <img src={selected.avatarUrl} alt={selected.label} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
@@ -369,10 +293,8 @@ export function MobilePickerSheet({
         ) : (
           <span className="text-muted-foreground">{placeholder}</span>
         )}
-        <svg
-          style={{ marginLeft: "auto", flexShrink: 0, opacity: 0.5 }}
-          width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-        >
+        <svg style={{ marginLeft: "auto", flexShrink: 0, opacity: 0.5 }}
+          width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
         </svg>
       </button>
