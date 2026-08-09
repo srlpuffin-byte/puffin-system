@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import { db } from "@workspace/db";
 import { maquinasTable, fotografiasTable, proyectosTable } from "@workspace/db";
-import { eq, isNotNull, and, inArray } from "drizzle-orm";
+import { eq, isNotNull, and, inArray, not } from "drizzle-orm";
 import { SatcomClient } from "../services/satcom";
 
 export const integrationsRouter = Router();
@@ -115,7 +115,12 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
     const maquinas = await db
       .select()
       .from(maquinasTable)
-      .where(isNotNull(maquinasTable.satcom_id));
+      .where(
+        and(
+          isNotNull(maquinasTable.satcom_id),
+          not(eq(maquinasTable.estado, "baja"))
+        )
+      );
 
     const maquinasIds = maquinas.map(m => m.id);
     const fotografias = maquinasIds.length > 0 ? await db
