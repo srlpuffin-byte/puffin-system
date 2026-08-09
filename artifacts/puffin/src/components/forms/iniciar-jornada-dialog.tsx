@@ -29,7 +29,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
   const uploadMut = useUploadFotografia();
   
   const { data: empleados, isLoading: loadingEmpleados } = useGetEmpleados({ estado: "activo" });
-  const { data: maquinas, isLoading: loadingMaquinas } = useGetMaquinas({ estado: "activa" });
+  const { data: maquinas, isLoading: loadingMaquinas } = useGetMaquinas({});
   const { data: proyectos } = useGetProyectos();
   const { data: user } = useGetMe();
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";
