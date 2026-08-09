@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { combustibleTable, empleadosTable, maquinasTable, actividadTable, fotografiasTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
-import { appendToSheet } from "../services/sheets.js";
+import { syncAllSheets } from "../services/sync-sheets.js";
 
 const router = Router();
 
@@ -76,21 +76,8 @@ router.post("/", async (req, res) => {
       entidad_id: registro.id,
     });
 
-    const [empleado] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable).where(eq(empleadosTable.id, empleado_id)).limit(1);
-
-    // Async append to Google Sheets
-    appendToSheet("Combustible", [
-      today,
-      new Date().toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hour12: false }),
-      maquinaNombre,
-      `${empleado?.nombre} ${empleado?.apellido}`,
-      litros,
-      precio || "",
-      importe || "",
-      estacion || "",
-      "", // I: FOTO (vacío inicialmente)
-      registro.id // J: ID
-    ]);
+    // Async full sync to Google Sheets
+    syncAllSheets().catch(() => {});
 
     return res.status(201).json({ ...registro, litros: Number(registro.litros) });
   } catch (err: any) {
@@ -128,6 +115,8 @@ router.put("/:id", async (req, res) => {
 
     if (!updated) return res.status(404).json({ error: "Registro no encontrado" });
 
+    syncAllSheets().catch(() => {});
+
     return res.json({ ...updated, litros: Number(updated.litros) });
   } catch (err: any) {
     req.log?.error(err);
@@ -145,6 +134,8 @@ router.delete("/:id", async (req, res) => {
 
     const [deleted] = await db.delete(combustibleTable).where(eq(combustibleTable.id, parseInt(id))).returning();
     if (!deleted) return res.status(404).json({ error: "Registro no encontrado" });
+
+    syncAllSheets().catch(() => {});
 
     return res.json({ message: "Registro eliminado correctamente" });
   } catch (err: any) {

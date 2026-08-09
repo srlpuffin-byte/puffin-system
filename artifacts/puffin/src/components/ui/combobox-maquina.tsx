@@ -105,7 +105,7 @@ export function ComboboxMaquina({
     return (
       <>
         {triggerButton}
-        <Sheet open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSearch(""); }} modal={false}>
+        <Sheet open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSearch(""); }}>
           <SheetContent side="bottom" className="h-[75vh] flex flex-col p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
             <SheetHeader className="px-4 pt-4 pb-2 border-b">
               <SheetTitle className="text-base flex items-center gap-2">

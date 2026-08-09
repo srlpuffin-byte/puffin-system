@@ -82,7 +82,7 @@ export function MultiImageUpload({ images, onChange, maxImages = 5 }: MultiImage
             <button
               type="button"
               onClick={() => removeImage(index)}
-              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
             >
               <X className="w-4 h-4" />
             </button>
