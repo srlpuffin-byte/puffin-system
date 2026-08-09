@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Drawer, DrawerContent, DrawerTrigger, DrawerTitle } from "@/components/ui/drawer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,37 +69,90 @@ export function ComboboxMaquina({
     );
   }, [maquinas, search]);
 
-  // ─── DESKTOP & MOBILE: Popover + HoverCard ─────────────────────────────────
+  const triggerButton = (
+    <Button
+      variant="outline"
+      role="combobox"
+      aria-expanded={open}
+      className={cn("w-full justify-between h-auto py-2", className)}
+      disabled={disabled}
+    >
+      {selectedMaquina ? (
+        <div className="flex items-center gap-2">
+          <Avatar className="h-6 w-6 rounded-md">
+            <AvatarImage src={selectedMaquina.imagen_url || undefined} className="object-cover" />
+            <AvatarFallback className="rounded-md bg-slate-100 text-[10px]">
+              <Tractor className="h-3 w-3 text-slate-400" />
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col text-left">
+            <span className="font-semibold text-sm truncate">
+              {selectedMaquina.nombre}
+              {selectedMaquina.patente ? ` (${selectedMaquina.patente})` : selectedMaquina.dominio ? ` (${selectedMaquina.dominio})` : ""}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <span className="text-muted-foreground">{placeholder}</span>
+      )}
+      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+    </Button>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>
+          {triggerButton}
+        </DrawerTrigger>
+        <DrawerContent className="h-[85vh] px-2 flex flex-col">
+          <div className="sr-only"><DrawerTitle>Seleccionar máquina</DrawerTitle></div>
+          <Command className="flex-1 overflow-hidden mt-4">
+            <CommandInput placeholder="Buscar máquina..." autoFocus={false} />
+            <CommandList className="max-h-full overflow-y-auto">
+              <CommandEmpty>No se encontró ninguna máquina.</CommandEmpty>
+              <CommandGroup>
+                {maquinas.filter(m => m.categoria !== "inventario").map((m) => {
+                  const isSelected = value === m.id.toString();
+                  return (
+                    <CommandItem
+                      key={m.id}
+                      value={`${m.nombre} ${m.patente || ""} ${m.dominio || ""}`}
+                      onSelect={() => { onChange(m.id.toString()); setOpen(false); }}
+                      className="py-3 px-2 border-b border-slate-100 last:border-0"
+                    >
+                      <Check className={cn("mr-3 h-5 w-5 text-primary shrink-0", isSelected ? "opacity-100" : "opacity-0")} />
+                      <Avatar className="h-8 w-8 mr-3 shrink-0 rounded-md">
+                        <AvatarImage src={m.imagen_url || undefined} className="object-cover" />
+                        <AvatarFallback className="rounded-md bg-slate-100 text-[10px]">
+                          <Tractor className="h-4 w-4 text-slate-400" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col text-left overflow-hidden">
+                        <span className="font-semibold text-base truncate">
+                          {m.nombre}
+                          {m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ""}
+                        </span>
+                        <span className="text-xs text-muted-foreground truncate">
+                          {m.marca || "-"} · {m.modelo || "-"}
+                        </span>
+                      </div>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  // ─── DESKTOP: Popover + HoverCard ────────────────────────────────────────────
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn("w-full justify-between h-auto py-2", className)}
-          disabled={disabled}
-        >
-          {selectedMaquina ? (
-            <div className="flex items-center gap-2">
-              <Avatar className="h-6 w-6 rounded-md">
-                <AvatarImage src={selectedMaquina.imagen_url || undefined} className="object-cover" />
-                <AvatarFallback className="rounded-md bg-slate-100 text-[10px]">
-                  <Tractor className="h-3 w-3 text-slate-400" />
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col text-left">
-                <span className="font-semibold text-sm truncate">
-                  {selectedMaquina.nombre}
-                  {selectedMaquina.patente ? ` (${selectedMaquina.patente})` : selectedMaquina.dominio ? ` (${selectedMaquina.dominio})` : ""}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <span className="text-muted-foreground">{placeholder}</span>
-          )}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
+        {triggerButton}
       </PopoverTrigger>
       <PopoverContent className="w-[min(400px,90vw)] p-0" align="start">
         <Command>

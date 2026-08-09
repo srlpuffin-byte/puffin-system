@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Drawer, DrawerContent, DrawerTrigger, DrawerTitle } from "@/components/ui/drawer";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -53,32 +54,78 @@ export function ComboboxEmpleado({
     return map;
   }, [proyectos]);
 
-  // ─── DESKTOP & MOBILE: Popover + HoverCard ─────────────────────────────────
+  const triggerButton = (
+    <Button
+      variant="outline"
+      role="combobox"
+      aria-expanded={open}
+      className={cn("w-full justify-between h-auto py-2", className)}
+      disabled={disabled}
+    >
+      {selectedEmpleado ? (
+        <div className="flex items-center gap-2">
+          <Avatar className="h-6 w-6">
+            <AvatarImage src={selectedEmpleado.foto_perfil || undefined} />
+            <AvatarFallback className="text-[10px]">
+              {selectedEmpleado.nombre[0]}{selectedEmpleado.apellido[0]}
+            </AvatarFallback>
+          </Avatar>
+          <span className="truncate">{selectedEmpleado.apellido}, {selectedEmpleado.nombre}</span>
+        </div>
+      ) : (
+        <span className="text-muted-foreground">{placeholder}</span>
+      )}
+      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+    </Button>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>
+          {triggerButton}
+        </DrawerTrigger>
+        <DrawerContent className="h-[85vh] px-2 flex flex-col">
+          <div className="sr-only"><DrawerTitle>Seleccionar operario</DrawerTitle></div>
+          <Command className="flex-1 overflow-hidden mt-4">
+            <CommandInput placeholder="Buscar operario..." autoFocus={false} />
+            <CommandList className="max-h-full overflow-y-auto">
+              <CommandEmpty>No se encontró ningún operario.</CommandEmpty>
+              <CommandGroup>
+                {empleados.map((e) => {
+                  const isSelected = value === e.id.toString();
+                  return (
+                    <CommandItem
+                      key={e.id}
+                      value={`${e.apellido} ${e.nombre}`}
+                      onSelect={() => { onChange(e.id.toString()); setOpen(false); }}
+                      className="py-3 px-2 border-b border-slate-100 last:border-0"
+                    >
+                      <Check className={cn("mr-3 h-5 w-5 text-primary shrink-0", isSelected ? "opacity-100" : "opacity-0")} />
+                      <Avatar className="h-8 w-8 mr-3 shrink-0">
+                        <AvatarImage src={e.foto_perfil || undefined} />
+                        <AvatarFallback className="text-xs">{e.nombre[0]}{e.apellido[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col text-left overflow-hidden">
+                        <span className="font-semibold text-base truncate">{e.apellido}, {e.nombre}</span>
+                        {e.cargo && <span className="text-xs text-muted-foreground truncate">{e.cargo}</span>}
+                      </div>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  // ─── DESKTOP: Popover + HoverCard ────────────────────────────────────────────
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn("w-full justify-between h-auto py-2", className)}
-          disabled={disabled}
-        >
-          {selectedEmpleado ? (
-            <div className="flex items-center gap-2">
-              <Avatar className="h-6 w-6">
-                <AvatarImage src={selectedEmpleado.foto_perfil || undefined} />
-                <AvatarFallback className="text-[10px]">
-                  {selectedEmpleado.nombre[0]}{selectedEmpleado.apellido[0]}
-                </AvatarFallback>
-              </Avatar>
-              <span className="truncate">{selectedEmpleado.apellido}, {selectedEmpleado.nombre}</span>
-            </div>
-          ) : (
-            <span className="text-muted-foreground">{placeholder}</span>
-          )}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
+        {triggerButton}
       </PopoverTrigger>
       <PopoverContent className="w-[min(400px,90vw)] p-0" align="start">
         <Command>
