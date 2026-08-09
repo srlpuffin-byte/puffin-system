@@ -1,12 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Drawer, DrawerContent, DrawerTrigger, DrawerTitle } from "@/components/ui/drawer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Check, ChevronsUpDown, Tractor, Briefcase } from "lucide-react";
+import { Check, ChevronsUpDown, Tractor, Briefcase, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Maquina } from "@workspace/api-client-react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -27,6 +25,158 @@ interface ComboboxMaquinaProps {
   className?: string;
 }
 
+// ─── MOBILE: Inline expandable list (no portals, works inside Dialog on iOS) ──
+function ComboboxMaquinaMobile({
+  value,
+  onChange,
+  maquinas,
+  disabled,
+  placeholder = "Seleccionar máquina",
+  className,
+}: Omit<ComboboxMaquinaProps, "proyectos">) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const selectedMaquina = value ? maquinas.find((m) => m.id.toString() === value) : null;
+
+  const filtered = React.useMemo(() => {
+    const list = maquinas.filter((m) => m.categoria !== "inventario");
+    if (!search.trim()) return list;
+    const q = search.toLowerCase();
+    return list.filter(
+      (m) =>
+        m.nombre.toLowerCase().includes(q) ||
+        (m.patente || "").toLowerCase().includes(q) ||
+        (m.dominio || "").toLowerCase().includes(q) ||
+        (m.marca || "").toLowerCase().includes(q) ||
+        (m.modelo || "").toLowerCase().includes(q)
+    );
+  }, [maquinas, search]);
+
+  const handleSelect = (id: string) => {
+    onChange(id);
+    setOpen(false);
+    setSearch("");
+  };
+
+  return (
+    <div className={cn("relative w-full", className)}>
+      {/* Trigger button */}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          "w-full flex items-center justify-between px-3 py-2.5 rounded-md border border-input bg-background text-sm",
+          "active:bg-accent focus:outline-none focus:ring-2 focus:ring-ring",
+          disabled && "opacity-50 cursor-not-allowed"
+        )}
+      >
+        {selectedMaquina ? (
+          <div className="flex items-center gap-2">
+            <Avatar className="h-6 w-6 rounded-md">
+              <AvatarImage src={selectedMaquina.imagen_url || undefined} className="object-cover" />
+              <AvatarFallback className="rounded-md bg-slate-100 text-[10px]">
+                <Tractor className="h-3 w-3 text-slate-400" />
+              </AvatarFallback>
+            </Avatar>
+            <span className="truncate font-medium">
+              {selectedMaquina.nombre}
+              {selectedMaquina.patente
+                ? ` (${selectedMaquina.patente})`
+                : selectedMaquina.dominio
+                ? ` (${selectedMaquina.dominio})`
+                : ""}
+            </span>
+          </div>
+        ) : (
+          <span className="text-muted-foreground">{placeholder}</span>
+        )}
+        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+      </button>
+
+      {/* Inline dropdown — rendered in the same DOM tree, no portals */}
+      {open && (
+        <div
+          className="w-full mt-1 rounded-md border border-input bg-background shadow-lg"
+          style={{ position: "relative", zIndex: 50 }}
+        >
+          {/* Search input */}
+          <div className="flex items-center gap-2 p-2 border-b">
+            <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+            <input
+              autoFocus={false}
+              type="text"
+              placeholder="Buscar máquina..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 text-sm outline-none bg-transparent placeholder:text-muted-foreground"
+            />
+            {search && (
+              <button type="button" onClick={() => setSearch("")}>
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+
+          {/* List */}
+          <div
+            ref={listRef}
+            className="overflow-y-auto"
+            style={{ maxHeight: "240px", WebkitOverflowScrolling: "touch" }}
+          >
+            {filtered.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground py-6">
+                No se encontró ninguna máquina.
+              </p>
+            ) : (
+              filtered.map((m) => {
+                const isSelected = value === m.id.toString();
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onPointerDown={() => handleSelect(m.id.toString())}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-3 text-left border-b border-slate-100 last:border-0",
+                      "active:bg-accent",
+                      isSelected && "bg-primary/5"
+                    )}
+                  >
+                    <Check
+                      className={cn(
+                        "h-4 w-4 shrink-0 text-primary",
+                        isSelected ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    <Avatar className="h-8 w-8 shrink-0 rounded-md">
+                      <AvatarImage src={m.imagen_url || undefined} className="object-cover" />
+                      <AvatarFallback className="rounded-md bg-slate-100 text-[10px]">
+                        <Tractor className="h-4 w-4 text-slate-400" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col text-left overflow-hidden">
+                      <span className="font-semibold text-sm truncate">
+                        {m.nombre}
+                        {m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ""}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {m.marca || "-"} · {m.modelo || "-"}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MAIN EXPORT ─────────────────────────────────────────────────────────────
 export function ComboboxMaquina({
   value,
   onChange,
@@ -40,8 +190,22 @@ export function ComboboxMaquina({
   const [search, setSearch] = useState("");
   const isMobile = useIsMobile();
 
-  const selectedMaquina = value ? maquinas.find((m) => m.id.toString() === value) : null;
+  // On mobile, use the inline version (no portals)
+  if (isMobile) {
+    return (
+      <ComboboxMaquinaMobile
+        value={value}
+        onChange={onChange}
+        maquinas={maquinas}
+        disabled={disabled}
+        placeholder={placeholder}
+        className={className}
+      />
+    );
+  }
 
+  // ─── DESKTOP: Popover + HoverCard ────────────────────────────────────────────
+  const selectedMaquina = value ? maquinas.find((m) => m.id.toString() === value) : null;
   const proyectosMap = React.useMemo(() => {
     const map = new Map<number, string>();
     if (proyectos) {
@@ -57,102 +221,49 @@ export function ComboboxMaquina({
   }, [proyectos]);
 
   const filtered = React.useMemo(() => {
-    const list = maquinas.filter(m => m.categoria !== "inventario");
+    const list = maquinas.filter((m) => m.categoria !== "inventario");
     if (!search.trim()) return list;
     const q = search.toLowerCase();
-    return list.filter(m =>
-      m.nombre.toLowerCase().includes(q) ||
-      (m.patente || "").toLowerCase().includes(q) ||
-      (m.dominio || "").toLowerCase().includes(q) ||
-      (m.marca || "").toLowerCase().includes(q) ||
-      (m.modelo || "").toLowerCase().includes(q)
+    return list.filter(
+      (m) =>
+        m.nombre.toLowerCase().includes(q) ||
+        (m.patente || "").toLowerCase().includes(q) ||
+        (m.dominio || "").toLowerCase().includes(q) ||
+        (m.marca || "").toLowerCase().includes(q) ||
+        (m.modelo || "").toLowerCase().includes(q)
     );
   }, [maquinas, search]);
 
-  const triggerButton = (
-    <Button
-      variant="outline"
-      role="combobox"
-      aria-expanded={open}
-      className={cn("w-full justify-between h-auto py-2", className)}
-      disabled={disabled}
-    >
-      {selectedMaquina ? (
-        <div className="flex items-center gap-2">
-          <Avatar className="h-6 w-6 rounded-md">
-            <AvatarImage src={selectedMaquina.imagen_url || undefined} className="object-cover" />
-            <AvatarFallback className="rounded-md bg-slate-100 text-[10px]">
-              <Tractor className="h-3 w-3 text-slate-400" />
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col text-left">
-            <span className="font-semibold text-sm truncate">
-              {selectedMaquina.nombre}
-              {selectedMaquina.patente ? ` (${selectedMaquina.patente})` : selectedMaquina.dominio ? ` (${selectedMaquina.dominio})` : ""}
-            </span>
-          </div>
-        </div>
-      ) : (
-        <span className="text-muted-foreground">{placeholder}</span>
-      )}
-      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-    </Button>
-  );
-
-  if (isMobile) {
-    return (
-      <Drawer open={open} onOpenChange={setOpen} shouldScaleBackground={false}>
-        <DrawerTrigger asChild>
-          {triggerButton}
-        </DrawerTrigger>
-        <DrawerContent className="h-[85vh] px-2 flex flex-col">
-          <div className="sr-only"><DrawerTitle>Seleccionar máquina</DrawerTitle></div>
-          <Command className="flex-1 overflow-hidden mt-4">
-            <CommandInput placeholder="Buscar máquina..." autoFocus={false} />
-            <CommandList className="max-h-full overflow-y-auto">
-              <CommandEmpty>No se encontró ninguna máquina.</CommandEmpty>
-              <CommandGroup>
-                {maquinas.filter(m => m.categoria !== "inventario").map((m) => {
-                  const isSelected = value === m.id.toString();
-                  return (
-                    <CommandItem
-                      key={m.id}
-                      value={`${m.nombre} ${m.patente || ""} ${m.dominio || ""}`}
-                      onSelect={() => { onChange(m.id.toString()); setOpen(false); }}
-                      className="py-3 px-2 border-b border-slate-100 last:border-0"
-                    >
-                      <Check className={cn("mr-3 h-5 w-5 text-primary shrink-0", isSelected ? "opacity-100" : "opacity-0")} />
-                      <Avatar className="h-8 w-8 mr-3 shrink-0 rounded-md">
-                        <AvatarImage src={m.imagen_url || undefined} className="object-cover" />
-                        <AvatarFallback className="rounded-md bg-slate-100 text-[10px]">
-                          <Tractor className="h-4 w-4 text-slate-400" />
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col text-left overflow-hidden">
-                        <span className="font-semibold text-base truncate">
-                          {m.nombre}
-                          {m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ""}
-                        </span>
-                        <span className="text-xs text-muted-foreground truncate">
-                          {m.marca || "-"} · {m.modelo || "-"}
-                        </span>
-                      </div>
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </DrawerContent>
-      </Drawer>
-    );
-  }
-
-  // ─── DESKTOP: Popover + HoverCard ────────────────────────────────────────────
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        {triggerButton}
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn("w-full justify-between h-auto py-2", className)}
+          disabled={disabled}
+        >
+          {selectedMaquina ? (
+            <div className="flex items-center gap-2">
+              <Avatar className="h-6 w-6 rounded-md">
+                <AvatarImage src={selectedMaquina.imagen_url || undefined} className="object-cover" />
+                <AvatarFallback className="rounded-md bg-slate-100 text-[10px]">
+                  <Tractor className="h-3 w-3 text-slate-400" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col text-left">
+                <span className="font-semibold text-sm truncate">
+                  {selectedMaquina.nombre}
+                  {selectedMaquina.patente ? ` (${selectedMaquina.patente})` : selectedMaquina.dominio ? ` (${selectedMaquina.dominio})` : ""}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <span className="text-muted-foreground">{placeholder}</span>
+          )}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[min(400px,90vw)] p-0" align="start">
         <Command>
@@ -160,7 +271,7 @@ export function ComboboxMaquina({
           <CommandList className="max-h-[40vh]">
             <CommandEmpty>No se encontró ninguna máquina.</CommandEmpty>
             <CommandGroup>
-              {maquinas.filter(m => m.categoria !== "inventario").map((m) => {
+              {maquinas.filter((m) => m.categoria !== "inventario").map((m) => {
                 const lugarProyecto = proyectosMap.get(m.id);
                 const isSelected = value === m.id.toString();
                 return (
