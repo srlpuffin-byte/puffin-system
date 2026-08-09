@@ -99,12 +99,20 @@ export function VerJornadaDialog({ open, onOpenChange, jornada }: VerJornadaDial
                 
                 <div className="border rounded-md p-3 bg-slate-100 md:col-span-2">
                   <p className="text-[10px] uppercase text-slate-700 font-semibold">Total Horas Reloj (Empleado)</p>
-                  <p className="font-bold text-xl">{jornada.horas_reloj != null ? `${jornada.horas_reloj} h` : "-"}</p>
+                  <p className="font-bold text-xl">
+                    {jornada.horas_reloj != null && Number(jornada.horas_reloj) >= 0
+                      ? `${parseFloat(Number(jornada.horas_reloj).toFixed(2))} h`
+                      : "-"}
+                  </p>
                 </div>
                 
                 <div className="border rounded-md p-3 bg-blue-100 md:col-span-2">
                   <p className="text-[10px] uppercase text-blue-800 font-semibold">Total Horas Máquina (Horómetro)</p>
-                  <p className="font-bold text-xl text-blue-700">{jornada.horas_trabajadas != null ? `${jornada.horas_trabajadas} h` : "-"}</p>
+                  <p className="font-bold text-xl text-blue-700">
+                    {jornada.horas_trabajadas != null && Number(jornada.horas_trabajadas) >= 0
+                      ? `${parseFloat(Number(jornada.horas_trabajadas).toFixed(2))} h`
+                      : "-"}
+                  </p>
                 </div>
 
                 {jornada.km_inicio != null && (

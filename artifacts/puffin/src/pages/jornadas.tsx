@@ -28,6 +28,13 @@ export function Jornadas() {
   const [jornadaAEditar, setJornadaAEditar] = useState<any | null>(null);
   const [jornadaAEliminar, setJornadaAEliminar] = useState<any | null>(null);
 
+  const formatHoras = (val: any) => {
+    if (val === null || val === undefined) return "-";
+    const n = Number(val);
+    if (isNaN(n) || n < 0) return "-";
+    return `${parseFloat(n.toFixed(2))}h`;
+  };
+
   const exportColumns = [
     { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy") : "-" },
     { header: "Operario", key: "empleado_nombre" },
@@ -94,7 +101,7 @@ export function Jornadas() {
                         <TableCell>
                           <div className="flex flex-col text-sm">
                             <span>{jor.hora_inicio || "-"} a {jor.hora_fin || "-"}</span>
-                            {jor.horas_reloj != null && <span className="text-xs text-muted-foreground">{jor.horas_reloj}h reloj</span>}
+                            {jor.horas_reloj != null && <span className="text-xs text-muted-foreground">{formatHoras(jor.horas_reloj)} reloj</span>}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -207,11 +214,11 @@ export function Jornadas() {
                       </div>
                       <div className="flex flex-col items-end">
                         <span className="text-[10px] uppercase text-muted-foreground font-semibold" title="Horas Reloj (Empleado)">Hs Reloj</span>
-                        <span className="font-bold text-slate-700">{jor.horas_reloj != null ? `${jor.horas_reloj}h` : "-"}</span>
+                        <span className="font-bold text-slate-700">{formatHoras(jor.horas_reloj)}</span>
                       </div>
                       <div className="flex flex-col items-end">
                         <span className="text-[10px] uppercase text-blue-700 font-semibold" title="Horas Máquina (Horómetro)">Hs Máq</span>
-                        <span className="font-bold text-blue-700">{jor.horas_trabajadas != null ? `${jor.horas_trabajadas}h` : "-"}</span>
+                        <span className="font-bold text-blue-700">{formatHoras(jor.horas_trabajadas)}</span>
                       </div>
                     </div>
 

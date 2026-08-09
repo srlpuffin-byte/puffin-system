@@ -15,7 +15,9 @@ async function enrichJornada(j: typeof jornadasTable.$inferSelect) {
 
   const hrInicio = j.horometro_inicio ? Number(j.horometro_inicio) : null;
   const hrFin = j.horometro_fin ? Number(j.horometro_fin) : null;
-  const horas = hrInicio !== null && hrFin !== null ? hrFin - hrInicio : null;
+  const horasDiff = hrInicio !== null && hrFin !== null ? hrFin - hrInicio : null;
+  // Si el diff es negativo (datos incorrectos), no mostrar nada
+  const horas = horasDiff !== null && horasDiff >= 0 ? Number(horasDiff.toFixed(2)) : null;
 
   let horasReloj = null;
   if (j.hora_inicio && j.hora_fin) {
