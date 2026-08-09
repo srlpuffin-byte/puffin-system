@@ -7,15 +7,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { MultiImageUpload, UploadedImage } from "../ui/multi-image-upload";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
-import { ComboboxEmpleado } from "@/components/ui/combobox-empleado";
-import { ComboboxMaquina } from "@/components/ui/combobox-maquina";
 import { useGetProyectos } from "@/hooks/use-proyectos";
 
 interface Props {
@@ -216,24 +213,38 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
               {!empleadoIdFijo && (
                 <div className="space-y-1">
                   <Label>Operario *</Label>
-                  <ComboboxEmpleado
+                  <select
                     value={form.empleado_id}
-                    onChange={v => set("empleado_id", v)}
-                    empleados={Array.isArray(empleados) ? empleados : []}
-                    proyectos={proyectos}
+                    onChange={e => set("empleado_id", e.target.value)}
                     disabled={isEmpleado}
-                  />
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  >
+                    <option value="" disabled>Seleccionar operario</option>
+                    {Array.isArray(empleados) && empleados.map((e: any) => (
+                      <option key={e.id} value={e.id.toString()}>
+                        {e.apellido}, {e.nombre} {e.cargo ? `(${e.cargo})` : ""}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
               {!maquinaIdFija && (
                 <div className="space-y-1">
                   <Label>Máquina *</Label>
-                  <ComboboxMaquina
+                  <select
                     value={form.maquina_id}
-                    onChange={v => set("maquina_id", v)}
-                    maquinas={Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario") : []}
-                    proyectos={proyectos}
-                  />
+                    onChange={e => set("maquina_id", e.target.value)}
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="" disabled>Seleccionar máquina</option>
+                    {Array.isArray(maquinas) && maquinas
+                      .filter((m: any) => m.categoria !== "inventario")
+                      .map((m: any) => (
+                        <option key={m.id} value={m.id.toString()}>
+                          {m.nombre} {m.patente ? `(${m.patente})` : m.dominio ? `(${m.dominio})` : ""}
+                        </option>
+                      ))}
+                  </select>
                 </div>
               )}
               <div className="grid grid-cols-2 gap-4">

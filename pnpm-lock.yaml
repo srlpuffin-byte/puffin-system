@@ -74,6 +74,9 @@ importers:
 
   .:
     dependencies:
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
       pg:
         specifier: ^8.22.0
         version: 8.22.0
@@ -126,6 +129,9 @@ importers:
       pino-http:
         specifier: ^10.5.0
         version: 10.5.0
+      xlsx:
+        specifier: ^0.18.5
+        version: 0.18.5
     devDependencies:
       '@types/compression':
         specifier: ^1.8.1
@@ -633,6 +639,12 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.4
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../lib/db
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/pg@8.20.0)(pg@8.22.0)
       tsx:
         specifier: 'catalog:'
         version: 4.22.4
