@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { useGetProyectos } from "@/hooks/use-proyectos";
+import { MobilePickerSheet } from "@/components/ui/mobile-picker-sheet";
 
 interface Props {
   open: boolean;
@@ -213,40 +214,40 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
               {!empleadoIdFijo && (
                 <div className="space-y-1">
                   <Label>Operario *</Label>
-                  <select
+                  <MobilePickerSheet
                     value={form.empleado_id}
-                    onChange={e => set("empleado_id", e.target.value)}
-                    onTouchStart={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}
+                    onChange={v => set("empleado_id", v)}
+                    placeholder="Seleccionar operario"
+                    searchPlaceholder="Buscar operario..."
                     disabled={isEmpleado}
-                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                  >
-                    <option value="" disabled>Seleccionar operario</option>
-                    {Array.isArray(empleados) && empleados.map((e: any) => (
-                      <option key={e.id} value={e.id.toString()}>
-                        {e.apellido}, {e.nombre} {e.cargo ? `(${e.cargo})` : ""}
-                      </option>
-                    ))}
-                  </select>
+                    options={Array.isArray(empleados) ? empleados.map((e: any) => ({
+                      value: e.id.toString(),
+                      label: `${e.apellido}, ${e.nombre}`,
+                      sublabel: e.cargo || undefined,
+                      avatarUrl: e.foto_perfil || null,
+                      initials: `${e.nombre?.[0] || ""}${e.apellido?.[0] || ""}`,
+                    })) : []}
+                  />
                 </div>
               )}
               {!maquinaIdFija && (
                 <div className="space-y-1">
                   <Label>Máquina *</Label>
-                  <select
+                  <MobilePickerSheet
                     value={form.maquina_id}
-                    onChange={e => set("maquina_id", e.target.value)}
-                    onTouchStart={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}
-                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="" disabled>Seleccionar máquina</option>
-                    {Array.isArray(maquinas) && maquinas
+                    onChange={v => set("maquina_id", v)}
+                    placeholder="Seleccionar máquina"
+                    searchPlaceholder="Buscar máquina..."
+                    options={Array.isArray(maquinas) ? maquinas
                       .filter((m: any) => m.categoria !== "inventario")
-                      .map((m: any) => (
-                        <option key={m.id} value={m.id.toString()}>
-                          {m.nombre} {m.patente ? `(${m.patente})` : m.dominio ? `(${m.dominio})` : ""}
-                        </option>
-                      ))}
-                  </select>
+                      .map((m: any) => ({
+                        value: m.id.toString(),
+                        label: m.nombre,
+                        sublabel: [m.patente || m.dominio, m.marca, m.modelo].filter(Boolean).join(" · ") || undefined,
+                        avatarUrl: m.imagen_url || null,
+                        initials: m.nombre?.slice(0, 2).toUpperCase(),
+                      })) : []}
+                  />
                 </div>
               )}
               <div className="grid grid-cols-2 gap-4">
