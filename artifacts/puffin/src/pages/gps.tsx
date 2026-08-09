@@ -50,6 +50,7 @@ export function Gps() {
   const [selectedMaquinaId, setSelectedMaquinaId] = useState<string>("");
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [machineSearch, setMachineSearch] = useState("");
+  const [machineRelinkSearch, setMachineRelinkSearch] = useState("");
 
   const queryClient = useQueryClient();
   const { data: maquinas } = useGetMaquinas();
@@ -140,7 +141,9 @@ export function Gps() {
 
   const openRelinkDialog = (point: MapPoint) => {
     setLinkDialog({ open: true, mode: "relink", point });
-    setSelectedDeviceId(point.device_id?.toString() ?? "");
+    setSelectedDeviceId("");
+    setSelectedMaquinaId("");
+    setMachineRelinkSearch("");
   };
 
   const openLinkUnlinkedDialog = (point: MapPoint) => {
@@ -161,11 +164,12 @@ export function Gps() {
         });
       }
     } else {
-      // Re-linking: change the GPS device of an already-linked machine
-      if (linkDialog.point.maquina_id && selectedDeviceId) {
+      // Re-linking: assign the CURRENT GPS device to a DIFFERENT machine
+      // The backend will automatically unlink it from the old machine
+      if (linkDialog.point.device_id && selectedMaquinaId) {
         linkMaquinaMutation.mutate({
-          maquina_id: linkDialog.point.maquina_id,
-          satcom_id: parseInt(selectedDeviceId),
+          maquina_id: parseInt(selectedMaquinaId),
+          satcom_id: linkDialog.point.device_id,
         });
       }
     }
@@ -461,7 +465,7 @@ export function Gps() {
             </DialogTitle>
             <DialogDescription>
               {linkDialog.mode === "relink" ? (
-                <>Seleccioná qué dispositivo GPS de Satcom corresponde a <b>{linkDialog.point?.nombre}</b>.</>
+                <>Seleccioná a qué máquina corresponde el GPS <b>{linkDialog.point?.nombre}</b>.</>
               ) : (
                 <>Seleccioná a qué máquina corresponde el GPS <b>{linkDialog.point?.nombre}</b>.</>
               )}
@@ -542,28 +546,6 @@ export function Gps() {
                   )}
                 </div>
               </div>
-            ) : (
-              // Picker: choose a SATCOM DEVICE (all devices, including currently linked ones)
-              <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar dispositivo GPS..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {satcomDevices.map(d => {
-                    const alreadyUsed = linkedDeviceIds.has(d.id) && d.id !== linkDialog.point?.device_id;
-                    return (
-                      <SelectItem key={d.id} value={d.id.toString()} disabled={alreadyUsed}>
-                        {d.name}
-                        {alreadyUsed && " (en uso)"}
-                        {d.id === linkDialog.point?.device_id && " ✓ actual"}
-                      </SelectItem>
-                    );
-                  })}
-                  {satcomDevices.length === 0 && (
-                    <SelectItem value="none" disabled>No se encontraron dispositivos</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
             )}
           </div>
 
@@ -575,8 +557,7 @@ export function Gps() {
               className="bg-primary hover:bg-primary/90 text-white"
               disabled={
                 linkMaquinaMutation.isPending ||
-                (linkDialog.mode === "link-unlinked" && (!selectedMaquinaId || selectedMaquinaId === "none")) ||
-                (linkDialog.mode === "relink" && (!selectedDeviceId || selectedDeviceId === "none"))
+                !selectedMaquinaId || selectedMaquinaId === "none"
               }
               onClick={handleLinkConfirm}
             >

@@ -43,12 +43,18 @@ integrationsRouter.post("/xpert/link", requireAuth, async (req, res) => {
       res.status(400).json({ error: "Missing ids" });
       return;
     }
+    // First: remove this satcom_id from any other machine that holds it (reasignment)
+    await db.update(maquinasTable)
+      .set({ satcom_id: null })
+      .where(eq(maquinasTable.satcom_id, satcom_id));
+    // Then: assign to the new machine
     await db.update(maquinasTable).set({ satcom_id }).where(eq(maquinasTable.id, maquina_id));
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: "Failed to link" });
   }
 });
+
 
 // Auto-link: match machines and Satcom devices by name similarity
 integrationsRouter.post("/xpert/auto-link", requireAuth, async (req, res) => {
