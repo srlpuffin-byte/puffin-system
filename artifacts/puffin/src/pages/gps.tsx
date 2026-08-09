@@ -3,13 +3,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, RefreshCw, Wifi, WifiOff, Zap, ZapOff, Plus, Pencil, Check, X, Link as LinkIcon, Unlink, Settings2 } from "lucide-react";
+import { MapPin, RefreshCw, Wifi, WifiOff, Zap, ZapOff, Plus, Pencil, Check, X, Link as LinkIcon, Unlink, Settings2, Search, Tractor } from "lucide-react";
 import { SatcomMap } from "@/components/map/SatcomMap";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useGetMaquinas, getGetMaquinasQueryKey } from "@workspace/api-client-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 
 interface MapPoint {
   maquina_id: number | null;
@@ -48,6 +49,7 @@ export function Gps() {
   }>({ open: false, mode: "link-unlinked", point: null });
   const [selectedMaquinaId, setSelectedMaquinaId] = useState<string>("");
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
+  const [machineSearch, setMachineSearch] = useState("");
 
   const queryClient = useQueryClient();
   const { data: maquinas } = useGetMaquinas();
@@ -144,6 +146,7 @@ export function Gps() {
   const openLinkUnlinkedDialog = (point: MapPoint) => {
     setLinkDialog({ open: true, mode: "link-unlinked", point });
     setSelectedMaquinaId("");
+    setMachineSearch("");
   };
 
   const handleLinkConfirm = () => {
@@ -451,7 +454,7 @@ export function Gps() {
 
       {/* ── Link / Re-link Dialog ─────────────────────────────────────────── */}
       <Dialog open={linkDialog.open} onOpenChange={(open) => !open && setLinkDialog({ open: false, mode: "link-unlinked", point: null })}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {linkDialog.mode === "relink" ? "Cambiar dispositivo GPS" : "Vincular GPS a Máquina Existente"}
@@ -467,22 +470,78 @@ export function Gps() {
 
           <div className="py-4">
             {linkDialog.mode === "link-unlinked" ? (
-              // Picker: choose an EXISTING MACHINE (without GPS)
-              <Select value={selectedMaquinaId} onValueChange={setSelectedMaquinaId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar máquina..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {maquinas?.filter(m => m.estado !== "baja" && !(m as any).satcom_id).map(m => (
-                    <SelectItem key={m.id} value={m.id.toString()}>
-                      {m.nombre}{m.patente ? ` (${m.patente})` : ""}
-                    </SelectItem>
-                  ))}
+              // Visual card grid: pick an EXISTING MACHINE (without GPS)
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar máquina por nombre o patente..."
+                    value={machineSearch}
+                    onChange={e => setMachineSearch(e.target.value)}
+                    className="pl-9"
+                    autoFocus
+                  />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[55vh] overflow-y-auto pr-1">
+                  {maquinas
+                    ?.filter(m =>
+                      m.estado !== "baja" &&
+                      !(m as any).satcom_id &&
+                      (`${m.nombre} ${m.patente || ''} ${m.marca || ''} ${m.modelo || ''}`.toLowerCase().includes(machineSearch.toLowerCase()))
+                    )
+                    .map(m => {
+                      const isChosen = selectedMaquinaId === m.id.toString();
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setSelectedMaquinaId(m.id.toString())}
+                          className={`group relative rounded-xl border-2 overflow-hidden text-left transition-all focus:outline-none ${
+                            isChosen
+                              ? "border-primary shadow-md ring-2 ring-primary/30"
+                              : "border-slate-200 hover:border-primary/50 hover:shadow-sm"
+                          }`}
+                        >
+                          {/* Photo */}
+                          <div className="aspect-video w-full bg-slate-100 relative overflow-hidden">
+                            {(m as any).imagen_url ? (
+                              <img
+                                src={(m as any).imagen_url}
+                                alt={m.nombre}
+                                className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Tractor className="h-10 w-10 text-slate-300" />
+                              </div>
+                            )}
+                            {isChosen && (
+                              <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                                <Check className="h-8 w-8 text-primary drop-shadow-lg" />
+                              </div>
+                            )}
+                          </div>
+                          {/* Info */}
+                          <div className="p-2">
+                            <p className="text-xs font-semibold leading-tight truncate text-slate-800">{m.nombre}</p>
+                            {(m.marca || m.modelo) && (
+                              <p className="text-[10px] text-muted-foreground truncate">{m.marca} {m.modelo}</p>
+                            )}
+                            {m.patente && (
+                              <p className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1 rounded mt-0.5 inline-block">{m.patente}</p>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })
+                  }
                   {maquinas?.filter(m => m.estado !== "baja" && !(m as any).satcom_id).length === 0 && (
-                    <SelectItem value="none" disabled>No hay máquinas sin GPS asignado</SelectItem>
+                    <div className="col-span-3 py-8 text-center text-sm text-muted-foreground">
+                      No hay máquinas disponibles sin GPS asignado
+                    </div>
                   )}
-                </SelectContent>
-              </Select>
+                </div>
+              </div>
             ) : (
               // Picker: choose a SATCOM DEVICE (all devices, including currently linked ones)
               <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
