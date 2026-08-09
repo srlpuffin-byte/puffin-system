@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import { db } from "@workspace/db";
-import { maquinasTable, fotografiasTable } from "@workspace/db";
+import { maquinasTable, fotografiasTable, proyectosTable } from "@workspace/db";
 import { eq, isNotNull, and, inArray } from "drizzle-orm";
 import { SatcomClient } from "../services/satcom";
 
@@ -124,7 +124,6 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
       }
     });
 
-    const { proyectosTable } = await import("@workspace/db");
     const proyectos = await db.select({ 
       id: proyectosTable.id, 
       lugar: proyectosTable.lugar, 
