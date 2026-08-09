@@ -546,6 +546,72 @@ export function Gps() {
                   )}
                 </div>
               </div>
+            ) : (
+              // Re-link: pick which SYSTEM MACHINE should own this GPS device
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  El GPS <b>{linkDialog.point?.nombre}</b> se desvinculará de la máquina actual y se asignará a la que elijas.
+                </p>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar máquina por nombre o patente..."
+                    value={machineRelinkSearch}
+                    onChange={e => setMachineRelinkSearch(e.target.value)}
+                    className="pl-9"
+                    autoFocus
+                  />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[50vh] overflow-y-auto pr-1">
+                  {maquinas
+                    ?.filter(m =>
+                      m.estado !== "baja" &&
+                      m.id !== linkDialog.point?.maquina_id &&
+                      (`${m.nombre} ${m.patente || ''} ${m.marca || ''} ${m.modelo || ''}`.toLowerCase().includes(machineRelinkSearch.toLowerCase()))
+                    )
+                    .map(m => {
+                      const isChosen = selectedMaquinaId === m.id.toString();
+                      const alreadyHasGps = !!(m as any).satcom_id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setSelectedMaquinaId(m.id.toString())}
+                          className={`group relative rounded-xl border-2 overflow-hidden text-left transition-all focus:outline-none ${
+                            isChosen
+                              ? "border-primary shadow-md ring-2 ring-primary/30"
+                              : "border-slate-200 hover:border-primary/50 hover:shadow-sm"
+                          }`}
+                        >
+                          <div className="aspect-video w-full bg-slate-100 relative overflow-hidden">
+                            {(m as any).imagen_url ? (
+                              <img src={(m as any).imagen_url} alt={m.nombre} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center"><Tractor className="h-10 w-10 text-slate-300" /></div>
+                            )}
+                            {isChosen && (
+                              <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                                <Check className="h-8 w-8 text-primary drop-shadow-lg" />
+                              </div>
+                            )}
+                            {alreadyHasGps && !isChosen && (
+                              <div className="absolute top-1 right-1 bg-blue-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                                GPS
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-2">
+                            <p className="text-xs font-semibold leading-tight truncate text-slate-800">{m.nombre}</p>
+                            {(m.marca || m.modelo) && <p className="text-[10px] text-muted-foreground truncate">{m.marca} {m.modelo}</p>}
+                            {m.patente && <p className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1 rounded mt-0.5 inline-block">{m.patente}</p>}
+                            {alreadyHasGps && <p className="text-[9px] text-blue-600 mt-0.5">Ya tiene GPS (se reemplazará)</p>}
+                          </div>
+                        </button>
+                      );
+                    })
+                  }
+                </div>
+              </div>
             )}
           </div>
 
