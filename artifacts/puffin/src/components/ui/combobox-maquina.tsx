@@ -101,7 +101,7 @@ export function ComboboxMaquina({
 
   if (isMobile) {
     return (
-      <Drawer open={open} onOpenChange={setOpen}>
+      <Drawer open={open} onOpenChange={setOpen} shouldScaleBackground={false}>
         <DrawerTrigger asChild>
           {triggerButton}
         </DrawerTrigger>
