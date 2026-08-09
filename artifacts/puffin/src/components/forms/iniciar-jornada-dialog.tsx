@@ -219,6 +219,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
                     onChange={v => set("empleado_id", v)}
                     placeholder="Seleccionar operario"
                     searchPlaceholder="Buscar operario..."
+                    recentStorageKey="puffin_recent_operarios"
                     disabled={isEmpleado}
                     options={Array.isArray(empleados) ? empleados.map((e: any) => ({
                       value: e.id.toString(),
@@ -238,6 +239,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
                     onChange={v => set("maquina_id", v)}
                     placeholder="Seleccionar máquina"
                     searchPlaceholder="Buscar máquina..."
+                    recentStorageKey="puffin_recent_maquinas"
                     options={Array.isArray(maquinas) ? maquinas
                       .filter((m: any) => m.categoria !== "inventario")
                       .map((m: any) => ({

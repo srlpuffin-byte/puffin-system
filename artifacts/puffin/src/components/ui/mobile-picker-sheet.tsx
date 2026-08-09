@@ -19,6 +19,7 @@ interface MobilePickerSheetProps {
   searchPlaceholder?: string;
   disabled?: boolean;
   className?: string;
+  recentStorageKey?: string;
 }
 
 export function MobilePickerSheet({
@@ -29,19 +30,31 @@ export function MobilePickerSheet({
   searchPlaceholder = "Buscar...",
   disabled = false,
   className,
+  recentStorageKey,
 }: MobilePickerSheetProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+  const [recentIds, setRecentIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (recentStorageKey) {
+      try {
+        const stored = JSON.parse(localStorage.getItem(recentStorageKey) || "[]");
+        if (Array.isArray(stored)) setRecentIds(stored);
+      } catch (e) {}
+    }
+  }, [recentStorageKey, open]);
 
   const selected = options.find((o) => o.value === value);
 
-  const filtered = search.trim()
-    ? options.filter((o) =>
-        o.label.toLowerCase().includes(search.toLowerCase()) ||
-        (o.sublabel || "").toLowerCase().includes(search.toLowerCase())
-      )
-    : options;
+  let filtered = options;
+  if (search.trim()) {
+    filtered = options.filter((o) =>
+      o.label.toLowerCase().includes(search.toLowerCase()) ||
+      (o.sublabel || "").toLowerCase().includes(search.toLowerCase())
+    );
+  }
 
   const handleOpen = () => {
     // Force blur any active element so keyboard closes first
@@ -54,9 +67,99 @@ export function MobilePickerSheet({
   };
 
   const handleSelect = (val: string) => {
+    if (recentStorageKey) {
+      try {
+        const updated = [val, ...recentIds.filter(id => id !== val)].slice(0, 3);
+        localStorage.setItem(recentStorageKey, JSON.stringify(updated));
+        setRecentIds(updated);
+      } catch (e) {}
+    }
     onChange(val);
     setOpen(false);
     setSearch("");
+  };
+
+  const renderOption = (opt: PickerOption, currentValue: string, onSelect: (val: string) => void) => {
+    const isSelected = opt.value === currentValue;
+    return (
+      <button
+        key={opt.value}
+        type="button"
+        onClick={() => onSelect(opt.value)}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "12px 16px",
+          textAlign: "left",
+          border: "none",
+          borderBottom: "1px solid #f3f4f6",
+          background: isSelected ? "#eff6ff" : "white",
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >
+        {/* Avatar */}
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: "50%",
+            overflow: "hidden",
+            flexShrink: 0,
+            background: "#e5e7eb",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 13,
+            fontWeight: 600,
+            color: "#6b7280",
+          }}
+        >
+          {opt.avatarUrl ? (
+            <img
+              src={opt.avatarUrl}
+              alt={opt.label}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          ) : (
+            <span>{opt.initials || opt.label.slice(0, 2).toUpperCase()}</span>
+          )}
+        </div>
+
+        {/* Text */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{
+            margin: 0,
+            fontSize: 15,
+            fontWeight: isSelected ? 600 : 400,
+            color: isSelected ? "#1d4ed8" : "#111827",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}>
+            {opt.label}
+          </p>
+          {opt.sublabel && (
+            <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
+              {opt.sublabel}
+            </p>
+          )}
+        </div>
+
+        {/* Check */}
+        {isSelected && (
+          <div style={{
+            width: 20, height: 20, borderRadius: "50%",
+            background: "#3b82f6", display: "flex",
+            alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>✓</span>
+          </div>
+        )}
+      </button>
+    );
   };
 
   const handleClose = () => {
@@ -184,88 +287,23 @@ export function MobilePickerSheet({
                   No se encontraron resultados.
                 </p>
               ) : (
-                filtered.map((opt) => {
-                  const isSelected = opt.value === value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => handleSelect(opt.value)}
-                      style={{
-                        width: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        padding: "12px 16px",
-                        textAlign: "left",
-                        border: "none",
-                        borderBottom: "1px solid #f3f4f6",
-                        background: isSelected ? "#eff6ff" : "white",
-                        cursor: "pointer",
-                        WebkitTapHighlightColor: "transparent",
-                      }}
-                    >
-                      {/* Avatar */}
-                      <div
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: "50%",
-                          overflow: "hidden",
-                          flexShrink: 0,
-                          background: "#e5e7eb",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "#6b7280",
-                        }}
-                      >
-                        {opt.avatarUrl ? (
-                          <img
-                            src={opt.avatarUrl}
-                            alt={opt.label}
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          />
-                        ) : (
-                          <span>{opt.initials || opt.label.slice(0, 2).toUpperCase()}</span>
-                        )}
+                <>
+                  {!search.trim() && recentIds.length > 0 && (
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ padding: "12px 16px 4px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        ⭐ Sugeridas (Recientes)
                       </div>
-
-                      {/* Text */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{
-                          margin: 0,
-                          fontSize: 15,
-                          fontWeight: isSelected ? 600 : 400,
-                          color: isSelected ? "#1d4ed8" : "#111827",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}>
-                          {opt.label}
-                        </p>
-                        {opt.sublabel && (
-                          <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
-                            {opt.sublabel}
-                          </p>
-                        )}
+                      {recentIds
+                        .map(id => options.find(o => o.value === id))
+                        .filter(Boolean)
+                        .map(opt => opt && renderOption(opt, value, handleSelect))}
+                      <div style={{ padding: "12px 16px 4px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", borderTop: "1px solid #f3f4f6", marginTop: 8 }}>
+                        Todas las opciones
                       </div>
-
-                      {/* Check */}
-                      {isSelected && (
-                        <div style={{
-                          width: 20, height: 20, borderRadius: "50%",
-                          background: "#3b82f6", display: "flex",
-                          alignItems: "center", justifyContent: "center", flexShrink: 0,
-                        }}>
-                          <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>✓</span>
-                        </div>
-                      )}
-                    </button>
-                  );
-                })
+                    </div>
+                  )}
+                  {filtered.map((opt) => renderOption(opt, value, handleSelect))}
+                </>
               )}
             </div>
           </div>
