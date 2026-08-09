@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "fix-centro-costos": "tsx ./src/fix-centro-costos.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@workspace/db": "workspace:*",
+    "drizzle-orm": "catalog:",
     "tsx": "catalog:"
   }
 }
