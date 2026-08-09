@@ -58,22 +58,23 @@ router.get("/", async (req, res) => {
 
   if (conditions.length) query = query.where(and(...conditions));
 
-  const empleados = await query.orderBy(empleadosTable.apellido);
+  // Ejecutar en paralelo para máxima velocidad
+  const [empleados, jornadas, alertasActivas, fotos] = await Promise.all([
+    query.orderBy(empleadosTable.apellido),
+    db.select({ empleado_id: jornadasTable.empleado_id }).from(jornadasTable).where(eq(jornadasTable.estado, "en_curso")),
+    db.select({
+      empleado_id: alertasTable.entidad_id,
+      count: sql<number>`count(*)`.as("count")
+    })
+      .from(alertasTable)
+      .where(and(eq(alertasTable.estado, "activa"), eq(alertasTable.entidad_tipo, "empleado")))
+      .groupBy(alertasTable.entidad_id),
+    db.select({ entidad_id: fotografiasTable.entidad_id, url: fotografiasTable.url, descripcion: fotografiasTable.descripcion })
+      .from(fotografiasTable).where(eq(fotografiasTable.entidad_tipo, "empleado")),
+  ]);
 
-  const jornadas = await db.select().from(jornadasTable).where(eq(jornadasTable.estado, "en_curso"));
   const jornadaEmpleadoIds = new Set(jornadas.map(j => j.empleado_id));
-
-  const alertasActivas = await db.select({
-    empleado_id: alertasTable.entidad_id,
-    count: sql<number>`count(*)`.as("count")
-  })
-    .from(alertasTable)
-    .where(and(eq(alertasTable.estado, "activa"), eq(alertasTable.entidad_tipo, "empleado")))
-    .groupBy(alertasTable.entidad_id);
-
   const alertasMap = new Map(alertasActivas.map(a => [a.empleado_id, Number(a.count)]));
-
-  const fotos = await db.select().from(fotografiasTable).where(eq(fotografiasTable.entidad_tipo, "empleado"));
   const fotosMap = new Map<number, string>();
   for (const f of fotos) {
     if (f.descripcion === "Foto de perfil" || f.descripcion?.toLowerCase().includes("perfil")) {

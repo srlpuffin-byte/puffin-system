@@ -92,38 +92,33 @@ router.get("/", async (req, res) => {
   ));
   if (conditions.length) query = query.where(and(...conditions));
 
-  const maquinas = await query.orderBy(maquinasTable.nombre);
-
-  // Get fotos for the maquinas
-  const maquinasIds = maquinas.map(m => m.id);
-  let fotografiasMap = new Map();
-  let maquinasProyectoMap = new Map();
-
-  if (maquinasIds.length > 0) {
-    const fotografias = await db
-      .select()
+  // Ejecutar las 3 consultas en paralelo para máxima velocidad
+  const [maquinas, fotografias, proyectos] = await Promise.all([
+    query.orderBy(maquinasTable.nombre),
+    db.select({ entidad_id: fotografiasTable.entidad_id, url: fotografiasTable.url })
       .from(fotografiasTable)
-      .where(and(eq(fotografiasTable.entidad_tipo, "maquina"), inArray(fotografiasTable.entidad_id, maquinasIds)));
-    fotografias.forEach(f => {
-      if (!fotografiasMap.has(f.entidad_id)) {
-        fotografiasMap.set(f.entidad_id, f.url);
-      }
-    });
+      .where(eq(fotografiasTable.entidad_tipo, "maquina")),
+    db.select({ id: proyectosTable.id, lugar: proyectosTable.lugar, maquinas_asignadas: proyectosTable.maquinas_asignadas })
+      .from(proyectosTable),
+  ]);
 
-    const proyectos = await db.select({ 
-      id: proyectosTable.id, 
-      lugar: proyectosTable.lugar, 
-      maquinas_asignadas: proyectosTable.maquinas_asignadas 
-    }).from(proyectosTable);
+  const maquinasIds = new Set(maquinas.map(m => m.id));
 
-    proyectos.forEach(p => {
-      if (p.maquinas_asignadas && Array.isArray(p.maquinas_asignadas)) {
-        p.maquinas_asignadas.forEach((mId: any) => {
-          maquinasProyectoMap.set(Number(mId), { id: p.id, lugar: p.lugar });
-        });
-      }
-    });
-  }
+  const fotografiasMap = new Map<number, string>();
+  fotografias.forEach(f => {
+    if (maquinasIds.has(f.entidad_id) && !fotografiasMap.has(f.entidad_id)) {
+      fotografiasMap.set(f.entidad_id, f.url);
+    }
+  });
+
+  const maquinasProyectoMap = new Map<number, { id: number; lugar: string }>();
+  proyectos.forEach(p => {
+    if (p.maquinas_asignadas && Array.isArray(p.maquinas_asignadas)) {
+      p.maquinas_asignadas.forEach((mId: any) => {
+        maquinasProyectoMap.set(Number(mId), { id: p.id, lugar: p.lugar });
+      });
+    }
+  });
 
   return res.json(maquinas.map(m => ({ 
     ...m, 

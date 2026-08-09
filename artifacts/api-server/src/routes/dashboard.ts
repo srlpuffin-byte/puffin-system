@@ -41,51 +41,6 @@ router.get("/update-actividades-temp", async (req, res) => {
 });
 
 router.get("/resumen", async (req, res) => {
-  const [maquinasActivas] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(maquinasTable)
-    .where(and(eq(maquinasTable.estado, "activa"), sql`(categoria IS NULL OR categoria != 'inventario')`));
-
-  const [maquinasDetenidas] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(maquinasTable)
-    .where(and(eq(maquinasTable.estado, "detenida"), sql`(categoria IS NULL OR categoria != 'inventario')`));
-
-  const [maquinasMantenimiento] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(maquinasTable)
-    .where(and(eq(maquinasTable.estado, "mantenimiento"), sql`(categoria IS NULL OR categoria != 'inventario')`));
-
-  const [inventarioActivo] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(maquinasTable)
-    .where(and(eq(maquinasTable.categoria, "inventario"), eq(maquinasTable.estado, "activa")));
-
-  const [inventarioTotal] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(maquinasTable)
-    .where(eq(maquinasTable.categoria, "inventario"));
-
-  const [empleadosActivos] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(empleadosTable)
-    .where(eq(empleadosTable.estado, "activo"));
-
-  const [alertasActivas] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(alertasTable)
-    .where(eq(alertasTable.estado, "activa"));
-
-  const [alertasRojas] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(alertasTable)
-    .where(and(eq(alertasTable.estado, "activa"), eq(alertasTable.prioridad, "roja")));
-
-  const [alertasAmarillas] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(alertasTable)
-    .where(and(eq(alertasTable.estado, "activa"), eq(alertasTable.prioridad, "amarilla")));
-
   const isEmpleado = req.user?.rol?.toLowerCase() === "empleado";
   let userEmpleadoId = -1;
   if (isEmpleado && req.user) {
@@ -95,23 +50,44 @@ router.get("/resumen", async (req, res) => {
   const now = new Date();
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
 
-  const [combustibleMes] = await db
-    .select({ total: sql<number>`coalesce(sum(litros::numeric), 0)` })
-    .from(combustibleTable)
-    .where(
-      isEmpleado 
-      ? and(gte(combustibleTable.fecha, firstDayOfMonth), eq(combustibleTable.empleado_id, userEmpleadoId))
-      : gte(combustibleTable.fecha, firstDayOfMonth)
-    );
-
-  const jornadasMes = await db
-    .select({ horometro_inicio: jornadasTable.horometro_inicio, horometro_fin: jornadasTable.horometro_fin })
-    .from(jornadasTable)
-    .where(
+  // Ejecutar todas las queries del dashboard en paralelo
+  const [
+    maquinasActivas,
+    maquinasDetenidas,
+    maquinasMantenimiento,
+    inventarioActivo,
+    inventarioTotal,
+    empleadosActivos,
+    alertasActivas,
+    alertasRojas,
+    alertasAmarillas,
+    combustibleMes,
+    jornadasMes,
+    mantenimientosMes,
+    maquinas,
+  ] = await Promise.all([
+    db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(and(eq(maquinasTable.estado, "activa"), sql`(categoria IS NULL OR categoria != 'inventario')`)).then(r => r[0]),
+    db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(and(eq(maquinasTable.estado, "detenida"), sql`(categoria IS NULL OR categoria != 'inventario')`)).then(r => r[0]),
+    db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(and(eq(maquinasTable.estado, "mantenimiento"), sql`(categoria IS NULL OR categoria != 'inventario')`)).then(r => r[0]),
+    db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(and(eq(maquinasTable.categoria, "inventario"), eq(maquinasTable.estado, "activa"))).then(r => r[0]),
+    db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(eq(maquinasTable.categoria, "inventario")).then(r => r[0]),
+    db.select({ count: sql<number>`count(*)` }).from(empleadosTable).where(eq(empleadosTable.estado, "activo")).then(r => r[0]),
+    db.select({ count: sql<number>`count(*)` }).from(alertasTable).where(eq(alertasTable.estado, "activa")).then(r => r[0]),
+    db.select({ count: sql<number>`count(*)` }).from(alertasTable).where(and(eq(alertasTable.estado, "activa"), eq(alertasTable.prioridad, "roja"))).then(r => r[0]),
+    db.select({ count: sql<number>`count(*)` }).from(alertasTable).where(and(eq(alertasTable.estado, "activa"), eq(alertasTable.prioridad, "amarilla"))).then(r => r[0]),
+    db.select({ total: sql<number>`coalesce(sum(litros::numeric), 0)` }).from(combustibleTable).where(
       isEmpleado
-      ? and(gte(jornadasTable.fecha, firstDayOfMonth), eq(jornadasTable.estado, "finalizada"), eq(jornadasTable.empleado_id, userEmpleadoId))
-      : and(gte(jornadasTable.fecha, firstDayOfMonth), eq(jornadasTable.estado, "finalizada"))
-    );
+        ? and(gte(combustibleTable.fecha, firstDayOfMonth), eq(combustibleTable.empleado_id, userEmpleadoId))
+        : gte(combustibleTable.fecha, firstDayOfMonth)
+    ).then(r => r[0]),
+    db.select({ horometro_inicio: jornadasTable.horometro_inicio, horometro_fin: jornadasTable.horometro_fin }).from(jornadasTable).where(
+      isEmpleado
+        ? and(gte(jornadasTable.fecha, firstDayOfMonth), eq(jornadasTable.estado, "finalizada"), eq(jornadasTable.empleado_id, userEmpleadoId))
+        : and(gte(jornadasTable.fecha, firstDayOfMonth), eq(jornadasTable.estado, "finalizada"))
+    ),
+    db.select({ count: sql<number>`count(*)` }).from(mantenimientosTable).where(gte(mantenimientosTable.fecha, firstDayOfMonth)).then(r => r[0]),
+    db.select().from(maquinasTable).where(sql`(categoria IS NULL OR categoria != 'inventario')`).limit(10),
+  ]);
 
   const horasMes = jornadasMes.reduce((acc, j) => {
     if (j.horometro_inicio && j.horometro_fin) {
@@ -119,11 +95,6 @@ router.get("/resumen", async (req, res) => {
     }
     return acc;
   }, 0);
-
-  const [mantenimientosMes] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(mantenimientosTable)
-    .where(gte(mantenimientosTable.fecha, firstDayOfMonth));
 
   const totalMaquinas = Number(maquinasActivas.count) + Number(maquinasDetenidas.count) + Number(maquinasMantenimiento.count);
   const disponibilidad = totalMaquinas > 0
@@ -148,11 +119,6 @@ router.get("/resumen", async (req, res) => {
     .sort((a, b) => a.dias_restantes - b.dias_restantes)
     .slice(0, 5);
 
-  const maquinas = await db
-    .select()
-    .from(maquinasTable)
-    .where(sql`(categoria IS NULL OR categoria != 'inventario')`)
-    .limit(10);
   const maquinas_resumen = maquinas.map(m => ({
     id: m.id,
     nombre: m.nombre,
