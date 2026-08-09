@@ -194,7 +194,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
         </AlertDialogContent>
       </AlertDialog>
 
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetForm(); }}>
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetForm(); }} modal={false}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Iniciar Jornada y Checklist Preoperacional</DialogTitle>

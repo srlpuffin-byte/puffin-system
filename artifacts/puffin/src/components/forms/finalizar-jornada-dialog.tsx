@@ -95,7 +95,7 @@ export function FinalizarJornadaDialog({ open, onOpenChange, jornadaId, empleado
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetForm(); }}>
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetForm(); }} modal={false}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Finalizar Jornada (Checklist de Cierre)</DialogTitle>
