@@ -12,6 +12,7 @@ interface MapPoint {
   encendido: boolean;
   is_unlinked?: boolean;
   imagen_url?: string | null;
+  proyecto_lugar?: string | null;
 }
 
 interface SatcomMapProps {
@@ -128,6 +129,7 @@ export function SatcomMap({ points, height = "420px", activePointId }: SatcomMap
             ${p.imagen_url ? `<img src="${p.imagen_url}" style="width:100%;height:100px;object-fit:cover;border-radius:6px;margin-bottom:8px" alt="${p.nombre}" />` : ''}
             <strong style="font-size:14px">${p.nombre}</strong><br/>
             <span style="color:#64748b;font-size:12px">${p.tipo}</span>
+            ${p.proyecto_lugar ? `<br/><span style="display:inline-block;margin-top:4px;padding:2px 6px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:12px;font-size:10px;font-weight:600;">En: ${p.proyecto_lugar}</span>` : ''}
             <hr style="margin:6px 0;border-color:#e2e8f0"/>
             <div style="display:flex;gap:6px;flex-direction:column;font-size:12px">
               <span>${p.encendido ? "🟢" : "🔴"} <b>${p.encendido ? "Encendido" : "Apagado"}</b></span>

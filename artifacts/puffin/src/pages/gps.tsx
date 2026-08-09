@@ -19,6 +19,7 @@ interface MapPoint {
   encendido: boolean;
   is_unlinked?: boolean;
   imagen_url?: string | null;
+  proyecto_lugar?: string | null;
 }
 
 export function Gps() {
@@ -216,8 +217,13 @@ export function Gps() {
                       }
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 mt-1 ml-4">
+                  <div className="flex items-center gap-3 mt-1 ml-4 flex-wrap">
                     <span className="text-[11px] text-muted-foreground">{p.tipo}</span>
+                    {p.proyecto_lugar && (
+                      <span className="text-[10px] font-medium bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded-full truncate max-w-[120px]">
+                        En: {p.proyecto_lugar}
+                      </span>
+                    )}
                     {p.velocidad_kmh !== null && p.velocidad_kmh > 0 && (
                       <span className="text-[11px] font-medium text-blue-600">{p.velocidad_kmh} km/h</span>
                     )}

@@ -124,6 +124,22 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
       }
     });
 
+    const { proyectosTable } = await import("@workspace/db");
+    const proyectos = await db.select({ 
+      id: proyectosTable.id, 
+      lugar: proyectosTable.lugar, 
+      maquinas_asignadas: proyectosTable.maquinas_asignadas 
+    }).from(proyectosTable);
+
+    const maquinasProyectoMap = new Map();
+    proyectos.forEach(p => {
+      if (p.maquinas_asignadas && Array.isArray(p.maquinas_asignadas)) {
+        p.maquinas_asignadas.forEach((mId: any) => {
+          maquinasProyectoMap.set(Number(mId), p.lugar);
+        });
+      }
+    });
+
     const devices = await SatcomClient.getDevices();
 
     // Identificar dispositivos vinculados
@@ -160,6 +176,7 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
         encendido: position?.attributes?.ignition || false,
         is_unlinked: false,
         imagen_url: fotografiasMap.get(m.id) || null,
+        proyecto_lugar: maquinasProyectoMap.get(m.id) || null,
       });
     }
 
@@ -177,6 +194,7 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
         velocidad_kmh: position ? Math.round(position.speed * 1.852) : null,
         encendido: position?.attributes?.ignition || false,
         is_unlinked: true,
+        proyecto_lugar: null,
       });
     }
 
