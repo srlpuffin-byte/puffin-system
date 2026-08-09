@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ComboboxMaquina } from "@/components/ui/combobox-maquina";
+import { MobilePickerSheet } from "@/components/ui/mobile-picker-sheet";
 import { useGetProyectos } from "@/hooks/use-proyectos";
 
 const TIPOS_MANTENIMIENTO = ["Service Periódico", "Service por km", "Service por horas", "Reparación", "Preventivo", "Correctivo", "Cambio de neumáticos", "Cambio de aceite", "Revisión general", "Otro"];
@@ -119,11 +119,20 @@ export function RegistrarMantenimientoDialog({ open, onOpenChange, maquinaIdFija
           {!maquinaIdFija && (
             <div className="space-y-1">
               <Label>Máquina *</Label>
-              <ComboboxMaquina
+              <MobilePickerSheet
                 value={form.maquina_id}
                 onChange={v => set("maquina_id", v)}
-                maquinas={(Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario") : [])}
-                proyectos={proyectos}
+                placeholder="Seleccionar máquina"
+                searchPlaceholder="Buscar máquina..."
+                recentStorageKey="puffin_recent_maquinas"
+                options={Array.isArray(maquinas) ? maquinas
+                  .map((m: any) => ({
+                    value: m.id.toString(),
+                    label: m.nombre,
+                    sublabel: [m.patente || m.dominio, m.marca, m.modelo].filter(Boolean).join(" · ") || undefined,
+                    avatarUrl: m.imagen_url || null,
+                    initials: m.nombre.substring(0, 2).toUpperCase(),
+                  })) : []}
               />
             </div>
           )}

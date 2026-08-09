@@ -10,8 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Camera, X, ImagePlus, Search } from "lucide-react";
-import { ComboboxEmpleado } from "@/components/ui/combobox-empleado";
-import { ComboboxMaquina } from "@/components/ui/combobox-maquina";
+import { MobilePickerSheet } from "@/components/ui/mobile-picker-sheet";
 import { useGetProyectos } from "@/hooks/use-proyectos";
 
 const TIPOS_INCIDENTE = [
@@ -235,13 +234,20 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
           {!empleadoIdFijo && (
             <div className="space-y-1">
               <Label>Operario involucrado</Label>
-              <ComboboxEmpleado
+              <MobilePickerSheet
                 value={form.empleado_id}
                 onChange={v => set("empleado_id", v)}
-                empleados={Array.isArray(empleados) ? empleados : []}
-                proyectos={proyectos}
+                placeholder="Seleccionar operario involucrado"
+                searchPlaceholder="Buscar operario..."
+                recentStorageKey="puffin_recent_operarios"
                 disabled={isEmpleado}
-                placeholder="(Opcional) Seleccionar operario"
+                options={Array.isArray(empleados) ? empleados.map((e: any) => ({
+                  value: e.id.toString(),
+                  label: `${e.apellido}, ${e.nombre}`,
+                  sublabel: e.cargo || undefined,
+                  avatarUrl: e.foto_perfil || null,
+                  initials: `${e.nombre?.[0] || ""}${e.apellido?.[0] || ""}`,
+                })) : []}
               />
             </div>
           )}
@@ -250,12 +256,20 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
           {!maquinaIdFija && (
             <div className="space-y-1">
               <Label>Máquina involucrada</Label>
-              <ComboboxMaquina
+              <MobilePickerSheet
                 value={form.maquina_id}
                 onChange={v => set("maquina_id", v)}
-                maquinas={Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario") : []}
-                proyectos={proyectos}
-                placeholder="(Opcional) Seleccionar máquina"
+                placeholder="Seleccionar máquina involucrada"
+                searchPlaceholder="Buscar máquina..."
+                recentStorageKey="puffin_recent_maquinas"
+                options={Array.isArray(maquinas) ? maquinas
+                  .map((m: any) => ({
+                    value: m.id.toString(),
+                    label: m.nombre,
+                    sublabel: [m.patente || m.dominio, m.marca, m.modelo].filter(Boolean).join(" · ") || undefined,
+                    avatarUrl: m.imagen_url || null,
+                    initials: m.nombre.substring(0, 2).toUpperCase(),
+                  })) : []}
               />
             </div>
           )}

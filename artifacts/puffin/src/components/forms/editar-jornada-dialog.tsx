@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ComboboxEmpleado } from "@/components/ui/combobox-empleado";
-import { ComboboxMaquina } from "@/components/ui/combobox-maquina";
+import { MobilePickerSheet } from "@/components/ui/mobile-picker-sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Props {
@@ -106,18 +105,37 @@ export function EditarJornadaDialog({ open, onOpenChange, jornada }: Props) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-white/70">Operario *</Label>
-              <ComboboxEmpleado
-                empleados={empleados || []}
+              <MobilePickerSheet
                 value={form.empleado_id}
-                onChange={(val) => set("empleado_id", val)}
+                onChange={v => set("empleado_id", v)}
+                placeholder="Seleccionar operario"
+                searchPlaceholder="Buscar operario..."
+                recentStorageKey="puffin_recent_operarios"
+                options={Array.isArray(empleados) ? empleados.map((e: any) => ({
+                  value: e.id.toString(),
+                  label: `${e.apellido}, ${e.nombre}`,
+                  sublabel: e.cargo || undefined,
+                  avatarUrl: e.foto_perfil || null,
+                  initials: `${e.nombre?.[0] || ""}${e.apellido?.[0] || ""}`,
+                })) : []}
               />
             </div>
             <div className="space-y-2">
               <Label className="text-white/70">Máquina *</Label>
-              <ComboboxMaquina
-                maquinas={(maquinas || []).filter(m => m.categoria !== "inventario")}
+              <MobilePickerSheet
                 value={form.maquina_id}
-                onChange={(val) => set("maquina_id", val)}
+                onChange={v => set("maquina_id", v)}
+                placeholder="Seleccionar máquina"
+                searchPlaceholder="Buscar máquina..."
+                recentStorageKey="puffin_recent_maquinas"
+                options={Array.isArray(maquinas) ? maquinas
+                  .map((m: any) => ({
+                    value: m.id.toString(),
+                    label: m.nombre,
+                    sublabel: [m.patente || m.dominio, m.marca, m.modelo].filter(Boolean).join(" · ") || undefined,
+                    avatarUrl: m.imagen_url || null,
+                    initials: m.nombre.substring(0, 2).toUpperCase(),
+                  })) : []}
               />
             </div>
           </div>

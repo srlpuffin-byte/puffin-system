@@ -8,8 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Camera } from "lucide-react";
-import { ComboboxEmpleado } from "@/components/ui/combobox-empleado";
-import { ComboboxMaquina } from "@/components/ui/combobox-maquina";
+import { MobilePickerSheet } from "@/components/ui/mobile-picker-sheet";
 import { useGetProyectos } from "@/hooks/use-proyectos";
 
 interface Props {
@@ -135,21 +134,38 @@ export function EditarCargaDialog({ open, onOpenChange, carga }: Props) {
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
             <div className="space-y-1">
               <Label>Operario *</Label>
-              <ComboboxEmpleado
+              <MobilePickerSheet
                 value={form.empleado_id}
                 onChange={v => set("empleado_id", v)}
-                empleados={Array.isArray(empleados) ? empleados : []}
-                proyectos={proyectos}
+                placeholder="Seleccionar operario"
+                searchPlaceholder="Buscar operario..."
+                recentStorageKey="puffin_recent_operarios"
                 disabled={isEmpleado}
+                options={Array.isArray(empleados) ? empleados.map((e: any) => ({
+                  value: e.id.toString(),
+                  label: `${e.apellido}, ${e.nombre}`,
+                  sublabel: e.cargo || undefined,
+                  avatarUrl: e.foto_perfil || null,
+                  initials: `${e.nombre?.[0] || ""}${e.apellido?.[0] || ""}`,
+                })) : []}
               />
             </div>
             <div className="space-y-1">
               <Label>Máquina *</Label>
-              <ComboboxMaquina
+              <MobilePickerSheet
                 value={form.maquina_id}
                 onChange={v => set("maquina_id", v)}
-                maquinas={Array.isArray(maquinas) ? maquinas.filter(m => m.categoria !== "inventario") : []}
-                proyectos={proyectos}
+                placeholder="Seleccionar máquina"
+                searchPlaceholder="Buscar máquina..."
+                recentStorageKey="puffin_recent_maquinas"
+                options={Array.isArray(maquinas) ? maquinas
+                  .map((m: any) => ({
+                    value: m.id.toString(),
+                    label: m.nombre,
+                    sublabel: [m.patente || m.dominio, m.marca, m.modelo].filter(Boolean).join(" · ") || undefined,
+                    avatarUrl: m.imagen_url || null,
+                    initials: m.nombre.substring(0, 2).toUpperCase(),
+                  })) : []}
               />
             </div>
           <div className="grid grid-cols-3 gap-4">
