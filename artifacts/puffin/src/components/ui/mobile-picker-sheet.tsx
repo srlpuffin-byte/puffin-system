@@ -181,155 +181,158 @@ export function MobilePickerSheet({
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
-  const sheet = open
-    ? ReactDOM.createPortal(
+  // Render the sheet directly (no portal) so it stays inside the Radix Dialog
+  // event tree - this is critical for iOS touch events to work correctly.
+  const sheet = open ? (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "flex-end",
+      }}
+    >
+      {/* Backdrop */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundColor: "rgba(0,0,0,0.5)",
+        }}
+        onClick={handleClose}
+      />
+
+      {/* Sheet */}
+      <div
+        style={{
+          position: "relative",
+          backgroundColor: "white",
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
+          maxHeight: "80dvh",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 -4px 32px rgba(0,0,0,0.15)",
+        }}
+      >
+        {/* Handle + Close */}
         <div
           style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 9999,
             display: "flex",
-            flexDirection: "column",
-            justifyContent: "flex-end",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "12px 16px 8px",
+            borderBottom: "1px solid #e5e7eb",
+            flexShrink: 0,
           }}
-          // Stop propagation so Radix Dialog doesn't intercept touch events
-          onTouchMove={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
         >
-          {/* Backdrop */}
-          <div
+          <div style={{ width: 40, height: 4, backgroundColor: "#d1d5db", borderRadius: 4, margin: "0 auto" }} />
+          <button
+            type="button"
+            onClick={handleClose}
             style={{
               position: "absolute",
-              inset: 0,
-              backgroundColor: "rgba(0,0,0,0.5)",
+              right: 12,
+              top: 12,
+              padding: 4,
+              borderRadius: 8,
+              border: "none",
+              background: "none",
+              cursor: "pointer",
             }}
-            onClick={handleClose}
+          >
+            <X style={{ width: 20, height: 20, color: "#6b7280" }} />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 16px",
+            borderBottom: "1px solid #e5e7eb",
+            flexShrink: 0,
+          }}
+        >
+          <Search style={{ width: 16, height: 16, color: "#9ca3af", flexShrink: 0 }} />
+          <input
+            ref={searchRef}
+            type="text"
+            placeholder={searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              flex: 1,
+              border: "none",
+              outline: "none",
+              fontSize: 14,
+              color: "#111827",
+              background: "transparent",
+            }}
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }}
+            >
+              <X style={{ width: 14, height: 14, color: "#9ca3af" }} />
+            </button>
+          )}
+        </div>
 
-            {/* Sheet */}
-            <div
-              style={{
-                position: "relative",
-                backgroundColor: "white",
-                borderTopLeftRadius: 16,
-                borderTopRightRadius: 16,
-                maxHeight: "80dvh",
-                height: "100%", // Let it take up the 80dvh if needed, gives scrolling context
-                display: "flex",
-                flexDirection: "column",
-                boxShadow: "0 -4px 32px rgba(0,0,0,0.15)",
-                touchAction: "pan-y",
-              }}
-            >
-            {/* Handle + Close */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "12px 16px 8px",
-                borderBottom: "1px solid #e5e7eb",
-              }}
-            >
-              <div style={{ width: 40, height: 4, backgroundColor: "#d1d5db", borderRadius: 4, margin: "0 auto" }} />
-              <button
-                type="button"
-                onClick={handleClose}
-                style={{
-                  position: "absolute",
-                  right: 12,
-                  top: 12,
-                  padding: 4,
-                  borderRadius: 8,
-                  border: "none",
-                  background: "none",
-                  cursor: "pointer",
-                }}
-              >
-                <X style={{ width: 20, height: 20, color: "#6b7280" }} />
-              </button>
+        {/* List — explicitly overflow-y: scroll for iOS Safari */}
+        <div
+          style={{
+            overflowY: "scroll",
+            WebkitOverflowScrolling: "touch" as any,
+            flex: "1 1 0",
+            minHeight: 0,
+            overscrollBehavior: "contain",
+          }}
+        >
+          {isLoading ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 16px", gap: 12 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: "50%",
+                border: "3px solid #e5e7eb",
+                borderTopColor: "#3b82f6",
+                animation: "spin 0.8s linear infinite",
+              }} />
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              <p style={{ color: "#6b7280", fontSize: 14 }}>Cargando opciones...</p>
             </div>
-
-            {/* Search */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 16px",
-                borderBottom: "1px solid #e5e7eb",
-              }}
-            >
-              <Search style={{ width: 16, height: 16, color: "#9ca3af", flexShrink: 0 }} />
-              <input
-                ref={searchRef}
-                type="text"
-                placeholder={searchPlaceholder}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{
-                  flex: 1,
-                  border: "none",
-                  outline: "none",
-                  fontSize: 14,
-                  color: "#111827",
-                  background: "transparent",
-                }}
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }}
-                >
-                  <X style={{ width: 14, height: 14, color: "#9ca3af" }} />
-                </button>
-              )}
-            </div>
-
-            {/* List */}
-            <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch" as any, flex: 1, overscrollBehavior: "contain", touchAction: "pan-y" }}>
-              {isLoading ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 16px", gap: 12 }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: "50%",
-                    border: "3px solid #e5e7eb",
-                    borderTopColor: "#3b82f6",
-                    animation: "spin 0.8s linear infinite",
-                  }} />
-                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                  <p style={{ color: "#6b7280", fontSize: 14 }}>Cargando opciones...</p>
+          ) : filtered.length === 0 ? (
+            <p style={{ textAlign: "center", color: "#9ca3af", padding: "32px 16px", fontSize: 14 }}>
+              No se encontraron resultados.
+            </p>
+          ) : (
+            <>
+              {!search.trim() && recentIds.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ padding: "12px 16px 4px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    ⭐ Sugeridas (Recientes)
+                  </div>
+                  {recentIds
+                    .map(id => options.find(o => o.value === id))
+                    .filter(Boolean)
+                    .map(opt => opt && renderOption(opt, value, handleSelect))}
+                  <div style={{ padding: "12px 16px 4px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", borderTop: "1px solid #f3f4f6", marginTop: 8 }}>
+                    Todas las opciones
+                  </div>
                 </div>
-              ) : filtered.length === 0 ? (
-                <p style={{ textAlign: "center", color: "#9ca3af", padding: "32px 16px", fontSize: 14 }}>
-                  No se encontraron resultados.
-                </p>
-              ) : (
-                <>
-                  {!search.trim() && recentIds.length > 0 && (
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ padding: "12px 16px 4px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                        ⭐ Sugeridas (Recientes)
-                      </div>
-                      {recentIds
-                        .map(id => options.find(o => o.value === id))
-                        .filter(Boolean)
-                        .map(opt => opt && renderOption(opt, value, handleSelect))}
-                      <div style={{ padding: "12px 16px 4px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", borderTop: "1px solid #f3f4f6", marginTop: 8 }}>
-                        Todas las opciones
-                      </div>
-                    </div>
-                  )}
-                  {filtered.map((opt) => renderOption(opt, value, handleSelect))}
-                </>
               )}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )
-    : null;
+              {filtered.map((opt) => renderOption(opt, value, handleSelect))}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <>
