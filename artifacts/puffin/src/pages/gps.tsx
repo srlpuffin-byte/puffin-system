@@ -490,6 +490,7 @@ export function Gps() {
                   {maquinas
                     ?.filter(m =>
                       m.estado !== "baja" &&
+                      m.categoria !== "inventario" &&
                       !(m as any).satcom_id &&
                       (`${m.nombre} ${m.patente || ''} ${m.marca || ''} ${m.modelo || ''}`.toLowerCase().includes(machineSearch.toLowerCase()))
                     )
@@ -539,7 +540,7 @@ export function Gps() {
                       );
                     })
                   }
-                  {maquinas?.filter(m => m.estado !== "baja" && !(m as any).satcom_id).length === 0 && (
+                  {maquinas?.filter(m => m.estado !== "baja" && m.categoria !== "inventario" && !(m as any).satcom_id).length === 0 && (
                     <div className="col-span-3 py-8 text-center text-sm text-muted-foreground">
                       No hay máquinas disponibles sin GPS asignado
                     </div>
@@ -566,6 +567,7 @@ export function Gps() {
                   {maquinas
                     ?.filter(m =>
                       m.estado !== "baja" &&
+                      m.categoria !== "inventario" &&
                       m.id !== linkDialog.point?.maquina_id &&
                       (`${m.nombre} ${m.patente || ''} ${m.marca || ''} ${m.modelo || ''}`.toLowerCase().includes(machineRelinkSearch.toLowerCase()))
                     )
