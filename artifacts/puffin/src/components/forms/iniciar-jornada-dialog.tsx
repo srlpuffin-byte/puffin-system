@@ -243,7 +243,6 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
                     recentStorageKey="puffin_recent_maquinas"
                     isLoading={loadingMaquinas}
                     options={Array.isArray(maquinas) ? maquinas
-                      .filter((m: any) => m.categoria !== "inventario")
                       .map((m: any) => ({
                         value: m.id.toString(),
                         label: m.nombre,
