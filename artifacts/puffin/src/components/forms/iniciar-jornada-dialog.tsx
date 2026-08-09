@@ -204,11 +204,11 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
         
         <form onSubmit={handleSubmit} className="py-2">
           <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-4">
-              <TabsTrigger value="general">1. General</TabsTrigger>
-              <TabsTrigger value="seguridad">2. Seguridad</TabsTrigger>
-              <TabsTrigger value="mecanica">3. Mecánica</TabsTrigger>
-              <TabsTrigger value="fotos">4. Fotos/Fin</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto gap-1 mb-4 p-1">
+              <TabsTrigger className="py-2 text-xs sm:text-sm" value="general">1. General</TabsTrigger>
+              <TabsTrigger className="py-2 text-xs sm:text-sm" value="seguridad">2. Seguridad</TabsTrigger>
+              <TabsTrigger className="py-2 text-xs sm:text-sm" value="mecanica">3. Mecánica</TabsTrigger>
+              <TabsTrigger className="py-2 text-xs sm:text-sm" value="fotos">4. Fotos/Fin</TabsTrigger>
             </TabsList>
 
             <TabsContent value="general" className="space-y-4">
