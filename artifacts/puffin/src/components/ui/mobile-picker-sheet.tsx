@@ -203,19 +203,21 @@ export function MobilePickerSheet({
             onClick={handleClose}
           />
 
-          {/* Sheet */}
-          <div
-            style={{
-              position: "relative",
-              backgroundColor: "white",
-              borderTopLeftRadius: 16,
-              borderTopRightRadius: 16,
-              maxHeight: "80vh",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow: "0 -4px 32px rgba(0,0,0,0.15)",
-            }}
-          >
+            {/* Sheet */}
+            <div
+              style={{
+                position: "relative",
+                backgroundColor: "white",
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16,
+                maxHeight: "80dvh",
+                height: "100%", // Let it take up the 80dvh if needed, gives scrolling context
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 -4px 32px rgba(0,0,0,0.15)",
+                touchAction: "pan-y",
+              }}
+            >
             {/* Handle + Close */}
             <div
               style={{
@@ -283,7 +285,7 @@ export function MobilePickerSheet({
             </div>
 
             {/* List */}
-            <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch" as any, flex: 1 }}>
+            <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch" as any, flex: 1, overscrollBehavior: "contain", touchAction: "pan-y" }}>
               {isLoading ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 16px", gap: 12 }}>
                   <div style={{
