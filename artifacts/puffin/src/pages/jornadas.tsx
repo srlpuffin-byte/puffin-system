@@ -36,7 +36,8 @@ export function Jornadas() {
     { header: "Tipo de Trabajo", key: "tipo_trabajo" },
     { header: "H. Inicio", key: "horometro_inicio" },
     { header: "H. Fin", key: "horometro_fin" },
-    { header: "Horas Trabajadas", key: "horas_trabajadas" },
+    { header: "Hs Máquina", key: "horas_trabajadas" },
+    { header: "Hs Reloj", key: "horas_reloj" },
     { header: "Estado", key: "estado" }
   ];
 
@@ -71,9 +72,8 @@ export function Jornadas() {
                     <TableHead>Fecha</TableHead>
                     <TableHead>Operario</TableHead>
                     <TableHead>Máquina</TableHead>
-                    <TableHead>Inicio</TableHead>
-                    <TableHead>Fin</TableHead>
-                    <TableHead>Horas</TableHead>
+                    <TableHead>Reloj</TableHead>
+                    <TableHead>Hs Máq.</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Acciones / Tarea</TableHead>
                   </TableRow>
@@ -91,10 +91,14 @@ export function Jornadas() {
                         </TableCell>
                         <TableCell>{jor.empleado_nombre}</TableCell>
                         <TableCell>{jor.maquina_nombre}</TableCell>
-                        <TableCell>{jor.hora_inicio || "-"}</TableCell>
-                        <TableCell>{jor.hora_fin || "-"}</TableCell>
                         <TableCell>
-                          {jor.horas_trabajadas != null ? `${jor.horas_trabajadas} h` : "-"}
+                          <div className="flex flex-col text-sm">
+                            <span>{jor.hora_inicio || "-"} a {jor.hora_fin || "-"}</span>
+                            {jor.horas_reloj != null && <span className="text-xs text-muted-foreground">{jor.horas_reloj}h reloj</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {jor.horas_trabajadas != null ? <span className="font-semibold text-blue-700">{jor.horas_trabajadas} h</span> : "-"}
                         </TableCell>
                         <TableCell>
                           <Badge variant={jor.estado === "en_curso" ? "outline" : "secondary"}
@@ -192,7 +196,7 @@ export function Jornadas() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 text-sm bg-slate-50 p-2 rounded border mt-1">
+                    <div className="grid grid-cols-4 gap-2 text-sm bg-slate-50 p-2 rounded border mt-1">
                       <div className="flex flex-col">
                         <span className="text-[10px] uppercase text-muted-foreground font-semibold">Inicio</span>
                         <span className="font-medium">{jor.hora_inicio || "-"}</span>
@@ -202,8 +206,12 @@ export function Jornadas() {
                         <span className="font-medium">{jor.hora_fin || "-"}</span>
                       </div>
                       <div className="flex flex-col items-end">
-                        <span className="text-[10px] uppercase text-muted-foreground font-semibold">Total</span>
-                        <span className="font-bold text-blue-700">{jor.horas_trabajadas != null ? `${jor.horas_trabajadas} h` : "-"}</span>
+                        <span className="text-[10px] uppercase text-muted-foreground font-semibold" title="Horas Reloj (Empleado)">Hs Reloj</span>
+                        <span className="font-bold text-slate-700">{jor.horas_reloj != null ? `${jor.horas_reloj}h` : "-"}</span>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] uppercase text-blue-700 font-semibold" title="Horas Máquina (Horómetro)">Hs Máq</span>
+                        <span className="font-bold text-blue-700">{jor.horas_trabajadas != null ? `${jor.horas_trabajadas}h` : "-"}</span>
                       </div>
                     </div>
 

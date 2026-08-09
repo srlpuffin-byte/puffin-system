@@ -17,6 +17,17 @@ async function enrichJornada(j: typeof jornadasTable.$inferSelect) {
   const hrFin = j.horometro_fin ? Number(j.horometro_fin) : null;
   const horas = hrInicio !== null && hrFin !== null ? hrFin - hrInicio : null;
 
+  let horasReloj = null;
+  if (j.hora_inicio && j.hora_fin) {
+    const [hI, mI] = j.hora_inicio.split(':').map(Number);
+    const [hF, mF] = j.hora_fin.split(':').map(Number);
+    if (!isNaN(hI) && !isNaN(mI) && !isNaN(hF) && !isNaN(mF)) {
+      let diff = (hF * 60 + mF) - (hI * 60 + mI);
+      if (diff < 0) diff += 24 * 60; // Cruzó la medianoche
+      horasReloj = Number((diff / 60).toFixed(2));
+    }
+  }
+
   return {
     ...j,
     empleado_nombre: empleado ? `${empleado.nombre} ${empleado.apellido}` : "Desconocido",
@@ -26,6 +37,7 @@ async function enrichJornada(j: typeof jornadasTable.$inferSelect) {
     horometro_inicio: hrInicio,
     horometro_fin: hrFin,
     horas_trabajadas: horas,
+    horas_reloj: horasReloj,
   };
 }
 

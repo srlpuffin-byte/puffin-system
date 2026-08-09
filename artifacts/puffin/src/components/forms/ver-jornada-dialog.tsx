@@ -97,6 +97,16 @@ export function VerJornadaDialog({ open, onOpenChange, jornada }: VerJornadaDial
                   <p className="font-medium text-lg">{jornada.horometro_fin != null ? jornada.horometro_fin : "-"}</p>
                 </div>
                 
+                <div className="border rounded-md p-3 bg-slate-100 md:col-span-2">
+                  <p className="text-[10px] uppercase text-slate-700 font-semibold">Total Horas Reloj (Empleado)</p>
+                  <p className="font-bold text-xl">{jornada.horas_reloj != null ? `${jornada.horas_reloj} h` : "-"}</p>
+                </div>
+                
+                <div className="border rounded-md p-3 bg-blue-100 md:col-span-2">
+                  <p className="text-[10px] uppercase text-blue-800 font-semibold">Total Horas Máquina (Horómetro)</p>
+                  <p className="font-bold text-xl text-blue-700">{jornada.horas_trabajadas != null ? `${jornada.horas_trabajadas} h` : "-"}</p>
+                </div>
+
                 {jornada.km_inicio != null && (
                   <div className="border rounded-md p-3 bg-amber-50/50">
                     <p className="text-[10px] uppercase text-amber-700 font-semibold">KM Inicio</p>
