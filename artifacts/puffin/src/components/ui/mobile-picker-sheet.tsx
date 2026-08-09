@@ -165,7 +165,8 @@ export function MobilePickerSheet({
         backgroundColor: "white",
         borderTopLeftRadius: 16,
         borderTopRightRadius: 16,
-        maxHeight: "80vh",
+        height: "75vh",
+        maxHeight: "75vh",
         display: "flex",
         flexDirection: "column",
         boxShadow: "0 -4px 32px rgba(0,0,0,0.15)",
@@ -217,7 +218,9 @@ export function MobilePickerSheet({
         <div style={{
           overflowY: "scroll",
           WebkitOverflowScrolling: "touch" as any,
-          flex: "1 1 0",
+          flexGrow: 1,
+          flexShrink: 1,
+          flexBasis: "0%",
           minHeight: 0,
           overscrollBehavior: "contain",
         }}>
