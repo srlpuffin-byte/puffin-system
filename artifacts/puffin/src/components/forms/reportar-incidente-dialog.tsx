@@ -35,7 +35,8 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
   const queryClient = useQueryClient();
   const createMut = useCreateIncidente();
   const uploadMut = useUploadFotografia();
-  const { data: maquinas } = useGetMaquinas();
+  const { data: maquinasRaw } = useGetMaquinas({ categoria: "maquinaria" });
+  const maquinas = (maquinasRaw || []).filter((m: any) => m.categoria !== "inventario");
   const { data: empleados } = useGetEmpleados();
   const { data: proyectos } = useGetProyectos();
   const { data: user } = useGetMe();

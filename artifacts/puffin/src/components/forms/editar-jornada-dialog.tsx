@@ -20,7 +20,8 @@ export function EditarJornadaDialog({ open, onOpenChange, jornada }: Props) {
   const queryClient = useQueryClient();
   const updateMut = useUpdateJornada();
   const { data: empleados } = useGetEmpleados({ estado: "activo" });
-  const { data: maquinas } = useGetMaquinas();
+  const { data: maquinasRaw } = useGetMaquinas({ categoria: "maquinaria" });
+  const maquinas = (maquinasRaw || []).filter((m: any) => m.categoria !== "inventario");
 
   const [form, setForm] = useState({
     empleado_id: "",

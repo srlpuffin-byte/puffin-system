@@ -29,7 +29,8 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
   const createMut = useCreateCombustible();
   const uploadMut = useUploadFotografia();
   const { data: empleados } = useGetEmpleados({ estado: "activo" });
-  const { data: maquinas } = useGetMaquinas();
+  const { data: maquinasRaw } = useGetMaquinas({ categoria: "maquinaria" });
+  const maquinas = (maquinasRaw || []).filter(m => m.categoria !== "inventario");
   const { data: user } = useGetMe();
   const { data: proyectos } = useGetProyectos();
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";

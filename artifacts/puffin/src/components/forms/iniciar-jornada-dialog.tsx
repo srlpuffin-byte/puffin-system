@@ -29,7 +29,8 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
   const uploadMut = useUploadFotografia();
   
   const { data: empleados, isLoading: loadingEmpleados } = useGetEmpleados({ estado: "activo" });
-  const { data: maquinas, isLoading: loadingMaquinas } = useGetMaquinas({});
+  const { data: maquinasRaw, isLoading: loadingMaquinas } = useGetMaquinas({ categoria: "maquinaria" });
+  const maquinas = (maquinasRaw || []).filter(m => m.categoria !== "inventario");
   const { data: proyectos } = useGetProyectos();
   const { data: user } = useGetMe();
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";

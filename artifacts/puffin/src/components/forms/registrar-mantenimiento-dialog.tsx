@@ -24,7 +24,8 @@ interface Props {
 export function RegistrarMantenimientoDialog({ open, onOpenChange, maquinaIdFija, editData }: Props) {
   const queryClient = useQueryClient();
   const createMut = useCreateMantenimiento();
-  const { data: maquinas } = useGetMaquinas();
+  const { data: maquinasRaw } = useGetMaquinas({ categoria: "maquinaria" });
+  const maquinas = (maquinasRaw || []).filter((m: any) => m.categoria !== "inventario");
   const { data: proyectos } = useGetProyectos();
 
   const updateMut = useMutation({
