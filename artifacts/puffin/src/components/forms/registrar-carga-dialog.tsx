@@ -114,7 +114,7 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Registrar Carga de Combustible</DialogTitle>

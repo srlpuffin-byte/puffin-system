@@ -126,7 +126,7 @@ export function EditarCargaDialog({ open, onOpenChange, carga }: Props) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Editar Carga de Combustible</DialogTitle>

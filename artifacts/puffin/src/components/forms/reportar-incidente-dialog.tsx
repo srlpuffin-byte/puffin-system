@@ -200,7 +200,7 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
   const maquinaSeleccionada = maquinas?.find(m => m.id.toString() === form.maquina_id);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-destructive flex items-center gap-2">

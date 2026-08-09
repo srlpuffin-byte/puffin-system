@@ -110,7 +110,7 @@ export function RegistrarMantenimientoDialog({ open, onOpenChange, maquinaIdFija
   const isPending = createMut.isPending || updateMut.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{editData ? "Editar Mantenimiento" : "Registrar Mantenimiento"}</DialogTitle>
