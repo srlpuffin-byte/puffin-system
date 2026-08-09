@@ -2,10 +2,8 @@ import React, { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Check, ChevronsUpDown, Users, Briefcase, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Empleado } from "@workspace/api-client-react";
@@ -37,7 +35,6 @@ export function ComboboxEmpleado({
   className,
 }: ComboboxEmpleadoProps) {
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
   const isMobile = useIsMobile();
 
   const selectedEmpleado = value ? empleados.find((e) => e.id.toString() === value) : null;
@@ -56,104 +53,7 @@ export function ComboboxEmpleado({
     return map;
   }, [proyectos]);
 
-  const filtered = React.useMemo(() => {
-    if (!search.trim()) return empleados;
-    const q = search.toLowerCase();
-    return empleados.filter(e =>
-      e.nombre.toLowerCase().includes(q) ||
-      e.apellido.toLowerCase().includes(q) ||
-      (e.cargo || "").toLowerCase().includes(q)
-    );
-  }, [empleados, search]);
-
-  // ─── MOBILE: Sheet from bottom ───────────────────────────────────────────────
-  if (isMobile) {
-    return (
-      <>
-        <Button
-          variant="outline"
-          role="combobox"
-          className={cn("w-full justify-between h-auto py-2", className)}
-          disabled={disabled}
-          onClick={() => setOpen(true)}
-        >
-          {selectedEmpleado ? (
-            <div className="flex items-center gap-2">
-              <Avatar className="h-6 w-6">
-                <AvatarImage src={selectedEmpleado.foto_perfil || undefined} />
-                <AvatarFallback className="text-[10px]">
-                  {selectedEmpleado.nombre[0]}{selectedEmpleado.apellido[0]}
-                </AvatarFallback>
-              </Avatar>
-              <span className="truncate">{selectedEmpleado.apellido}, {selectedEmpleado.nombre}</span>
-            </div>
-          ) : (
-            <span className="text-muted-foreground">{placeholder}</span>
-          )}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-
-        <Sheet open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSearch(""); }}>
-          <SheetContent side="bottom" className="h-[75vh] flex flex-col p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
-            <SheetHeader className="px-4 pt-4 pb-2 border-b">
-              <SheetTitle className="text-base flex items-center gap-2">
-                <Users className="h-4 w-4" /> Seleccionar operario
-              </SheetTitle>
-              <Input
-                placeholder="Buscar operario..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="mt-2"
-                autoFocus={false}
-              />
-            </SheetHeader>
-
-            <div className="flex-1 overflow-y-auto">
-              {filtered.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8 text-sm">No se encontró ningún operario.</p>
-              ) : (
-                filtered.map((e) => {
-                  const isSelected = value === e.id.toString();
-                  return (
-                    <button
-                      key={e.id}
-                      type="button"
-                      className={cn(
-                        "w-full flex items-center gap-3 px-4 py-3 border-b border-slate-100 text-left active:bg-slate-100 transition-colors",
-                        isSelected && "bg-primary/5"
-                      )}
-                      onClick={() => {
-                        onChange(e.id.toString());
-                        setSearch("");
-                        setOpen(false);
-                      }}
-                    >
-                      <Check className={cn("h-4 w-4 shrink-0 text-primary", isSelected ? "opacity-100" : "opacity-0")} />
-                      <Avatar className="h-10 w-10 shrink-0">
-                        <AvatarImage src={e.foto_perfil || undefined} className="object-cover" />
-                        <AvatarFallback className="text-sm font-medium">
-                          {e.nombre[0]}{e.apellido[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col overflow-hidden flex-1">
-                        <span className="font-semibold text-sm truncate">{e.apellido}, {e.nombre}</span>
-                        {e.cargo && <span className="text-xs text-slate-500 truncate">{e.cargo}</span>}
-                      </div>
-                      {(e.alertas_count ?? 0) > 0 && (
-                        <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0" />
-                      )}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-      </>
-    );
-  }
-
-  // ─── DESKTOP: Popover + HoverCard ────────────────────────────────────────────
+  // ─── DESKTOP & MOBILE: Popover + HoverCard ─────────────────────────────────
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
