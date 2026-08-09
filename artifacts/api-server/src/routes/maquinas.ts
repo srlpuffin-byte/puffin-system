@@ -165,7 +165,8 @@ router.put("/:id", async (req, res) => {
       motor,
       chasis,
       descripcion,
-      filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio
+      filtro_tipo, filtro_codigo, filtro_fecha_cambio, filtro_proximo_cambio,
+      satcom_id
     } = req.body;
     
     const updateData: Record<string, unknown> = {};
@@ -191,6 +192,8 @@ router.put("/:id", async (req, res) => {
     if (filtro_fecha_cambio !== undefined) updateData.filtro_fecha_cambio = filtro_fecha_cambio;
     if (filtro_proximo_cambio !== undefined) updateData.filtro_proximo_cambio = filtro_proximo_cambio;
     if (descripcion !== undefined) updateData.descripcion = descripcion;
+    // satcom_id can be set to null (unlink) or a number (link/relink)
+    if (satcom_id !== undefined) updateData.satcom_id = satcom_id === null ? null : Number(satcom_id);
 
     const [maquina] = await db.update(maquinasTable).set(updateData).where(eq(maquinasTable.id, id)).returning();
     if (!maquina) return res.status(404).json({ error: "Maquinaria no encontrada" });
