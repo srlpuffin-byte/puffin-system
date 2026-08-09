@@ -28,8 +28,8 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
   const createMut = useIniciarJornada();
   const uploadMut = useUploadFotografia();
   
-  const { data: empleados } = useGetEmpleados({ estado: "activo" });
-  const { data: maquinas } = useGetMaquinas({ estado: "activa" });
+  const { data: empleados, isLoading: loadingEmpleados } = useGetEmpleados({ estado: "activo" });
+  const { data: maquinas, isLoading: loadingMaquinas } = useGetMaquinas({ estado: "activa" });
   const { data: proyectos } = useGetProyectos();
   const { data: user } = useGetMe();
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";
@@ -221,6 +221,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
                     searchPlaceholder="Buscar operario..."
                     recentStorageKey="puffin_recent_operarios"
                     disabled={isEmpleado}
+                    isLoading={loadingEmpleados}
                     options={Array.isArray(empleados) ? empleados.map((e: any) => ({
                       value: e.id.toString(),
                       label: `${e.apellido}, ${e.nombre}`,
@@ -240,6 +241,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
                     placeholder="Seleccionar máquina"
                     searchPlaceholder="Buscar máquina..."
                     recentStorageKey="puffin_recent_maquinas"
+                    isLoading={loadingMaquinas}
                     options={Array.isArray(maquinas) ? maquinas
                       .filter((m: any) => m.categoria !== "inventario")
                       .map((m: any) => ({

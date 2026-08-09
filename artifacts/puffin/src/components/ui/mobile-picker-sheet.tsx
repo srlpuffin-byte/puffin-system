@@ -20,6 +20,7 @@ interface MobilePickerSheetProps {
   disabled?: boolean;
   className?: string;
   recentStorageKey?: string;
+  isLoading?: boolean;
 }
 
 export function MobilePickerSheet({
@@ -31,6 +32,7 @@ export function MobilePickerSheet({
   disabled = false,
   className,
   recentStorageKey,
+  isLoading = false,
 }: MobilePickerSheetProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -282,7 +284,18 @@ export function MobilePickerSheet({
 
             {/* List */}
             <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch" as any, flex: 1 }}>
-              {filtered.length === 0 ? (
+              {isLoading ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 16px", gap: 12 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: "50%",
+                    border: "3px solid #e5e7eb",
+                    borderTopColor: "#3b82f6",
+                    animation: "spin 0.8s linear infinite",
+                  }} />
+                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                  <p style={{ color: "#6b7280", fontSize: 14 }}>Cargando opciones...</p>
+                </div>
+              ) : filtered.length === 0 ? (
                 <p style={{ textAlign: "center", color: "#9ca3af", padding: "32px 16px", fontSize: 14 }}>
                   No se encontraron resultados.
                 </p>
