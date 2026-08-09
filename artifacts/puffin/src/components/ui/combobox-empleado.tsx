@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Check, ChevronsUpDown, Users, Briefcase, AlertTriangle, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Empleado } from "@workspace/api-client-react";
-import { useIsMobile } from "@/hooks/use-mobile";
+
+// Touch device detection - works regardless of screen size
+function isTouchDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  return navigator.maxTouchPoints > 0 || ("ontouchstart" in window);
+}
 
 interface ProyectoResumen {
   id: number;
@@ -69,7 +74,7 @@ export function ComboboxEmpleado({
   className,
 }: ComboboxEmpleadoProps) {
   const [open, setOpen] = useState(false);
-  const isMobile = useIsMobile();
+  const isMobile = isTouchDevice();
 
   // On mobile, use the inline version (no portals)
   if (isMobile) {
