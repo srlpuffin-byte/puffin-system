@@ -25,7 +25,7 @@ interface ComboboxEmpleadoProps {
   className?: string;
 }
 
-// ─── MOBILE: Inline expandable list (no portals, works inside Dialog on iOS) ──
+// ─── MOBILE: Native select (bulletproof on iOS) ──────────────────────────────
 function ComboboxEmpleadoMobile({
   value,
   onChange,
@@ -34,138 +34,27 @@ function ComboboxEmpleadoMobile({
   placeholder = "Seleccionar operario",
   className,
 }: Omit<ComboboxEmpleadoProps, "proyectos">) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const listRef = useRef<HTMLDivElement>(null);
-
-  const selectedEmpleado = value ? empleados.find((e) => e.id.toString() === value) : null;
-
-  const filtered = React.useMemo(() => {
-    if (!search.trim()) return empleados;
-    const q = search.toLowerCase();
-    return empleados.filter(
-      (e) =>
-        e.nombre.toLowerCase().includes(q) ||
-        e.apellido.toLowerCase().includes(q) ||
-        (e.cargo || "").toLowerCase().includes(q)
-    );
-  }, [empleados, search]);
-
-  const handleSelect = (id: string) => {
-    onChange(id);
-    setOpen(false);
-    setSearch("");
-  };
-
   return (
-    <div className={cn("relative w-full", className)}>
-      {/* Trigger button */}
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen((o) => !o)}
-        className={cn(
-          "w-full flex items-center justify-between px-3 py-2.5 rounded-md border border-input bg-background text-sm",
-          "active:bg-accent focus:outline-none focus:ring-2 focus:ring-ring",
-          disabled && "opacity-50 cursor-not-allowed"
-        )}
-      >
-        {selectedEmpleado ? (
-          <div className="flex items-center gap-2">
-            <Avatar className="h-6 w-6">
-              <AvatarImage src={selectedEmpleado.foto_perfil || undefined} />
-              <AvatarFallback className="text-[10px]">
-                {selectedEmpleado.nombre[0]}{selectedEmpleado.apellido[0]}
-              </AvatarFallback>
-            </Avatar>
-            <span className="truncate font-medium">
-              {selectedEmpleado.apellido}, {selectedEmpleado.nombre}
-            </span>
-          </div>
-        ) : (
-          <span className="text-muted-foreground">{placeholder}</span>
-        )}
-        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-      </button>
-
-      {/* Inline dropdown — rendered in the same DOM tree, no portals */}
-      {open && (
-        <div
-          className="w-full mt-1 rounded-md border border-input bg-background shadow-lg z-50"
-          style={{ position: "relative" }}
-        >
-          {/* Search input */}
-          <div className="flex items-center gap-2 p-2 border-b">
-            <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-            <input
-              autoFocus={false}
-              type="text"
-              placeholder="Buscar operario..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 text-sm outline-none bg-transparent placeholder:text-muted-foreground"
-            />
-            {search && (
-              <button type="button" onClick={() => setSearch("")}>
-                <X className="h-4 w-4 text-muted-foreground" />
-              </button>
-            )}
-          </div>
-
-          {/* List */}
-          <div
-            ref={listRef}
-            className="overflow-y-auto"
-            style={{ maxHeight: "240px", WebkitOverflowScrolling: "touch" }}
-          >
-            {filtered.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-6">
-                No se encontró ningún operario.
-              </p>
-            ) : (
-              filtered.map((e) => {
-                const isSelected = value === e.id.toString();
-                return (
-                  <button
-                    key={e.id}
-                    type="button"
-                    onPointerDown={() => handleSelect(e.id.toString())}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-3 py-3 text-left border-b border-slate-100 last:border-0",
-                      "active:bg-accent",
-                      isSelected && "bg-primary/5"
-                    )}
-                  >
-                    <Check
-                      className={cn(
-                        "h-4 w-4 shrink-0 text-primary",
-                        isSelected ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    <Avatar className="h-8 w-8 shrink-0">
-                      <AvatarImage src={e.foto_perfil || undefined} />
-                      <AvatarFallback className="text-xs">
-                        {e.nombre[0]}{e.apellido[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col text-left overflow-hidden">
-                      <span className="font-semibold text-sm truncate">
-                        {e.apellido}, {e.nombre}
-                      </span>
-                      {e.cargo && (
-                        <span className="text-xs text-muted-foreground truncate">
-                          {e.cargo}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+      className={cn(
+        "w-full h-10 px-3 rounded-md border border-input bg-background text-sm",
+        "focus:outline-none focus:ring-2 focus:ring-ring",
+        disabled && "opacity-50 cursor-not-allowed",
+        className
       )}
-    </div>
+    >
+      <option value="" disabled>
+        {placeholder}
+      </option>
+      {empleados.map((e) => (
+        <option key={e.id} value={e.id.toString()}>
+          {e.apellido}, {e.nombre} {e.cargo ? `(${e.cargo})` : ""}
+        </option>
+      ))}
+    </select>
   );
 }
 

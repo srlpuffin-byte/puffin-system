@@ -25,7 +25,7 @@ interface ComboboxMaquinaProps {
   className?: string;
 }
 
-// ─── MOBILE: Inline expandable list (no portals, works inside Dialog on iOS) ──
+// ─── MOBILE: Native select (bulletproof on iOS) ──────────────────────────────
 function ComboboxMaquinaMobile({
   value,
   onChange,
@@ -34,145 +34,31 @@ function ComboboxMaquinaMobile({
   placeholder = "Seleccionar máquina",
   className,
 }: Omit<ComboboxMaquinaProps, "proyectos">) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const listRef = useRef<HTMLDivElement>(null);
-
-  const selectedMaquina = value ? maquinas.find((m) => m.id.toString() === value) : null;
-
   const filtered = React.useMemo(() => {
-    const list = maquinas.filter((m) => m.categoria !== "inventario");
-    if (!search.trim()) return list;
-    const q = search.toLowerCase();
-    return list.filter(
-      (m) =>
-        m.nombre.toLowerCase().includes(q) ||
-        (m.patente || "").toLowerCase().includes(q) ||
-        (m.dominio || "").toLowerCase().includes(q) ||
-        (m.marca || "").toLowerCase().includes(q) ||
-        (m.modelo || "").toLowerCase().includes(q)
-    );
-  }, [maquinas, search]);
-
-  const handleSelect = (id: string) => {
-    onChange(id);
-    setOpen(false);
-    setSearch("");
-  };
+    return maquinas.filter((m) => m.categoria !== "inventario");
+  }, [maquinas]);
 
   return (
-    <div className={cn("relative w-full", className)}>
-      {/* Trigger button */}
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen((o) => !o)}
-        className={cn(
-          "w-full flex items-center justify-between px-3 py-2.5 rounded-md border border-input bg-background text-sm",
-          "active:bg-accent focus:outline-none focus:ring-2 focus:ring-ring",
-          disabled && "opacity-50 cursor-not-allowed"
-        )}
-      >
-        {selectedMaquina ? (
-          <div className="flex items-center gap-2">
-            <Avatar className="h-6 w-6 rounded-md">
-              <AvatarImage src={selectedMaquina.imagen_url || undefined} className="object-cover" />
-              <AvatarFallback className="rounded-md bg-slate-100 text-[10px]">
-                <Tractor className="h-3 w-3 text-slate-400" />
-              </AvatarFallback>
-            </Avatar>
-            <span className="truncate font-medium">
-              {selectedMaquina.nombre}
-              {selectedMaquina.patente
-                ? ` (${selectedMaquina.patente})`
-                : selectedMaquina.dominio
-                ? ` (${selectedMaquina.dominio})`
-                : ""}
-            </span>
-          </div>
-        ) : (
-          <span className="text-muted-foreground">{placeholder}</span>
-        )}
-        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-      </button>
-
-      {/* Inline dropdown — rendered in the same DOM tree, no portals */}
-      {open && (
-        <div
-          className="w-full mt-1 rounded-md border border-input bg-background shadow-lg"
-          style={{ position: "relative", zIndex: 50 }}
-        >
-          {/* Search input */}
-          <div className="flex items-center gap-2 p-2 border-b">
-            <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-            <input
-              autoFocus={false}
-              type="text"
-              placeholder="Buscar máquina..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 text-sm outline-none bg-transparent placeholder:text-muted-foreground"
-            />
-            {search && (
-              <button type="button" onClick={() => setSearch("")}>
-                <X className="h-4 w-4 text-muted-foreground" />
-              </button>
-            )}
-          </div>
-
-          {/* List */}
-          <div
-            ref={listRef}
-            className="overflow-y-auto"
-            style={{ maxHeight: "240px", WebkitOverflowScrolling: "touch" }}
-          >
-            {filtered.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-6">
-                No se encontró ninguna máquina.
-              </p>
-            ) : (
-              filtered.map((m) => {
-                const isSelected = value === m.id.toString();
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onPointerDown={() => handleSelect(m.id.toString())}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-3 py-3 text-left border-b border-slate-100 last:border-0",
-                      "active:bg-accent",
-                      isSelected && "bg-primary/5"
-                    )}
-                  >
-                    <Check
-                      className={cn(
-                        "h-4 w-4 shrink-0 text-primary",
-                        isSelected ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    <Avatar className="h-8 w-8 shrink-0 rounded-md">
-                      <AvatarImage src={m.imagen_url || undefined} className="object-cover" />
-                      <AvatarFallback className="rounded-md bg-slate-100 text-[10px]">
-                        <Tractor className="h-4 w-4 text-slate-400" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col text-left overflow-hidden">
-                      <span className="font-semibold text-sm truncate">
-                        {m.nombre}
-                        {m.patente ? ` (${m.patente})` : m.dominio ? ` (${m.dominio})` : ""}
-                      </span>
-                      <span className="text-xs text-muted-foreground truncate">
-                        {m.marca || "-"} · {m.modelo || "-"}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+      className={cn(
+        "w-full h-10 px-3 rounded-md border border-input bg-background text-sm",
+        "focus:outline-none focus:ring-2 focus:ring-ring",
+        disabled && "opacity-50 cursor-not-allowed",
+        className
       )}
-    </div>
+    >
+      <option value="" disabled>
+        {placeholder}
+      </option>
+      {filtered.map((m) => (
+        <option key={m.id} value={m.id.toString()}>
+          {m.nombre} {m.patente ? `(${m.patente})` : m.dominio ? `(${m.dominio})` : ""}
+        </option>
+      ))}
+    </select>
   );
 }
 
