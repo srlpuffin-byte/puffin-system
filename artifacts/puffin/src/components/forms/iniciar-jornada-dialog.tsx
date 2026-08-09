@@ -216,6 +216,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
                   <select
                     value={form.empleado_id}
                     onChange={e => set("empleado_id", e.target.value)}
+                    onTouchStart={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}
                     disabled={isEmpleado}
                     className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
                   >
@@ -234,6 +235,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
                   <select
                     value={form.maquina_id}
                     onChange={e => set("maquina_id", e.target.value)}
+                    onTouchStart={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}
                     className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="" disabled>Seleccionar máquina</option>
@@ -250,11 +252,11 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label>Horómetro inicial (h) *</Label>
-                  <Input type="number" step="0.1" placeholder="4850" value={form.horometro_inicio} onChange={e => set("horometro_inicio", e.target.value)} required />
+                  <Input type="text" inputMode="decimal" placeholder="4850" value={form.horometro_inicio} onChange={e => set("horometro_inicio", e.target.value)} required />
                 </div>
                 <div className="space-y-1">
                   <Label>Km inicial (si aplica)</Label>
-                  <Input type="number" placeholder="89500" value={form.km_inicio} onChange={e => set("km_inicio", e.target.value)} />
+                  <Input type="text" inputMode="numeric" placeholder="89500" value={form.km_inicio} onChange={e => set("km_inicio", e.target.value)} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
