@@ -34,7 +34,7 @@ export function Maquinas() {
   const urlParams = new URLSearchParams(searchStr);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"maquinaria" | "inventario">("maquinaria");
-  const [filterEstado, setFilterEstado] = useState(urlParams.get("estado") || "todos");
+  const [filterEstado, setFilterEstado] = useState(urlParams.get("estado") || "activos");
   const [filterTipo, setFilterTipo] = useState("todos");
   const [openDialog, setOpenDialog] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -44,7 +44,8 @@ export function Maquinas() {
   const { data: maquinasRaw, isLoading } = useGetMaquinas({ search: search || undefined, categoria: activeTab });
 
   const maquinas = (maquinasRaw || []).filter(m => {
-    if (filterEstado !== "todos" && m.estado !== filterEstado) return false;
+    if (filterEstado === "activos" && m.estado === "baja") return false;
+    if (filterEstado !== "todos" && filterEstado !== "activos" && m.estado !== filterEstado) return false;
     if (filterTipo !== "todos" && m.tipo !== filterTipo) return false;
     return true;
   });
@@ -68,7 +69,7 @@ export function Maquinas() {
     }
   };
 
-  const clearFilters = () => { setSearch(""); setFilterEstado("todos"); setFilterTipo("todos"); };
+  const clearFilters = () => { setSearch(""); setFilterEstado("activos"); setFilterTipo("todos"); };
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -166,7 +167,8 @@ export function Maquinas() {
             <Select value={filterEstado} onValueChange={setFilterEstado}>
               <SelectTrigger className="w-[160px]"><SelectValue placeholder="Estado" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Todos los estados</SelectItem>
+                <SelectItem value="todos">Todos (Inc. Baja)</SelectItem>
+                <SelectItem value="activos">Activos (No baja)</SelectItem>
                 <SelectItem value="activa">Activa</SelectItem>
                 <SelectItem value="detenida">Detenida</SelectItem>
                 <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
@@ -367,7 +369,7 @@ export function Maquinas() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente este registro y todas sus fotos asociadas.
+              Esta acción dará de baja lógicamente la máquina. Desaparecerá de las listas activas y se desvinculará de los proyectos, pero mantendrá su historial de uso.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

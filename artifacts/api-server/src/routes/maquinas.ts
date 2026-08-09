@@ -218,11 +218,20 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ error: "Máquina no encontrada" });
     }
 
-    // Attempt delete
-    await db.delete(maquinasTable).where(eq(maquinasTable.id, id));
+    // Soft delete instead of hard delete to preserve historical integrity
+    await db.update(maquinasTable).set({ estado: "baja" }).where(eq(maquinasTable.id, id));
 
-    // Also delete associated photos
-    await db.delete(fotografiasTable).where(and(eq(fotografiasTable.entidad_tipo, "maquina"), eq(fotografiasTable.entidad_id, id)));
+    // Remove from assigned projects
+    const proyectos = await db.select().from(proyectosTable);
+    for (const p of proyectos) {
+      if (p.maquinas_asignadas && Array.isArray(p.maquinas_asignadas)) {
+        const mAsig = p.maquinas_asignadas.map(m => Number(m));
+        if (mAsig.includes(id)) {
+          const nuevasMaquinas = p.maquinas_asignadas.filter(m => Number(m) !== id);
+          await db.update(proyectosTable).set({ maquinas_asignadas: nuevasMaquinas }).where(eq(proyectosTable.id, p.id));
+        }
+      }
+    }
 
     // Sincronizar con Google Sheets
     import("../services/sync-sheets.js").then(({ syncAllSheets }) => {

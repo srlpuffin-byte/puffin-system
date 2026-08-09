@@ -3,9 +3,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, RefreshCw, Wifi, WifiOff, Zap, ZapOff, Plus, Pencil, Check, X } from "lucide-react";
+import { MapPin, RefreshCw, Wifi, WifiOff, Zap, ZapOff, Plus, Pencil, Check, X, Link as LinkIcon } from "lucide-react";
 import { SatcomMap } from "@/components/map/SatcomMap";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useGetMaquinas, getGetMaquinasQueryKey } from "@workspace/api-client-react";
 
 interface MapPoint {
   maquina_id: number | null;
@@ -26,7 +29,10 @@ export function Gps() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [linkingDevice, setLinkingDevice] = useState<MapPoint | null>(null);
+  const [selectedMaquinaId, setSelectedMaquinaId] = useState<string>("");
   const queryClient = useQueryClient();
+  const { data: maquinas } = useGetMaquinas();
 
   const { data: mapPoints = [], isLoading, refetch } = useQuery<MapPoint[]>({
     queryKey: ["satcom-mapa"],
@@ -52,6 +58,24 @@ export function Gps() {
     },
     onError: () => {
       toast.error("Error al crear la máquina");
+    }
+  });
+
+  const linkMaquinaMutation = useMutation({
+    mutationFn: async ({ maquina_id, satcom_id }: { maquina_id: number; satcom_id: number }) => {
+      return apiFetch("/integrations/xpert/link", {
+        method: "POST",
+        body: JSON.stringify({ maquina_id, satcom_id }),
+      });
+    },
+    onSuccess: () => {
+      toast.success("GPS vinculado correctamente a la máquina");
+      queryClient.invalidateQueries({ queryKey: ["satcom-mapa"] });
+      queryClient.invalidateQueries({ queryKey: getGetMaquinasQueryKey() });
+      setLinkingDevice(null);
+    },
+    onError: () => {
+      toast.error("Error al vincular el GPS");
     }
   });
 
@@ -268,25 +292,40 @@ export function Gps() {
                           }
                         </div>
                       </div>
-                      <div className="mt-1.5 flex items-center justify-between">
+                      <div className="mt-1.5 flex items-center justify-between gap-2">
                         <span className="text-[11px] text-amber-600/80 font-medium">Equipo sin asignar</span>
-                        <Button 
-                          size="sm" 
-                          variant="secondary" 
-                          className="h-7 text-xs bg-amber-200/50 hover:bg-amber-200 text-amber-900 border-0 px-3 shadow-none"
-                          disabled={createMaquinaMutation.isPending}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            createMaquinaMutation.mutate(p);
-                          }}
-                        >
-                          {createMaquinaMutation.isPending ? "Creando..." : (
-                            <>
-                              <Plus className="h-3 w-3 mr-1" />
-                              Crear
-                            </>
-                          )}
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button 
+                            size="sm" 
+                            variant="secondary" 
+                            className="h-7 text-xs bg-amber-200/50 hover:bg-amber-200 text-amber-900 border-0 px-2 shadow-none"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLinkingDevice(p);
+                              setSelectedMaquinaId("");
+                            }}
+                          >
+                            <LinkIcon className="h-3 w-3 sm:mr-1" />
+                            <span className="hidden sm:inline">Vincular</span>
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="secondary" 
+                            className="h-7 text-xs bg-amber-200/50 hover:bg-amber-200 text-amber-900 border-0 px-2 shadow-none"
+                            disabled={createMaquinaMutation.isPending}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              createMaquinaMutation.mutate(p);
+                            }}
+                          >
+                            {createMaquinaMutation.isPending ? "..." : (
+                              <>
+                                <Plus className="h-3 w-3 sm:mr-1" />
+                                <span className="hidden sm:inline">Crear</span>
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     </button>
                   );
@@ -319,6 +358,51 @@ export function Gps() {
         </div>
 
       </div>
+
+      <Dialog open={!!linkingDevice} onOpenChange={(open) => !open && setLinkingDevice(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vincular GPS a Máquina Existente</DialogTitle>
+            <DialogDescription>
+              Selecciona a qué maquinaria o equipo del inventario pertenece el GPS <b>{linkingDevice?.nombre}</b>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select value={selectedMaquinaId} onValueChange={setSelectedMaquinaId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar máquina..." />
+              </SelectTrigger>
+              <SelectContent>
+                {maquinas?.filter(m => m.estado !== "baja" && !(m as any).satcom_id).map(m => (
+                  <SelectItem key={m.id} value={m.id.toString()}>
+                    {m.nombre} {m.patente ? `(${m.patente})` : ""}
+                  </SelectItem>
+                ))}
+                {maquinas?.filter(m => m.estado !== "baja" && !(m as any).satcom_id).length === 0 && (
+                  <SelectItem value="none" disabled>No hay máquinas disponibles sin GPS</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkingDevice(null)}>Cancelar</Button>
+            <Button 
+              className="bg-primary hover:bg-primary/90 text-white"
+              disabled={!selectedMaquinaId || selectedMaquinaId === "none" || linkMaquinaMutation.isPending}
+              onClick={() => {
+                if (linkingDevice?.device_id && selectedMaquinaId) {
+                  linkMaquinaMutation.mutate({ 
+                    maquina_id: parseInt(selectedMaquinaId), 
+                    satcom_id: linkingDevice.device_id 
+                  });
+                }
+              }}
+            >
+              {linkMaquinaMutation.isPending ? "Vinculando..." : "Vincular"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

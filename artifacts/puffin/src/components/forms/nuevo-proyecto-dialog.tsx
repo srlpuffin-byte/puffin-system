@@ -55,7 +55,7 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
   });
 
   const empleados = empleadosData;
-  const maquinas = maquinasData;
+  const maquinas = maquinasData?.filter(m => m.estado !== "baja");
 
   // Reiniciar estado al abrir/cerrar
   useEffect(() => {

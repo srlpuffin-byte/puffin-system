@@ -58,7 +58,7 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
   });
 
   const empleados = empleadosData;
-  const maquinas = maquinasData;
+  const maquinas = maquinasData?.filter(m => m.estado !== "baja");
 
   // Cargar datos del proyecto al abrir
   useEffect(() => {
