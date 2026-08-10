@@ -22,7 +22,7 @@ export function EditarCargaDialog({ open, onOpenChange, carga }: Props) {
   const updateMut = useUpdateCombustible();
   const uploadMut = useUploadFotografia();
   const { data: empleados } = useGetEmpleados({ estado: "activo" });
-  const { data: maquinasRaw } = useGetMaquinas({ categoria: "maquinaria" });
+  const { data: maquinasRaw } = useGetMaquinas();
   const maquinas = (maquinasRaw || []).filter((m: any) => m.categoria !== "inventario");
   const { data: proyectos } = useGetProyectos();
   const { data: user } = useGetMe();

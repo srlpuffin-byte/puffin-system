@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { maquinasTable, fotografiasTable, proyectosTable } from "@workspace/db";
-import { eq, and, or, ilike, inArray } from "drizzle-orm";
+import { eq, and, or, ilike, inArray, not } from "drizzle-orm";
 import { updateOrAppendToSheet } from "../services/sheets.js";
 
 const router = Router();
@@ -82,7 +82,12 @@ router.get("/", async (req, res) => {
 
   let query = db.select().from(maquinasTable).$dynamic();
   const conditions = [];
-  if (estado) conditions.push(eq(maquinasTable.estado, estado));
+  // Por defecto no mostrar maquinas eliminadas (soft delete) a menos que se pidan explicitamente
+  if (estado) {
+    conditions.push(eq(maquinasTable.estado, estado));
+  } else {
+    conditions.push(not(eq(maquinasTable.estado, "baja")));
+  }
   if (categoria) conditions.push(eq(maquinasTable.categoria, categoria));
   if (search) conditions.push(or(
     ilike(maquinasTable.nombre, `%${search}%`),

@@ -29,7 +29,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
   const uploadMut = useUploadFotografia();
   
   const { data: empleados, isLoading: loadingEmpleados } = useGetEmpleados({ estado: "activo" });
-  const { data: maquinasRaw, isLoading: loadingMaquinas } = useGetMaquinas({ categoria: "maquinaria" });
+  const { data: maquinasRaw, isLoading: loadingMaquinas } = useGetMaquinas();
   const maquinas = (maquinasRaw || []).filter(m => m.categoria !== "inventario");
   const { data: proyectos } = useGetProyectos();
   const { data: user } = useGetMe();
