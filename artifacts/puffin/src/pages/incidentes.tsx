@@ -149,6 +149,21 @@ export function Incidentes() {
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";
   const queryClient = useQueryClient();
 
+  const handleAbrirEditar = (inc: Incidente, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setOpenDialog(false); // cerrar el de crear si estuviera abierto
+    setEditingIncidente(inc);
+  };
+
+  const handleCerrarEditor = (v: boolean) => {
+    if (!v) setEditingIncidente(null);
+  };
+
+  const handleAbrirNuevo = () => {
+    setEditingIncidente(null); // cerrar el de editar si estuviera abierto
+    setOpenDialog(true);
+  };
+
   // Activos (no resueltos) primero
   const sortedIncidentes = [...(incidentes || [])].sort((a, b) => {
     if (a.estado !== "resuelto" && b.estado === "resuelto") return -1;
@@ -204,7 +219,7 @@ export function Incidentes() {
               title="Reporte de Incidentes"
             />
           )}
-          <Button className="bg-destructive hover:bg-destructive/90 flex-1 sm:flex-none" onClick={() => setOpenDialog(true)}>
+          <Button className="bg-destructive hover:bg-destructive/90 flex-1 sm:flex-none" onClick={handleAbrirNuevo}>
             <Plus className="mr-2 h-4 w-4" />
             Reportar Incidente
           </Button>
@@ -280,7 +295,7 @@ export function Incidentes() {
                                 </DropdownMenuItem>
                                 {!isEmpleado && (
                                   <>
-                                    <DropdownMenuItem onClick={() => setEditingIncidente(inc as Incidente)} className="cursor-pointer">
+                              <DropdownMenuItem onClick={() => handleAbrirEditar(inc as Incidente)} className="cursor-pointer">
                                       <Pencil className="mr-2 h-4 w-4" /> Editar
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handleDelete(inc.id)} className="cursor-pointer text-red-600 focus:text-red-600">
@@ -369,7 +384,7 @@ export function Incidentes() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingIncidente(inc as Incidente); }} className="cursor-pointer">
+                              <DropdownMenuItem onClick={(e) => { handleAbrirEditar(inc as Incidente, e); }} className="cursor-pointer">
                                 <Pencil className="mr-2 h-4 w-4" /> Editar
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(inc.id); }} className="cursor-pointer text-red-600 focus:text-red-600">
@@ -389,13 +404,11 @@ export function Incidentes() {
       </Card>
 
       <ReportarIncidenteDialog open={openDialog} onOpenChange={setOpenDialog} />
-      {editingIncidente && (
-        <ReportarIncidenteDialog 
-          open={!!editingIncidente} 
-          onOpenChange={(v) => { if (!v) setEditingIncidente(null); }} 
-          editData={editingIncidente} 
-        />
-      )}
+      <ReportarIncidenteDialog 
+        open={!!editingIncidente} 
+        onOpenChange={handleCerrarEditor} 
+        editData={editingIncidente ?? undefined} 
+      />
 
       <IncidenteDetalleDialog
         incidente={selectedIncidente}
