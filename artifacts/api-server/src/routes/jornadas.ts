@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { jornadasTable, empleadosTable, maquinasTable, actividadTable, alertasTable, combustibleTable, incidentesTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { appendToSheet } from "../services/sheets.js";
 import { sendWhatsAppMessage } from "../services/whatsapp.js";
 
@@ -63,7 +63,52 @@ router.get("/", async (req, res) => {
   if (conditions.length) query = query.where(and(...conditions));
 
   const jornadas = await query.orderBy(jornadasTable.createdAt);
-  const enriched = await Promise.all(jornadas.map(enrichJornada));
+
+  // Bulk-load para evitar N+1 (una query por nombre antes era O(N*2) calls)
+  const empIds = [...new Set(jornadas.map(j => j.empleado_id).filter((id): id is number => !!id))];
+  const maqIds = [...new Set(jornadas.map(j => j.maquina_id).filter((id): id is number => !!id))];
+
+  const [empleadosList, maquinasList] = await Promise.all([
+    empIds.length > 0
+      ? db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
+          .from(empleadosTable).where(inArray(empleadosTable.id, empIds))
+      : [],
+    maqIds.length > 0
+      ? db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre })
+          .from(maquinasTable).where(inArray(maquinasTable.id, maqIds))
+      : [],
+  ]);
+  const empMap = new Map(empleadosList.map(e => [e.id, `${e.nombre} ${e.apellido}`]));
+  const maqMap = new Map(maquinasList.map(m => [m.id, m.nombre]));
+
+  const enriched = jornadas.map(j => {
+    const hrInicio = j.horometro_inicio ? Number(j.horometro_inicio) : null;
+    const hrFin    = j.horometro_fin    ? Number(j.horometro_fin)    : null;
+    const horasDiff = hrInicio !== null && hrFin !== null ? hrFin - hrInicio : null;
+    const horas = horasDiff !== null && horasDiff >= 0 ? Number(horasDiff.toFixed(2)) : null;
+    let horasReloj = null;
+    if (j.hora_inicio && j.hora_fin) {
+      const [hI, mI] = j.hora_inicio.split(':').map(Number);
+      const [hF, mF] = j.hora_fin.split(':').map(Number);
+      if (!isNaN(hI) && !isNaN(mI) && !isNaN(hF) && !isNaN(mF)) {
+        let diff = (hF * 60 + mF) - (hI * 60 + mI);
+        if (diff < 0) diff += 24 * 60;
+        horasReloj = Number((diff / 60).toFixed(2));
+      }
+    }
+    return {
+      ...j,
+      empleado_nombre: j.empleado_id ? (empMap.get(j.empleado_id) ?? "Desconocido") : "Desconocido",
+      maquina_nombre:  j.maquina_id  ? (maqMap.get(j.maquina_id)  ?? "Desconocida") : "Desconocida",
+      km_inicio: j.km_inicio ? Number(j.km_inicio) : null,
+      km_fin:    j.km_fin    ? Number(j.km_fin)    : null,
+      horometro_inicio: hrInicio,
+      horometro_fin:    hrFin,
+      horas_trabajadas: horas,
+      horas_reloj:      horasReloj,
+    };
+  });
+
   return res.json(enriched.reverse());
 });
 

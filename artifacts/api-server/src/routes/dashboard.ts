@@ -9,7 +9,7 @@ import {
   mantenimientosTable,
   documentosTable,
 } from "@workspace/db";
-import { eq, sql, and, gte } from "drizzle-orm";
+import { eq, sql, and, gte, not } from "drizzle-orm";
 import { getEmpleadoIdForUser } from "../lib/auth-helpers";
 import { actividadTable } from "@workspace/db";
 
@@ -66,11 +66,11 @@ router.get("/resumen", async (req, res) => {
     mantenimientosMes,
     maquinas,
   ] = await Promise.all([
-    db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(and(eq(maquinasTable.estado, "activa"), sql`(categoria IS NULL OR categoria != 'inventario')`)).then(r => r[0]),
-    db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(and(eq(maquinasTable.estado, "detenida"), sql`(categoria IS NULL OR categoria != 'inventario')`)).then(r => r[0]),
+    db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(and(eq(maquinasTable.estado, "activa"),      sql`(categoria IS NULL OR categoria != 'inventario')`)).then(r => r[0]),
+    db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(and(eq(maquinasTable.estado, "detenida"),    sql`(categoria IS NULL OR categoria != 'inventario')`)).then(r => r[0]),
     db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(and(eq(maquinasTable.estado, "mantenimiento"), sql`(categoria IS NULL OR categoria != 'inventario')`)).then(r => r[0]),
-    db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(and(eq(maquinasTable.categoria, "inventario"), eq(maquinasTable.estado, "activa"))).then(r => r[0]),
-    db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(eq(maquinasTable.categoria, "inventario")).then(r => r[0]),
+    db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(and(eq(maquinasTable.categoria, "inventario"), not(eq(maquinasTable.estado, "baja")), eq(maquinasTable.estado, "activa"))).then(r => r[0]),
+    db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(and(eq(maquinasTable.categoria, "inventario"), not(eq(maquinasTable.estado, "baja")))).then(r => r[0]),
     db.select({ count: sql<number>`count(*)` }).from(empleadosTable).where(eq(empleadosTable.estado, "activo")).then(r => r[0]),
     db.select({ count: sql<number>`count(*)` }).from(alertasTable).where(eq(alertasTable.estado, "activa")).then(r => r[0]),
     db.select({ count: sql<number>`count(*)` }).from(alertasTable).where(and(eq(alertasTable.estado, "activa"), eq(alertasTable.prioridad, "roja"))).then(r => r[0]),
@@ -86,7 +86,7 @@ router.get("/resumen", async (req, res) => {
         : and(gte(jornadasTable.fecha, firstDayOfMonth), eq(jornadasTable.estado, "finalizada"))
     ),
     db.select({ count: sql<number>`count(*)` }).from(mantenimientosTable).where(gte(mantenimientosTable.fecha, firstDayOfMonth)).then(r => r[0]),
-    db.select().from(maquinasTable).where(sql`(categoria IS NULL OR categoria != 'inventario')`).limit(10),
+    db.select().from(maquinasTable).where(and(sql`(categoria IS NULL OR categoria != 'inventario')`, not(eq(maquinasTable.estado, "baja")))).limit(10),
   ]);
 
   const horasMes = jornadasMes.reduce((acc, j) => {

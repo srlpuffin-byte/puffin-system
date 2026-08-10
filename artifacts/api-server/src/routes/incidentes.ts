@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { incidentesTable, empleadosTable, maquinasTable, actividadTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { sendWhatsAppMessage } from "../services/whatsapp.js";
 
 const router = Router();
@@ -25,20 +25,31 @@ router.get("/", async (req, res) => {
   if (conditions.length) query = query.where(and(...conditions));
 
   const incidentes = await query.orderBy(incidentesTable.createdAt);
-  const enriched = await Promise.all(incidentes.map(async i => {
-    let empleado_nombre = null, maquina_nombre = null;
-    if (i.empleado_id) {
-      const [e] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
-        .from(empleadosTable).where(eq(empleadosTable.id, i.empleado_id)).limit(1);
-      if (e) empleado_nombre = `${e.nombre} ${e.apellido}`;
-    }
-    if (i.maquina_id) {
-      const [m] = await db.select({ nombre: maquinasTable.nombre })
-        .from(maquinasTable).where(eq(maquinasTable.id, i.maquina_id)).limit(1);
-      if (m) maquina_nombre = m.nombre;
-    }
-    return { ...i, empleado_nombre, maquina_nombre };
+
+  // Bulk-load empleados y maquinas para evitar N+1 queries
+  const empleadoIds = [...new Set(incidentes.map(i => i.empleado_id).filter((id): id is number => !!id))];
+  const maquinaIds  = [...new Set(incidentes.map(i => i.maquina_id).filter((id): id is number => !!id))];
+
+  const [empleadosList, maquinasList] = await Promise.all([
+    empleadoIds.length > 0
+      ? db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
+          .from(empleadosTable).where(inArray(empleadosTable.id, empleadoIds))
+      : [],
+    maquinaIds.length > 0
+      ? db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre })
+          .from(maquinasTable).where(inArray(maquinasTable.id, maquinaIds))
+      : [],
+  ]);
+
+  const empleadosMap = new Map(empleadosList.map(e => [e.id, `${e.nombre} ${e.apellido}`]));
+  const maquinasMap  = new Map(maquinasList.map(m => [m.id, m.nombre]));
+
+  const enriched = incidentes.map(i => ({
+    ...i,
+    empleado_nombre: i.empleado_id ? (empleadosMap.get(i.empleado_id) ?? null) : null,
+    maquina_nombre:  i.maquina_id  ? (maquinasMap.get(i.maquina_id)  ?? null) : null,
   }));
+
   return res.json(enriched.reverse());
 });
 
