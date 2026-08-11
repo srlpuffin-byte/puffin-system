@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, numeric, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, numeric, timestamp, date, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -18,7 +18,11 @@ export const combustibleTable = pgTable("combustible", {
   foto_surtidor: text("foto_surtidor"),
   estado: text("estado").notNull().default("activo"), // activo, anulado
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  fechaIdx: index("combustible_fecha_idx").on(table.fecha),
+  empleadoIdx: index("combustible_empleado_idx").on(table.empleado_id),
+  maquinaIdx: index("combustible_maquina_idx").on(table.maquina_id),
+}));
 
 export const insertCombustibleSchema = createInsertSchema(combustibleTable).omit({ id: true, createdAt: true });
 export type InsertCombustible = z.infer<typeof insertCombustibleSchema>;
