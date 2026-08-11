@@ -167,7 +167,7 @@ export function CargarJornadaPasadaDialog({ open, onOpenChange }: Props) {
   const horasHorometro = calcularHorasHorometro();
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetForm(); }}>
+    <Dialog modal={false} open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetForm(); }}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
