@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { mantenimientosTable, maquinasTable, actividadTable, empleadosTable } from "@workspace/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import { getEmpleadoIdForUser } from "../lib/auth-helpers";
 import { sendWhatsAppMessage } from "../services/whatsapp.js";
 
@@ -22,7 +22,7 @@ router.get("/", async (req, res) => {
 
   if (conditions.length) query = query.where(and(...conditions));
 
-  const mantenimientos = await query.orderBy(mantenimientosTable.fecha);
+  const mantenimientos = await query.orderBy(desc(mantenimientosTable.fecha), desc(mantenimientosTable.id)).limit(300);
 
   // Bulk-load empleados y máquinas con inArray — elimina N+1 (antes: 2 queries por registro)
   const maqIds = [...new Set(mantenimientos.map(m => m.maquina_id).filter((id): id is number => !!id))];
@@ -49,7 +49,7 @@ router.get("/", async (req, res) => {
     horas: m.horas ? Number(m.horas) : null,
   }));
 
-  return res.json(enriched.reverse());
+  return res.json(enriched);
 });
 
 router.post("/", async (req, res) => {

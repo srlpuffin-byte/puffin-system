@@ -36,7 +36,7 @@ router.get("/", async (req, res) => {
 
   if (conditions.length) query = query.where(and(...conditions));
 
-  const egresos = await query.orderBy(desc(egresosTable.fecha));
+  const egresos = await query.orderBy(desc(egresosTable.fecha), desc(egresosTable.id)).limit(300);
   
   // Transform numeric fields
   return res.json(egresos.map(e => ({

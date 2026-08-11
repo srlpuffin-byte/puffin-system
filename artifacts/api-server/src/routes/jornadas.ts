@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { jornadasTable, empleadosTable, maquinasTable, actividadTable, alertasTable, combustibleTable, incidentesTable } from "@workspace/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import { appendToSheet } from "../services/sheets.js";
 import { sendWhatsAppMessage } from "../services/whatsapp.js";
 
@@ -62,7 +62,7 @@ router.get("/", async (req, res) => {
 
   if (conditions.length) query = query.where(and(...conditions));
 
-  const jornadas = await query.orderBy(jornadasTable.createdAt);
+  const jornadas = await query.orderBy(desc(jornadasTable.fecha), desc(jornadasTable.id)).limit(300);
 
   // Bulk-load para evitar N+1 (una query por nombre antes era O(N*2) calls)
   const empIds = [...new Set(jornadas.map(j => j.empleado_id).filter((id): id is number => !!id))];
@@ -109,7 +109,7 @@ router.get("/", async (req, res) => {
     };
   });
 
-  return res.json(enriched.reverse());
+  return res.json(enriched);
 });
 
 router.post("/iniciar", async (req, res) => {

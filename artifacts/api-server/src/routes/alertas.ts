@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { alertasTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 
 const router = Router();
 
@@ -12,11 +12,11 @@ router.get("/", async (req, res) => {
   if (prioridad) conditions.push(eq(alertasTable.prioridad, prioridad));
   if (estado) conditions.push(eq(alertasTable.estado, estado));
   if (conditions.length) query = query.where(and(...conditions));
-  const alertas = await query.orderBy(alertasTable.fecha);
+  const alertas = await query.orderBy(desc(alertasTable.fecha), desc(alertasTable.id)).limit(300);
   return res.json(alertas.map(a => ({
     ...a,
     fecha: a.fecha?.toISOString() || new Date().toISOString(),
-  })).reverse());
+  })));
 });
 
 router.put("/:id", async (req, res) => {

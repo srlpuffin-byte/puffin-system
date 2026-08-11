@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { incidentesTable, empleadosTable, maquinasTable, actividadTable } from "@workspace/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import { sendWhatsAppMessage } from "../services/whatsapp.js";
 
 const router = Router();
@@ -24,7 +24,7 @@ router.get("/", async (req, res) => {
 
   if (conditions.length) query = query.where(and(...conditions));
 
-  const incidentes = await query.orderBy(incidentesTable.createdAt);
+  const incidentes = await query.orderBy(desc(incidentesTable.fecha), desc(incidentesTable.id)).limit(300);
 
   // Bulk-load empleados y maquinas para evitar N+1 queries
   const empleadoIds = [...new Set(incidentes.map(i => i.empleado_id).filter((id): id is number => !!id))];
@@ -50,7 +50,7 @@ router.get("/", async (req, res) => {
     maquina_nombre:  i.maquina_id  ? (maquinasMap.get(i.maquina_id)  ?? null) : null,
   }));
 
-  return res.json(enriched.reverse());
+  return res.json(enriched);
 });
 
 router.post("/", async (req, res) => {

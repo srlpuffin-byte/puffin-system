@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { combustibleTable, empleadosTable, maquinasTable, actividadTable, fotografiasTable } from "@workspace/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { syncAllSheets } from "../services/sync-sheets.js";
 
 const router = Router();
@@ -48,7 +48,8 @@ router.get("/", async (req, res) => {
     eq(fotografiasTable.entidad_tipo, "combustible")
   ))
   .where(conditions.length ? and(...conditions) : undefined)
-  .orderBy(combustibleTable.fecha);
+  .orderBy(desc(combustibleTable.fecha), desc(combustibleTable.id))
+  .limit(300);
 
   const enriched = registros.map(r => ({
     ...r,
@@ -60,7 +61,7 @@ router.get("/", async (req, res) => {
     kilometraje: r.kilometraje ? Number(r.kilometraje) : null,
   }));
 
-  return res.json(enriched.reverse());
+  return res.json(enriched);
 });
 
 router.post("/", async (req, res) => {
