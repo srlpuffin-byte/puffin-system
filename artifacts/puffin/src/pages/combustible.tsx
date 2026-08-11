@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useGetCombustible, RegistroCombustible, useDeleteCombustible, getGetCombustibleQueryKey } from "@workspace/api-client-react";
+import { TableSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -93,7 +94,7 @@ export function Combustible() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={9} className="text-center py-8">Cargando registros...</TableCell></TableRow>
+                    <TableSkeleton cols={9} rows={5} />
                   ) : registros?.length === 0 ? (
                     <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No hay cargas registradas.</TableCell></TableRow>
                   ) : (
@@ -180,7 +181,7 @@ export function Combustible() {
             {/* Vista Mobile (Tarjetas) */}
             <div className="md:hidden divide-y">
               {isLoading ? (
-                <div className="text-center py-8">Cargando registros...</div>
+                <CardSkeleton rows={4} />
               ) : registros?.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No hay cargas registradas.</div>
               ) : (

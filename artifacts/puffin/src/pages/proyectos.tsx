@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useGetProyectos, useDeleteProyecto, type Proyecto } from "@/hooks/use-proyectos";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { useGetEmpleados, useGetMaquinas, useGetMe } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -168,7 +169,7 @@ export function Proyectos() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-8">Cargando proyectos...</TableCell></TableRow>
+                    <TableSkeleton cols={5} rows={5} />
                   ) : filteredProyectos?.length === 0 ? (
                     <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No se encontraron resultados.</TableCell></TableRow>
                   ) : (
@@ -288,7 +289,7 @@ export function Proyectos() {
             {/* Vista Mobile (Tarjetas) */}
             <div className="md:hidden divide-y">
               {isLoading ? (
-                <div className="text-center py-8">Cargando proyectos...</div>
+                <CardSkeleton rows={4} />
               ) : filteredProyectos?.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No se encontraron resultados.</div>
               ) : (

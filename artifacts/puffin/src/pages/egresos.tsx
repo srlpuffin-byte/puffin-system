@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useGetEgresos, useCreateEgreso, useGetEmpleados, useGetMaquinas, getGetEgresosQueryKey } from "@workspace/api-client-react";
+import { TableSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
 import { useGetProyectos } from "@/hooks/use-proyectos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -363,7 +364,7 @@ export function Egresos() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando egresos...</TableCell></TableRow>
+                    <TableSkeleton cols={8} rows={5} />
                   ) : egresosFiltrados.length === 0 ? (
                     <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay egresos con los filtros seleccionados.</TableCell></TableRow>
                   ) : (
@@ -453,7 +454,7 @@ export function Egresos() {
             {/* Vista Mobile (Tarjetas) */}
             <div className="md:hidden divide-y">
               {isLoading ? (
-                <div className="text-center py-8">Cargando egresos...</div>
+                <CardSkeleton rows={4} />
               ) : egresosFiltrados.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No hay egresos con los filtros seleccionados.</div>
               ) : (

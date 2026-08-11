@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useGetMaquinas } from "@workspace/api-client-react";
+import { useGetMaquinas, useDeleteMaquina, useUpdateMaquina, getGetMaquinasQueryKey } from "@workspace/api-client-react";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -207,7 +208,7 @@ export function Maquinas() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando maquinaria...</TableCell></TableRow>
+                    <TableSkeleton cols={8} rows={5} />
                   ) : maquinas?.length === 0 ? (
                     <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No se encontraron resultados.</TableCell></TableRow>
                   ) : (
@@ -282,7 +283,7 @@ export function Maquinas() {
             {/* Vista Mobile (Tarjetas) */}
             <div className="md:hidden divide-y">
               {isLoading ? (
-                <div className="text-center py-8">Cargando maquinaria...</div>
+                <CardSkeleton rows={4} />
               ) : maquinas?.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No se encontraron resultados.</div>
               ) : (

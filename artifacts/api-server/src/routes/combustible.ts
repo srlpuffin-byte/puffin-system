@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { combustibleTable, empleadosTable, maquinasTable, actividadTable, fotografiasTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { syncAllSheets } from "../services/sync-sheets.js";
 
 const router = Router();
@@ -10,40 +10,56 @@ import { getEmpleadoIdForUser } from "../lib/auth-helpers";
 
 router.get("/", async (req, res) => {
   const { maquina_id, empleado_id } = req.query as Record<string, string>;
-  let query = db.select().from(combustibleTable).$dynamic();
-  const conditions = [];
   
+  const conditions = [];
   if (maquina_id) conditions.push(eq(combustibleTable.maquina_id, parseInt(maquina_id)));
   if (empleado_id) conditions.push(eq(combustibleTable.empleado_id, parseInt(empleado_id)));
 
-  // Role-Based Access Control: Empleados solo ven sus propios reportes de combustible
   if (req.user?.rol?.toLowerCase() === "empleado") {
     const userEmpleadoId = await getEmpleadoIdForUser(req.user.id);
     conditions.push(eq(combustibleTable.empleado_id, userEmpleadoId));
   }
 
-  if (conditions.length) query = query.where(and(...conditions));
+  const registros = await db.select({
+    id: combustibleTable.id,
+    empresa_id: combustibleTable.empresa_id,
+    maquina_id: combustibleTable.maquina_id,
+    empleado_id: combustibleTable.empleado_id,
+    fecha: combustibleTable.fecha,
+    litros: combustibleTable.litros,
+    precio: combustibleTable.precio,
+    importe: combustibleTable.importe,
+    estacion: combustibleTable.estacion,
+    ubicacion: combustibleTable.ubicacion,
+    kilometraje: combustibleTable.kilometraje,
+    foto_ticket: combustibleTable.foto_ticket,
+    foto_surtidor: combustibleTable.foto_surtidor,
+    estado: combustibleTable.estado,
+    createdAt: combustibleTable.createdAt,
+    empleado_nombre: sql<string>`concat(${empleadosTable.nombre}, ' ', ${empleadosTable.apellido})`,
+    maquina_nombre: maquinasTable.nombre,
+    foto_url: fotografiasTable.url,
+  })
+  .from(combustibleTable)
+  .leftJoin(empleadosTable, eq(combustibleTable.empleado_id, empleadosTable.id))
+  .leftJoin(maquinasTable, eq(combustibleTable.maquina_id, maquinasTable.id))
+  .leftJoin(fotografiasTable, and(
+    eq(fotografiasTable.entidad_id, combustibleTable.id),
+    eq(fotografiasTable.entidad_tipo, "combustible")
+  ))
+  .where(conditions.length ? and(...conditions) : undefined)
+  .orderBy(combustibleTable.fecha);
 
-  const registros = await query.orderBy(combustibleTable.fecha);
-  const fotografias = await db.select().from(fotografiasTable).where(eq(fotografiasTable.entidad_tipo, "combustible"));
-
-  const enriched = await Promise.all(registros.map(async r => {
-    const [empleado] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
-      .from(empleadosTable).where(eq(empleadosTable.id, r.empleado_id)).limit(1);
-    const [maquina] = await db.select({ nombre: maquinasTable.nombre })
-      .from(maquinasTable).where(eq(maquinasTable.id, r.maquina_id)).limit(1);
-    const foto = fotografias.find(f => f.entidad_id === r.id);
-    return {
-      ...r,
-      empleado_nombre: empleado ? `${empleado.nombre} ${empleado.apellido}` : "Desconocido",
-      maquina_nombre: maquina?.nombre || "Desconocida",
-      litros: Number(r.litros),
-      precio: r.precio ? Number(r.precio) : null,
-      importe: r.importe ? Number(r.importe) : null,
-      kilometraje: r.kilometraje ? Number(r.kilometraje) : null,
-      foto_url: foto ? foto.url : null,
-    };
+  const enriched = registros.map(r => ({
+    ...r,
+    empleado_nombre: r.empleado_nombre || "Desconocido",
+    maquina_nombre: r.maquina_nombre || "Desconocida",
+    litros: Number(r.litros),
+    precio: r.precio ? Number(r.precio) : null,
+    importe: r.importe ? Number(r.importe) : null,
+    kilometraje: r.kilometraje ? Number(r.kilometraje) : null,
   }));
+
   return res.json(enriched.reverse());
 });
 

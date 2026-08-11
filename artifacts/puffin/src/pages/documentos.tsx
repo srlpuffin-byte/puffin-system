@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useGetDocumentos } from "@workspace/api-client-react";
+import { TableSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -91,7 +92,7 @@ export function Documentos() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-8">Cargando documentos...</TableCell></TableRow>
+                    <TableSkeleton cols={6} rows={5} />
                   ) : documentos?.length === 0 ? (
                     <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       {empleadoId ? "Este operario no tiene documentos registrados." : "No hay documentos registrados."}
@@ -134,7 +135,7 @@ export function Documentos() {
             {/* Vista Mobile (Tarjetas) */}
             <div className="md:hidden divide-y">
               {isLoading ? (
-                <div className="text-center py-8">Cargando documentos...</div>
+                <CardSkeleton rows={4} />
               ) : documentos?.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   {empleadoId ? "Este operario no tiene documentos registrados." : "No hay documentos registrados."}

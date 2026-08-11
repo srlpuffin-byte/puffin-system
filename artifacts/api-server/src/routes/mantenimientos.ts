@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { mantenimientosTable, maquinasTable, actividadTable, empleadosTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { getEmpleadoIdForUser } from "../lib/auth-helpers";
 import { sendWhatsAppMessage } from "../services/whatsapp.js";
 
@@ -23,22 +23,32 @@ router.get("/", async (req, res) => {
   if (conditions.length) query = query.where(and(...conditions));
 
   const mantenimientos = await query.orderBy(mantenimientosTable.fecha);
-  const enriched = await Promise.all(mantenimientos.map(async m => {
-    const [maquina] = await db.select({ nombre: maquinasTable.nombre })
-      .from(maquinasTable).where(eq(maquinasTable.id, m.maquina_id)).limit(1);
-    let empleado_nombre = null;
-    if (m.empleado_id) {
-      const [e] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
-        .from(empleadosTable).where(eq(empleadosTable.id, m.empleado_id)).limit(1);
-      if (e) empleado_nombre = `${e.nombre} ${e.apellido}`;
-    }
-    return {
-      ...m,
-      maquina_nombre: maquina?.nombre || "Desconocida",
-      empleado_nombre,
-      horas: m.horas ? Number(m.horas) : null,
-    };
+
+  // Bulk-load empleados y máquinas con inArray — elimina N+1 (antes: 2 queries por registro)
+  const maqIds = [...new Set(mantenimientos.map(m => m.maquina_id).filter((id): id is number => !!id))];
+  const empIds = [...new Set(mantenimientos.map(m => m.empleado_id).filter((id): id is number => !!id))];
+
+  const [maquinasList, empleadosList] = await Promise.all([
+    maqIds.length > 0
+      ? db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre })
+          .from(maquinasTable).where(inArray(maquinasTable.id, maqIds))
+      : [],
+    empIds.length > 0
+      ? db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
+          .from(empleadosTable).where(inArray(empleadosTable.id, empIds))
+      : [],
+  ]);
+
+  const maqMap = new Map(maquinasList.map(m => [m.id, m.nombre]));
+  const empMap = new Map(empleadosList.map(e => [e.id, `${e.nombre} ${e.apellido}`]));
+
+  const enriched = mantenimientos.map(m => ({
+    ...m,
+    maquina_nombre: m.maquina_id ? (maqMap.get(m.maquina_id) ?? "Desconocida") : "Desconocida",
+    empleado_nombre: m.empleado_id ? (empMap.get(m.empleado_id) ?? null) : null,
+    horas: m.horas ? Number(m.horas) : null,
   }));
+
   return res.json(enriched.reverse());
 });
 

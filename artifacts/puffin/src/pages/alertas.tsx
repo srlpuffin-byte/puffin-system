@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useGetAlertas, useUpdateAlerta } from "@workspace/api-client-react";
+import { TableSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -81,9 +82,7 @@ export function Alertas() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">Cargando alertas...</TableCell>
-                    </TableRow>
+                    <TableSkeleton cols={6} rows={4} />
                   ) : alertas?.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
@@ -132,7 +131,7 @@ export function Alertas() {
             {/* Vista Mobile (Tarjetas) */}
             <div className="md:hidden divide-y">
               {isLoading ? (
-                <div className="text-center py-8">Cargando alertas...</div>
+                <CardSkeleton rows={4} />
               ) : alertas?.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">

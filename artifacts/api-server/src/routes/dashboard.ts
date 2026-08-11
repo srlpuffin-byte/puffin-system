@@ -50,7 +50,7 @@ router.get("/resumen", async (req, res) => {
   const now = new Date();
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
 
-  // Ejecutar todas las queries del dashboard en paralelo
+  // Ejecutar TODAS las queries del dashboard en paralelo (incluyendo docs)
   const [
     maquinasActivas,
     maquinasDetenidas,
@@ -65,6 +65,7 @@ router.get("/resumen", async (req, res) => {
     jornadasMes,
     mantenimientosMes,
     maquinas,
+    docs,
   ] = await Promise.all([
     db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(and(eq(maquinasTable.estado, "activa"),      sql`(categoria IS NULL OR categoria != 'inventario')`)).then(r => r[0]),
     db.select({ count: sql<number>`count(*)` }).from(maquinasTable).where(and(eq(maquinasTable.estado, "detenida"),    sql`(categoria IS NULL OR categoria != 'inventario')`)).then(r => r[0]),
@@ -87,6 +88,10 @@ router.get("/resumen", async (req, res) => {
     ),
     db.select({ count: sql<number>`count(*)` }).from(mantenimientosTable).where(gte(mantenimientosTable.fecha, firstDayOfMonth)).then(r => r[0]),
     db.select().from(maquinasTable).where(and(sql`(categoria IS NULL OR categoria != 'inventario')`, not(eq(maquinasTable.estado, "baja")))).limit(10),
+    // Docs query ahora corre en paralelo con las demás — antes era secuencial después del Promise.all
+    isEmpleado
+      ? db.select().from(documentosTable).where(and(eq(documentosTable.entidad_tipo, "empleado"), eq(documentosTable.entidad_id, userEmpleadoId)))
+      : db.select().from(documentosTable),
   ]);
 
   const horasMes = jornadasMes.reduce((acc, j) => {
@@ -101,11 +106,7 @@ router.get("/resumen", async (req, res) => {
     ? Math.round((Number(maquinasActivas.count) / totalMaquinas) * 100)
     : 0;
 
-  const docsQuery = db.select().from(documentosTable);
-  if (isEmpleado) {
-    docsQuery.where(and(eq(documentosTable.entidad_tipo, "empleado"), eq(documentosTable.entidad_id, userEmpleadoId)));
-  }
-  const docs = await docsQuery;
+  // docs ya viene del Promise.all de arriba
   const proximos_vencimientos = docs
     .map(d => {
       const venc = new Date(d.fecha_vencimiento);

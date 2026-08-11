@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useGetMantenimientos, useUpdateMantenimientoEstado, getGetMantenimientosQueryKey, useGetMe } from "@workspace/api-client-react";
+import { TableSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -104,7 +105,7 @@ export function Mantenimientos() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando mantenimientos...</TableCell></TableRow>
+                    <TableSkeleton cols={8} rows={5} />
                   ) : mantenimientos?.length === 0 ? (
                     <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay mantenimientos registrados.</TableCell></TableRow>
                   ) : (
@@ -153,7 +154,7 @@ export function Mantenimientos() {
             {/* Vista Mobile (Tarjetas) */}
             <div className="md:hidden divide-y">
               {isLoading ? (
-                <div className="text-center py-8">Cargando mantenimientos...</div>
+                <CardSkeleton rows={4} />
               ) : mantenimientos?.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No hay mantenimientos registrados.</div>
               ) : (

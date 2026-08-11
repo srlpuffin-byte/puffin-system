@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useGetJornadas, useDeleteJornada, useGetMe } from "@workspace/api-client-react";
+import { TableSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -87,7 +88,7 @@ export function Jornadas() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando jornadas...</TableCell></TableRow>
+                    <TableSkeleton cols={8} rows={5} />
                   ) : jornadas?.length === 0 ? (
                     <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay jornadas registradas.</TableCell></TableRow>
                   ) : (
@@ -175,7 +176,7 @@ export function Jornadas() {
             {/* Vista Mobile (Tarjetas) */}
             <div className="md:hidden divide-y">
               {isLoading ? (
-                <div className="text-center py-8">Cargando jornadas...</div>
+                <CardSkeleton rows={4} />
               ) : jornadas?.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No hay jornadas registradas.</div>
               ) : (

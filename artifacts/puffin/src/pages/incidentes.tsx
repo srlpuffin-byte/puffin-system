@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useGetIncidentes, getGetIncidentesQueryKey, useGetMe } from "@workspace/api-client-react";
+import { TableSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
@@ -245,7 +246,7 @@ export function Incidentes() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={7} className="text-center py-8">Cargando incidentes...</TableCell></TableRow>
+                    <TableSkeleton cols={7} rows={5} />
                   ) : incidentes?.length === 0 ? (
                     <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No hay incidentes registrados.</TableCell></TableRow>
                   ) : (
@@ -317,7 +318,7 @@ export function Incidentes() {
             {/* Vista Mobile (Tarjetas) */}
             <div className="md:hidden divide-y">
               {isLoading ? (
-                <div className="text-center py-8">Cargando incidentes...</div>
+                <CardSkeleton rows={4} />
               ) : incidentes?.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No hay incidentes registrados.</div>
               ) : (
