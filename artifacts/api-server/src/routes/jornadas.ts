@@ -137,7 +137,6 @@ router.post("/manual", async (req, res) => {
 
     // Si es empleado, solo puede cargar su propia jornada
     if (req.user?.rol?.toLowerCase() === "empleado") {
-      const { getEmpleadoIdForUser } = await import("../lib/auth-helpers.js");
       const userEmpleadoId = await getEmpleadoIdForUser(req.user.id);
       if (parseInt(empleado_id) !== userEmpleadoId) {
         return res.status(403).json({ error: "Solo podés cargar tus propias jornadas" });
