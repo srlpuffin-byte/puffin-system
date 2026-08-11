@@ -5,12 +5,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlayCircle, Square, MapPin, Pencil, Trash2 } from "lucide-react";
+import { PlayCircle, Square, MapPin, Pencil, Trash2, CalendarDays } from "lucide-react";
 import { format } from "date-fns";
 import { IniciarJornadaDialog } from "@/components/forms/iniciar-jornada-dialog";
 import { FinalizarJornadaDialog } from "@/components/forms/finalizar-jornada-dialog";
 import { VerJornadaDialog } from "@/components/forms/ver-jornada-dialog";
 import { EditarJornadaDialog } from "@/components/forms/editar-jornada-dialog";
+import { CargarJornadaPasadaDialog } from "@/components/forms/cargar-jornada-pasada-dialog";
 import { ExportButtons } from "@/components/ui/export-buttons";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -22,6 +23,7 @@ export function Jornadas() {
   const isAdmin = user?.rol?.toLowerCase() !== "empleado";
   const deleteMut = useDeleteJornada();
   const [openIniciar, setOpenIniciar] = useState(false);
+  const [openJornadaPasada, setOpenJornadaPasada] = useState(false);
   const [jornadaAFinalizar, setJornadaAFinalizar] = useState<{
     id: number; empleado_nombre?: string; maquina_nombre?: string; horometro_inicio?: number | null;
   } | null>(null);
@@ -53,7 +55,7 @@ export function Jornadas() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Jornadas Laborales</h1>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
           {jornadas && (
             <ExportButtons 
               data={jornadas} 
@@ -62,6 +64,10 @@ export function Jornadas() {
               title="Reporte de Jornadas Laborales" 
             />
           )}
+          <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setOpenJornadaPasada(true)}>
+            <CalendarDays className="mr-2 h-4 w-4" />
+            Cargar jornada anterior
+          </Button>
           <Button className="bg-primary flex-1 sm:flex-none" onClick={() => setOpenIniciar(true)}>
             <PlayCircle className="mr-2 h-4 w-4" />
             Iniciar Jornada
@@ -271,6 +277,8 @@ export function Jornadas() {
       </Card>
 
       <IniciarJornadaDialog open={openIniciar} onOpenChange={setOpenIniciar} />
+
+      <CargarJornadaPasadaDialog open={openJornadaPasada} onOpenChange={setOpenJornadaPasada} />
 
       {jornadaAFinalizar && (
         <FinalizarJornadaDialog

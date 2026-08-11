@@ -112,6 +112,71 @@ router.get("/", async (req, res) => {
   return res.json(enriched);
 });
 
+// Endpoint para cargar una jornada pasada que no se pudo registrar en el momento
+router.post("/manual", async (req, res) => {
+  try {
+    const { empleado_id, maquina_id, fecha, hora_inicio, hora_fin, horometro_inicio, horometro_fin, horas_trabajadas, horas_reloj, ubicacion, descripcion_trabajo, observaciones } = req.body;
+
+    if (!empleado_id || !maquina_id || !fecha || !hora_inicio || !hora_fin || horometro_inicio === undefined || horometro_fin === undefined) {
+      return res.status(400).json({ error: "Campos requeridos: empleado, máquina, fecha, hora inicio, hora fin, horómetro" });
+    }
+
+    // Validar que la fecha no sea futura ni de más de 7 días atrás
+    const fechaJornada = new Date(fecha + "T12:00:00");
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const hace7Dias = new Date(hoy);
+    hace7Dias.setDate(hace7Dias.getDate() - 7);
+
+    if (fechaJornada >= hoy) {
+      return res.status(400).json({ error: "No se puede cargar una jornada para hoy o una fecha futura. Use el flujo normal." });
+    }
+    if (fechaJornada < hace7Dias) {
+      return res.status(400).json({ error: "Solo se pueden cargar jornadas de los últimos 7 días." });
+    }
+
+    // Si es empleado, solo puede cargar su propia jornada
+    if (req.user?.rol?.toLowerCase() === "empleado") {
+      const { getEmpleadoIdForUser } = await import("../lib/auth-helpers.js");
+      const userEmpleadoId = await getEmpleadoIdForUser(req.user.id);
+      if (parseInt(empleado_id) !== userEmpleadoId) {
+        return res.status(403).json({ error: "Solo podés cargar tus propias jornadas" });
+      }
+    }
+
+    const horasCalc = horas_trabajadas || (parseFloat(horometro_fin) - parseFloat(horometro_inicio));
+
+    const [jornada] = await db.insert(jornadasTable).values({
+      empleado_id: parseInt(empleado_id),
+      maquina_id: parseInt(maquina_id),
+      fecha,
+      hora_inicio,
+      hora_fin,
+      horometro_inicio: horometro_inicio.toString(),
+      horometro_fin: horometro_fin.toString(),
+      ubicacion: ubicacion || null,
+      descripcion_trabajo: descripcion_trabajo || null,
+      observaciones: observaciones ? `[CARGA RETROACTIVA] ${observaciones}` : "[CARGA RETROACTIVA]",
+      estado: "finalizada",
+    }).returning();
+
+    const [maquina] = await db.select({ nombre: maquinasTable.nombre }).from(maquinasTable).where(eq(maquinasTable.id, parseInt(maquina_id))).limit(1);
+    const [empleado] = await db.select({ nombre: empleadosTable.nombre, apellido: empleadosTable.apellido }).from(empleadosTable).where(eq(empleadosTable.id, parseInt(empleado_id))).limit(1);
+
+    await db.insert(actividadTable).values({
+      tipo: "jornada",
+      descripcion: `Jornada retroactiva registrada: ${empleado ? `${empleado.nombre} ${empleado.apellido}` : ""} en ${maquina?.nombre || ""} (${fecha})`,
+      entidad_tipo: "jornada",
+      entidad_id: jornada.id,
+    });
+
+    return res.status(201).json(await enrichJornada(jornada));
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al guardar la jornada: " + (err?.message || "Error interno") });
+  }
+});
+
 router.post("/iniciar", async (req, res) => {
   try {
     const { empleado_id, maquina_id, horometro_inicio, km_inicio, observaciones, checklist_previo, checklist_ok, estado_equipo_inicio, foto_tablero_inicio, ubicacion, tipo_trabajo, nombre_obra, descripcion_trabajo, confirmar_duplicado } = req.body;
