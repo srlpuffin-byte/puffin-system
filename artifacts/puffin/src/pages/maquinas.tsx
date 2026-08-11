@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useGetMaquinas, useDeleteMaquina, useUpdateMaquina, getGetMaquinasQueryKey } from "@workspace/api-client-react";
-import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { TableSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import { ExportButtons } from "@/components/ui/export-buttons";
 import { NuevaMaquinaDialog } from "@/components/forms/nueva-maquina-dialog";
 import { AlertTriangle, Package, Truck, Trash2, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
-import { useDeleteMaquina, useUpdateMaquina, getGetMaquinasQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";

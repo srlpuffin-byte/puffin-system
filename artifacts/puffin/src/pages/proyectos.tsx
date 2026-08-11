@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useGetProyectos, useDeleteProyecto, type Proyecto } from "@/hooks/use-proyectos";
-import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { TableSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
 import { useGetEmpleados, useGetMaquinas, useGetMe } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
