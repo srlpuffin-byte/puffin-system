@@ -208,14 +208,29 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem("theme");
+    if (saved === "dark") {
+      document.documentElement.classList.add("dark");
+      return true;
+    } else if (saved === "light") {
+      document.documentElement.classList.remove("dark");
+      return false;
+    }
+    // Default: seguir preferencia del sistema operativo
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (prefersDark) document.documentElement.classList.add("dark");
+    return prefersDark;
+  });
   
   const toggleTheme = () => {
     if (isDark) {
       document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
       setIsDark(false);
     } else {
       document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
       setIsDark(true);
     }
   };
@@ -345,8 +360,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <main className="flex-1 bg-slate-50 flex flex-col min-w-0" style={{overflowY: 'auto', WebkitOverflowScrolling: 'touch'}}>
-        <div className="lg:hidden h-14 bg-white border-b flex items-center justify-between px-4 flex-shrink-0">
+      <main className="flex-1 bg-background flex flex-col min-w-0" style={{overflowY: 'auto', WebkitOverflowScrolling: 'touch'}}>
+        <div className="lg:hidden h-14 bg-card border-b border-border flex items-center justify-between px-4 flex-shrink-0">
           <div className="flex items-center">
             <Button variant="ghost" size="sm" onClick={() => setMobileOpen(true)} className="mr-2">
               <Menu className="h-5 w-5" />
