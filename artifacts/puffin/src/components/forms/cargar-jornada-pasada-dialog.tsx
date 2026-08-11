@@ -133,7 +133,7 @@ export function CargarJornadaPasadaDialog({ open, onOpenChange }: Props) {
 
     setIsPending(true);
     try {
-      await customFetch("/jornadas/manual", {
+      await customFetch("/api/jornadas/manual", {
         method: "POST",
         body: JSON.stringify({
           empleado_id: parseInt(form.empleado_id),
