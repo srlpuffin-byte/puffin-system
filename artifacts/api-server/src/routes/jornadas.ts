@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { logger } from "../lib/logger.js";
+import { syncAllSheets } from "../services/sync-sheets.js";
 import { db } from "@workspace/db";
 import { jornadasTable, empleadosTable, maquinasTable, actividadTable, alertasTable, combustibleTable, incidentesTable } from "@workspace/db";
 import { eq, and, inArray, desc } from "drizzle-orm";
@@ -169,6 +171,7 @@ router.post("/manual", async (req, res) => {
       entidad_id: jornada.id,
     });
 
+    syncAllSheets().catch(() => {});
     return res.status(201).json(await enrichJornada(jornada));
   } catch (err: any) {
     req.log?.error(err);
