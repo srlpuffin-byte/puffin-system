@@ -157,7 +157,8 @@ export function CargarJornadaPasadaDialog({ open, onOpenChange }: Props) {
       onOpenChange(false);
       resetForm();
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || "Error al cargar la jornada");
+      const errorMsg = err?.data?.error || err?.response?.data?.error || err?.message || "Error al cargar la jornada";
+      toast.error(errorMsg);
     } finally {
       setIsPending(false);
     }

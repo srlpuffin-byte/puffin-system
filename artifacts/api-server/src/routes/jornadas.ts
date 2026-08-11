@@ -117,7 +117,7 @@ router.post("/manual", async (req, res) => {
   try {
     const { empleado_id, maquina_id, fecha, hora_inicio, hora_fin, horometro_inicio, horometro_fin, horas_trabajadas, horas_reloj, ubicacion, descripcion_trabajo, observaciones } = req.body;
 
-    if (!empleado_id || !maquina_id || !fecha || !hora_inicio || !hora_fin || horometro_inicio === undefined || horometro_fin === undefined) {
+    if (!empleado_id || !maquina_id || !fecha || !hora_inicio || !hora_fin || horometro_inicio == null || horometro_fin == null) {
       return res.status(400).json({ error: "Campos requeridos: empleado, máquina, fecha, hora inicio, hora fin, horómetro" });
     }
 
