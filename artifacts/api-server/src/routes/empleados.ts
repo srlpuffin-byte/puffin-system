@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { empleadosTable, jornadasTable, alertasTable, documentosTable, usuariosTable, fotografiasTable } from "@workspace/db";
-import { eq, and, or, ilike, sql } from "drizzle-orm";
+import { eq, and, or, ilike, sql, inArray } from "drizzle-orm";
 import { updateOrAppendToSheet } from "../services/sheets.js";
 
 const router = Router();
@@ -59,7 +59,7 @@ router.get("/", async (req, res) => {
   if (conditions.length) query = query.where(and(...conditions));
 
   // Ejecutar en paralelo para máxima velocidad
-  const [empleados, jornadas, alertasActivas, fotos] = await Promise.all([
+  const [empleados, jornadas, alertasActivas] = await Promise.all([
     query.orderBy(empleadosTable.apellido),
     db.select({ empleado_id: jornadasTable.empleado_id }).from(jornadasTable).where(eq(jornadasTable.estado, "en_curso")),
     db.select({
@@ -68,10 +68,12 @@ router.get("/", async (req, res) => {
     })
       .from(alertasTable)
       .where(and(eq(alertasTable.estado, "activa"), eq(alertasTable.entidad_tipo, "empleado")))
-      .groupBy(alertasTable.entidad_id),
-    db.select({ entidad_id: fotografiasTable.entidad_id, url: fotografiasTable.url, descripcion: fotografiasTable.descripcion })
-      .from(fotografiasTable).where(eq(fotografiasTable.entidad_tipo, "empleado")),
+      .groupBy(alertasTable.entidad_id)
   ]);
+
+  const empleadoIdsArray = empleados.map(e => e.id);
+  const fotos = empleadoIdsArray.length > 0 ? await db.select({ entidad_id: fotografiasTable.entidad_id, url: fotografiasTable.url, descripcion: fotografiasTable.descripcion })
+    .from(fotografiasTable).where(and(eq(fotografiasTable.entidad_tipo, "empleado"), inArray(fotografiasTable.entidad_id, empleadoIdsArray))) : [];
 
   const jornadaEmpleadoIds = new Set(jornadas.map(j => j.empleado_id));
   const alertasMap = new Map(alertasActivas.map(a => [a.empleado_id, Number(a.count)]));

@@ -97,17 +97,25 @@ router.get("/", async (req, res) => {
   ));
   if (conditions.length) query = query.where(and(...conditions));
 
-  // Ejecutar las 3 consultas en paralelo para máxima velocidad
-  const [maquinas, fotografias, proyectos] = await Promise.all([
-    query.orderBy(maquinasTable.nombre),
-    db.select({ entidad_id: fotografiasTable.entidad_id, url: fotografiasTable.url })
-      .from(fotografiasTable)
-      .where(eq(fotografiasTable.entidad_tipo, "maquina")),
+  const [maquinas, proyectos] = await Promise.all([
+    query.orderBy(maquinasTable.nombre).limit(300),
     db.select({ id: proyectosTable.id, lugar: proyectosTable.lugar, maquinas_asignadas: proyectosTable.maquinas_asignadas })
       .from(proyectosTable),
   ]);
 
   const maquinasIds = new Set(maquinas.map(m => m.id));
+  const idsArray = Array.from(maquinasIds);
+
+  const fotografias = idsArray.length > 0 ? await db.select({ entidad_id: fotografiasTable.entidad_id, url: fotografiasTable.url })
+    .from(fotografiasTable)
+    .where(
+      and(
+        eq(fotografiasTable.entidad_tipo, "maquina"),
+        inArray(fotografiasTable.entidad_id, idsArray)
+      )
+    ) : [];
+
+
 
   const fotografiasMap = new Map<number, string>();
   fotografias.forEach(f => {
