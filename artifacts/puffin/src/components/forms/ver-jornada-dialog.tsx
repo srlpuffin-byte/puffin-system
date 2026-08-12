@@ -8,7 +8,24 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Clock, MapPin, Wrench, CheckCircle2, AlertTriangle, User, Tractor, Info } from "lucide-react";
+import { Clock, MapPin, Wrench, CheckCircle2, XCircle, AlertTriangle, User, Tractor, Info } from "lucide-react";
+
+// Mapa de etiquetas legibles para cada ítem del checklist
+const CHECKLIST_LABELS: Record<string, string> = {
+  cinturon: "Cinturón de seguridad",
+  bocina: "Bocina",
+  luces_delanteras: "Luces delanteras",
+  luces_traseras: "Luces traseras",
+  balizas: "Balizas",
+  espejos: "Espejos",
+  matafuego: "Matafuego (Presencia)",
+  nivel_aceite: "Nivel de aceite",
+  nivel_combustible: "Nivel de combustible",
+  nivel_refrigerante: "Nivel de refrigerante",
+  perdidas: "Ausencia de pérdidas (aceite/agua)",
+  neumaticos: "Estado de neumáticos / orugas",
+  luces_advertencia: "Tablero sin luces de advertencia",
+};
 
 interface VerJornadaDialogProps {
   open: boolean;
@@ -35,7 +52,7 @@ export function VerJornadaDialog({ open, onOpenChange, jornada }: VerJornadaDial
                 </Badge>
               </DialogTitle>
               <p className="text-muted-foreground mt-1 text-sm">
-                {jornada.fecha ? format(new Date(jornada.fecha), "dd/MM/yyyy") : "Sin fecha"}
+                {jornada.fecha ? format(new Date(jornada.fecha + "T12:00:00"), "dd/MM/yyyy") : "Sin fecha"}
               </p>
             </div>
           </div>
@@ -143,7 +160,11 @@ export function VerJornadaDialog({ open, onOpenChange, jornada }: VerJornadaDial
                   <h4 className="text-[10px] font-semibold uppercase text-muted-foreground mb-2 border-b pb-1">Condiciones Iniciales</h4>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Estado General:</span>
-                    <span className="font-medium capitalize">{jornada.estado_equipo_inicio?.replace(/_/g, " ") || "-"}</span>
+                    <span className={`font-medium capitalize ${
+                      jornada.estado_equipo_inicio === "apto" ? "text-green-600" :
+                      jornada.estado_equipo_inicio === "apto_observaciones" ? "text-yellow-600" :
+                      jornada.estado_equipo_inicio === "no_apto" ? "text-red-600" : ""
+                    }`}>{jornada.estado_equipo_inicio?.replace(/_/g, " ") || "-"}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Nivel Combustible:</span>
@@ -163,17 +184,57 @@ export function VerJornadaDialog({ open, onOpenChange, jornada }: VerJornadaDial
                   <h4 className="text-[10px] font-semibold uppercase text-muted-foreground mb-2 border-b pb-1">Condiciones Finales</h4>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Estado Cierre:</span>
-                    <span className="font-medium capitalize">{jornada.estado_equipo_fin?.replace(/_/g, " ") || "-"}</span>
+                    <span className={`font-medium capitalize ${
+                      jornada.estado_equipo_fin === "sin_novedades" ? "text-green-600" :
+                      jornada.estado_equipo_fin === "con_observaciones" ? "text-yellow-600" :
+                      jornada.estado_equipo_fin === "requiere_mantenimiento" ? "text-orange-600" :
+                      jornada.estado_equipo_fin === "fuera_de_servicio" ? "text-red-600" : ""
+                    }`}>{jornada.estado_equipo_fin?.replace(/_/g, " ") || "-"}</span>
                   </div>
                   <div className="flex flex-col text-sm mt-2">
                     <span className="text-muted-foreground mb-1">Problemas / Novedades:</span>
-                    <span className={jornada.problemas ? "font-medium text-red-600 p-2 bg-red-50 rounded text-xs" : "font-medium"}>{jornada.problemas || "Ninguno"}</span>
+                    <span className={jornada.problemas ? "font-medium text-red-600 p-2 bg-red-50 rounded text-xs" : "font-medium text-muted-foreground"}>{jornada.problemas || "Ninguno"}</span>
                   </div>
                 </div>
               </div>
+
+              {/* Checklist preoperacional detallado */}
+              {jornada.checklist_previo && (() => {
+                let items: Record<string, boolean> = {};
+                try { items = JSON.parse(jornada.checklist_previo); } catch { return null; }
+                const keys = Object.keys(items);
+                if (keys.length === 0) return null;
+                const aprobados = keys.filter(k => items[k]).length;
+                return (
+                  <div className="mt-4 border rounded-md p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-[10px] font-semibold uppercase text-muted-foreground border-b pb-1 flex-1">Checklist Preoperacional</h4>
+                      <span className={`text-xs font-bold ml-3 px-2 py-0.5 rounded-full ${
+                        aprobados === keys.length ? "bg-green-100 text-green-700" :
+                        aprobados >= keys.length / 2 ? "bg-yellow-100 text-yellow-700" :
+                        "bg-red-100 text-red-700"
+                      }`}>{aprobados}/{keys.length} OK</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {keys.map(key => (
+                        <div key={key} className={`flex items-center gap-2 text-sm p-2 rounded ${
+                          items[key] ? "bg-green-50" : "bg-red-50"
+                        }`}>
+                          {items[key]
+                            ? <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                            : <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />}
+                          <span className={items[key] ? "text-green-800" : "text-red-700"}>
+                            {CHECKLIST_LABELS[key] || key}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
-            {/* Observaciones */}
+            {/* Descripción y Observaciones — siempre se muestran si existen */}
             {(jornada.descripcion_trabajo || jornada.observaciones) && (
               <div>
                 <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><Info className="w-4 h-4" /> Descripción y Observaciones</h3>
@@ -185,9 +246,9 @@ export function VerJornadaDialog({ open, onOpenChange, jornada }: VerJornadaDial
                     </div>
                   )}
                   {jornada.observaciones && (
-                    <div className="border rounded-md p-3 text-sm bg-amber-50/30">
-                      <p className="text-[10px] uppercase text-amber-700 font-semibold mb-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Observaciones</p>
-                      <p>{jornada.observaciones}</p>
+                    <div className="border rounded-md p-3 text-sm bg-amber-50/50 border-amber-200">
+                      <p className="text-[10px] uppercase text-amber-700 font-semibold mb-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Observaciones del Operario</p>
+                      <p className="text-amber-900">{jornada.observaciones}</p>
                     </div>
                   )}
                 </div>

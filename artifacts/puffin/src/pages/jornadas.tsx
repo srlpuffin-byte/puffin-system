@@ -39,7 +39,7 @@ export function Jornadas() {
   };
 
   const exportColumns = [
-    { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v), "dd/MM/yyyy") : "-" },
+    { header: "Fecha", key: "fecha", formatter: (v: string) => v ? format(new Date(v + "T12:00:00"), "dd/MM/yyyy") : "-" },
     { header: "Operario", key: "empleado_nombre" },
     { header: "Máquina", key: "maquina_nombre" },
     { header: "Ubicación", key: "ubicacion" },
@@ -101,7 +101,7 @@ export function Jornadas() {
                     jornadas?.map((jor: any) => (
                       <TableRow key={jor.id} className="cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setJornadaAVer(jor)}>
                         <TableCell className="font-medium">
-                          {jor.fecha ? format(new Date(jor.fecha), "dd/MM/yyyy") : "-"}
+                          {jor.fecha ? format(new Date(jor.fecha + "T12:00:00"), "dd/MM/yyyy") : "-"}
                         </TableCell>
                         <TableCell>{jor.empleado_nombre}</TableCell>
                         <TableCell>{jor.maquina_nombre}</TableCell>
@@ -191,7 +191,7 @@ export function Jornadas() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-col">
                         <span className="font-semibold text-base text-primary leading-tight">{jor.empleado_nombre}</span>
-                        <span className="text-xs text-muted-foreground mt-0.5">{jor.fecha ? format(new Date(jor.fecha), "dd/MM/yyyy") : "-"}</span>
+                        <span className="text-xs text-muted-foreground mt-0.5">{jor.fecha ? format(new Date(jor.fecha + "T12:00:00"), "dd/MM/yyyy") : "-"}</span>
                       </div>
                       <Badge variant={jor.estado === "en_curso" ? "outline" : "secondary"} className={jor.estado === "en_curso" ? "text-blue-600 border-blue-600" : ""}>
                         {jor.estado.toUpperCase().replace("_", " ")}
@@ -309,7 +309,7 @@ export function Jornadas() {
           <div className="bg-background rounded-xl border border-white/10 shadow-2xl p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-bold text-white mb-2">Eliminar Jornada</h3>
             <p className="text-white/70 text-sm mb-6">
-              ¿Estás seguro que querés eliminar la jornada de <strong>{jornadaAEliminar.empleado_nombre}</strong> del {jornadaAEliminar.fecha ? format(new Date(jornadaAEliminar.fecha), "dd/MM/yyyy") : "-"}? Esta acción no se puede deshacer.
+              ¿Estás seguro que querés eliminar la jornada de <strong>{jornadaAEliminar.empleado_nombre}</strong> del {jornadaAEliminar.fecha ? format(new Date(jornadaAEliminar.fecha + "T12:00:00"), "dd/MM/yyyy") : "-"}? Esta acción no se puede deshacer.
             </p>
             <div className="flex gap-3 justify-end">
               <Button

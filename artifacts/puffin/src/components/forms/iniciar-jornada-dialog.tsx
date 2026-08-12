@@ -178,17 +178,27 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
               {conflictWarning?.map((c, i) => (
                 <p key={i} className="text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-md px-3 py-2">⚠️ {c}</p>
               ))}
-              <p className="text-sm text-slate-600 pt-1">¿Querés crear una nueva jornada igual?</p>
+              {isEmpleado ? (
+                <p className="text-sm text-red-700 font-semibold bg-red-50 border border-red-200 rounded-md px-3 py-2 mt-2">
+                  🚫 Debés finalizar tu jornada activa antes de iniciar una nueva.
+                </p>
+              ) : (
+                <p className="text-sm text-slate-600 pt-1">Como administrador, podés forzar la creación de una nueva jornada.</p>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setConflictWarning(null)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-amber-600 hover:bg-amber-700"
-              onClick={() => { setConflictWarning(null); doSubmit(true); }}
-            >
-              Sí, crear igual
-            </AlertDialogAction>
+            <AlertDialogCancel onClick={() => setConflictWarning(null)}>{
+              isEmpleado ? "Entendido" : "Cancelar"
+            }</AlertDialogCancel>
+            {!isEmpleado && (
+              <AlertDialogAction
+                className="bg-amber-600 hover:bg-amber-700"
+                onClick={() => { setConflictWarning(null); doSubmit(true); }}
+              >
+                Sí, crear igual
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
