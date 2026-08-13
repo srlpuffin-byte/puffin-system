@@ -96,7 +96,9 @@ router.get("/resumen", async (req, res) => {
 
   const horasMes = jornadasMes.reduce((acc, j) => {
     if (j.horometro_inicio && j.horometro_fin) {
-      return acc + (Number(j.horometro_fin) - Number(j.horometro_inicio));
+      const diff = Number(j.horometro_fin) - Number(j.horometro_inicio);
+      // Ignorar registros con datos incorrectos (horómetro fin < inicio)
+      if (diff > 0) return acc + diff;
     }
     return acc;
   }, 0);
