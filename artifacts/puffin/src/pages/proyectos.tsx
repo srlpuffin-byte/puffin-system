@@ -51,7 +51,9 @@ export function Proyectos() {
     if (!maquinas) return `${ids.length} asignadas`;
     return ids.map(id => {
       const maq = maquinas.find(m => m.id === id);
-      return maq ? `${maq.marca} ${maq.modelo}` : `ID ${id}`;
+      if (!maq) return `ID ${id}`;
+      const extra = [maq.marca, maq.modelo].filter(Boolean).join(" ");
+      return extra ? `${maq.nombre} (${extra})` : maq.nombre;
     }).join(", ");
   };
 
