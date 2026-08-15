@@ -260,6 +260,11 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
                               checked={maquinasIds.includes(maq.id)}
                               onCheckedChange={() => toggleMaquina(maq.id)}
                             />
+                            {getMaquinaFoto(maq.id) ? (
+                              <img src={getMaquinaFoto(maq.id)} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+                            ) : (
+                              <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-slate-400 text-[9px] flex-shrink-0 border">S/F</div>
+                            )}
                             <HoverCard openDelay={200}>
                               <HoverCardTrigger asChild>
                                 <label
@@ -329,6 +334,11 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
                               checked={maquinasIds.includes(maq.id)}
                               onCheckedChange={() => toggleMaquina(maq.id)}
                             />
+                            {getMaquinaFoto(maq.id) ? (
+                              <img src={getMaquinaFoto(maq.id)} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+                            ) : (
+                              <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-slate-400 text-[9px] flex-shrink-0 border">S/F</div>
+                            )}
                             <HoverCard openDelay={200}>
                               <HoverCardTrigger asChild>
                                 <label
