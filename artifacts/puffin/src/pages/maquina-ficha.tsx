@@ -47,13 +47,16 @@ export function MaquinaFicha() {
   const handleDeleteFoto = async (id: number) => {
     if (confirm("¿Estás seguro de eliminar esta fotografía?")) {
       try {
-        await fetch(`${import.meta.env.VITE_API_URL}/fotografias/${id}`, {
+        const res = await fetch(`/api/fotografias/${id}`, {
           method: "DELETE",
           headers: { Authorization: `Bearer ${getAuthToken()}` }
         });
+        if (!res.ok) throw new Error("Error HTTP " + res.status);
         queryClient.invalidateQueries({ queryKey: getGetFotografiasQueryKey() });
+        queryClient.invalidateQueries({ queryKey: ["/api/fotografias"] });
         toast.success("Fotografía eliminada");
       } catch (e) {
+        console.error(e);
         toast.error("Error al eliminar");
       }
     }
@@ -61,13 +64,16 @@ export function MaquinaFicha() {
 
   const handleSetMainFoto = async (id: number) => {
     try {
-      await fetch(`${import.meta.env.VITE_API_URL}/fotografias/${id}/set-main`, {
+      const res = await fetch(`/api/fotografias/${id}/set-main`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${getAuthToken()}` }
       });
+      if (!res.ok) throw new Error("Error HTTP " + res.status);
       queryClient.invalidateQueries({ queryKey: getGetFotografiasQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ["/api/fotografias"] });
       toast.success("Establecida como foto principal");
     } catch (e) {
+      console.error(e);
       toast.error("Error al actualizar");
     }
   };
