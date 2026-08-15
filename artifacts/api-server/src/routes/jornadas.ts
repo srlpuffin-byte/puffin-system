@@ -106,8 +106,14 @@ router.get("/", async (req, res) => {
   const empFotoMap = new Map<number, string>();
   const maqFotoMap = new Map<number, string>();
   fotografias.forEach(f => {
-    if (f.entidad_tipo === "empleado" && (f.descripcion === "Foto de perfil" || f.descripcion?.toLowerCase().includes("perfil"))) {
-      empFotoMap.set(f.entidad_id, f.url);
+    // Para empleados: primero intentar foto de perfil, si no hay tomar cualquier foto
+    if (f.entidad_tipo === "empleado") {
+      const esPerfil = f.descripcion === "Foto de perfil" || f.descripcion?.toLowerCase().includes("perfil");
+      if (esPerfil) {
+        empFotoMap.set(f.entidad_id, f.url); // sobreescribe con la de perfil
+      } else if (!empFotoMap.has(f.entidad_id)) {
+        empFotoMap.set(f.entidad_id, f.url); // usa la primera disponible
+      }
     } else if (f.entidad_tipo === "maquina" && !maqFotoMap.has(f.entidad_id)) {
       maqFotoMap.set(f.entidad_id, f.url);
     }
