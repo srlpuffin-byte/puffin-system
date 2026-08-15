@@ -8,7 +8,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Clock, MapPin, Wrench, CheckCircle2, XCircle, AlertTriangle, User, Tractor, Info } from "lucide-react";
+import { Clock, MapPin, Wrench, CheckCircle2, XCircle, AlertTriangle, User, Tractor, Info, ExternalLink } from "lucide-react";
+import { useLocation } from "wouter";
 
 // Mapa de etiquetas legibles para cada ítem del checklist
 const CHECKLIST_LABELS: Record<string, string> = {
@@ -34,7 +35,14 @@ interface VerJornadaDialogProps {
 }
 
 export function VerJornadaDialog({ open, onOpenChange, jornada }: VerJornadaDialogProps) {
+  const [, setLocation] = useLocation();
   if (!jornada) return null;
+
+  const irAFichaMaquina = () => {
+    if (!jornada.maquina_id) return;
+    onOpenChange(false);
+    setTimeout(() => setLocation(`/maquinas/${jornada.maquina_id}`), 150);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -77,15 +85,22 @@ export function VerJornadaDialog({ open, onOpenChange, jornada }: VerJornadaDial
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center gap-3 cursor-pointer rounded-md p-1.5 -m-1.5 hover:bg-blue-50 hover:border hover:border-blue-200 transition-colors group"
+                  onClick={irAFichaMaquina}
+                  title="Ver ficha de la máquina"
+                >
                   {jornada.maquina_foto ? (
                     <img src={jornada.maquina_foto} alt="Máquina" className="w-12 h-12 rounded-md object-cover border flex-shrink-0" />
                   ) : (
                     <div className="w-12 h-12 rounded-md bg-slate-200 flex items-center justify-center flex-shrink-0"><Tractor className="w-6 h-6 text-slate-500" /></div>
                   )}
-                  <div>
+                  <div className="flex-1">
                     <p className="font-semibold text-muted-foreground uppercase text-[10px]">Máquina</p>
-                    <p className="font-medium text-sm">{jornada.maquina_nombre || "-"}</p>
+                    <p className="font-medium text-sm flex items-center gap-1">
+                      {jornada.maquina_nombre || "-"}
+                      <ExternalLink className="w-3 h-3 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </p>
                     {jornada.maquina_descripcion && <p className="text-muted-foreground mt-0.5">{jornada.maquina_descripcion}</p>}
                     {jornada.tipo_trabajo && <p className="text-muted-foreground mt-0.5">Trabajo: {jornada.tipo_trabajo}</p>}
                   </div>
