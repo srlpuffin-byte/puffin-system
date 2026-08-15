@@ -12,7 +12,7 @@ import { RegistrarCargaDialog } from "@/components/forms/registrar-carga-dialog"
 import { ReportarIncidenteDialog } from "@/components/forms/reportar-incidente-dialog";
 import { EditarMaquinaDialog } from "@/components/forms/editar-maquina-dialog";
 import { HistorialMaquinaDialog } from "@/components/forms/historial-maquina-dialog";
-import { History, AlertTriangle, Trash2, Star, FileText, Plus } from "lucide-react";
+import { History, AlertTriangle, Trash2, Star, FileText, Plus, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -272,6 +272,11 @@ export function MaquinaFicha() {
                         <span className="text-muted-foreground">Vencimiento:</span>{" "}
                         <span className="font-semibold">{format(new Date(d.fecha_vencimiento + 'T12:00:00'), "dd/MM/yyyy", { locale: es })}</span>
                       </div>
+                      {d.archivo_url && (
+                        <a href={d.archivo_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-primary hover:underline font-medium">
+                          <ExternalLink className="w-3 h-3" /> Ver archivo
+                        </a>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -24,6 +24,7 @@ export function AñadirDocumentoDialog({ open, onOpenChange, defaultEntidadTipo,
   const { data: maquinas } = useGetMaquinas();
   const { data: empleados } = useGetEmpleados();
 
+  const [file, setFile] = useState<{ name: string; base64: string } | null>(null);
   const [form, setForm] = useState({
     tipo: "",
     descripcion: "",
@@ -46,6 +47,21 @@ export function AñadirDocumentoDialog({ open, onOpenChange, defaultEntidadTipo,
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const selected = e.target.files[0];
+      if (selected.size > 10 * 1024 * 1024) {
+        toast.error("El archivo no puede pesar más de 10MB");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFile({ name: selected.name, base64: reader.result as string });
+      };
+      reader.readAsDataURL(selected);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.tipo || !form.fecha_vencimiento) {
@@ -60,7 +76,9 @@ export function AñadirDocumentoDialog({ open, onOpenChange, defaultEntidadTipo,
           entidad_tipo: form.entidad_tipo || undefined,
           entidad_id: form.entidad_id ? parseInt(form.entidad_id) : undefined,
           fecha_vencimiento: form.fecha_vencimiento,
-        },
+          base64Data: file?.base64,
+          filename: file?.name,
+        } as any,
       },
       {
         onSuccess: () => {
@@ -68,6 +86,7 @@ export function AñadirDocumentoDialog({ open, onOpenChange, defaultEntidadTipo,
           queryClient.invalidateQueries({ queryKey: getGetDocumentosQueryKey() });
           onOpenChange(false);
           setForm({ tipo: "", descripcion: "", entidad_tipo: "", entidad_id: "", fecha_vencimiento: "" });
+          setFile(null);
         },
         onError: () => toast.error("Error al añadir el documento"),
       }
@@ -129,6 +148,10 @@ export function AñadirDocumentoDialog({ open, onOpenChange, defaultEntidadTipo,
           <div className="space-y-1">
             <Label>Fecha de vencimiento *</Label>
             <Input type="date" value={form.fecha_vencimiento} onChange={e => set("fecha_vencimiento", e.target.value)} required />
+          </div>
+          <div className="space-y-1">
+            <Label>Archivo (Opcional - Imagen o PDF)</Label>
+            <Input type="file" accept="image/*,application/pdf" onChange={handleFileChange} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>

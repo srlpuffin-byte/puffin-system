@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { documentosTable, empleadosTable, maquinasTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { uploadImage } from "../services/storage";
 
 const router = Router();
 
@@ -51,15 +52,25 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { tipo, descripcion, entidad_tipo, entidad_id, fecha_vencimiento } = req.body;
+  const { tipo, descripcion, entidad_tipo, entidad_id, fecha_vencimiento, base64Data, filename } = req.body;
   if (!tipo || !fecha_vencimiento) return res.status(400).json({ error: "Tipo y fecha de vencimiento son requeridos" });
 
-  const [doc] = await db.insert(documentosTable).values({
-    tipo, descripcion, entidad_tipo, entidad_id, fecha_vencimiento, estado_doc: "vigente"
-  }).returning();
+  try {
+    let archivo_url = null;
+    if (base64Data) {
+      archivo_url = await uploadImage(filename || `doc_${Date.now()}`, base64Data);
+    }
 
-  const { estado, dias_restantes } = calcEstado(doc.fecha_vencimiento);
-  return res.status(201).json({ ...doc, entidad_nombre: null, estado, dias_restantes });
+    const [doc] = await db.insert(documentosTable).values({
+      tipo, descripcion, entidad_tipo, entidad_id, fecha_vencimiento, estado_doc: "vigente", archivo_url
+    }).returning();
+
+    const { estado, dias_restantes } = calcEstado(doc.fecha_vencimiento);
+    return res.status(201).json({ ...doc, entidad_nombre: null, estado, dias_restantes });
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al crear documento: " + (err?.message || "Error interno") });
+  }
 });
 
 export default router;
