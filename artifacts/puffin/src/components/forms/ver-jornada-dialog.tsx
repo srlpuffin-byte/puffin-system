@@ -263,11 +263,39 @@ export function VerJornadaDialog({ open, onOpenChange, jornada }: VerJornadaDial
                 {/* Info block para verificar fotos con los datos cargados */}
                 <div className="bg-slate-50 border rounded-md p-3 mb-4 text-xs">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <p><span className="font-semibold text-muted-foreground uppercase mr-1">Operario:</span> {jornada.empleado_nombre}</p>
-                    <p><span className="font-semibold text-muted-foreground uppercase mr-1">Máquina:</span> {jornada.maquina_nombre}</p>
-                    <p><span className="font-semibold text-muted-foreground uppercase mr-1">Desc. Trabajo:</span> {jornada.descripcion_trabajo || jornada.tipo_trabajo || "Sin descripción"}</p>
-                    <p><span className="font-semibold text-muted-foreground uppercase mr-1">Ubicación Cargada:</span> {jornada.ubicacion || "-"} {jornada.nombre_obra ? `(${jornada.nombre_obra})` : ""}</p>
-                    <p className="md:col-span-2 mt-1 pt-1 border-t"><span className="font-semibold text-blue-700 uppercase mr-1">Máquina Asignada En (Proyecto):</span> {jornada.maquina_asignada_en || "No asignada a proyecto"}</p>
+                    
+                    <div className="flex items-center gap-3">
+                      {jornada.empleado_foto ? (
+                        <img src={jornada.empleado_foto} alt="Operario" className="w-10 h-10 rounded-full object-cover border" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center"><User className="w-5 h-5 text-slate-500" /></div>
+                      )}
+                      <div>
+                        <p className="font-semibold text-muted-foreground uppercase text-[10px]">Operario</p>
+                        <p className="font-medium text-sm">{jornada.empleado_nombre}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {jornada.maquina_foto ? (
+                        <img src={jornada.maquina_foto} alt="Máquina" className="w-10 h-10 rounded-md object-cover border" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-md bg-slate-200 flex items-center justify-center"><Tractor className="w-5 h-5 text-slate-500" /></div>
+                      )}
+                      <div>
+                        <p className="font-semibold text-muted-foreground uppercase text-[10px]">Máquina</p>
+                        <p className="font-medium text-sm">{jornada.maquina_nombre}</p>
+                      </div>
+                    </div>
+                    
+                    <p className="mt-2"><span className="font-semibold text-muted-foreground uppercase mr-1">Desc. Máquina:</span> {jornada.maquina_descripcion || "Sin descripción"}</p>
+                    <p className="mt-2"><span className="font-semibold text-muted-foreground uppercase mr-1">Trabajo realizado:</span> {jornada.descripcion_trabajo || jornada.tipo_trabajo || "Sin descripción"}</p>
+                    
+                    <div className="md:col-span-2 mt-2 pt-2 border-t grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <p><span className="font-semibold text-red-600 uppercase mr-1 block text-[10px] mb-0.5">📍 Ubicación (Operario reporta):</span> <span className="font-medium">{jornada.ubicacion || "-"} {jornada.nombre_obra ? `(${jornada.nombre_obra})` : ""}</span></p>
+                      <p><span className="font-semibold text-blue-700 uppercase mr-1 block text-[10px] mb-0.5">🏢 Máquina Asignada En (Sistema):</span> <span className="font-medium">{jornada.maquina_asignada_en || "No asignada a ningún proyecto"}</span></p>
+                    </div>
+
                   </div>
                 </div>
 
