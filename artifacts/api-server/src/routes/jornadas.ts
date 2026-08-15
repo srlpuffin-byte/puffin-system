@@ -2,8 +2,8 @@ import { Router } from "express";
 import { logger } from "../lib/logger.js";
 import { syncAllSheets } from "../services/sync-sheets.js";
 import { db } from "@workspace/db";
-import { jornadasTable, empleadosTable, maquinasTable, actividadTable, alertasTable, combustibleTable, incidentesTable } from "@workspace/db";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import { jornadasTable, empleadosTable, maquinasTable, actividadTable, alertasTable, combustibleTable, incidentesTable, proyectosTable } from "@workspace/db";
+import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import { appendToSheet } from "../services/sheets.js";
 import { sendWhatsAppMessage } from "../services/whatsapp.js";
 
@@ -21,6 +21,11 @@ async function enrichJornada(j: typeof jornadasTable.$inferSelect) {
   // Si el diff es negativo (datos incorrectos), no mostrar nada
   const horas = horasDiff !== null && horasDiff >= 0 ? Number(horasDiff.toFixed(2)) : null;
 
+  const [proyecto] = await db.select({ lugar: proyectosTable.lugar })
+    .from(proyectosTable)
+    .where(sql`${j.maquina_id} = ANY(${proyectosTable.maquinas_asignadas})`)
+    .limit(1);
+
   let horasReloj = null;
   if (j.hora_inicio && j.hora_fin) {
     const [hI, mI] = j.hora_inicio.split(':').map(Number);
@@ -36,6 +41,7 @@ async function enrichJornada(j: typeof jornadasTable.$inferSelect) {
     ...j,
     empleado_nombre: empleado ? `${empleado.nombre} ${empleado.apellido}` : "Desconocido",
     maquina_nombre: maquina?.nombre || "Desconocida",
+    maquina_asignada_en: proyecto?.lugar || null,
     km_inicio: j.km_inicio ? Number(j.km_inicio) : null,
     km_fin: j.km_fin ? Number(j.km_fin) : null,
     horometro_inicio: hrInicio,

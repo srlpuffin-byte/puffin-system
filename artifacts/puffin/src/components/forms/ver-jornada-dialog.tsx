@@ -58,7 +58,7 @@ export function VerJornadaDialog({ open, onOpenChange, jornada }: VerJornadaDial
           </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 p-6">
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-6">
             
             {/* General Info Section */}
@@ -259,20 +259,38 @@ export function VerJornadaDialog({ open, onOpenChange, jornada }: VerJornadaDial
             {(jornada.foto_tablero_inicio || jornada.foto_tablero_fin) && (
               <div>
                 <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><Info className="w-4 h-4" /> Fotos (Evidencia)</h3>
+                
+                {/* Info block para verificar fotos con los datos cargados */}
+                <div className="bg-slate-50 border rounded-md p-3 mb-4 text-xs">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <p><span className="font-semibold text-muted-foreground uppercase mr-1">Operario:</span> {jornada.empleado_nombre}</p>
+                    <p><span className="font-semibold text-muted-foreground uppercase mr-1">Máquina:</span> {jornada.maquina_nombre}</p>
+                    <p><span className="font-semibold text-muted-foreground uppercase mr-1">Desc. Trabajo:</span> {jornada.descripcion_trabajo || jornada.tipo_trabajo || "Sin descripción"}</p>
+                    <p><span className="font-semibold text-muted-foreground uppercase mr-1">Ubicación Cargada:</span> {jornada.ubicacion || "-"} {jornada.nombre_obra ? `(${jornada.nombre_obra})` : ""}</p>
+                    <p className="md:col-span-2 mt-1 pt-1 border-t"><span className="font-semibold text-blue-700 uppercase mr-1">Máquina Asignada En (Proyecto):</span> {jornada.maquina_asignada_en || "No asignada a proyecto"}</p>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {jornada.foto_tablero_inicio && (
                     <div className="border rounded-md p-2 flex flex-col items-center">
                       <p className="text-[10px] uppercase text-muted-foreground font-semibold mb-2">Tablero (Inicio)</p>
-                      <a href={jornada.foto_tablero_inicio} target="_blank" rel="noreferrer">
-                         <img src={jornada.foto_tablero_inicio} alt="Tablero Inicio" className="w-full h-48 object-cover rounded cursor-pointer hover:opacity-90 transition" />
+                      <a href={jornada.foto_tablero_inicio} target="_blank" rel="noreferrer" className="relative block w-full h-48 group">
+                         <img src={jornada.foto_tablero_inicio} alt="Tablero Inicio" className="w-full h-full object-cover rounded cursor-pointer group-hover:opacity-90 transition" />
+                         <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity rounded-b pointer-events-none">
+                            Ver imagen original
+                         </div>
                       </a>
                     </div>
                   )}
                   {jornada.foto_tablero_fin && (
                     <div className="border rounded-md p-2 flex flex-col items-center">
                       <p className="text-[10px] uppercase text-muted-foreground font-semibold mb-2">Tablero (Fin)</p>
-                      <a href={jornada.foto_tablero_fin} target="_blank" rel="noreferrer">
-                         <img src={jornada.foto_tablero_fin} alt="Tablero Fin" className="w-full h-48 object-cover rounded cursor-pointer hover:opacity-90 transition" />
+                      <a href={jornada.foto_tablero_fin} target="_blank" rel="noreferrer" className="relative block w-full h-48 group">
+                         <img src={jornada.foto_tablero_fin} alt="Tablero Fin" className="w-full h-full object-cover rounded cursor-pointer group-hover:opacity-90 transition" />
+                         <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity rounded-b pointer-events-none">
+                            Ver imagen original
+                         </div>
                       </a>
                     </div>
                   )}
@@ -281,7 +299,7 @@ export function VerJornadaDialog({ open, onOpenChange, jornada }: VerJornadaDial
             )}
 
           </div>
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
