@@ -271,8 +271,8 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
           </div>
 
           <div className="space-y-1">
-            <Label>Actualizar Fotografía (Opcional)</Label>
-            <MultiImageUpload images={images} onChange={setImages} maxImages={1} />
+            <Label>Agregar Fotografías (Opcional)</Label>
+            <MultiImageUpload images={images} onChange={setImages} maxImages={10} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>

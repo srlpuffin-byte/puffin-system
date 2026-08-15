@@ -14,9 +14,11 @@ const TIPOS_DOC = ["Seguro", "VTV", "Carnet", "Habilitación", "Patente", "Permi
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultEntidadTipo?: string;
+  defaultEntidadId?: string;
 }
 
-export function AñadirDocumentoDialog({ open, onOpenChange }: Props) {
+export function AñadirDocumentoDialog({ open, onOpenChange, defaultEntidadTipo, defaultEntidadId }: Props) {
   const queryClient = useQueryClient();
   const createMut = useCreateDocumento();
   const { data: maquinas } = useGetMaquinas();
@@ -25,10 +27,22 @@ export function AñadirDocumentoDialog({ open, onOpenChange }: Props) {
   const [form, setForm] = useState({
     tipo: "",
     descripcion: "",
-    entidad_tipo: "",
-    entidad_id: "",
+    entidad_tipo: defaultEntidadTipo || "",
+    entidad_id: defaultEntidadId || "",
     fecha_vencimiento: "",
   });
+
+  React.useEffect(() => {
+    if (open) {
+      setForm({
+        tipo: "",
+        descripcion: "",
+        entidad_tipo: defaultEntidadTipo || "",
+        entidad_id: defaultEntidadId || "",
+        fecha_vencimiento: "",
+      });
+    }
+  }, [open, defaultEntidadTipo, defaultEntidadId]);
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
 

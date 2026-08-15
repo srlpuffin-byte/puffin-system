@@ -58,4 +58,29 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+router.patch("/:id/set-main", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const foto = await db.select().from(fotografiasTable).where(eq(fotografiasTable.id, parseInt(id))).limit(1);
+    if (!foto.length) return res.status(404).json({ error: "Fotografía no encontrada" });
+    
+    const oldest = await db.select({ date: fotografiasTable.createdAt }).from(fotografiasTable)
+      .where(and(eq(fotografiasTable.entidad_tipo, foto[0].entidad_tipo), eq(fotografiasTable.entidad_id, foto[0].entidad_id)))
+      .orderBy(fotografiasTable.createdAt).limit(1);
+      
+    let newDate = new Date();
+    if (oldest.length && oldest[0].date) {
+      newDate = new Date(oldest[0].date.getTime() - 10000); // 10 seconds older than the oldest
+    } else {
+      newDate = new Date(0);
+    }
+    
+    await db.update(fotografiasTable).set({ createdAt: newDate }).where(eq(fotografiasTable.id, parseInt(id)));
+    return res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Error al establecer como principal" });
+  }
+});
+
 export default router;

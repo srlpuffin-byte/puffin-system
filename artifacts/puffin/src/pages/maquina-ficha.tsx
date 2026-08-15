@@ -12,8 +12,14 @@ import { RegistrarCargaDialog } from "@/components/forms/registrar-carga-dialog"
 import { ReportarIncidenteDialog } from "@/components/forms/reportar-incidente-dialog";
 import { EditarMaquinaDialog } from "@/components/forms/editar-maquina-dialog";
 import { HistorialMaquinaDialog } from "@/components/forms/historial-maquina-dialog";
-import { History, AlertTriangle } from "lucide-react";
+import { History, AlertTriangle, Trash2, Star, FileText, Plus } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { getAuthToken } from "@/hooks/use-auth";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import { getGetFotografiasQueryKey, useGetDocumentos } from "@workspace/api-client-react";
+import { AñadirDocumentoDialog } from "@/components/forms/aniadir-documento-dialog";
 
 const estadoBadge = (estado: string) => {
   if (estado === "activa") return <Badge className="bg-green-600 hover:bg-green-700">ACTIVA</Badge>;
@@ -33,6 +39,38 @@ export function MaquinaFicha() {
   const [openInc, setOpenInc] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [openHistorial, setOpenHistorial] = useState(false);
+  const [openDocs, setOpenDocs] = useState(false);
+
+  const queryClient = useQueryClient();
+  const { data: documentos } = useGetDocumentos({ entidad_tipo: "maquina", entidad_id: maquinaId.toString() }, { query: { enabled: !!maquinaId } as any });
+
+  const handleDeleteFoto = async (id: number) => {
+    if (confirm("¿Estás seguro de eliminar esta fotografía?")) {
+      try {
+        await fetch(`${import.meta.env.VITE_API_URL}/fotografias/${id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${getAuthToken()}` }
+        });
+        queryClient.invalidateQueries({ queryKey: getGetFotografiasQueryKey() });
+        toast.success("Fotografía eliminada");
+      } catch (e) {
+        toast.error("Error al eliminar");
+      }
+    }
+  };
+
+  const handleSetMainFoto = async (id: number) => {
+    try {
+      await fetch(`${import.meta.env.VITE_API_URL}/fotografias/${id}/set-main`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${getAuthToken()}` }
+      });
+      queryClient.invalidateQueries({ queryKey: getGetFotografiasQueryKey() });
+      toast.success("Establecida como foto principal");
+    } catch (e) {
+      toast.error("Error al actualizar");
+    }
+  };
 
   if (isLoading) return <div className="p-8 text-center">Cargando ficha de máquina...</div>;
   if (!maquina) return <div className="p-8 text-center text-red-500">Máquina no encontrada</div>;
@@ -82,18 +120,46 @@ export function MaquinaFicha() {
         <div className="md:col-span-2 space-y-6">
           {fotos && fotos.length > 0 && (
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ImageIcon className="h-5 w-5" />
-                  Fotografías
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center justify-between text-base">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="h-5 w-5" /> Fotografías
+                  </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {fotos.map(f => (
-                  <div key={f.id} className="relative rounded-lg overflow-hidden border">
-                    <img src={f.url} alt="Fotografía" className="w-full h-48 object-cover" />
-                  </div>
-                ))}
+              <CardContent>
+                <Carousel className="w-full">
+                  <CarouselContent>
+                    {fotos.map((f, i) => (
+                      <CarouselItem key={f.id}>
+                        <div className="relative group rounded-lg overflow-hidden border bg-black flex justify-center items-center h-64 sm:h-96">
+                          <img src={f.url} alt="Fotografía" className="w-full h-full object-contain" />
+                          <div className="absolute top-2 right-2 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                            {i !== 0 && (
+                              <Button size="sm" variant="secondary" onClick={() => handleSetMainFoto(f.id)} className="h-8">
+                                <Star className="w-4 h-4 mr-1 text-yellow-500 fill-yellow-500" /> Principal
+                              </Button>
+                            )}
+                            <Button size="icon" variant="destructive" onClick={() => handleDeleteFoto(f.id)} className="h-8 w-8">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          {i === 0 && (
+                            <div className="absolute top-2 left-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded font-bold flex items-center gap-1 shadow-md">
+                              <Star className="w-3 h-3 fill-white" /> Principal
+                            </div>
+                          )}
+                        </div>
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  {fotos.length > 1 && (
+                    <>
+                      <CarouselPrevious className="left-2" />
+                      <CarouselNext className="right-2" />
+                    </>
+                  )}
+                </Carousel>
               </CardContent>
             </Card>
           )}
@@ -173,6 +239,48 @@ export function MaquinaFicha() {
             </CardContent>
           </Card>
         )}
+
+        <Card className="mt-6">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" /> Documentos de la maquinaria
+            </CardTitle>
+            <Button variant="outline" size="sm" onClick={() => setOpenDocs(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Añadir
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {documentos && documentos.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                {documentos.map((d: any) => (
+                  <div key={d.id} className="border rounded-lg p-4 flex flex-col justify-between hover:shadow-md transition">
+                    <div>
+                      <div className="flex justify-between items-start mb-2">
+                        <Badge variant="outline">{d.tipo}</Badge>
+                        {d.estado === "vencido" ? (
+                          <Badge variant="destructive">Vencido</Badge>
+                        ) : d.estado === "proximo_vencimiento" ? (
+                          <Badge className="bg-yellow-500 text-white">Próximo a vencer</Badge>
+                        ) : (
+                          <Badge className="bg-green-600">Vigente</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{d.descripcion || "Sin descripción"}</p>
+                    </div>
+                    <div className="mt-4 pt-4 border-t flex items-center justify-between">
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Vencimiento:</span>{" "}
+                        <span className="font-semibold">{format(new Date(d.fecha_vencimiento + 'T12:00:00'), "dd/MM/yyyy", { locale: es })}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-6">No hay documentos registrados.</p>
+            )}
+          </CardContent>
+        </Card>
         </div>
 
         <div className="space-y-4">
@@ -287,6 +395,7 @@ export function MaquinaFicha() {
       <ReportarIncidenteDialog open={openInc} onOpenChange={setOpenInc} maquinaIdFija={maquinaId} />
       <EditarMaquinaDialog open={openEdit} onOpenChange={setOpenEdit} maquina={maquina} />
       <HistorialMaquinaDialog open={openHistorial} onOpenChange={setOpenHistorial} maquina={maquina} />
+      <AñadirDocumentoDialog open={openDocs} onOpenChange={setOpenDocs} defaultEntidadTipo="maquina" defaultEntidadId={maquinaId.toString()} />
     </div>
   );
 }
