@@ -2,7 +2,7 @@ import { Router } from "express";
 import { logger } from "../lib/logger.js";
 import { syncAllSheets } from "../services/sync-sheets.js";
 import { db } from "@workspace/db";
-import { jornadasTable, empleadosTable, maquinasTable, actividadTable, alertasTable, combustibleTable, incidentesTable, proyectosTable } from "@workspace/db";
+import { jornadasTable, empleadosTable, maquinasTable, actividadTable, alertasTable, combustibleTable, incidentesTable, proyectosTable, fotografiasTable } from "@workspace/db";
 import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import { appendToSheet } from "../services/sheets.js";
 import { sendWhatsAppMessage } from "../services/whatsapp.js";
@@ -76,18 +76,42 @@ router.get("/", async (req, res) => {
   const empIds = [...new Set(jornadas.map(j => j.empleado_id).filter((id): id is number => !!id))];
   const maqIds = [...new Set(jornadas.map(j => j.maquina_id).filter((id): id is number => !!id))];
 
-  const [empleadosList, maquinasList] = await Promise.all([
+  const [empleadosList, maquinasList, proyectos, fotografias] = await Promise.all([
     empIds.length > 0
       ? db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
           .from(empleadosTable).where(inArray(empleadosTable.id, empIds))
       : [],
     maqIds.length > 0
-      ? db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre })
+      ? db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre, descripcion: maquinasTable.descripcion })
           .from(maquinasTable).where(inArray(maquinasTable.id, maqIds))
       : [],
+    db.select({ id: proyectosTable.id, lugar: proyectosTable.lugar, maquinas_asignadas: proyectosTable.maquinas_asignadas }).from(proyectosTable),
+    db.select({ entidad_tipo: fotografiasTable.entidad_tipo, entidad_id: fotografiasTable.entidad_id, url: fotografiasTable.url, descripcion: fotografiasTable.descripcion })
+      .from(fotografiasTable)
+      .where(inArray(fotografiasTable.entidad_tipo, ["empleado", "maquina"]))
   ]);
+
   const empMap = new Map(empleadosList.map(e => [e.id, `${e.nombre} ${e.apellido}`]));
-  const maqMap = new Map(maquinasList.map(m => [m.id, m.nombre]));
+  const maqMap = new Map(maquinasList.map(m => [m.id, { nombre: m.nombre, descripcion: m.descripcion }]));
+
+  const maquinasProyectoMap = new Map<number, string>();
+  proyectos.forEach(p => {
+    if (p.maquinas_asignadas && Array.isArray(p.maquinas_asignadas)) {
+      p.maquinas_asignadas.forEach((mId: any) => {
+        maquinasProyectoMap.set(Number(mId), p.lugar);
+      });
+    }
+  });
+
+  const empFotoMap = new Map<number, string>();
+  const maqFotoMap = new Map<number, string>();
+  fotografias.forEach(f => {
+    if (f.entidad_tipo === "empleado" && (f.descripcion === "Foto de perfil" || f.descripcion?.toLowerCase().includes("perfil"))) {
+      empFotoMap.set(f.entidad_id, f.url);
+    } else if (f.entidad_tipo === "maquina" && !maqFotoMap.has(f.entidad_id)) {
+      maqFotoMap.set(f.entidad_id, f.url);
+    }
+  });
 
   const enriched = jornadas.map(j => {
     const hrInicio = j.horometro_inicio ? Number(j.horometro_inicio) : null;
@@ -104,10 +128,15 @@ router.get("/", async (req, res) => {
         horasReloj = Number((diff / 60).toFixed(2));
       }
     }
+    const maqInfo = j.maquina_id ? maqMap.get(j.maquina_id) : null;
     return {
       ...j,
       empleado_nombre: j.empleado_id ? (empMap.get(j.empleado_id) ?? "Desconocido") : "Desconocido",
-      maquina_nombre:  j.maquina_id  ? (maqMap.get(j.maquina_id)  ?? "Desconocida") : "Desconocida",
+      empleado_foto: j.empleado_id ? (empFotoMap.get(j.empleado_id) || null) : null,
+      maquina_nombre:  maqInfo?.nombre ?? "Desconocida",
+      maquina_descripcion: maqInfo?.descripcion || null,
+      maquina_foto: j.maquina_id ? (maqFotoMap.get(j.maquina_id) || null) : null,
+      maquina_asignada_en: j.maquina_id ? (maquinasProyectoMap.get(j.maquina_id) || null) : null,
       km_inicio: j.km_inicio ? Number(j.km_inicio) : null,
       km_fin:    j.km_fin    ? Number(j.km_fin)    : null,
       horometro_inicio: hrInicio,
