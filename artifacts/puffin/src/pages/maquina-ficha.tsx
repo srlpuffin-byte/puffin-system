@@ -134,13 +134,13 @@ export function MaquinaFicha() {
                       <CarouselItem key={f.id}>
                         <div className="relative group rounded-lg overflow-hidden border bg-black flex justify-center items-center h-64 sm:h-96">
                           <img src={f.url} alt="Fotografía" className="w-full h-full object-contain" />
-                          <div className="absolute top-2 right-2 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          <div className="absolute top-2 right-2 flex flex-col sm:flex-row gap-2 z-10">
                             {i !== 0 && (
-                              <Button size="sm" variant="secondary" onClick={() => handleSetMainFoto(f.id)} className="h-8">
+                              <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handleSetMainFoto(f.id); }} className="h-8 shadow-sm">
                                 <Star className="w-4 h-4 mr-1 text-yellow-500 fill-yellow-500" /> Principal
                               </Button>
                             )}
-                            <Button size="icon" variant="destructive" onClick={() => handleDeleteFoto(f.id)} className="h-8 w-8">
+                            <Button size="icon" variant="destructive" onClick={(e) => { e.stopPropagation(); handleDeleteFoto(f.id); }} className="h-8 w-8 shadow-sm self-end sm:self-auto">
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
