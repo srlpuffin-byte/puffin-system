@@ -143,7 +143,7 @@ router.post("/consulta", async (req, res) => {
       const conteo: Record<number, { nombre: string; horas: number }> = {};
       for (const j of jornadas) {
         if (!j.horometro_inicio || !j.horometro_fin) continue;
-        const horas = Number(j.horometro_fin) - Number(j.horometro_inicio);
+        const horas = Math.max(0, Number(j.horometro_fin) - Number(j.horometro_inicio));
         if (!conteo[j.empleado_id]) {
           const emp = empleados.find((e) => e.id === j.empleado_id);
           conteo[j.empleado_id] = {
@@ -185,6 +185,17 @@ router.post("/consulta", async (req, res) => {
       const detenidas = maquinas.filter((m) => m.estado === "detenida").length;
       const mantenimiento = maquinas.filter((m) => m.estado === "mantenimiento").length;
       respuesta = `La flota tiene ${maquinas.length} máquinas en total: ${activas} activas, ${detenidas} detenidas y ${mantenimiento} en mantenimiento.`;
+    } else if (p.includes("usuario") || p.includes("actividad") || p.includes("ingreso") || p.includes("ingresaron") || p.includes("carga")) {
+      const { usuariosTable } = await import("@workspace/db");
+      const { actividadTable } = await import("@workspace/db");
+      const users = await db.select().from(usuariosTable);
+      const acts = await db.select().from(actividadTable);
+      
+      const inactivos = users.filter(u => !u.ultimo_login).length;
+      const sinCargas = users.filter(u => u.ultimo_login && !acts.some(a => a.usuario_id === u.id)).length;
+      const activos = users.length - inactivos - sinCargas;
+
+      respuesta = `Hay ${users.length} usuarios en total: ${activos} están activos y realizando cargas, ${sinCargas} ingresaron pero no registran cargas, y ${inactivos} nunca ingresaron al sistema.`;
     } else {
       respuesta = "Puedo responder consultas sobre: alertas de operarios, consumo de combustible por máquina, vencimientos de documentos, horas trabajadas, máquinas detenidas, incidentes y estado de la flota. ¿Qué querés saber?";
     }
