@@ -65,17 +65,14 @@ export function Egresos() {
     page,
     limit: 50,
     ...(filterCategoria !== "todos" ? { categoria: filterCategoria } : {}),
+    ...(filterProyecto !== "todos" ? { centro_costos: filterProyecto } : {}),
+    ...(filterMetodo !== "todos" ? { metodo_pago: filterMetodo } : {}),
     ...(filterSearch ? { search: filterSearch } : {}),
   });
   const egresos = egresosResp?.data;
   const paginationMeta = egresosResp?.meta;
 
-  // Aplicar filtros restantes (metodo y proyecto) en el cliente sobre la página actual
-  const egresosFiltrados = (egresos || []).filter((eg: any) => {
-    if (filterProyecto !== "todos" && eg.centro_costos !== filterProyecto) return false;
-    if (filterMetodo !== "todos" && eg.metodo_pago !== filterMetodo) return false;
-    return true;
-  });
+  const egresosFiltrados = egresos || [];
   const hasFilters = filterProyecto !== "todos" || filterCategoria !== "todos" || filterMetodo !== "todos" || filterSearch !== "";
   const clearFilters = () => { setFilterProyecto("todos"); setFilterCategoria("todos"); setFilterMetodo("todos"); setFilterSearch(""); setPage(1); };
 
@@ -206,7 +203,7 @@ export function Egresos() {
     }
   };
 
-  const total = egresosFiltrados.reduce((acc, curr: any) => acc + Number(curr.monto || 0), 0);
+  const total = paginationMeta?.total_suma || 0;
 
   const handleSyncSheets = async () => {
     try {
@@ -301,7 +298,7 @@ export function Egresos() {
               ${total.toLocaleString("es-AR")}
             </div>
             {hasFilters && (
-              <p className="text-xs text-muted-foreground mt-1">{egresosFiltrados.length} de {egresos?.length || 0} registros</p>
+              <p className="text-xs text-muted-foreground mt-1">Total de registros: {paginationMeta?.total || 0}</p>
             )}
           </CardContent>
         </Card>

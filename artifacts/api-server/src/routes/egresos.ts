@@ -16,7 +16,7 @@ router.get("/sync-sheet", async (req, res) => {
 });
 
 router.get("/", async (req, res) => {
-  const { categoria, centro_costos, proveedor, search } = req.query as Record<string, string>;
+  const { categoria, centro_costos, proveedor, search, metodo_pago } = req.query as Record<string, string>;
   const page  = Math.max(1, parseInt((req.query.page  as string) || "1"));
   const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || "50")));
   const offset = (page - 1) * limit;
@@ -27,6 +27,7 @@ router.get("/", async (req, res) => {
   if (categoria) conditions.push(eq(egresosTable.categoria, categoria));
   if (centro_costos) conditions.push(eq(egresosTable.centro_costos, centro_costos));
   if (proveedor) conditions.push(eq(egresosTable.proveedor, proveedor));
+  if (metodo_pago) conditions.push(eq(egresosTable.metodo_pago, metodo_pago));
   
   if (search) {
     conditions.push(
@@ -41,8 +42,11 @@ router.get("/", async (req, res) => {
   const whereClause = conditions.length ? and(...conditions) : undefined;
   if (whereClause) baseQuery = baseQuery.where(whereClause);
 
-  const [{ total }] = await db
-    .select({ total: sql<number>`count(*)::int` })
+  const [{ total, suma }] = await db
+    .select({ 
+      total: sql<number>`count(*)::int`,
+      suma: sql<number>`sum(${egresosTable.monto})::float`
+    })
     .from(egresosTable)
     .where(whereClause);
 
@@ -57,6 +61,7 @@ router.get("/", async (req, res) => {
       total,
       page,
       lastPage: Math.ceil(total / limit),
+      total_suma: suma || 0,
     },
   });
 });

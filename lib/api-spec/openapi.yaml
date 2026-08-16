@@ -951,6 +951,10 @@ paths:
           in: query
           schema:
             type: string
+        - name: metodo_pago
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Lista de egresos
@@ -2056,6 +2060,8 @@ components:
           type: integer
         lastPage:
           type: integer
+        total_suma:
+          type: number
 
     PaginatedJornadas:
       type: object

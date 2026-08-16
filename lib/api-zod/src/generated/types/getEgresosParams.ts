@@ -13,4 +13,5 @@ categoria?: string;
 centro_costos?: string;
 proveedor?: string;
 search?: string;
+metodo_pago?: string;
 };

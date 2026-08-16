@@ -761,6 +761,7 @@ export interface PaginationMeta {
   total: number;
   page: number;
   lastPage: number;
+  total_suma?: number;
 }
 
 export interface PaginatedJornadas {
@@ -925,6 +926,7 @@ categoria?: string;
 centro_costos?: string;
 proveedor?: string;
 search?: string;
+metodo_pago?: string;
 };
 
 export type GlobalSearchParams = {

@@ -501,7 +501,8 @@ export const GetJornadasResponse = zod.object({
   "meta": zod.object({
   "total": zod.number(),
   "page": zod.number(),
-  "lastPage": zod.number()
+  "lastPage": zod.number(),
+  "total_suma": zod.number().optional()
 })
 })
 
@@ -739,7 +740,8 @@ export const GetCombustibleResponse = zod.object({
   "meta": zod.object({
   "total": zod.number(),
   "page": zod.number(),
-  "lastPage": zod.number()
+  "lastPage": zod.number(),
+  "total_suma": zod.number().optional()
 })
 })
 
@@ -851,7 +853,8 @@ export const GetMantenimientosResponse = zod.object({
   "meta": zod.object({
   "total": zod.number(),
   "page": zod.number(),
-  "lastPage": zod.number()
+  "lastPage": zod.number(),
+  "total_suma": zod.number().optional()
 })
 })
 
@@ -1202,7 +1205,8 @@ export const GetEgresosQueryParams = zod.object({
   "categoria": zod.coerce.string().optional(),
   "centro_costos": zod.coerce.string().optional(),
   "proveedor": zod.coerce.string().optional(),
-  "search": zod.coerce.string().optional()
+  "search": zod.coerce.string().optional(),
+  "metodo_pago": zod.coerce.string().optional()
 })
 
 export const GetEgresosResponse = zod.object({
@@ -1222,7 +1226,8 @@ export const GetEgresosResponse = zod.object({
   "meta": zod.object({
   "total": zod.number(),
   "page": zod.number(),
-  "lastPage": zod.number()
+  "lastPage": zod.number(),
+  "total_suma": zod.number().optional()
 })
 })
 

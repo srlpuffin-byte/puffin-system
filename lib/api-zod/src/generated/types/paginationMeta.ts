@@ -10,4 +10,5 @@ export interface PaginationMeta {
   total: number;
   page: number;
   lastPage: number;
+  total_suma?: number;
 }
