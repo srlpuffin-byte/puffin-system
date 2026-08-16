@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { fotografiasTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { uploadImage } from "../services/storage";
+import { requireAuth } from "../middleware/auth";
 
 const router = Router();
 
@@ -28,6 +29,9 @@ router.get("/:id/raw", async (req, res) => {
     return res.status(500).send("Error al obtener la imagen");
   }
 });
+
+// Autenticación requerida para los endpoints a partir de acá (CRUD)
+router.use(requireAuth);
 
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
