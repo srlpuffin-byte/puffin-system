@@ -467,6 +467,17 @@ router.put("/:id", async (req, res) => {
       horometro_inicio, horometro_fin, km_inicio, km_fin, estado 
     } = req.body;
 
+    // Validar horómetros si se proporcionan ambos
+    if (horometro_inicio !== undefined && horometro_fin !== undefined) {
+      const hrI = Number(horometro_inicio);
+      const hrF = Number(horometro_fin);
+      if (!isNaN(hrI) && !isNaN(hrF) && hrF <= hrI) {
+        return res.status(400).json({
+          error: `El horómetro final (${hrF}) no puede ser menor o igual al de inicio (${hrI}). Verificá los valores.`
+        });
+      }
+    }
+
     const [jornadaActualizada] = await db
       .update(jornadasTable)
       .set({

@@ -47,7 +47,7 @@ router.get("/", async (req, res) => {
   try {
     let proyectos = await db.select().from(proyectosTable).orderBy(proyectosTable.createdAt);
     
-    if (req.user?.rol === "empleado") {
+    if (req.user?.rol?.toLowerCase() === "empleado") {
       const [user] = await db.select().from(usuariosTable).where(eq(usuariosTable.id, req.user.id)).limit(1);
       const [emp] = await db.select().from(empleadosTable)
         .where(or(
@@ -128,7 +128,7 @@ router.get("/:id", async (req, res) => {
     let [proyecto] = await db.select().from(proyectosTable).where(eq(proyectosTable.id, id)).limit(1);
     if (!proyecto) return res.status(404).json({ error: "Proyecto no encontrado" });
 
-    if (req.user?.rol === "empleado") {
+    if (req.user?.rol?.toLowerCase() === "empleado") {
       const [user] = await db.select().from(usuariosTable).where(eq(usuariosTable.id, req.user.id)).limit(1);
       const [emp] = await db.select().from(empleadosTable)
         .where(or(

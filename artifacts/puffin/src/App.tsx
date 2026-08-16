@@ -1,6 +1,6 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { QueryClient } from "@tanstack/react-query";
-import { PersistQueryClientProvider, useIsRestoring } from '@tanstack/react-query-persist-client';
+import { QueryClient, useIsRestoring } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryPersister, PERSIST_MAX_AGE } from '@/lib/query-persister';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";

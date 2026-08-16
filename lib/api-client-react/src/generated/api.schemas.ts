@@ -830,6 +830,8 @@ tipo?: string;
 export type GetDocumentosParams = {
 tipo?: string;
 proximo_vencimiento?: boolean;
+entidad_tipo?: string;
+entidad_id?: string | number;
 };
 
 export type GetAlertasParams = {
