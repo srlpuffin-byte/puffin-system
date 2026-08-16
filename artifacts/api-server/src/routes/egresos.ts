@@ -45,7 +45,7 @@ router.get("/", async (req, res) => {
   const [{ total, suma }] = await db
     .select({ 
       total: sql<number>`count(*)::int`,
-      suma: sql<number>`sum(${egresosTable.monto})::float`
+      suma: sql<string>`coalesce(sum(${egresosTable.monto}), 0)::numeric`
     })
     .from(egresosTable)
     .where(whereClause);
@@ -61,7 +61,7 @@ router.get("/", async (req, res) => {
       total,
       page,
       lastPage: Math.ceil(total / limit),
-      total_suma: suma || 0,
+      total_suma: Number(suma) || 0,
     },
   });
 });
