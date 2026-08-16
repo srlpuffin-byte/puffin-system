@@ -6,6 +6,41 @@ import { uploadImage } from "../services/storage";
 
 const router = Router();
 
+router.get("/:id/raw", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [foto] = await db.select().from(fotografiasTable).where(eq(fotografiasTable.id, parseInt(id))).limit(1);
+    if (!foto || !foto.url) return res.status(404).send("Foto no encontrada");
+
+    if (foto.url.startsWith("data:image/")) {
+      const match = foto.url.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
+      if (match) {
+        const mime = `image/${match[1]}`;
+        const buffer = Buffer.from(match[2], "base64");
+        res.setHeader("Content-Type", mime);
+        res.setHeader("Cache-Control", "public, max-age=86400, immutable");
+        return res.send(buffer);
+      }
+    }
+    return res.redirect(foto.url);
+  } catch (err: any) {
+    req.log.error(err);
+    return res.status(500).send("Error al obtener la imagen");
+  }
+});
+
+router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [foto] = await db.select().from(fotografiasTable).where(eq(fotografiasTable.id, parseInt(id))).limit(1);
+    if (!foto) return res.status(404).json({ error: "Foto no encontrada" });
+    return res.json(foto);
+  } catch (err: any) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Error al obtener la fotografía" });
+  }
+});
+
 router.get("/", async (req, res) => {
   const { entidad_tipo, entidad_id } = req.query as Record<string, string>;
   let query = db.select().from(fotografiasTable).$dynamic();

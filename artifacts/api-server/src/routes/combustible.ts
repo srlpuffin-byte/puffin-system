@@ -32,13 +32,11 @@ router.get("/", async (req, res) => {
     estacion: combustibleTable.estacion,
     ubicacion: combustibleTable.ubicacion,
     kilometraje: combustibleTable.kilometraje,
-    foto_ticket: combustibleTable.foto_ticket,
-    foto_surtidor: combustibleTable.foto_surtidor,
     estado: combustibleTable.estado,
     createdAt: combustibleTable.createdAt,
     empleado_nombre: sql<string>`concat(${empleadosTable.nombre}, ' ', ${empleadosTable.apellido})`,
     maquina_nombre: maquinasTable.nombre,
-    foto_url: fotografiasTable.url,
+    foto_id: fotografiasTable.id,
   })
   .from(combustibleTable)
   .leftJoin(empleadosTable, eq(combustibleTable.empleado_id, empleadosTable.id))
@@ -59,6 +57,7 @@ router.get("/", async (req, res) => {
     precio: r.precio ? Number(r.precio) : null,
     importe: r.importe ? Number(r.importe) : null,
     kilometraje: r.kilometraje ? Number(r.kilometraje) : null,
+    foto_url: r.foto_id ? `/api/fotografias/${r.foto_id}/raw` : null,
   }));
 
   return res.json(enriched);

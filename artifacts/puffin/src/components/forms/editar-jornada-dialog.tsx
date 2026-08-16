@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { MobilePickerSheet } from "@/components/ui/mobile-picker-sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertTriangle } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -56,10 +57,22 @@ export function EditarJornadaDialog({ open, onOpenChange, jornada }: Props) {
     setForm(prev => ({ ...prev, [field]: val }));
   };
 
+  // Derived validation: horometro fin debe ser mayor al inicio
+  const hrInicioNum = form.horometro_inicio ? parseFloat(form.horometro_inicio) : null;
+  const hrFinNum = form.horometro_fin ? parseFloat(form.horometro_fin) : null;
+  const horometroError =
+    hrInicioNum !== null &&
+    hrFinNum !== null &&
+    hrFinNum <= hrInicioNum;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.empleado_id || !form.maquina_id || !form.fecha) {
       toast.error("Operario, máquina y fecha son obligatorios");
+      return;
+    }
+    if (horometroError) {
+      toast.error(`El horómetro final (${hrFinNum}) debe ser mayor al de inicio (${hrInicioNum}). Verificá los valores.`);
       return;
     }
     if (!jornada) return;
@@ -206,9 +219,19 @@ export function EditarJornadaDialog({ open, onOpenChange, jornada }: Props) {
                 step="0.1"
                 value={form.horometro_fin}
                 onChange={e => set("horometro_fin", e.target.value)}
-                className="bg-black/20 border-white/10 text-white focus:border-white/30 transition-colors"
+                className={`bg-black/20 border-white/10 text-white focus:border-white/30 transition-colors${
+                  horometroError ? " border-amber-500" : ""
+                }`}
                 placeholder="Ej. 128.5"
               />
+              {horometroError && (
+                <div className="flex items-start gap-1.5 mt-1 p-2 rounded-md bg-amber-900/30 border border-amber-500/50">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-300 font-medium">
+                    El horómetro final ({hrFinNum}) es menor o igual al de inicio ({hrInicioNum}h). Verificá los valores.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -246,7 +269,7 @@ export function EditarJornadaDialog({ open, onOpenChange, jornada }: Props) {
             </Button>
             <Button
               type="submit"
-              disabled={updateMut.isPending}
+              disabled={updateMut.isPending || horometroError}
               className="bg-white text-black hover:bg-white/90 shadow-lg shadow-white/20 transition-all active:scale-95"
             >
               {updateMut.isPending ? "Guardando..." : "Guardar Cambios"}

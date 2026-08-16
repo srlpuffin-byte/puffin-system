@@ -106,7 +106,7 @@ router.get("/", async (req, res) => {
   const maquinasIds = new Set(maquinas.map(m => m.id));
   const idsArray = Array.from(maquinasIds);
 
-  const fotografias = idsArray.length > 0 ? await db.select({ entidad_id: fotografiasTable.entidad_id, url: fotografiasTable.url })
+  const fotografias = idsArray.length > 0 ? await db.select({ id: fotografiasTable.id, entidad_id: fotografiasTable.entidad_id })
     .from(fotografiasTable)
     .where(
       and(
@@ -115,12 +115,10 @@ router.get("/", async (req, res) => {
       )
     ) : [];
 
-
-
   const fotografiasMap = new Map<number, string>();
   fotografias.forEach(f => {
     if (maquinasIds.has(f.entidad_id) && !fotografiasMap.has(f.entidad_id)) {
-      fotografiasMap.set(f.entidad_id, f.url);
+      fotografiasMap.set(f.entidad_id, `/api/fotografias/${f.id}/raw`);
     }
   });
 

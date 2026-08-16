@@ -86,7 +86,7 @@ router.get("/", async (req, res) => {
           .from(maquinasTable).where(inArray(maquinasTable.id, maqIds))
       : [],
     db.select({ id: proyectosTable.id, lugar: proyectosTable.lugar, maquinas_asignadas: proyectosTable.maquinas_asignadas }).from(proyectosTable),
-    db.select({ entidad_tipo: fotografiasTable.entidad_tipo, entidad_id: fotografiasTable.entidad_id, url: fotografiasTable.url, descripcion: fotografiasTable.descripcion })
+    db.select({ id: fotografiasTable.id, entidad_tipo: fotografiasTable.entidad_tipo, entidad_id: fotografiasTable.entidad_id, descripcion: fotografiasTable.descripcion })
       .from(fotografiasTable)
       .where(inArray(fotografiasTable.entidad_tipo, ["empleado", "maquina"]))
   ]);
@@ -106,16 +106,16 @@ router.get("/", async (req, res) => {
   const empFotoMap = new Map<number, string>();
   const maqFotoMap = new Map<number, string>();
   fotografias.forEach(f => {
-    // Para empleados: primero intentar foto de perfil, si no hay tomar cualquier foto
+    const rawUrl = `/api/fotografias/${f.id}/raw`;
     if (f.entidad_tipo === "empleado") {
       const esPerfil = f.descripcion === "Foto de perfil" || f.descripcion?.toLowerCase().includes("perfil");
       if (esPerfil) {
-        empFotoMap.set(f.entidad_id, f.url); // sobreescribe con la de perfil
+        empFotoMap.set(f.entidad_id, rawUrl);
       } else if (!empFotoMap.has(f.entidad_id)) {
-        empFotoMap.set(f.entidad_id, f.url); // usa la primera disponible
+        empFotoMap.set(f.entidad_id, rawUrl);
       }
     } else if (f.entidad_tipo === "maquina" && !maqFotoMap.has(f.entidad_id)) {
-      maqFotoMap.set(f.entidad_id, f.url);
+      maqFotoMap.set(f.entidad_id, rawUrl);
     }
   });
 
@@ -315,6 +315,20 @@ router.post("/:id/finalizar", async (req, res) => {
     if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
     const { horometro_fin, km_fin, problemas, estado_equipo_fin, foto_tablero_fin, combustible_nivel, aceite_estado, danos_choques } = req.body;
     if (horometro_fin === undefined) return res.status(400).json({ error: "Horómetro final requerido" });
+
+    // Validar que el horómetro final sea mayor al de inicio
+    const [jornadaActual] = await db.select().from(jornadasTable).where(eq(jornadasTable.id, id)).limit(1);
+    if (!jornadaActual) return res.status(404).json({ error: "Jornada no encontrada" });
+
+    if (jornadaActual.horometro_inicio !== null && jornadaActual.horometro_inicio !== undefined) {
+      const hrInicio = Number(jornadaActual.horometro_inicio);
+      const hrFin = Number(horometro_fin);
+      if (!isNaN(hrInicio) && !isNaN(hrFin) && hrFin <= hrInicio) {
+        return res.status(400).json({
+          error: `El horómetro final (${hrFin}) no puede ser menor o igual al de inicio (${hrInicio}). Verificá el valor ingresado.`
+        });
+      }
+    }
 
     const horaFin = new Date().toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hour12: false });
 

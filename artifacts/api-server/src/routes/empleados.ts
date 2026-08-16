@@ -72,17 +72,22 @@ router.get("/", async (req, res) => {
   ]);
 
   const empleadoIdsArray = empleados.map(e => e.id);
-  const fotos = empleadoIdsArray.length > 0 ? await db.select({ entidad_id: fotografiasTable.entidad_id, url: fotografiasTable.url, descripcion: fotografiasTable.descripcion })
+  const fotos = empleadoIdsArray.length > 0 ? await db.select({ id: fotografiasTable.id, entidad_id: fotografiasTable.entidad_id, descripcion: fotografiasTable.descripcion })
     .from(fotografiasTable).where(and(eq(fotografiasTable.entidad_tipo, "empleado"), inArray(fotografiasTable.entidad_id, empleadoIdsArray))) : [];
 
   const jornadaEmpleadoIds = new Set(jornadas.map(j => j.empleado_id));
   const alertasMap = new Map(alertasActivas.map(a => [a.empleado_id, Number(a.count)]));
   const fotosMap = new Map<number, string>();
-  for (const f of fotos) {
-    if (f.descripcion === "Foto de perfil" || f.descripcion?.toLowerCase().includes("perfil")) {
-      fotosMap.set(f.entidad_id, f.url);
+
+  fotos.forEach(f => {
+    const rawUrl = `/api/fotografias/${f.id}/raw`;
+    const esPerfil = f.descripcion === "Foto de perfil" || f.descripcion?.toLowerCase().includes("perfil");
+    if (esPerfil) {
+      fotosMap.set(f.entidad_id, rawUrl);
+    } else if (!fotosMap.has(f.entidad_id)) {
+      fotosMap.set(f.entidad_id, rawUrl);
     }
-  }
+  });
 
   return res.json(empleados.map(e => ({
     ...e,

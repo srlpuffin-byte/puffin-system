@@ -38,10 +38,22 @@ export function FinalizarJornadaDialog({ open, onOpenChange, jornadaId, empleado
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
 
+  // Derived validation state
+  const horometroFinNum = form.horometro_fin ? parseFloat(form.horometro_fin) : null;
+  const horometroError =
+    horometroFinNum !== null &&
+    horometroInicio !== null &&
+    horometroInicio !== undefined &&
+    horometroFinNum <= horometroInicio;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.horometro_fin) {
       toast.error("El horómetro final es obligatorio");
+      return;
+    }
+    if (horometroError) {
+      toast.error(`El horómetro final (${horometroFinNum}) debe ser mayor al de inicio (${horometroInicio}). Verificá el valor ingresado.`);
       return;
     }
     if (!form.estado_equipo_fin) {
@@ -110,7 +122,23 @@ export function FinalizarJornadaDialog({ open, onOpenChange, jornadaId, empleado
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label>Horómetro final (h) *</Label>
-              <Input type="number" step="0.1" placeholder={horometroInicio?.toString() || "0"} value={form.horometro_fin} onChange={e => set("horometro_fin", e.target.value)} required />
+              <Input
+                type="number"
+                step="0.1"
+                placeholder={horometroInicio?.toString() || "0"}
+                value={form.horometro_fin}
+                onChange={e => set("horometro_fin", e.target.value)}
+                className={horometroError ? "border-amber-500 focus-visible:ring-amber-500" : ""}
+                required
+              />
+              {horometroError && (
+                <div className="flex items-start gap-1.5 mt-1 p-2 rounded-md bg-amber-50 border border-amber-300">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700 font-medium">
+                    El horómetro final ({horometroFinNum}) es menor o igual al de inicio ({horometroInicio}h). Verificá bien el valor antes de continuar.
+                  </p>
+                </div>
+              )}
             </div>
             <div className="space-y-1">
               <Label>Km final (si aplica)</Label>
@@ -195,7 +223,7 @@ export function FinalizarJornadaDialog({ open, onOpenChange, jornadaId, empleado
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" variant="destructive" disabled={finalizarMut.isPending || uploadMut.isPending}>
+            <Button type="submit" variant="destructive" disabled={finalizarMut.isPending || uploadMut.isPending || horometroError}>
               {(finalizarMut.isPending || uploadMut.isPending) ? "Finalizando..." : "Finalizar Jornada"}
             </Button>
           </DialogFooter>
