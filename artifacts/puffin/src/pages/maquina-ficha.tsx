@@ -42,7 +42,7 @@ export function MaquinaFicha() {
   const [openDocs, setOpenDocs] = useState(false);
 
   const queryClient = useQueryClient();
-  const { data: documentos } = useGetDocumentos({ entidad_tipo: "maquina", entidad_id: maquinaId.toString() }, { query: { enabled: !!maquinaId } as any });
+  const { data: documentos } = useGetDocumentos({}, { query: { enabled: !!maquinaId } as any });
 
   const handleDeleteFoto = async (id: number) => {
     if (confirm("¿Estás seguro de eliminar esta fotografía?")) {
@@ -305,8 +305,8 @@ export function MaquinaFicha() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {mantenimientos && mantenimientos.length > 0 ? (() => {
-                const ultimo = mantenimientos[mantenimientos.length - 1];
+              {mantenimientos?.data && mantenimientos.data.length > 0 ? (() => {
+                const ultimo = mantenimientos.data[mantenimientos.data.length - 1];
                 const ultimo_fecha = ultimo?.fecha ? format(new Date(ultimo.fecha + 'T12:00:00'), "dd/MM/yyyy", { locale: es }) : "—";
                 return (
                   <>
@@ -338,7 +338,7 @@ export function MaquinaFicha() {
           </Card>
 
           {/* Historial de mantenimientos */}
-          {mantenimientos && mantenimientos.length > 0 && (
+          {mantenimientos?.data && mantenimientos.data.length > 0 && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -347,7 +347,7 @@ export function MaquinaFicha() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {mantenimientos.map((m: any) => (
+                {mantenimientos.data.map((m: any) => (
                   <div key={m.id} className="flex items-start gap-3 pb-3 border-b last:border-0 last:pb-0">
                     <div className={`mt-0.5 rounded-full p-1.5 shrink-0 ${m.estado === "realizado" ? "bg-green-100 text-green-600" : "bg-amber-100 text-amber-600"}`}>
                       {m.estado === "realizado" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}

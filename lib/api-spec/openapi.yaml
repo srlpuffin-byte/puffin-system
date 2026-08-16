@@ -334,6 +334,16 @@ paths:
       tags: [jornadas]
       summary: Listar jornadas
       parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
         - name: empleado_id
           in: query
           schema:
@@ -361,9 +371,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Jornada"
+                $ref: "#/components/schemas/PaginatedJornadas"
 
   /jornadas/iniciar:
     post:
@@ -501,6 +509,16 @@ paths:
       tags: [combustible]
       summary: Listar registros de combustible
       parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
         - name: maquina_id
           in: query
           schema:
@@ -523,9 +541,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/RegistroCombustible"
+                $ref: "#/components/schemas/PaginatedCombustible"
     post:
       operationId: createCombustible
       tags: [combustible]
@@ -588,6 +604,16 @@ paths:
       tags: [mantenimientos]
       summary: Listar mantenimientos
       parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
         - name: maquina_id
           in: query
           schema:
@@ -602,9 +628,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Mantenimiento"
+                $ref: "#/components/schemas/PaginatedMantenimientos"
     post:
       operationId: createMantenimiento
       tags: [mantenimientos]
@@ -901,6 +925,16 @@ paths:
       tags: [egresos]
       summary: Listar egresos
       parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
         - name: categoria
           in: query
           schema:
@@ -923,9 +957,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Egreso"
+                $ref: "#/components/schemas/PaginatedEgresos"
     post:
       operationId: createEgreso
       tags: [egresos]
@@ -2006,11 +2038,68 @@ components:
           items:
             $ref: "#/components/schemas/Incidente"
 
+
     UpdateMantenimientoEstadoInput:
       type: object
       properties:
         estado:
           type: string
           enum: [pendiente, realizado, cancelado]
+
+    PaginationMeta:
+      type: object
+      required: [total, page, lastPage]
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        lastPage:
+          type: integer
+
+    PaginatedJornadas:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Jornada"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    PaginatedCombustible:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RegistroCombustible"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    PaginatedMantenimientos:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Mantenimiento"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    PaginatedEgresos:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Egreso"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
 
 

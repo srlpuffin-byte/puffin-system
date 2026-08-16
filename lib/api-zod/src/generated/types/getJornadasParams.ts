@@ -8,6 +8,8 @@
 import type { GetJornadasEstado } from './getJornadasEstado';
 
 export type GetJornadasParams = {
+page?: number;
+limit?: number;
 empleado_id?: number;
 maquina_id?: number;
 fecha_desde?: string;

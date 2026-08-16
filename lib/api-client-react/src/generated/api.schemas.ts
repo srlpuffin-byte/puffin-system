@@ -757,6 +757,32 @@ export interface UpdateMantenimientoEstadoInput {
   estado?: UpdateMantenimientoEstadoInputEstado;
 }
 
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  lastPage: number;
+}
+
+export interface PaginatedJornadas {
+  data: Jornada[];
+  meta: PaginationMeta;
+}
+
+export interface PaginatedCombustible {
+  data: RegistroCombustible[];
+  meta: PaginationMeta;
+}
+
+export interface PaginatedMantenimientos {
+  data: Mantenimiento[];
+  meta: PaginationMeta;
+}
+
+export interface PaginatedEgresos {
+  data: Egreso[];
+  meta: PaginationMeta;
+}
+
 export type EjecutarCierreMensual200 = {
   message?: string;
 };
@@ -795,6 +821,8 @@ export type DeleteMaquina200 = {
 };
 
 export type GetJornadasParams = {
+page?: number;
+limit?: number;
 empleado_id?: number;
 maquina_id?: number;
 fecha_desde?: string;
@@ -816,6 +844,8 @@ entidad_id: number;
 };
 
 export type GetCombustibleParams = {
+page?: number;
+limit?: number;
 maquina_id?: number;
 empleado_id?: number;
 fecha_desde?: string;
@@ -823,6 +853,8 @@ fecha_hasta?: string;
 };
 
 export type GetMantenimientosParams = {
+page?: number;
+limit?: number;
 maquina_id?: number;
 tipo?: string;
 };
@@ -830,8 +862,6 @@ tipo?: string;
 export type GetDocumentosParams = {
 tipo?: string;
 proximo_vencimiento?: boolean;
-entidad_tipo?: string;
-entidad_id?: string | number;
 };
 
 export type GetAlertasParams = {
@@ -889,6 +919,8 @@ export const GetReportesResumenPeriodo = {
 } as const;
 
 export type GetEgresosParams = {
+page?: number;
+limit?: number;
 categoria?: string;
 centro_costos?: string;
 proveedor?: string;

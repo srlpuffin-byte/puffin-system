@@ -47,7 +47,7 @@ export function HistorialMaquinaDialog({ open, onOpenChange, maquina }: Props) {
             <TabsContent value="jornadas" className="space-y-4">
               {loadingJornadas ? (
                 <p className="text-center text-muted-foreground py-8">Cargando jornadas...</p>
-              ) : jornadas?.length === 0 ? (
+              ) : jornadas?.data?.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No hay jornadas registradas para esta máquina.</p>
               ) : (
                 <div className="rounded-md border">
@@ -63,7 +63,7 @@ export function HistorialMaquinaDialog({ open, onOpenChange, maquina }: Props) {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {jornadas?.map((j) => (
+                      {jornadas?.data?.map((j: any) => (
                         <tr key={j.id} className="hover:bg-muted/50">
                           <td className="p-3">{format(new Date(j.fecha), 'dd/MM/yyyy', { locale: es })}</td>
                           <td className="p-3">{j.empleado_nombre}</td>
@@ -93,7 +93,7 @@ export function HistorialMaquinaDialog({ open, onOpenChange, maquina }: Props) {
             <TabsContent value="mantenimientos" className="space-y-4">
               {loadingMantenimientos ? (
                 <p className="text-center text-muted-foreground py-8">Cargando mantenimientos...</p>
-              ) : mantenimientos?.length === 0 ? (
+              ) : mantenimientos?.data?.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No hay mantenimientos registrados.</p>
               ) : (
                 <div className="rounded-md border">
@@ -108,7 +108,7 @@ export function HistorialMaquinaDialog({ open, onOpenChange, maquina }: Props) {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {mantenimientos?.map((m) => (
+                      {mantenimientos?.data?.map((m: any) => (
                         <tr key={m.id} className="hover:bg-muted/50">
                           <td className="p-3">{m.fecha_programada ? format(new Date(m.fecha_programada), 'dd/MM/yyyy', { locale: es }) : "-"}</td>
                           <td className="p-3 capitalize">{m.tipo}</td>

@@ -65,6 +65,10 @@ import type {
   Maquina,
   MaquinaInput,
   MaquinaUpdate,
+  PaginatedCombustible,
+  PaginatedEgresos,
+  PaginatedJornadas,
+  PaginatedMantenimientos,
   RegistroAuditoria,
   RegistroCombustible,
   ReporteResumen,
@@ -1237,9 +1241,9 @@ export const getGetJornadasUrl = (params?: GetJornadasParams,) => {
 /**
  * @summary Listar jornadas
  */
-export const getJornadas = async (params?: GetJornadasParams, options?: RequestInit): Promise<Jornada[]> => {
+export const getJornadas = async (params?: GetJornadasParams, options?: RequestInit): Promise<PaginatedJornadas> => {
 
-  return customFetch<Jornada[]>(getGetJornadasUrl(params),
+  return customFetch<PaginatedJornadas>(getGetJornadasUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1757,9 +1761,9 @@ export const getGetCombustibleUrl = (params?: GetCombustibleParams,) => {
 /**
  * @summary Listar registros de combustible
  */
-export const getCombustible = async (params?: GetCombustibleParams, options?: RequestInit): Promise<RegistroCombustible[]> => {
+export const getCombustible = async (params?: GetCombustibleParams, options?: RequestInit): Promise<PaginatedCombustible> => {
 
-  return customFetch<RegistroCombustible[]>(getGetCombustibleUrl(params),
+  return customFetch<PaginatedCombustible>(getGetCombustibleUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2052,9 +2056,9 @@ export const getGetMantenimientosUrl = (params?: GetMantenimientosParams,) => {
 /**
  * @summary Listar mantenimientos
  */
-export const getMantenimientos = async (params?: GetMantenimientosParams, options?: RequestInit): Promise<Mantenimiento[]> => {
+export const getMantenimientos = async (params?: GetMantenimientosParams, options?: RequestInit): Promise<PaginatedMantenimientos> => {
 
-  return customFetch<Mantenimiento[]>(getGetMantenimientosUrl(params),
+  return customFetch<PaginatedMantenimientos>(getGetMantenimientosUrl(params),
   {
     ...options,
     method: 'GET'
@@ -3223,9 +3227,9 @@ export const getGetEgresosUrl = (params?: GetEgresosParams,) => {
 /**
  * @summary Listar egresos
  */
-export const getEgresos = async (params?: GetEgresosParams, options?: RequestInit): Promise<Egreso[]> => {
+export const getEgresos = async (params?: GetEgresosParams, options?: RequestInit): Promise<PaginatedEgresos> => {
 
-  return customFetch<Egreso[]>(getGetEgresosUrl(params),
+  return customFetch<PaginatedEgresos>(getGetEgresosUrl(params),
   {
     ...options,
     method: 'GET'

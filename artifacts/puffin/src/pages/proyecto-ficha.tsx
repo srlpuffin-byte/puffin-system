@@ -45,7 +45,7 @@ export function ProyectoFicha() {
   const assignedInventario = maquinas?.filter(m => proyecto.maquinas_asignadas?.includes(m.id) && m.categoria === "inventario") || [];
 
   // Filtrar egresos de este proyecto (por nombre de lugar en centro_costos)
-  const egresosProyecto = todosLosEgresos?.filter(eg => {
+  const egresosProyecto = todosLosEgresos?.data?.filter((eg: any) => {
     const cc = (eg.centro_costos || "").trim().toLowerCase();
     if (!cc) return false;
     const lugar = proyecto.lugar.toLowerCase();
@@ -53,7 +53,7 @@ export function ProyectoFicha() {
   }) || [];
 
   // Totales
-  const totalGastosARS = egresosProyecto.reduce((sum, eg) => sum + parseFloat(eg.monto?.toString() || "0"), 0);
+  const totalGastosARS = egresosProyecto.reduce((sum: number, eg: any) => sum + parseFloat(eg.monto?.toString() || "0"), 0);
   const tc = parseFloat(tipoCambio) || 1;
   const gananciaUSD = parseFloat(proyecto.ganancia_estimada || "0");
   const gananciaARS = gananciaUSD * tc;
@@ -313,7 +313,7 @@ export function ProyectoFicha() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {egresosProyecto.map(eg => {
+                        {egresosProyecto.map((eg: any) => {
                           const monto = parseFloat(eg.monto?.toString() || "0");
                           return (
                             <TableRow key={eg.id}>
@@ -351,7 +351,7 @@ export function ProyectoFicha() {
 
                   {/* Vista Mobile (Tarjetas) */}
                   <div className="md:hidden divide-y">
-                    {egresosProyecto.map(eg => {
+                    {egresosProyecto.map((eg: any) => {
                       const monto = parseFloat(eg.monto?.toString() || "0");
                       return (
                         <div key={eg.id} className="p-4 flex flex-col gap-2 hover:bg-slate-50 transition-colors">

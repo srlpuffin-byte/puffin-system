@@ -456,7 +456,12 @@ export const DeleteMaquinaResponse = zod.object({
 /**
  * @summary Listar jornadas
  */
+export const getJornadasQueryPageDefault = 1;
+export const getJornadasQueryLimitDefault = 50;
+
 export const GetJornadasQueryParams = zod.object({
+  "page": zod.coerce.number().default(getJornadasQueryPageDefault),
+  "limit": zod.coerce.number().default(getJornadasQueryLimitDefault),
   "empleado_id": zod.coerce.number().optional(),
   "maquina_id": zod.coerce.number().optional(),
   "fecha_desde": zod.coerce.string().optional(),
@@ -464,7 +469,8 @@ export const GetJornadasQueryParams = zod.object({
   "estado": zod.enum(['en_curso', 'finalizada']).optional()
 })
 
-export const GetJornadasResponseItem = zod.object({
+export const GetJornadasResponse = zod.object({
+  "data": zod.array(zod.object({
   "id": zod.number(),
   "empresa_id": zod.number().optional(),
   "empleado_id": zod.number(),
@@ -491,8 +497,13 @@ export const GetJornadasResponseItem = zod.object({
   "combustible_nivel": zod.string().nullish(),
   "aceite_estado": zod.string().nullish(),
   "danos_choques": zod.string().nullish()
+})),
+  "meta": zod.object({
+  "total": zod.number(),
+  "page": zod.number(),
+  "lastPage": zod.number()
 })
-export const GetJornadasResponse = zod.array(GetJornadasResponseItem)
+})
 
 
 /**
@@ -697,14 +708,20 @@ export const UploadFotografiaResponse = zod.object({
 /**
  * @summary Listar registros de combustible
  */
+export const getCombustibleQueryPageDefault = 1;
+export const getCombustibleQueryLimitDefault = 50;
+
 export const GetCombustibleQueryParams = zod.object({
+  "page": zod.coerce.number().default(getCombustibleQueryPageDefault),
+  "limit": zod.coerce.number().default(getCombustibleQueryLimitDefault),
   "maquina_id": zod.coerce.number().optional(),
   "empleado_id": zod.coerce.number().optional(),
   "fecha_desde": zod.coerce.string().optional(),
   "fecha_hasta": zod.coerce.string().optional()
 })
 
-export const GetCombustibleResponseItem = zod.object({
+export const GetCombustibleResponse = zod.object({
+  "data": zod.array(zod.object({
   "id": zod.number(),
   "empresa_id": zod.number().optional(),
   "empleado_id": zod.number(),
@@ -718,8 +735,13 @@ export const GetCombustibleResponseItem = zod.object({
   "estacion": zod.string().nullish(),
   "kilometraje": zod.number().nullish(),
   "foto_url": zod.string().nullish()
+})),
+  "meta": zod.object({
+  "total": zod.number(),
+  "page": zod.number(),
+  "lastPage": zod.number()
 })
-export const GetCombustibleResponse = zod.array(GetCombustibleResponseItem)
+})
 
 
 /**
@@ -801,12 +823,18 @@ export const DeleteCombustibleResponse = zod.unknown()
 /**
  * @summary Listar mantenimientos
  */
+export const getMantenimientosQueryPageDefault = 1;
+export const getMantenimientosQueryLimitDefault = 50;
+
 export const GetMantenimientosQueryParams = zod.object({
+  "page": zod.coerce.number().default(getMantenimientosQueryPageDefault),
+  "limit": zod.coerce.number().default(getMantenimientosQueryLimitDefault),
   "maquina_id": zod.coerce.number().optional(),
   "tipo": zod.coerce.string().optional()
 })
 
-export const GetMantenimientosResponseItem = zod.object({
+export const GetMantenimientosResponse = zod.object({
+  "data": zod.array(zod.object({
   "id": zod.number(),
   "empresa_id": zod.number().optional(),
   "maquina_id": zod.number(),
@@ -819,8 +847,13 @@ export const GetMantenimientosResponseItem = zod.object({
   "estado": zod.enum(['pendiente', 'realizado', 'cancelado']).optional(),
   "fecha_programada": zod.string().nullish(),
   "proveedor": zod.string().nullish()
+})),
+  "meta": zod.object({
+  "total": zod.number(),
+  "page": zod.number(),
+  "lastPage": zod.number()
 })
-export const GetMantenimientosResponse = zod.array(GetMantenimientosResponseItem)
+})
 
 
 /**
@@ -1160,14 +1193,20 @@ export const UpdateMantenimientoEstadoResponse = zod.object({
 /**
  * @summary Listar egresos
  */
+export const getEgresosQueryPageDefault = 1;
+export const getEgresosQueryLimitDefault = 50;
+
 export const GetEgresosQueryParams = zod.object({
+  "page": zod.coerce.number().default(getEgresosQueryPageDefault),
+  "limit": zod.coerce.number().default(getEgresosQueryLimitDefault),
   "categoria": zod.coerce.string().optional(),
   "centro_costos": zod.coerce.string().optional(),
   "proveedor": zod.coerce.string().optional(),
   "search": zod.coerce.string().optional()
 })
 
-export const GetEgresosResponseItem = zod.object({
+export const GetEgresosResponse = zod.object({
+  "data": zod.array(zod.object({
   "id": zod.number(),
   "empresa_id": zod.number().optional(),
   "fecha": zod.string(),
@@ -1179,8 +1218,13 @@ export const GetEgresosResponseItem = zod.object({
   "comprobante": zod.boolean().optional(),
   "centro_costos": zod.string().nullish(),
   "observaciones": zod.string().nullish()
+})),
+  "meta": zod.object({
+  "total": zod.number(),
+  "page": zod.number(),
+  "lastPage": zod.number()
 })
-export const GetEgresosResponse = zod.array(GetEgresosResponseItem)
+})
 
 
 /**

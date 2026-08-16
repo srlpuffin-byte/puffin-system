@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useGetEgresos, useCreateEgreso, useGetEmpleados, useGetMaquinas, getGetEgresosQueryKey } from "@workspace/api-client-react";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { TableSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
 import { useGetProyectos } from "@/hooks/use-proyectos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +22,6 @@ import { useQueryClient } from "@tanstack/react-query";
 const CATEGORIAS = ["Combustible", "Mantenimiento", "Sueldos", "Repuestos", "Servicios", "Impuestos", "Otros"];
 
 export function Egresos() {
-  const { data: egresos, isLoading } = useGetEgresos();
   const { data: proyectos } = useGetProyectos();
   const { data: empleados } = useGetEmpleados();
   const { data: maquinas } = useGetMaquinas();
@@ -54,21 +54,30 @@ export function Egresos() {
     }
   };
 
-  // ── Filtros ──────────────────────────────────────────────────────────────
+  const [page, setPage] = useState(1);
+  // Filtros (client-side para metodo_pago y proyecto; server-side para categoria y search)
   const [filterProyecto, setFilterProyecto] = useState("todos");
   const [filterCategoria, setFilterCategoria] = useState("todos");
   const [filterMetodo, setFilterMetodo] = useState("todos");
   const [filterSearch, setFilterSearch] = useState("");
 
+  const { data: egresosResp, isLoading } = useGetEgresos({
+    page,
+    limit: 50,
+    ...(filterCategoria !== "todos" ? { categoria: filterCategoria } : {}),
+    ...(filterSearch ? { search: filterSearch } : {}),
+  });
+  const egresos = egresosResp?.data;
+  const paginationMeta = egresosResp?.meta;
+
+  // Aplicar filtros restantes (metodo y proyecto) en el cliente sobre la página actual
   const egresosFiltrados = (egresos || []).filter((eg: any) => {
     if (filterProyecto !== "todos" && eg.centro_costos !== filterProyecto) return false;
-    if (filterCategoria !== "todos" && eg.categoria !== filterCategoria) return false;
     if (filterMetodo !== "todos" && eg.metodo_pago !== filterMetodo) return false;
-    if (filterSearch && !eg.concepto?.toLowerCase().includes(filterSearch.toLowerCase())) return false;
     return true;
   });
   const hasFilters = filterProyecto !== "todos" || filterCategoria !== "todos" || filterMetodo !== "todos" || filterSearch !== "";
-  const clearFilters = () => { setFilterProyecto("todos"); setFilterCategoria("todos"); setFilterMetodo("todos"); setFilterSearch(""); };
+  const clearFilters = () => { setFilterProyecto("todos"); setFilterCategoria("todos"); setFilterMetodo("todos"); setFilterSearch(""); setPage(1); };
 
   // Helper: fecha local sin conversión UTC
   const localToday = () => {
@@ -501,6 +510,15 @@ export function Egresos() {
               )}
             </div>
           </div>
+          {paginationMeta && (
+            <PaginationControls
+              page={paginationMeta.page}
+              lastPage={paginationMeta.lastPage}
+              total={paginationMeta.total}
+              limit={50}
+              onPageChange={setPage}
+            />
+          )}
         </CardContent>
       </Card>
 

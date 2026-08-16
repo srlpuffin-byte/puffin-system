@@ -6,9 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetMantenimientosParams = {
-page?: number;
-limit?: number;
-maquina_id?: number;
-tipo?: string;
-};
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  lastPage: number;
+}

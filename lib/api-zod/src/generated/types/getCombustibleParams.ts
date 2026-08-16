@@ -7,6 +7,8 @@
  */
 
 export type GetCombustibleParams = {
+page?: number;
+limit?: number;
 maquina_id?: number;
 empleado_id?: number;
 fecha_desde?: string;

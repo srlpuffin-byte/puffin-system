@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { egresosTable } from "@workspace/db/schema";
-import { eq, and, or, ilike, desc } from "drizzle-orm";
+import { eq, and, or, ilike, desc, sql } from "drizzle-orm";
 import { syncAllSheets } from "../services/sync-sheets.js";
 
 const router = Router();
@@ -17,7 +17,11 @@ router.get("/sync-sheet", async (req, res) => {
 
 router.get("/", async (req, res) => {
   const { categoria, centro_costos, proveedor, search } = req.query as Record<string, string>;
-  let query = db.select().from(egresosTable).$dynamic();
+  const page  = Math.max(1, parseInt((req.query.page  as string) || "1"));
+  const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || "50")));
+  const offset = (page - 1) * limit;
+
+  let baseQuery = db.select().from(egresosTable).$dynamic();
   
   const conditions = [];
   if (categoria) conditions.push(eq(egresosTable.categoria, categoria));
@@ -34,15 +38,27 @@ router.get("/", async (req, res) => {
     );
   }
 
-  if (conditions.length) query = query.where(and(...conditions));
+  const whereClause = conditions.length ? and(...conditions) : undefined;
+  if (whereClause) baseQuery = baseQuery.where(whereClause);
 
-  const egresos = await query.orderBy(desc(egresosTable.fecha), desc(egresosTable.id)).limit(300);
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(egresosTable)
+    .where(whereClause);
+
+  const egresos = await baseQuery
+    .orderBy(desc(egresosTable.fecha), desc(egresosTable.id))
+    .limit(limit)
+    .offset(offset);
   
-  // Transform numeric fields
-  return res.json(egresos.map(e => ({
-    ...e,
-    monto: Number(e.monto)
-  })));
+  return res.json({
+    data: egresos.map(e => ({ ...e, monto: Number(e.monto) })),
+    meta: {
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+    },
+  });
 });
 
 router.post("/", async (req, res) => {

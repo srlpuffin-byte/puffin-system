@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { mantenimientosTable, maquinasTable, actividadTable, empleadosTable } from "@workspace/db";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import { getEmpleadoIdForUser } from "../lib/auth-helpers";
 import { sendWhatsAppMessage } from "../services/whatsapp.js";
 
@@ -9,7 +9,11 @@ const router = Router();
 
 router.get("/", async (req, res) => {
   const { maquina_id, tipo } = req.query as Record<string, string>;
-  let query = db.select().from(mantenimientosTable).$dynamic();
+  const page  = Math.max(1, parseInt((req.query.page  as string) || "1"));
+  const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || "50")));
+  const offset = (page - 1) * limit;
+
+  let baseQuery = db.select().from(mantenimientosTable).$dynamic();
   const conditions = [];
   if (maquina_id) conditions.push(eq(mantenimientosTable.maquina_id, parseInt(maquina_id)));
   if (tipo) conditions.push(eq(mantenimientosTable.tipo, tipo));
@@ -20,9 +24,18 @@ router.get("/", async (req, res) => {
     conditions.push(eq(mantenimientosTable.empleado_id, userEmpleadoId));
   }
 
-  if (conditions.length) query = query.where(and(...conditions));
+  const whereClause = conditions.length ? and(...conditions) : undefined;
+  if (whereClause) baseQuery = baseQuery.where(whereClause);
 
-  const mantenimientos = await query.orderBy(desc(mantenimientosTable.fecha), desc(mantenimientosTable.id)).limit(300);
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(mantenimientosTable)
+    .where(whereClause);
+
+  const mantenimientos = await baseQuery
+    .orderBy(desc(mantenimientosTable.fecha), desc(mantenimientosTable.id))
+    .limit(limit)
+    .offset(offset);
 
   // Bulk-load empleados y máquinas con inArray — elimina N+1 (antes: 2 queries por registro)
   const maqIds = [...new Set(mantenimientos.map(m => m.maquina_id).filter((id): id is number => !!id))];
@@ -42,14 +55,21 @@ router.get("/", async (req, res) => {
   const maqMap = new Map(maquinasList.map(m => [m.id, m.nombre]));
   const empMap = new Map(empleadosList.map(e => [e.id, `${e.nombre} ${e.apellido}`]));
 
-  const enriched = mantenimientos.map(m => ({
+  const data = mantenimientos.map(m => ({
     ...m,
     maquina_nombre: m.maquina_id ? (maqMap.get(m.maquina_id) ?? "Desconocida") : "Desconocida",
     empleado_nombre: m.empleado_id ? (empMap.get(m.empleado_id) ?? null) : null,
     horas: m.horas ? Number(m.horas) : null,
   }));
 
-  return res.json(enriched);
+  return res.json({
+    data,
+    meta: {
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+    },
+  });
 });
 
 router.post("/", async (req, res) => {

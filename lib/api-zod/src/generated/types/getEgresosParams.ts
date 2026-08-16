@@ -7,6 +7,8 @@
  */
 
 export type GetEgresosParams = {
+page?: number;
+limit?: number;
 categoria?: string;
 centro_costos?: string;
 proveedor?: string;

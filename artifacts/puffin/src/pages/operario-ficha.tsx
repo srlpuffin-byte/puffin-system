@@ -278,7 +278,7 @@ function BalanceOperario({ operarioId }: { operarioId: number }) {
   const { data: jornadas, isLoading } = useGetJornadas({ empleado_id: String(operarioId) } as any);
 
   if (isLoading) return <div className="p-4 text-center">Cargando jornadas...</div>;
-  if (!jornadas || jornadas.length === 0) return <div className="p-4 text-center text-muted-foreground">No hay jornadas registradas para este operario.</div>;
+  if (!jornadas?.data || jornadas.data.length === 0) return <div className="p-4 text-center text-muted-foreground">No hay jornadas registradas para este operario.</div>;
 
   return (
     <div className="rounded-md border-0 md:border md:rounded-md overflow-hidden">
@@ -296,7 +296,7 @@ function BalanceOperario({ operarioId }: { operarioId: number }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {jornadas.map((j) => (
+            {jornadas.data.map((j: any) => (
               <TableRow key={j.id}>
                 <TableCell className="font-medium">{format(new Date(j.fecha), "dd/MM/yyyy")}</TableCell>
                 <TableCell>{(j as any).maquina_nombre || "-"}</TableCell>
@@ -316,7 +316,7 @@ function BalanceOperario({ operarioId }: { operarioId: number }) {
 
       {/* Vista Mobile */}
       <div className="md:hidden divide-y">
-        {jornadas.map((j) => (
+        {jornadas.data.map((j: any) => (
           <div key={j.id} className="p-4 flex flex-col gap-2 hover:bg-slate-50 transition-colors">
             <div className="flex items-start justify-between gap-2">
               <span className="font-semibold text-primary">{format(new Date(j.fecha), "dd/MM/yyyy")}</span>

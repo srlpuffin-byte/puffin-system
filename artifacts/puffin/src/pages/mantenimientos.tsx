@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useGetMantenimientos, useUpdateMantenimientoEstado, getGetMantenimientosQueryKey, useGetMe } from "@workspace/api-client-react";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { TableSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +16,10 @@ import { ExportButtons } from "@/components/ui/export-buttons";
 
 export function Mantenimientos() {
   const queryClient = useQueryClient();
-  const { data: mantenimientos, isLoading } = useGetMantenimientos();
+  const [page, setPage] = useState(1);
+  const { data: mantenimientosResp, isLoading } = useGetMantenimientos({ page, limit: 50 });
+  const mantenimientos = mantenimientosResp?.data;
+  const paginationMeta = mantenimientosResp?.meta;
   const updateEstadoMut = useUpdateMantenimientoEstado();
   const { data: user } = useGetMe();
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";
@@ -70,9 +74,9 @@ export function Mantenimientos() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Mantenimientos</h1>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          {mantenimientos && (
+          {mantenimientosResp && (
             <ExportButtons 
-              data={mantenimientos} 
+              data={mantenimientos ?? []} 
               columns={exportColumns} 
               filename="Reporte_Mantenimientos" 
               title="Reporte de Mantenimientos" 
@@ -210,6 +214,15 @@ export function Mantenimientos() {
               )}
             </div>
           </div>
+          {paginationMeta && (
+            <PaginationControls
+              page={paginationMeta.page}
+              lastPage={paginationMeta.lastPage}
+              total={paginationMeta.total}
+              limit={50}
+              onPageChange={setPage}
+            />
+          )}
         </CardContent>
       </Card>
 

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useGetJornadas, useDeleteJornada, useGetMe } from "@workspace/api-client-react";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { TableSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,10 @@ import { toast } from "sonner";
 
 export function Jornadas() {
   const queryClient = useQueryClient();
-  const { data: jornadas, isLoading } = useGetJornadas();
+  const [page, setPage] = useState(1);
+  const { data: jornadasResp, isLoading } = useGetJornadas({ page, limit: 50 });
+  const jornadas = jornadasResp?.data;
+  const paginationMeta = jornadasResp?.meta;
   const { data: user } = useGetMe();
   const isAdmin = user?.rol?.toLowerCase() !== "empleado";
   const deleteMut = useDeleteJornada();
@@ -56,9 +60,9 @@ export function Jornadas() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Jornadas Laborales</h1>
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-          {jornadas && (
+          {jornadasResp && (
             <ExportButtons 
-              data={jornadas} 
+              data={jornadas ?? []} 
               columns={exportColumns} 
               filename="Reporte_Jornadas" 
               title="Reporte de Jornadas Laborales" 
@@ -273,6 +277,15 @@ export function Jornadas() {
               )}
             </div>
           </div>
+          {paginationMeta && (
+            <PaginationControls
+              page={paginationMeta.page}
+              lastPage={paginationMeta.lastPage}
+              total={paginationMeta.total}
+              limit={50}
+              onPageChange={setPage}
+            />
+          )}
         </CardContent>
       </Card>
 

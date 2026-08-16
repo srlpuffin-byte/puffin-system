@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useGetCombustible, RegistroCombustible, useDeleteCombustible, getGetCombustibleQueryKey } from "@workspace/api-client-react";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { TableSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,7 +20,10 @@ import { Users, Tractor, Briefcase } from "lucide-react";
 
 export function Combustible() {
   const queryClient = useQueryClient();
-  const { data: registros, isLoading } = useGetCombustible();
+  const [page, setPage] = useState(1);
+  const { data: registrosResp, isLoading } = useGetCombustible({ page, limit: 50 });
+  const registros = registrosResp?.data;
+  const paginationMeta = registrosResp?.meta;
   const { data: proyectos } = useGetProyectos();
   const [openDialog, setOpenDialog] = useState(false);
   const [cargaParaEditar, setCargaParaEditar] = useState<RegistroCombustible | null>(null);
@@ -57,9 +61,9 @@ export function Combustible() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Control de Combustible</h1>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          {registros && (
+          {registrosResp && (
             <ExportButtons 
-              data={registros} 
+              data={registros ?? []} 
               columns={exportColumns} 
               filename="Reporte_Combustible" 
               title="Reporte de Cargas de Combustible" 
@@ -236,6 +240,15 @@ export function Combustible() {
               )}
             </div>
           </div>
+          {paginationMeta && (
+            <PaginationControls
+              page={paginationMeta.page}
+              lastPage={paginationMeta.lastPage}
+              total={paginationMeta.total}
+              limit={50}
+              onPageChange={setPage}
+            />
+          )}
         </CardContent>
       </Card>
 

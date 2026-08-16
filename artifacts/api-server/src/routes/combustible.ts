@@ -10,6 +10,9 @@ import { getEmpleadoIdForUser } from "../lib/auth-helpers";
 
 router.get("/", async (req, res) => {
   const { maquina_id, empleado_id } = req.query as Record<string, string>;
+  const page  = Math.max(1, parseInt((req.query.page  as string) || "1"));
+  const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || "50")));
+  const offset = (page - 1) * limit;
   
   const conditions = [];
   if (maquina_id) conditions.push(eq(combustibleTable.maquina_id, parseInt(maquina_id)));
@@ -19,6 +22,13 @@ router.get("/", async (req, res) => {
     const userEmpleadoId = await getEmpleadoIdForUser(req.user.id);
     conditions.push(eq(combustibleTable.empleado_id, userEmpleadoId));
   }
+
+  const whereClause = conditions.length ? and(...conditions) : undefined;
+
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(combustibleTable)
+    .where(whereClause);
 
   const registros = await db.select({
     id: combustibleTable.id,
@@ -45,11 +55,12 @@ router.get("/", async (req, res) => {
     eq(fotografiasTable.entidad_id, combustibleTable.id),
     eq(fotografiasTable.entidad_tipo, "combustible")
   ))
-  .where(conditions.length ? and(...conditions) : undefined)
+  .where(whereClause)
   .orderBy(desc(combustibleTable.fecha), desc(combustibleTable.id))
-  .limit(300);
+  .limit(limit)
+  .offset(offset);
 
-  const enriched = registros.map(r => ({
+  const data = registros.map(r => ({
     ...r,
     empleado_nombre: r.empleado_nombre || "Desconocido",
     maquina_nombre: r.maquina_nombre || "Desconocida",
@@ -60,7 +71,14 @@ router.get("/", async (req, res) => {
     foto_url: r.foto_id ? `/api/fotografias/${r.foto_id}/raw` : null,
   }));
 
-  return res.json(enriched);
+  return res.json({
+    data,
+    meta: {
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+    },
+  });
 });
 
 router.post("/", async (req, res) => {

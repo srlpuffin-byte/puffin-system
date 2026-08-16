@@ -55,7 +55,11 @@ import { getEmpleadoIdForUser } from "../lib/auth-helpers";
 
 router.get("/", async (req, res) => {
   const { empleado_id, maquina_id, estado } = req.query as Record<string, string>;
-  let query = db.select().from(jornadasTable).$dynamic();
+  const page  = Math.max(1, parseInt((req.query.page  as string) || "1"));
+  const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || "50")));
+  const offset = (page - 1) * limit;
+
+  let baseQuery = db.select().from(jornadasTable).$dynamic();
   const conditions = [];
   
   if (empleado_id) conditions.push(eq(jornadasTable.empleado_id, parseInt(empleado_id)));
@@ -68,9 +72,18 @@ router.get("/", async (req, res) => {
     conditions.push(eq(jornadasTable.empleado_id, userEmpleadoId));
   }
 
-  if (conditions.length) query = query.where(and(...conditions));
+  if (conditions.length) baseQuery = baseQuery.where(and(...conditions));
 
-  const jornadas = await query.orderBy(desc(jornadasTable.fecha), desc(jornadasTable.id)).limit(300);
+  // Count total for pagination meta (same filters, no limit)
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(jornadasTable)
+    .where(conditions.length ? and(...conditions) : undefined);
+
+  const jornadas = await baseQuery
+    .orderBy(desc(jornadasTable.fecha), desc(jornadasTable.id))
+    .limit(limit)
+    .offset(offset);
 
   // Bulk-load para evitar N+1 (una query por nombre antes era O(N*2) calls)
   const empIds = [...new Set(jornadas.map(j => j.empleado_id).filter((id): id is number => !!id))];
@@ -152,10 +165,18 @@ router.get("/", async (req, res) => {
     };
   });
 
-  return res.json(enriched);
+  return res.json({
+    data: enriched,
+    meta: {
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+    },
+  });
 });
 
 // Endpoint para cargar una jornada pasada que no se pudo registrar en el momento
+
 router.post("/manual", async (req, res) => {
   try {
     const { empleado_id, maquina_id, fecha, hora_inicio, hora_fin, horometro_inicio, horometro_fin, horas_trabajadas, horas_reloj, ubicacion, descripcion_trabajo, observaciones } = req.body;
