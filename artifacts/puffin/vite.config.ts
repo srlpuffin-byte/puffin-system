@@ -46,13 +46,25 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         maximumFileSizeToCacheInBytes: 5000000,
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp}'],
+        // Solo cachear assets con hash (JS, CSS, imágenes) — NO el index.html
+        globPatterns: ['**/*.{js,css,ico,png,svg,jpg,jpeg,webp}'],
+        // El index.html siempre viene de la red (network-first)
+        navigateFallback: null,
         runtimeCaching: [
+          {
+            // Rutas de navegación (index.html) — siempre red primero
+            urlPattern: ({ request }: any) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'navigation-cache',
+              networkTimeoutSeconds: 5,
+            }
+          },
           {
             urlPattern: /^\/api\/.*/,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'api-cache-v2',
+              cacheName: 'api-cache-v3',
               expiration: {
                 maxEntries: 200,
                 maxAgeSeconds: 24 * 60 * 60,

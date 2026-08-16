@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { egresosTable } from "@workspace/db/schema";
-import { eq, and, or, ilike, desc, sql } from "drizzle-orm";
+import { eq, and, or, ilike, desc, sql, sum } from "drizzle-orm";
 import { syncAllSheets } from "../services/sync-sheets.js";
 
 const router = Router();
@@ -45,7 +45,7 @@ router.get("/", async (req, res) => {
   const [{ total, suma }] = await db
     .select({ 
       total: sql<number>`count(*)::int`,
-      suma: sql<string>`coalesce(sum(${egresosTable.monto}), 0)::numeric`
+      suma: sum(egresosTable.monto)
     })
     .from(egresosTable)
     .where(whereClause);
@@ -61,7 +61,7 @@ router.get("/", async (req, res) => {
       total,
       page,
       lastPage: Math.ceil(total / limit),
-      total_suma: Number(suma) || 0,
+      total_suma: suma ? parseFloat(suma) : 0,
     },
   });
 });
