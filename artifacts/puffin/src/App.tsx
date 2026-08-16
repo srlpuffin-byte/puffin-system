@@ -1,6 +1,6 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient } from "@tanstack/react-query";
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { PersistQueryClientProvider, useIsRestoring } from '@tanstack/react-query-persist-client';
 import { queryPersister, PERSIST_MAX_AGE } from '@/lib/query-persister';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -87,6 +87,23 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   );
 }
 
+// Muestra un splash screen mientras se restaura la cache de IndexedDB
+// Evita que cada seccion muestre su propio skeleton al arrancar
+function RestoreGate({ children }: { children: React.ReactNode }) {
+  const isRestoring = useIsRestoring();
+  if (isRestoring) {
+    return (
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-background z-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+          <p className="text-sm text-muted-foreground font-medium">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
 function Router() {
   const [location, setLocation] = useLocation();
 
@@ -143,12 +160,14 @@ function App() {
   return (
     <PersistQueryClientProvider client={queryClient} persistOptions={{ persister: queryPersister, maxAge: PERSIST_MAX_AGE }}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-        <SonnerToaster />
-        <OfflineBadge />
+        <RestoreGate>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+          <SonnerToaster />
+          <OfflineBadge />
+        </RestoreGate>
       </TooltipProvider>
     </PersistQueryClientProvider>
   );
