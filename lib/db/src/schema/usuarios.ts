@@ -13,6 +13,7 @@ export const usuariosTable = pgTable("usuarios", {
   activo: boolean("activo").default(true),
   intentos_fallidos: integer("intentos_fallidos").default(0),
   bloqueado: boolean("bloqueado").default(false),
+  ultimo_login: timestamp("ultimo_login"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

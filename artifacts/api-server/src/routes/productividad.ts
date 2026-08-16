@@ -55,7 +55,7 @@ router.get("/", async (req, res) => {
         const horas = empJornadas
           .filter((j) => j.horometro_inicio != null && j.horometro_fin != null)
           .reduce(
-            (acc, j) => acc + (Number(j.horometro_fin) - Number(j.horometro_inicio)),
+            (acc, j) => acc + Math.max(0, Number(j.horometro_fin) - Number(j.horometro_inicio)),
             0
           );
 
@@ -93,7 +93,7 @@ router.get("/", async (req, res) => {
       const horas = maqJornadas
         .filter((j) => j.horometro_inicio != null && j.horometro_fin != null)
         .reduce(
-          (acc, j) => acc + (Number(j.horometro_fin) - Number(j.horometro_inicio)),
+          (acc, j) => acc + Math.max(0, Number(j.horometro_fin) - Number(j.horometro_inicio)),
           0
         );
 

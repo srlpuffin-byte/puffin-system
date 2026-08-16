@@ -52,7 +52,10 @@ router.post("/login", async (req, res) => {
 
   await db
     .update(usuariosTable)
-    .set({ intentos_fallidos: 0 })
+    .set({ 
+      intentos_fallidos: 0,
+      ultimo_login: new Date()
+    })
     .where(eq(usuariosTable.id, user.id));
 
   const token = generateToken(user.id, user.rol);

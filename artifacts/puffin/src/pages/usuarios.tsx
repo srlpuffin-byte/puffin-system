@@ -21,6 +21,25 @@ interface Usuario {
   activo: boolean;
   bloqueado: boolean;
   intentos_fallidos: number;
+  ultimo_login?: string | null;
+  ultima_carga?: string | null;
+}
+
+function renderEstadoActividad(fechaLogin?: string | null, fechaCarga?: string | null) {
+  if (!fechaLogin) {
+    return <Badge variant="outline" className="text-red-500 border-red-200">Nunca ingresó</Badge>;
+  }
+  if (!fechaCarga) {
+    return <Badge variant="outline" className="text-yellow-600 border-yellow-300">Sin cargas</Badge>;
+  }
+  const diffDays = Math.floor((new Date().getTime() - new Date(fechaCarga).getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) {
+    return <Badge variant="outline" className="text-green-600 border-green-200">Activo (Hoy)</Badge>;
+  } else if (diffDays <= 7) {
+    return <Badge variant="outline" className="text-blue-600 border-blue-200">Activo (Hace {diffDays} días)</Badge>;
+  } else {
+    return <Badge variant="outline" className="text-orange-500 border-orange-200">Inactivo (+7 días)</Badge>;
+  }
 }
 
 function NuevoUsuarioDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -270,6 +289,7 @@ export function Usuarios() {
                       <TableHead>Usuario</TableHead>
                       <TableHead>Rol</TableHead>
                       <TableHead>Estado</TableHead>
+                      <TableHead>Actividad</TableHead>
                       <TableHead>Intentos fallidos</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
@@ -292,6 +312,9 @@ export function Usuarios() {
                           ) : (
                             <Badge variant="secondary">Inactivo</Badge>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          {renderEstadoActividad(u.ultimo_login, u.ultima_carga)}
                         </TableCell>
                         <TableCell>
                           <span className={u.intentos_fallidos > 0 ? "text-red-600 font-bold" : "text-muted-foreground"}>
@@ -344,6 +367,10 @@ export function Usuarios() {
                       ) : (
                         <Badge variant="secondary" className="text-[10px]">Inactivo</Badge>
                       )}
+                    </div>
+                    
+                    <div className="mt-1">
+                      {renderEstadoActividad(u.ultimo_login, u.ultima_carga)}
                     </div>
 
                     <div className="flex items-center justify-between text-sm bg-slate-50 p-2 rounded border mt-1">

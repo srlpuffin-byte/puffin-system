@@ -39,11 +39,11 @@ router.get("/resumen", async (req, res) => {
   const maquinaria = maquinas.map(m => {
     const jornadasMaq = jornadas.filter(j => j.maquina_id === m.id);
     const horas = jornadasMaq.reduce((acc, j) => {
-      if (j.horometro_inicio && j.horometro_fin) return acc + (Number(j.horometro_fin) - Number(j.horometro_inicio));
+      if (j.horometro_inicio && j.horometro_fin) return acc + Math.max(0, Number(j.horometro_fin) - Number(j.horometro_inicio));
       return acc;
     }, 0);
     const kmTotal = jornadasMaq.reduce((acc, j) => {
-      if (j.km_inicio && j.km_fin) return acc + (Number(j.km_fin) - Number(j.km_inicio));
+      if (j.km_inicio && j.km_fin) return acc + Math.max(0, Number(j.km_fin) - Number(j.km_inicio));
       return acc;
     }, 0);
     const consumo = combustible.filter(c => c.maquina_id === m.id).reduce((acc, c) => acc + Number(c.litros), 0);
@@ -63,7 +63,7 @@ router.get("/resumen", async (req, res) => {
   const operarios = empleados.map(e => {
     const jornadasEmp = jornadas.filter(j => j.empleado_id === e.id);
     const horas = jornadasEmp.reduce((acc, j) => {
-      if (j.horometro_inicio && j.horometro_fin) return acc + (Number(j.horometro_fin) - Number(j.horometro_inicio));
+      if (j.horometro_inicio && j.horometro_fin) return acc + Math.max(0, Number(j.horometro_fin) - Number(j.horometro_inicio));
       return acc;
     }, 0);
     const incidentesEmp = incidentes.filter(i => i.empleado_id === e.id).length;

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usuariosTable, empleadosTable, alertasTable, documentosTable } from "@workspace/db";
-import { eq, and, ilike } from "drizzle-orm";
+import { usuariosTable, empleadosTable, alertasTable, documentosTable, actividadTable } from "@workspace/db";
+import { eq, and, ilike, max } from "drizzle-orm";
 import crypto from "crypto";
 
 const router = Router();
@@ -23,10 +23,21 @@ router.get("/", async (req, res) => {
         activo: usuariosTable.activo,
         bloqueado: usuariosTable.bloqueado,
         intentos_fallidos: usuariosTable.intentos_fallidos,
+        ultimo_login: usuariosTable.ultimo_login,
       })
       .from(usuariosTable)
       .orderBy(usuariosTable.nombre);
-    return res.json(users);
+
+    // Fetch ultima actividad per user
+    const actividad = await db.select().from(actividadTable);
+    const usersWithActivity = users.map(u => {
+      const userActivity = actividad.filter(a => a.usuario_id === u.id);
+      const fechas = userActivity.map(a => a.fecha?.getTime()).filter(Boolean) as number[];
+      const ultima_carga = fechas.length > 0 ? new Date(Math.max(...fechas)) : null;
+      return { ...u, ultima_carga };
+    });
+
+    return res.json(usersWithActivity);
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Error al obtener usuarios" });
