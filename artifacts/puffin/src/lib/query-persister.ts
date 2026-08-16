@@ -38,4 +38,8 @@ const idbStorage = {
 export const queryPersister = createAsyncStoragePersister({
   storage: idbStorage,
   key: 'puffin-offline-cache',
+  throttleTime: 2000, // Escribe al disco máximo cada 2s (evita writes excesivos)
 });
+
+// Tiempo máximo que se considera válida la cache persistida: 24 horas
+export const PERSIST_MAX_AGE = 24 * 60 * 60 * 1000;
