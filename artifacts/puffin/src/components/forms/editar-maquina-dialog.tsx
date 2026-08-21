@@ -123,6 +123,7 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
           // Invalidar DESPUÉS de que las fotos terminaron de subirse
           queryClient.invalidateQueries({ queryKey: getGetMaquinaQueryKey(maquina.id) });
           queryClient.invalidateQueries({ queryKey: getGetMaquinasQueryKey() });
+          queryClient.invalidateQueries({ queryKey: ["/api/fotografias"] });
           onOpenChange(false);
           setImages([]);
         },

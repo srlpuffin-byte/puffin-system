@@ -91,6 +91,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, defaultCategoria = "maq
           toast.success("Máquina creada correctamente");
           // Invalidar DESPUÉS de que las fotos terminaron de subirse
           queryClient.invalidateQueries({ queryKey: getGetMaquinasQueryKey() });
+          queryClient.invalidateQueries({ queryKey: ["/api/fotografias"] });
           onOpenChange(false);
           setForm({ codigo: "", nombre: "", tipo: "", marca: "", modelo: "", anio: "", patente: "", dominio: "", horometro: "", kilometros: "", motor: "", chasis: "", filtro_tipo: "", filtro_codigo: "", filtro_fecha_cambio: "", filtro_proximo_cambio: "", vencimiento_seguro: "", vencimiento_vtv: "", descripcion: "" });
           setImages([]);
