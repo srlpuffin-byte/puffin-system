@@ -7,7 +7,6 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Clock, MapPin, Wrench, CheckCircle2, XCircle, AlertTriangle, User, Tractor, Info, ExternalLink } from "lucide-react";
 import { useLocation } from "wouter";
 
