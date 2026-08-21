@@ -100,6 +100,7 @@ export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
             }
           }
           toast.success("Operario creado correctamente");
+          // Invalidar DESPUÉS de que las fotos terminaron de subirse
           queryClient.invalidateQueries({ queryKey: getGetEmpleadosQueryKey() });
           onOpenChange(false);
           setForm({ nombre: "", apellido: "", dni: "", telefono: "", cargo: "", fecha_ingreso: "", contacto_familiar_nombre: "", contacto_familiar_telefono: "", contacto_familiar_relacion: "", fecha_vencimiento_carnet: "", telefono_whatsapp: "", recibir_alertas_whatsapp: false });

@@ -49,7 +49,7 @@ export function RegistrarPagoDialog({ open, onOpenChange, proyecto }: RegistrarP
           const options = {
             maxSizeMB: 1,
             maxWidthOrHeight: 1280,
-            useWebWorker: true,
+            useWebWorker: false, // false para compatibilidad con Safari iOS / Android Chrome en modo PWA
           };
           fileToUpload = await imageCompression(file, options);
         }

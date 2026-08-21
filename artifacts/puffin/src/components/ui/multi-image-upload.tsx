@@ -36,7 +36,7 @@ export function MultiImageUpload({ images, onChange, maxImages = 5 }: MultiImage
     const options = {
       maxSizeMB: 1, // Max file size in MB
       maxWidthOrHeight: 1280, // Max width/height
-      useWebWorker: true,
+      useWebWorker: false, // false para compatibilidad con Safari iOS / Android Chrome en modo PWA
     };
 
     try {
