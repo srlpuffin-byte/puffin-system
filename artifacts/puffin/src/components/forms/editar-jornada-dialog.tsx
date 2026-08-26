@@ -35,6 +35,7 @@ export function EditarJornadaDialog({ open, onOpenChange, jornada }: Props) {
     km_fin: "",
     estado: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (jornada) {
@@ -67,6 +68,7 @@ export function EditarJornadaDialog({ open, onOpenChange, jornada }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!form.empleado_id || !form.maquina_id || !form.fecha) {
       toast.error("Operario, máquina y fecha son obligatorios");
       return;
@@ -76,6 +78,7 @@ export function EditarJornadaDialog({ open, onOpenChange, jornada }: Props) {
       return;
     }
     if (!jornada) return;
+    setIsSubmitting(true);
     updateMut.mutate(
       {
         id: jornada.id,
@@ -97,9 +100,11 @@ export function EditarJornadaDialog({ open, onOpenChange, jornada }: Props) {
           queryClient.invalidateQueries({ queryKey: ["jornadas"] });
           toast.success("Jornada actualizada con éxito");
           onOpenChange(false);
+          setIsSubmitting(false);
         },
         onError: (err: any) => {
           toast.error(err?.response?.data?.error || "Error al actualizar jornada");
+          setIsSubmitting(false);
         },
       }
     );
@@ -269,10 +274,10 @@ export function EditarJornadaDialog({ open, onOpenChange, jornada }: Props) {
             </Button>
             <Button
               type="submit"
-              disabled={updateMut.isPending || horometroError}
+              disabled={isSubmitting || horometroError}
               className="bg-white text-black hover:bg-white/90 shadow-lg shadow-white/20 transition-all active:scale-95"
             >
-              {updateMut.isPending ? "Guardando..." : "Guardar Cambios"}
+              {isSubmitting ? "Guardando..." : "Guardar Cambios"}
             </Button>
           </DialogFooter>
         </form>

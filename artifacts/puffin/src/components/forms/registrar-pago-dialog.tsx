@@ -27,6 +27,7 @@ export function RegistrarPagoDialog({ open, onOpenChange, proyecto }: RegistrarP
   const [comprobanteUrl, setComprobanteUrl] = useState("");
   const [addToInventory, setAddToInventory] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const createPagoMut = useCreatePago();
   const uploadMut = useUploadFotografia();
@@ -84,6 +85,8 @@ export function RegistrarPagoDialog({ open, onOpenChange, proyecto }: RegistrarP
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await createPagoMut.mutateAsync({
         id: proyecto.id,
@@ -102,8 +105,10 @@ export function RegistrarPagoDialog({ open, onOpenChange, proyecto }: RegistrarP
       setMonto("");
       setDescripcion("");
       setComprobanteUrl("");
+      setIsSubmitting(false);
     } catch (err: any) {
       toast.error(err?.message || "Error al registrar el pago");
+      setIsSubmitting(false);
     }
   };
 
@@ -190,8 +195,8 @@ export function RegistrarPagoDialog({ open, onOpenChange, proyecto }: RegistrarP
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" disabled={createPagoMut.isPending || isUploading}>
-              {createPagoMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Registrar Pago"}
+            <Button type="submit" disabled={isSubmitting || isUploading}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Registrar Pago"}
             </Button>
           </DialogFooter>
         </form>

@@ -42,7 +42,7 @@ export function MaquinaFicha() {
   const [openDocs, setOpenDocs] = useState(false);
 
   const queryClient = useQueryClient();
-  const { data: documentos } = useGetDocumentos({ entidad_tipo: "maquina", entidad_id: maquinaId }, { query: { enabled: !!maquinaId } as any });
+  const { data: documentos } = useGetDocumentos({ entidad_tipo: "maquina", entidad_id: maquinaId } as any, { query: { enabled: !!maquinaId } as any });
 
   const handleDeleteFoto = async (id: number) => {
     if (confirm("¿Estás seguro de eliminar esta fotografía?")) {

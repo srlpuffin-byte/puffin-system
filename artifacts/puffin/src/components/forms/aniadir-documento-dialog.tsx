@@ -32,6 +32,7 @@ export function AñadirDocumentoDialog({ open, onOpenChange, defaultEntidadTipo,
     entidad_id: defaultEntidadId || "",
     fecha_vencimiento: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   React.useEffect(() => {
     if (open) {
@@ -64,10 +65,12 @@ export function AñadirDocumentoDialog({ open, onOpenChange, defaultEntidadTipo,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!form.tipo || !form.fecha_vencimiento) {
       toast.error("Tipo y fecha de vencimiento son obligatorios");
       return;
     }
+    setIsSubmitting(true);
     createMut.mutate(
       {
         data: {
@@ -87,8 +90,12 @@ export function AñadirDocumentoDialog({ open, onOpenChange, defaultEntidadTipo,
           onOpenChange(false);
           setForm({ tipo: "", descripcion: "", entidad_tipo: "", entidad_id: "", fecha_vencimiento: "" });
           setFile(null);
+          setIsSubmitting(false);
         },
-        onError: () => toast.error("Error al añadir el documento"),
+        onError: () => {
+          toast.error("Error al añadir el documento");
+          setIsSubmitting(false);
+        },
       }
     );
   };
@@ -155,8 +162,8 @@ export function AñadirDocumentoDialog({ open, onOpenChange, defaultEntidadTipo,
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" className="bg-primary" disabled={createMut.isPending}>
-              {createMut.isPending ? "Guardando..." : "Añadir Documento"}
+            <Button type="submit" className="bg-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Guardando..." : "Añadir Documento"}
             </Button>
           </DialogFooter>
         </form>

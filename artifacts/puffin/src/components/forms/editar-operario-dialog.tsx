@@ -59,6 +59,7 @@ export function EditarOperarioDialog({ open, onOpenChange, operario }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPending) return;
     if (!form.nombre || !form.apellido || !form.dni) {
       toast.error("Nombre, apellido y DNI son obligatorios");
       return;

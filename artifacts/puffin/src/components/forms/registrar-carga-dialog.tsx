@@ -36,6 +36,7 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
   const [fotoNivel, setFotoNivel] = useState<{ base64: string; name: string } | null>(null);
   const [openOperario, setOpenOperario] = useState(false);
   const [openMaquina, setOpenMaquina] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
     empleado_id: empleadoIdFijo?.toString() || "",
@@ -71,10 +72,12 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!form.empleado_id || !form.maquina_id || !form.litros) {
       toast.error("Operario, máquina y litros son obligatorios");
       return;
     }
+    setIsSubmitting(true);
     createMut.mutate(
       {
         data: {
@@ -107,8 +110,12 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
           onOpenChange(false);
           setForm({ empleado_id: empleadoIdFijo?.toString() || "", maquina_id: maquinaIdFija?.toString() || "", litros: "", precio: "", importe: "", estacion: "", kilometraje: "" });
           setFotoNivel(null);
+          setIsSubmitting(false);
         },
-        onError: () => toast.error("Error al registrar la carga"),
+        onError: () => {
+          toast.error("Error al registrar la carga");
+          setIsSubmitting(false);
+        },
       }
     );
   };
@@ -215,8 +222,8 @@ export function RegistrarCargaDialog({ open, onOpenChange, maquinaIdFija, emplea
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" className="bg-primary" disabled={createMut.isPending}>
-              {createMut.isPending ? "Guardando..." : "Registrar Carga"}
+            <Button type="submit" className="bg-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Guardando..." : "Registrar Carga"}
             </Button>
           </DialogFooter>
         </form>

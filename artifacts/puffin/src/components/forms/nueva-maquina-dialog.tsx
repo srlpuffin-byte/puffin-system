@@ -32,15 +32,18 @@ export function NuevaMaquinaDialog({ open, onOpenChange, defaultCategoria = "maq
     vencimiento_seguro: "", vencimiento_vtv: "",
     descripcion: ""
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!form.nombre || !form.tipo) {
       toast.error("Nombre y tipo son obligatorios");
       return;
     }
+    setIsSubmitting(true);
     createMut.mutate(
       {
         data: {
@@ -95,8 +98,12 @@ export function NuevaMaquinaDialog({ open, onOpenChange, defaultCategoria = "maq
           onOpenChange(false);
           setForm({ codigo: "", nombre: "", tipo: "", marca: "", modelo: "", anio: "", patente: "", dominio: "", horometro: "", kilometros: "", motor: "", chasis: "", filtro_tipo: "", filtro_codigo: "", filtro_fecha_cambio: "", filtro_proximo_cambio: "", vencimiento_seguro: "", vencimiento_vtv: "", descripcion: "" });
           setImages([]);
+          setIsSubmitting(false);
         },
-        onError: () => toast.error("Error al crear la máquina"),
+        onError: () => {
+          toast.error("Error al crear la máquina");
+          setIsSubmitting(false);
+        },
       }
     );
   };
@@ -235,8 +242,8 @@ export function NuevaMaquinaDialog({ open, onOpenChange, defaultCategoria = "maq
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" className="bg-primary" disabled={createMut.isPending}>
-              {createMut.isPending ? "Guardando..." : (defaultCategoria === "maquinaria" ? "Crear Máquina" : "Crear Ítem")}
+            <Button type="submit" className="bg-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Guardando..." : (defaultCategoria === "maquinaria" ? "Crear Máquina" : "Crear Ítem")}
             </Button>
           </DialogFooter>
         </form>

@@ -24,8 +24,8 @@ export function FinalizarJornadaDialog({ open, onOpenChange, jornadaId, empleado
   const queryClient = useQueryClient();
   const finalizarMut = useFinalizarJornada();
   const uploadMut = useUploadFotografia();
-  
   const [images, setImages] = useState<UploadedImage[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({ 
     horometro_fin: "", 
     km_fin: "", 
@@ -48,6 +48,7 @@ export function FinalizarJornadaDialog({ open, onOpenChange, jornadaId, empleado
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!form.horometro_fin) {
       toast.error("El horómetro final es obligatorio");
       return;
@@ -61,6 +62,7 @@ export function FinalizarJornadaDialog({ open, onOpenChange, jornadaId, empleado
       return;
     }
 
+    setIsSubmitting(true);
     try {
       await finalizarMut.mutateAsync({
         id: jornadaId,
@@ -95,9 +97,11 @@ export function FinalizarJornadaDialog({ open, onOpenChange, jornadaId, empleado
       queryClient.invalidateQueries({ queryKey: getGetJornadasQueryKey() });
       onOpenChange(false);
       resetForm();
+      setIsSubmitting(false);
     } catch (error) {
       toast.dismiss("uploading-photos-fin");
       toast.error("Error al finalizar la jornada");
+      setIsSubmitting(false);
     }
   };
 
@@ -223,8 +227,8 @@ export function FinalizarJornadaDialog({ open, onOpenChange, jornadaId, empleado
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" variant="destructive" disabled={finalizarMut.isPending || uploadMut.isPending || horometroError}>
-              {(finalizarMut.isPending || uploadMut.isPending) ? "Finalizando..." : "Finalizar Jornada"}
+            <Button type="submit" variant="destructive" disabled={isSubmitting || finalizarMut.isPending || uploadMut.isPending || horometroError}>
+              {(isSubmitting || finalizarMut.isPending || uploadMut.isPending) ? "Finalizando..." : "Finalizar Jornada"}
             </Button>
           </DialogFooter>
         </form>

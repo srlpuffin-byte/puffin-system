@@ -29,15 +29,18 @@ export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
     contacto_familiar_nombre: "", contacto_familiar_telefono: "", contacto_familiar_relacion: "",
     fecha_vencimiento_carnet: "", telefono_whatsapp: "", recibir_alertas_whatsapp: false,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const set = (field: string, val: string) => setForm(prev => ({ ...prev, [field]: val }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!form.nombre || !form.apellido || !form.dni) {
       toast.error("Nombre, apellido y DNI son obligatorios");
       return;
     }
+    setIsSubmitting(true);
     createMut.mutate(
       {
         data: {
@@ -106,8 +109,12 @@ export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
           setForm({ nombre: "", apellido: "", dni: "", telefono: "", cargo: "", fecha_ingreso: "", contacto_familiar_nombre: "", contacto_familiar_telefono: "", contacto_familiar_relacion: "", fecha_vencimiento_carnet: "", telefono_whatsapp: "", recibir_alertas_whatsapp: false });
           setFotoPerfil([]);
           setFotoCarnet([]);
+          setIsSubmitting(false);
         },
-        onError: () => toast.error("Error al crear el operario"),
+        onError: () => {
+          toast.error("Error al crear el operario");
+          setIsSubmitting(false);
+        },
       }
     );
   };
@@ -202,8 +209,8 @@ export function NuevoOperarioDialog({ open, onOpenChange }: Props) {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" className="bg-primary" disabled={createMut.isPending}>
-              {createMut.isPending ? "Guardando..." : "Crear Operario"}
+            <Button type="submit" className="bg-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Guardando..." : "Crear Operario"}
             </Button>
           </DialogFooter>
         </form>

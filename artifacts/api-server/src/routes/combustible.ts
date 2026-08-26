@@ -88,6 +88,20 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "Campos requeridos faltantes" });
     }
 
+    // Anti-duplicate guard
+    const existing = await db.select().from(combustibleTable).where(
+      and(
+        eq(combustibleTable.maquina_id, maquina_id),
+        eq(combustibleTable.empleado_id, empleado_id),
+        eq(combustibleTable.litros, litros.toString()),
+        sql`${combustibleTable.createdAt} >= NOW() - INTERVAL '30 seconds'`
+      )
+    ).limit(1);
+
+    if (existing.length > 0) {
+      return res.status(409).json({ error: "Ya existe una carga idéntica registrada recientemente. Por favor, verifica tus cargas." });
+    }
+
     const today = new Date().toISOString().split("T")[0];
 
     const [registro] = await db.insert(combustibleTable).values({

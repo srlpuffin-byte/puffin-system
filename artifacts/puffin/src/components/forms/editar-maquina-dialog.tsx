@@ -30,6 +30,7 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
     vencimiento_seguro: "", vencimiento_vtv: "",
     descripcion: ""
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categoria = form.categoria || "maquinaria";
 
@@ -66,10 +67,12 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!form.nombre || !form.tipo) {
       toast.error("Nombre y tipo son obligatorios");
       return;
     }
+    setIsSubmitting(true);
     updateMut.mutate(
       {
         id: maquina.id,
@@ -126,8 +129,12 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
           queryClient.invalidateQueries({ queryKey: ["/api/fotografias"] });
           onOpenChange(false);
           setImages([]);
+          setIsSubmitting(false);
         },
-        onError: () => toast.error("Error al actualizar la máquina"),
+        onError: () => {
+          toast.error("Error al actualizar la máquina");
+          setIsSubmitting(false);
+        },
       }
     );
   };
@@ -278,8 +285,8 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" className="bg-primary" disabled={updateMut.isPending}>
-              {updateMut.isPending ? "Guardando..." : "Guardar Cambios"}
+            <Button type="submit" className="bg-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Guardando..." : "Guardar Cambios"}
             </Button>
           </DialogFooter>
         </form>

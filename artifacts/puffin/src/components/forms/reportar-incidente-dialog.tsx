@@ -48,6 +48,7 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
     descripcion: "",
   });
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [fotos, setFotos] = useState<{ base64: string; name: string; preview: string }[]>([]);
   const [maquinaSearch, setMaquinaSearch] = useState("");
@@ -108,10 +109,12 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!form.tipo || !form.descripcion) {
       toast.error("Tipo y descripción son obligatorios");
       return;
     }
+    setIsSubmitting(true);
 
     if (editData?.id) {
       setIsUpdating(true);
@@ -151,6 +154,7 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
         toast.error("Error al actualizar incidente");
       } finally {
         setIsUpdating(false);
+        setIsSubmitting(false);
       }
       return;
     }
@@ -186,8 +190,12 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
           onOpenChange(false);
           setForm({ empleado_id: empleadoIdFijo?.toString() || "", maquina_id: maquinaIdFija?.toString() || "", tipo: "", descripcion: "" });
           setFotos([]);
+          setIsSubmitting(false);
         },
-        onError: () => toast.error("Error al reportar el incidente"),
+        onError: () => {
+          toast.error("Error al reportar el incidente");
+          setIsSubmitting(false);
+        },
       }
     );
   };
@@ -328,8 +336,8 @@ export function ReportarIncidenteDialog({ open, onOpenChange, maquinaIdFija, emp
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" variant="destructive" disabled={createMut.isPending || isUpdating}>
-              {createMut.isPending || isUpdating ? "Guardando..." : (editData ? "Guardar Cambios" : "Reportar Incidente")}
+            <Button type="submit" variant="destructive" disabled={isSubmitting}>
+              {isSubmitting ? "Guardando..." : (editData ? "Guardar Cambios" : "Reportar Incidente")}
             </Button>
           </DialogFooter>
         </form>

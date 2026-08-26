@@ -38,6 +38,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
   const [currentTab, setCurrentTab] = useState("general");
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [conflictWarning, setConflictWarning] = useState<string[] | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     empleado_id: empleadoIdFijo?.toString() || "",
     maquina_id: maquinaIdFija?.toString() || "",
@@ -86,6 +87,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
   }, [isEmpleado, user, empleados, form.empleado_id]);
 
   const doSubmit = async (confirmarDuplicado = false) => {
+    setIsSubmitting(true);
     try {
       // 1. Crear la jornada
       const jornada = await createMut.mutateAsync({
@@ -125,6 +127,7 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
       queryClient.invalidateQueries({ queryKey: getGetJornadasQueryKey() });
       onOpenChange(false);
       resetForm();
+      setIsSubmitting(false);
     } catch (error: any) {
       toast.dismiss("uploading-photos");
       // Check if it's a duplicate conflict (409)
@@ -134,11 +137,13 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
       } else {
         toast.error("Error al iniciar la jornada");
       }
+      setIsSubmitting(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!form.empleado_id || !form.maquina_id || !form.horometro_inicio) {
       toast.error("Operario, máquina y horómetro son obligatorios");
       return;
@@ -384,8 +389,8 @@ export function IniciarJornadaDialog({ open, onOpenChange, empleadoIdFijo, maqui
 
               <DialogFooter className="pt-4 flex justify-between sm:justify-between w-full">
                 <Button type="button" variant="outline" onClick={() => setCurrentTab("mecanica")}>Atrás</Button>
-                <Button type="submit" className="bg-primary" disabled={createMut.isPending || uploadMut.isPending}>
-                  {(createMut.isPending || uploadMut.isPending) ? "Guardando..." : "Confirmar e Iniciar Jornada"}
+                <Button type="submit" className="bg-primary" disabled={isSubmitting || createMut.isPending || uploadMut.isPending}>
+                  {(isSubmitting || createMut.isPending || uploadMut.isPending) ? "Guardando..." : "Confirmar e Iniciar Jornada"}
                 </Button>
               </DialogFooter>
             </TabsContent>

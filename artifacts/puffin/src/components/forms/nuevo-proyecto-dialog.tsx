@@ -25,6 +25,7 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
   const [maquinasIds, setMaquinasIds] = useState<number[]>([]);
   const [searchEmpleados, setSearchEmpleados] = useState("");
   const [searchMaquinas, setSearchMaquinas] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const createMut = useCreateProyecto();
   const { data: proyectos } = useGetProyectos();
@@ -72,6 +73,8 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await createMut.mutateAsync({
         lugar,
@@ -83,8 +86,10 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
       });
       toast.success("Proyecto creado con éxito");
       onOpenChange(false);
+      setIsSubmitting(false);
     } catch (err: any) {
       toast.error(err?.message || "Error al crear el proyecto");
+      setIsSubmitting(false);
     }
   };
 
@@ -339,9 +344,9 @@ export function NuevoProyectoDialog({ open, onOpenChange }: NuevoProyectoDialogP
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={createMut.isPending} className="bg-primary hover:bg-primary/90 text-white">
-              {createMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {createMut.isPending ? "Creando..." : "Crear Proyecto"}
+            <Button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primary/90 text-white">
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? "Creando..." : "Crear Proyecto"}
             </Button>
           </DialogFooter>
         </form>

@@ -47,6 +47,7 @@ export function CrearAlertaDialog({ open, onOpenChange }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPending) return;
     if (!form.descripcion) {
       toast.error("La descripción es obligatoria");
       return;

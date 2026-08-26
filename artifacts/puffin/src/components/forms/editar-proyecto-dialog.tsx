@@ -28,6 +28,7 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
   const [maquinasIds, setMaquinasIds] = useState<number[]>([]);
   const [searchEmpleados, setSearchEmpleados] = useState("");
   const [searchMaquinas, setSearchMaquinas] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateMut = useUpdateProyecto();
   const { data: proyectos } = useGetProyectos();
@@ -76,7 +77,9 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!proyecto) return;
+    setIsSubmitting(true);
     try {
       await updateMut.mutateAsync({
         id: proyecto.id,
@@ -91,8 +94,10 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
       });
       toast.success("Proyecto actualizado correctamente");
       onOpenChange(false);
+      setIsSubmitting(false);
     } catch (err: any) {
       toast.error(err?.message || "Error al actualizar el proyecto");
+      setIsSubmitting(false);
     }
   };
 
@@ -407,9 +412,9 @@ export function EditarProyectoDialog({ proyecto, open, onOpenChange }: EditarPro
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={updateMut.isPending} className="bg-primary hover:bg-primary/90 text-white">
-              {updateMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {updateMut.isPending ? "Guardando..." : "Guardar Cambios"}
+            <Button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primary/90 text-white">
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? "Guardando..." : "Guardar Cambios"}
             </Button>
           </DialogFooter>
         </form>

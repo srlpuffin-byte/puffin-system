@@ -105,6 +105,7 @@ export function CargarJornadaPasadaDialog({ open, onOpenChange }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPending) return;
 
     if (!form.empleado_id || !form.maquina_id || !form.fecha) {
       toast.error("Operario, máquina y fecha son obligatorios");

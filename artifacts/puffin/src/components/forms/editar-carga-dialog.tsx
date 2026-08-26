@@ -42,6 +42,7 @@ export function EditarCargaDialog({ open, onOpenChange, carga }: Props) {
     estacion: "",
     kilometraje: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (carga) {
@@ -82,11 +83,13 @@ export function EditarCargaDialog({ open, onOpenChange, carga }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!form.empleado_id || !form.maquina_id || !form.litros) {
       toast.error("Operario, máquina y litros son obligatorios");
       return;
     }
     if (!carga) return;
+    setIsSubmitting(true);
     updateMut.mutate(
       {
         id: carga.id,
@@ -119,8 +122,12 @@ export function EditarCargaDialog({ open, onOpenChange, carga }: Props) {
           queryClient.invalidateQueries({ queryKey: getGetCombustibleQueryKey() });
           onOpenChange(false);
           setFotoNivel(null);
+          setIsSubmitting(false);
         },
-        onError: () => toast.error("Error al actualizar la carga"),
+        onError: () => {
+          toast.error("Error al actualizar la carga");
+          setIsSubmitting(false);
+        },
       }
     );
   };
@@ -227,8 +234,8 @@ export function EditarCargaDialog({ open, onOpenChange, carga }: Props) {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" className="bg-primary" disabled={updateMut.isPending}>
-              {updateMut.isPending ? "Guardando..." : "Guardar Cambios"}
+            <Button type="submit" className="bg-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Guardando..." : "Guardar Cambios"}
             </Button>
           </DialogFooter>
         </form>

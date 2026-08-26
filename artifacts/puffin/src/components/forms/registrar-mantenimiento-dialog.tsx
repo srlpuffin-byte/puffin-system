@@ -39,8 +39,12 @@ export function RegistrarMantenimientoDialog({ open, onOpenChange, maquinaIdFija
       toast.success("Mantenimiento actualizado correctamente");
       queryClient.invalidateQueries({ queryKey: getGetMantenimientosQueryKey() });
       onOpenChange(false);
+      setIsSubmitting(false);
     },
-    onError: () => toast.error("Error al actualizar el mantenimiento"),
+    onError: () => {
+      toast.error("Error al actualizar el mantenimiento");
+      setIsSubmitting(false);
+    },
   });
 
   const [form, setForm] = useState({
@@ -50,6 +54,7 @@ export function RegistrarMantenimientoDialog({ open, onOpenChange, maquinaIdFija
     descripcion: "",
     proximo_service: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -77,10 +82,13 @@ export function RegistrarMantenimientoDialog({ open, onOpenChange, maquinaIdFija
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!form.maquina_id || !form.tipo) {
       toast.error("Máquina y tipo son obligatorios");
       return;
     }
+    
+    setIsSubmitting(true);
     
     const dataToSubmit = {
       maquina_id: parseInt(form.maquina_id),
@@ -100,8 +108,12 @@ export function RegistrarMantenimientoDialog({ open, onOpenChange, maquinaIdFija
             toast.success("Mantenimiento registrado correctamente");
             queryClient.invalidateQueries({ queryKey: getGetMantenimientosQueryKey() });
             onOpenChange(false);
+            setIsSubmitting(false);
           },
-          onError: () => toast.error("Error al registrar el mantenimiento"),
+          onError: () => {
+            toast.error("Error al registrar el mantenimiento");
+            setIsSubmitting(false);
+          },
         }
       );
     }
@@ -161,8 +173,8 @@ export function RegistrarMantenimientoDialog({ open, onOpenChange, maquinaIdFija
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" className="bg-primary" disabled={isPending}>
-              {isPending ? "Guardando..." : editData ? "Guardar Cambios" : "Registrar Mantenimiento"}
+            <Button type="submit" className="bg-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Guardando..." : editData ? "Guardar Cambios" : "Registrar Mantenimiento"}
             </Button>
           </DialogFooter>
         </form>
