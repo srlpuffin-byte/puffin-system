@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { egresosTable } from "@workspace/db/schema";
-import { eq, and, or, ilike, desc, sql, sum } from "drizzle-orm";
+import { eq, and, or, ilike, desc, sql, sum, isNull } from "drizzle-orm";
 import { syncAllSheets } from "../services/sync-sheets.js";
 
 const router = Router();
@@ -25,7 +25,14 @@ router.get("/", async (req, res) => {
   
   const conditions = [];
   if (categoria) conditions.push(eq(egresosTable.categoria, categoria));
-  if (centro_costos) conditions.push(eq(egresosTable.centro_costos, centro_costos));
+  if (centro_costos) {
+    // "General" significa sin proyecto asignado → centro_costos IS NULL en la BD
+    conditions.push(
+      centro_costos === "General"
+        ? isNull(egresosTable.centro_costos)
+        : eq(egresosTable.centro_costos, centro_costos)
+    );
+  }
   if (proveedor) conditions.push(eq(egresosTable.proveedor, proveedor));
   if (metodo_pago) conditions.push(eq(egresosTable.metodo_pago, metodo_pago));
   
