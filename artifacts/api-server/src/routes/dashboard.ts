@@ -49,6 +49,7 @@ router.get("/resumen", async (req, res) => {
 
   const now = new Date();
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString().split("T")[0];
 
   // Ejecutar TODAS las queries del dashboard en paralelo (incluyendo docs)
   const [
@@ -62,6 +63,7 @@ router.get("/resumen", async (req, res) => {
     alertasRojas,
     alertasAmarillas,
     combustibleMes,
+    combustible30d,
     jornadasMes,
     mantenimientosMes,
     maquinas,
@@ -80,6 +82,11 @@ router.get("/resumen", async (req, res) => {
       isEmpleado
         ? and(gte(combustibleTable.fecha, firstDayOfMonth), eq(combustibleTable.empleado_id, userEmpleadoId))
         : gte(combustibleTable.fecha, firstDayOfMonth)
+    ).then(r => r[0]),
+    db.select({ total: sql<number>`coalesce(sum(litros::numeric), 0)` }).from(combustibleTable).where(
+      isEmpleado
+        ? and(gte(combustibleTable.fecha, thirtyDaysAgo), eq(combustibleTable.empleado_id, userEmpleadoId))
+        : gte(combustibleTable.fecha, thirtyDaysAgo)
     ).then(r => r[0]),
     db.select({ horometro_inicio: jornadasTable.horometro_inicio, horometro_fin: jornadasTable.horometro_fin }).from(jornadasTable).where(
       isEmpleado
@@ -141,7 +148,8 @@ router.get("/resumen", async (req, res) => {
     alertas_activas: Number(alertasActivas.count),
     alertas_rojas: Number(alertasRojas.count),
     alertas_amarillas: Number(alertasAmarillas.count),
-    litros_mes: Number(combustibleMes.total),
+    litros_mes: Number(combustible30d.total),
+    litros_mes_calendario: Number(combustibleMes.total),
     horas_mes: Math.round(horasMes * 10) / 10,
     mantenimientos_mes: Number(mantenimientosMes.count),
     disponibilidad,

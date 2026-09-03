@@ -208,18 +208,27 @@ export function Panel() {
       )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Card>
+        <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-5 pb-5 text-center">
             <Droplets className="h-7 w-7 text-blue-500 mx-auto mb-1" />
-            <div className="text-2xl font-bold">{resumen?.litros_mes ?? 0} L</div>
-            <p className="text-xs text-muted-foreground mt-1">Combustible del mes</p>
+            <div className="text-2xl font-bold tracking-tight text-slate-800">
+              {Number(resumen?.litros_mes ?? 0).toLocaleString("es-AR")} L
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 font-medium">Combustible (últimos 30 días)</p>
+            {(resumen as any)?.litros_mes_calendario !== undefined && (
+              <p className="text-[11px] text-blue-600 font-semibold mt-0.5">
+                {Number((resumen as any).litros_mes_calendario).toLocaleString("es-AR")} L este mes
+              </p>
+            )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-5 pb-5 text-center">
             <Clock className="h-7 w-7 text-orange-500 mx-auto mb-1" />
-            <div className="text-2xl font-bold">{resumen?.horas_mes ?? 0} h</div>
-            <p className="text-xs text-muted-foreground mt-1">Horas trabajadas</p>
+            <div className="text-2xl font-bold tracking-tight text-slate-800">
+              {Number(resumen?.horas_mes ?? 0).toLocaleString("es-AR")} h
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 font-medium">Horas trabajadas</p>
           </CardContent>
         </Card>
         {!isEmpleado && (
