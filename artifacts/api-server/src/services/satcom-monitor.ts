@@ -28,7 +28,7 @@ async function syncSatcomHistory() {
       if (!position) continue;
 
       const currentIgnition = isPositionEngineOn(position);
-      const currentHorometro = position.attributes?.hours ? (position.attributes.hours / 3600000).toFixed(1) : "0";
+      const satcomHorometroRaw = position.attributes?.hours ? (position.attributes.hours / 3600000) : 0;
 
       const [ultimoEvento] = await db
         .select()
@@ -38,23 +38,45 @@ async function syncSatcomHistory() {
         .limit(1);
 
       let lastIgnition = null;
+      let lastHorometro = parseFloat(maq.horometro || "0");
       if (ultimoEvento) {
         lastIgnition = ultimoEvento.evento === "encendido";
+        const ultimoH = parseFloat(ultimoEvento.horometro || "0");
+        if (ultimoH > lastHorometro) {
+          lastHorometro = ultimoH;
+        }
       }
 
       if (lastIgnition !== currentIgnition) {
         const nuevoEstado = currentIgnition ? "encendido" : "apagado";
         
+        let newHorometro = lastHorometro;
+        // Si el motor estaba encendido y ahora se apaga, sumar el tiempo transcurrido
+        if (lastIgnition === true && !currentIgnition && ultimoEvento?.fecha_hora) {
+          const diffMs = Math.max(0, Date.now() - new Date(ultimoEvento.fecha_hora).getTime());
+          const diffHours = diffMs / (1000 * 60 * 60);
+          newHorometro = Number((lastHorometro + diffHours).toFixed(1));
+        } else if (satcomHorometroRaw > lastHorometro) {
+          newHorometro = Number(satcomHorometroRaw.toFixed(1));
+        }
+
+        const newHorometroStr = newHorometro.toFixed(1);
+
         await db.insert(historialUsoTable).values({
           maquina_id: maq.id,
           evento: nuevoEstado,
-          horometro: currentHorometro,
+          horometro: newHorometroStr,
           ubicacion_lat: position.latitude.toString(),
           ubicacion_lng: position.longitude.toString(),
           ubicacion_texto: "Base de Operaciones (Satcom)"
         });
 
-        console.log(`[SATCOM MONITOR] ${maq.nombre}: Cambio a ${nuevoEstado} (Horometro: ${currentHorometro})`);
+        // Actualizar el horómetro maestro de la máquina
+        await db.update(maquinasTable)
+          .set({ horometro: newHorometroStr })
+          .where(eq(maquinasTable.id, maq.id));
+
+        console.log(`[SATCOM MONITOR] ${maq.nombre}: Cambio a ${nuevoEstado} (Horometro: ${newHorometroStr})`);
       }
     }
   } catch (e) {

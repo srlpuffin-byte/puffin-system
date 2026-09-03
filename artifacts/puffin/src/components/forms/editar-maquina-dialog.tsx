@@ -85,8 +85,8 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
           anio: form.anio ? parseInt(form.anio) : undefined,
           patente: form.patente || undefined,
           dominio: form.dominio || undefined,
-          horometro: form.horometro ? parseFloat(form.horometro) : undefined,
-          kilometros: form.kilometros ? parseFloat(form.kilometros) : undefined,
+          horometro: form.horometro ? parseFloat(form.horometro.toString().replace(/,/g, ".").replace(/[^0-9.]/g, "")) : undefined,
+          kilometros: form.kilometros ? parseFloat(form.kilometros.toString().replace(/,/g, ".").replace(/[^0-9.]/g, "")) : undefined,
           motor: form.motor || undefined,
           chasis: form.chasis || undefined,
           estado: form.estado as MaquinaUpdateEstado || undefined,
@@ -219,12 +219,12 @@ export function EditarMaquinaDialog({ open, onOpenChange, maquina }: Props) {
                 </div>
                 <div className="space-y-1">
                   <Label>Horómetro (h)</Label>
-                  <Input type="number" step="0.1" placeholder="0" value={form.horometro} onChange={e => set("horometro", e.target.value)} />
+                  <Input type="text" inputMode="decimal" placeholder="Ej. 2858" value={form.horometro} onChange={e => set("horometro", e.target.value)} />
                 </div>
               </div>
               <div className="space-y-1">
                 <Label>Kilometraje (km)</Label>
-                <Input type="number" placeholder="0" value={form.kilometros} onChange={e => set("kilometros", e.target.value)} />
+                <Input type="text" inputMode="decimal" placeholder="0" value={form.kilometros} onChange={e => set("kilometros", e.target.value)} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">

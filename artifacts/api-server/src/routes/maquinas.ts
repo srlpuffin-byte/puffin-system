@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { maquinasTable, fotografiasTable, proyectosTable } from "@workspace/db";
-import { eq, and, or, ilike, inArray, not } from "drizzle-orm";
+import { maquinasTable, fotografiasTable, proyectosTable, historialUsoTable } from "@workspace/db";
+import { eq, and, or, ilike, inArray, not, desc } from "drizzle-orm";
 import { updateOrAppendToSheet } from "../services/sheets.js";
 
 const router = Router();
@@ -204,8 +204,26 @@ router.put("/:id", async (req, res) => {
     const updateData: Record<string, unknown> = {};
     if (nombre !== undefined) updateData.nombre = nombre;
     if (estado !== undefined) updateData.estado = estado;
-    if (horometro !== undefined) updateData.horometro = horometro.toString();
-    if (kilometros !== undefined) updateData.kilometros = kilometros.toString();
+    
+    let horometroParsedStr: string | null = null;
+    if (horometro !== undefined) {
+      const parsedH = typeof horometro === "string" 
+        ? parseFloat(horometro.replace(/,/g, ".").replace(/[^0-9.]/g, "")) 
+        : Number(horometro);
+      if (!isNaN(parsedH)) {
+        horometroParsedStr = parsedH.toFixed(1);
+        updateData.horometro = horometroParsedStr;
+      }
+    }
+
+    if (kilometros !== undefined) {
+      const parsedKm = typeof kilometros === "string" 
+        ? parseFloat(kilometros.replace(/,/g, ".").replace(/[^0-9.]/g, "")) 
+        : Number(kilometros);
+      if (!isNaN(parsedKm)) {
+        updateData.kilometros = parsedKm.toFixed(1);
+      }
+    }
     if (proximo_service !== undefined) updateData.proximo_service = proximo_service;
     
     if (codigo !== undefined) updateData.codigo = codigo;
@@ -229,6 +247,27 @@ router.put("/:id", async (req, res) => {
 
     const [maquina] = await db.update(maquinasTable).set(updateData).where(eq(maquinasTable.id, id)).returning();
     if (!maquina) return res.status(404).json({ error: "Maquinaria no encontrada" });
+
+    // Si se modificó el horómetro manualmente, sincronizar también el último registro en historial_uso para evitar discrepancias
+    if (horometroParsedStr) {
+      try {
+        const [ultimoEvento] = await db
+          .select({ id: historialUsoTable.id })
+          .from(historialUsoTable)
+          .where(eq(historialUsoTable.maquina_id, id))
+          .orderBy(desc(historialUsoTable.fecha_hora))
+          .limit(1);
+
+        if (ultimoEvento) {
+          await db
+            .update(historialUsoTable)
+            .set({ horometro: horometroParsedStr })
+            .where(eq(historialUsoTable.id, ultimoEvento.id));
+        }
+      } catch (hErr) {
+        console.error("Error sincronizando ultimo evento de historial:", hErr);
+      }
+    }
 
     // Sincronizar con Google Sheets
     import("../services/sync-sheets.js").then(({ syncAllSheets }) => {

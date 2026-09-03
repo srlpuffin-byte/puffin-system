@@ -108,23 +108,14 @@ router.get("/debug-proyectos-map", async (req, res) => {
   }
 });
 
-router.get("/debug-maquinas", async (req, res) => {
+router.get("/fix-horometro-159", async (req, res) => {
   try {
-    const { maquinasTable, historialUsoTable, alquileresTable, jornadasTable } = await import("@workspace/db/schema");
-    const maquinas = await db.select().from(maquinasTable);
-    const historial = await db.select().from(historialUsoTable).orderBy(desc(historialUsoTable.id)).limit(100);
-    const jornadas = await db.select().from(jornadasTable).orderBy(desc(jornadasTable.id)).limit(100);
-    const alquileres = await db.select().from(alquileresTable).orderBy(desc(alquileresTable.id)).limit(100);
-
-    const m159 = maquinas.find(x => x.id === 159);
-    const h1932 = historial.filter(h => String(h.horometro).includes("1932"));
-    const h159 = historial.filter(h => h.maquina_id === 159);
-    const j1932 = jornadas.filter(j => String(j.horometro_inicio).includes("1932") || String(j.horometro_fin).includes("1932"));
-    const alq1932 = alquileres.filter(a => String(a.horometro_inicio).includes("1932") || String(a.horometro_fin).includes("1932"));
-
-    return res.json({ m159, h1932, h159, j1932, alq1932, allHorometros: maquinas.map(m => ({ id: m.id, nombre: m.nombre, horometro: m.horometro, satcom_id: m.satcom_id })) });
+    const { maquinasTable, historialUsoTable } = await import("@workspace/db/schema");
+    await db.update(maquinasTable).set({ horometro: "2858.0" }).where(eq(maquinasTable.id, 159));
+    await db.update(historialUsoTable).set({ horometro: "2858.0" }).where(eq(historialUsoTable.maquina_id, 159));
+    return res.json({ success: true, message: "Excavadora rmg (159) e historial satelital actualizados exitosamente a 2858.0 hs" });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message, stack: err.stack });
+    return res.status(500).json({ error: err.message });
   }
 });
 
