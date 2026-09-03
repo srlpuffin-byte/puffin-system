@@ -110,10 +110,13 @@ router.get("/debug-proyectos-map", async (req, res) => {
 
 router.get("/debug-maquinas", async (req, res) => {
   try {
-    const { maquinasTable, historialUsoTable } = await import("@workspace/db/schema");
+    const { maquinasTable, historialUsoTable, alquileresTable, jornadasTable } = await import("@workspace/db/schema");
     const m = await db.select().from(maquinasTable);
-    const h = await db.select().from(historialUsoTable).orderBy(desc(historialUsoTable.id)).limit(10);
-    return res.json({ maquinas: m, historial: h });
+    const h1932 = await db.select().from(historialUsoTable).where(ilike(historialUsoTable.horometro, "%1932%"));
+    const hAll159 = await db.select().from(historialUsoTable).where(eq(historialUsoTable.maquina_id, 159)).orderBy(desc(historialUsoTable.id)).limit(10);
+    const j1932 = await db.select().from(jornadasTable).where(or(ilike(jornadasTable.horometro_inicio, "%1932%"), ilike(jornadasTable.horometro_fin, "%1932%")));
+    const alq1932 = await db.select().from(alquileresTable).where(or(ilike(alquileresTable.horometro_inicio, "%1932%"), ilike(alquileresTable.horometro_fin, "%1932%")));
+    return res.json({ m159: m.find(x => x.id === 159), h1932, hAll159, j1932, alq1932 });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
