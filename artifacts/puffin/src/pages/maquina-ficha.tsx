@@ -12,7 +12,8 @@ import { RegistrarCargaDialog } from "@/components/forms/registrar-carga-dialog"
 import { ReportarIncidenteDialog } from "@/components/forms/reportar-incidente-dialog";
 import { EditarMaquinaDialog } from "@/components/forms/editar-maquina-dialog";
 import { HistorialMaquinaDialog } from "@/components/forms/historial-maquina-dialog";
-import { History, AlertTriangle, Trash2, Star, FileText, Plus, ExternalLink, Satellite, Power, PowerOff } from "lucide-react";
+import { History, AlertTriangle, Trash2, Star, FileText, Plus, ExternalLink, Satellite, Power, PowerOff, RefreshCw, List, LayoutList, MapPin } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -42,6 +43,7 @@ export function MaquinaFicha() {
   const [openHistorial, setOpenHistorial] = useState(false);
   const [openDocs, setOpenDocs] = useState(false);
   const [openAlquiler, setOpenAlquiler] = useState(false);
+  const [historialView, setHistorialView] = useState<"tabla" | "timeline">("tabla");
 
   const queryClient = useQueryClient();
   const { data: documentos } = useGetDocumentos({ entidad_tipo: "maquina", entidad_id: maquinaId } as any, { query: { enabled: !!maquinaId } as any });
@@ -321,43 +323,180 @@ export function MaquinaFicha() {
             )}
           </CardContent>
         </Card>
-        <Card className="mt-6">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <Satellite className="h-5 w-5 text-blue-500" /> Historial de Uso Satelital
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {historialUso && historialUso.length > 0 ? (
-              <div className="space-y-4 mt-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-300 before:to-transparent">
-                {historialUso.map((evento: any) => (
-                  <div key={evento.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                    <div className={`flex items-center justify-center w-10 h-10 rounded-full border-4 border-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 ${evento.evento === 'encendido' ? 'bg-green-500' : 'bg-slate-400'}`}>
-                      {evento.evento === 'encendido' ? <Power className="text-white w-4 h-4" /> : <PowerOff className="text-white w-4 h-4" />}
-                    </div>
-                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded border border-slate-200 bg-white shadow-sm">
-                      <div className="flex items-center justify-between mb-1">
-                        <Badge variant="outline" className={evento.evento === 'encendido' ? 'text-green-600' : 'text-slate-600'}>
-                          {evento.evento.toUpperCase()}
-                        </Badge>
-                        <time className="text-xs font-medium text-slate-500">
-                          {format(new Date(evento.fecha_hora), "dd/MM/yyyy HH:mm", { locale: es })}
-                        </time>
-                      </div>
-                      <div className="text-sm text-slate-600">
-                        Horómetro: <strong className="text-slate-800">{evento.horometro} h</strong>
-                      </div>
-                      {evento.ubicacion_texto && (
-                        <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                          📍 {evento.ubicacion_texto}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+        <Card className="mt-6 border-slate-200 shadow-sm overflow-hidden">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 bg-slate-50/70 border-b border-slate-100 gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
+                <Satellite className="h-5 w-5" />
               </div>
+              <div>
+                <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  Historial de Telemetría Satelital
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">Registro automático de eventos de encendido, apagado y horómetro</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              {historialUso && historialUso.length > 0 && (
+                <>
+                  {historialUso[0].evento === "encendido" ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                      MOTOR ENCENDIDO
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-200 text-slate-700 border border-slate-300">
+                      <span className="h-2 w-2 rounded-full bg-slate-400"></span>
+                      MOTOR APAGADO
+                    </span>
+                  )}
+
+                  <Badge variant="outline" className="text-xs font-medium bg-white">
+                    {historialUso.length} eventos
+                  </Badge>
+
+                  {/* Toggle Vista */}
+                  <div className="flex rounded-md border bg-white overflow-hidden p-0.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setHistorialView("tabla")}
+                      className={`px-2 py-1 rounded font-medium transition-colors flex items-center gap-1 ${historialView === "tabla" ? "bg-primary text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"}`}
+                      title="Vista en tabla"
+                    >
+                      <LayoutList className="h-3.5 w-3.5" /> Tabla
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHistorialView("timeline")}
+                      className={`px-2 py-1 rounded font-medium transition-colors flex items-center gap-1 ${historialView === "timeline" ? "bg-primary text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"}`}
+                      title="Vista en línea de tiempo"
+                    >
+                      <List className="h-3.5 w-3.5" /> Línea
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="h-8 w-8 p-0 text-slate-500 hover:text-primary"
+                onClick={() => refetchHistorial()}
+                title="Actualizar historial satelital"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-0">
+            {historialUso && historialUso.length > 0 ? (
+              historialView === "tabla" ? (
+                <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100">
+                  <Table>
+                    <TableHeader className="bg-slate-50/90 sticky top-0 z-10 backdrop-blur-xs border-b">
+                      <TableRow>
+                        <TableHead className="w-[120px] font-semibold text-xs">Estado</TableHead>
+                        <TableHead className="font-semibold text-xs">Fecha y Hora</TableHead>
+                        <TableHead className="font-semibold text-xs">Horómetro</TableHead>
+                        <TableHead className="font-semibold text-xs">Ubicación GPS</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {historialUso.map((evento: any, idx: number) => {
+                        const isEnc = evento.evento === "encendido";
+                        const prevEvento = historialUso[idx + 1];
+                        let diffHoras = null;
+                        if (prevEvento && evento.horometro && prevEvento.horometro) {
+                          const diff = parseFloat(evento.horometro) - parseFloat(prevEvento.horometro);
+                          if (diff > 0) diffHoras = diff.toFixed(1);
+                        }
+
+                        return (
+                          <TableRow key={evento.id} className="hover:bg-slate-50/80 transition-colors">
+                            <TableCell className="py-2.5">
+                              {isEnc ? (
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <Power className="h-3 w-3 text-emerald-600" /> Encendido
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                  <PowerOff className="h-3 w-3 text-slate-400" /> Apagado
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="py-2.5 text-xs text-slate-700 font-medium whitespace-nowrap">
+                              {format(new Date(evento.fecha_hora), "dd/MM/yyyy HH:mm:ss", { locale: es })}
+                            </TableCell>
+                            <TableCell className="py-2.5 text-xs font-mono font-semibold text-slate-800">
+                              {evento.horometro} h
+                              {diffHoras && (
+                                <span className="ml-1.5 text-[10px] font-normal text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
+                                  +{diffHoras} h
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="py-2.5 text-xs text-slate-600 truncate max-w-[220px]">
+                              {evento.ubicacion_lat && evento.ubicacion_lng ? (
+                                <a 
+                                  href={`https://maps.google.com/?q=${evento.ubicacion_lat},${evento.ubicacion_lng}`} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-blue-600 hover:underline truncate"
+                                  title={`${evento.ubicacion_texto || "Ver en mapa"} (${evento.ubicacion_lat}, ${evento.ubicacion_lng})`}
+                                >
+                                  <MapPin className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{evento.ubicacion_texto || `${Number(evento.ubicacion_lat).toFixed(4)}, ${Number(evento.ubicacion_lng).toFixed(4)}`}</span>
+                                </a>
+                              ) : (
+                                <span className="text-slate-400">Sin coordenadas</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                // Vista Timeline Compacta con scroll
+                <div className="max-h-[380px] overflow-y-auto p-4">
+                  <div className="relative pl-6 space-y-3 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                    {historialUso.map((evento: any) => {
+                      const isEnc = evento.evento === "encendido";
+                      return (
+                        <div key={evento.id} className="relative flex items-start gap-3 text-xs group">
+                          <div className={`absolute -left-6 top-1 h-3.5 w-3.5 rounded-full border-2 border-white shadow-xs ${isEnc ? "bg-emerald-500 ring-2 ring-emerald-200" : "bg-slate-400 ring-2 ring-slate-100"}`} />
+                          <div className="flex-1 bg-slate-50/70 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between hover:bg-white hover:border-slate-300 transition-colors">
+                            <div className="flex items-center gap-2">
+                              <span className={`font-semibold uppercase tracking-wider text-[10px] px-1.5 py-0.5 rounded ${isEnc ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"}`}>
+                                {evento.evento}
+                              </span>
+                              <span className="font-mono text-slate-700 font-semibold">{evento.horometro} h</span>
+                              {evento.ubicacion_texto && (
+                                <span className="text-slate-500 hidden sm:inline truncate max-w-[180px]">· {evento.ubicacion_texto}</span>
+                              )}
+                            </div>
+                            <time className="text-[11px] text-slate-500 whitespace-nowrap ml-2">
+                              {format(new Date(evento.fecha_hora), "dd/MM/yyyy HH:mm", { locale: es })}
+                            </time>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-6">No hay registros satelitales.</p>
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                <Satellite className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                <p>No hay registros satelitales para esta máquina.</p>
+                <p className="text-xs text-slate-400 mt-1">Los eventos se registrarán automáticamente cuando el motor se encienda o apague.</p>
+              </div>
             )}
           </CardContent>
         </Card>

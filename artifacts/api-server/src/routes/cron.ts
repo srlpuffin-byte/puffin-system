@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { empleadosTable, maquinasTable, alertasTable, historialUsoTable } from "@workspace/db/schema";
-import { eq, or, and, isNotNull, sql, desc, inArray } from "drizzle-orm";
+import { eq, or, and, isNotNull, sql, desc, inArray, gte, ilike } from "drizzle-orm";
 import { sendWhatsAppMessage, sendWhatsAppTemplate } from "../services/whatsapp.js";
 import { SatcomClient } from "../services/satcom";
 
@@ -10,6 +10,42 @@ export const cronRouter = Router();
 // Endpoint para el CRON diario (idealmente llamado a la mañana)
 // Este endpoint debe estar protegido por un token de cron
 const CRON_SECRET = process.env.CRON_SECRET || "puffin_cron_secret";
+
+cronRouter.get("/debug-fuel", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1] || req.query.token;
+  if (token !== CRON_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const { combustibleTable, egresosTable } = await import("@workspace/db/schema");
+    const allComb = await db.select().from(combustibleTable).orderBy(desc(combustibleTable.id)).limit(20);
+    const totalAllLitros = await db.select({ total: sql`coalesce(sum(litros::numeric), 0)` }).from(combustibleTable);
+    
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+    const mesActual = await db.select({ total: sql`coalesce(sum(litros::numeric), 0)` }).from(combustibleTable).where(gte(combustibleTable.fecha, firstDayOfMonth));
+
+    const ultimos30DiasDate = new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString().split("T")[0];
+    const ultimos30Dias = await db.select({ total: sql`coalesce(sum(litros::numeric), 0)` }).from(combustibleTable).where(gte(combustibleTable.fecha, ultimos30DiasDate));
+
+    const egresosComb = await db.select().from(egresosTable).where(ilike(egresosTable.categoria, "%combustible%")).limit(20);
+
+    return res.json({
+      serverDate: now.toISOString(),
+      firstDayOfMonth,
+      ultimos30DiasDate,
+      mesActualTotal: mesActual[0]?.total,
+      ultimos30DiasTotal: ultimos30Dias[0]?.total,
+      totalAllLitros: totalAllLitros[0]?.total,
+      combustibleCount: allComb.length,
+      sampleCombustible: allComb.map(c => ({ id: c.id, fecha: c.fecha, litros: c.litros, importe: c.importe, estado: c.estado })),
+      totalEgresosComb: egresosComb.length,
+      sampleEgresosComb: egresosComb.map(e => ({ id: e.id, fecha: e.fecha, concepto: e.concepto, monto: e.monto }))
+    });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
 
 cronRouter.get("/alertas-diarias", async (req, res) => {
   const token = req.headers.authorization?.split(" ")[1] || req.query.token;
