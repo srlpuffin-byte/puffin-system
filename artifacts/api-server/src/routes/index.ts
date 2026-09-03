@@ -23,6 +23,7 @@ import fotografiasRouter from "./fotografias";
 import egresosRouter from "./egresos";
 import searchRouter from "./search";
 import cierresRouter from "./cierres";
+import alquileresRouter from "./alquileres";
 import { requireAuth } from "../middleware/auth";
 import { adminAuditMiddleware } from "../middleware/audit";
 
@@ -146,5 +147,6 @@ router.use("/egresos", requireAuth, adminAuditMiddleware, egresosRouter);
 router.use("/search", requireAuth, adminAuditMiddleware, searchRouter);
 router.use("/cierres", requireAuth, adminAuditMiddleware, cierresRouter);
 router.use("/proyectos", requireAuth, adminAuditMiddleware, proyectosRouter);
+router.use("/alquileres", requireAuth, adminAuditMiddleware, alquileresRouter);
 
 export default router;

@@ -20,6 +20,7 @@ import { getAuthToken } from "@/hooks/use-auth";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { getGetFotografiasQueryKey, useGetDocumentos } from "@workspace/api-client-react";
 import { AñadirDocumentoDialog } from "@/components/forms/aniadir-documento-dialog";
+import { RegistrarAlquilerDialog } from "@/components/forms/registrar-alquiler-dialog";
 
 const estadoBadge = (estado: string) => {
   if (estado === "activa") return <Badge className="bg-green-600 hover:bg-green-700">ACTIVA</Badge>;
@@ -40,9 +41,24 @@ export function MaquinaFicha() {
   const [openEdit, setOpenEdit] = useState(false);
   const [openHistorial, setOpenHistorial] = useState(false);
   const [openDocs, setOpenDocs] = useState(false);
+  const [openAlquiler, setOpenAlquiler] = useState(false);
 
   const queryClient = useQueryClient();
   const { data: documentos } = useGetDocumentos({ entidad_tipo: "maquina", entidad_id: maquinaId } as any, { query: { enabled: !!maquinaId } as any });
+
+  const { data: alquileres } = useQuery({
+    queryKey: ["alquileres", maquinaId],
+    queryFn: async () => {
+      const res = await fetch(`/api/alquileres/${maquinaId}`, {
+        headers: { Authorization: `Bearer ${getAuthToken()}` }
+      });
+      if (!res.ok) throw new Error("Error fetching alquileres");
+      return res.json();
+    },
+    enabled: !!maquinaId
+  });
+
+  const alquilerActivo = alquileres?.find((a: any) => a.estado === "en_curso");
 
   const { data: historialUso, refetch: refetchHistorial } = useQuery({
     queryKey: ["historial-uso", maquinaId],
@@ -139,6 +155,7 @@ export function MaquinaFicha() {
           <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
             {maquina.nombre}
             {estadoBadge(maquina.estado)}
+            {alquilerActivo && <Badge className="bg-purple-600 hover:bg-purple-700">EN ALQUILER</Badge>}
             <Button variant="ghost" size="sm" className="ml-2 h-7 px-2 border" onClick={() => setOpenEdit(true)}>
               <Edit className="w-3 h-3 mr-1" /> Editar
             </Button>
@@ -376,6 +393,71 @@ export function MaquinaFicha() {
             )}
           </CardContent>
         </Card>
+        
+        <Card className="mt-6">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-purple-500" /> Gestión de Alquileres
+            </CardTitle>
+            <Button 
+              size="sm" 
+              variant={alquilerActivo ? "default" : "outline"} 
+              className={alquilerActivo ? "bg-purple-600 hover:bg-purple-700 text-white" : ""}
+              onClick={() => setOpenAlquiler(true)}
+            >
+              {alquilerActivo ? "Finalizar Alquiler" : "Nuevo Alquiler"}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {alquileres && alquileres.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm mt-2 text-left">
+                  <thead className="bg-slate-50 text-slate-500">
+                    <tr>
+                      <th className="py-2 px-3 font-medium">Cliente/Proyecto</th>
+                      <th className="py-2 px-3 font-medium">Inicio</th>
+                      <th className="py-2 px-3 font-medium">Fin</th>
+                      <th className="py-2 px-3 font-medium">Horas Trabajadas</th>
+                      <th className="py-2 px-3 font-medium">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {alquileres.map((a: any) => (
+                      <tr key={a.id} className="hover:bg-slate-50/50">
+                        <td className="py-3 px-3 font-medium">{a.cliente}</td>
+                        <td className="py-3 px-3 text-slate-600">
+                          {format(new Date(a.fecha_inicio + 'T12:00:00'), "dd/MM/yyyy", { locale: es })}<br/>
+                          <span className="text-xs text-slate-400">({a.horometro_inicio} h)</span>
+                        </td>
+                        <td className="py-3 px-3 text-slate-600">
+                          {a.fecha_fin ? (
+                            <>
+                              {format(new Date(a.fecha_fin + 'T12:00:00'), "dd/MM/yyyy", { locale: es })}<br/>
+                              <span className="text-xs text-slate-400">({a.horometro_fin} h)</span>
+                            </>
+                          ) : "—"}
+                        </td>
+                        <td className="py-3 px-3 font-semibold text-slate-800">
+                          {a.horas_trabajadas ? `${a.horas_trabajadas} h` : "—"}
+                        </td>
+                        <td className="py-3 px-3">
+                          {a.estado === "en_curso" ? (
+                            <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50">En Curso</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="bg-slate-100">Finalizado</Badge>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-6">No hay registros de alquiler para esta maquinaria.</p>
+            )}
+          </CardContent>
+        </Card>
+        
         </div>
 
 
@@ -492,6 +574,7 @@ export function MaquinaFicha() {
       <EditarMaquinaDialog open={openEdit} onOpenChange={setOpenEdit} maquina={maquina} />
       <HistorialMaquinaDialog open={openHistorial} onOpenChange={setOpenHistorial} maquina={maquina} />
       <AñadirDocumentoDialog open={openDocs} onOpenChange={setOpenDocs} defaultEntidadTipo="maquina" defaultEntidadId={maquinaId.toString()} />
+      <RegistrarAlquilerDialog open={openAlquiler} onOpenChange={setOpenAlquiler} maquina={maquina} alquilerActivo={alquilerActivo} />
     </div>
   );
 }

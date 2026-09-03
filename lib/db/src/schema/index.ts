@@ -16,3 +16,4 @@ export * from "./egresos";
 export * from "./proyectos";
 export * from "./whatsapp-sesiones";
 export * from "./historial_uso";
+export * from "./alquileres";
