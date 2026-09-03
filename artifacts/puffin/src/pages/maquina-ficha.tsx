@@ -33,7 +33,13 @@ const estadoBadge = (estado: string) => {
 export function MaquinaFicha() {
   const { id } = useParams();
   const maquinaId = parseInt(id || "0", 10);
-  const { data: maquina, isLoading } = useGetMaquina(maquinaId, { query: { enabled: !!maquinaId } as any });
+  const { data: maquina, isLoading, refetch: refetchMaquina } = useGetMaquina(maquinaId, { 
+    query: { 
+      enabled: !!maquinaId,
+      refetchInterval: 15000,
+      staleTime: 0
+    } as any 
+  });
   const { data: fotos } = useGetFotografias({ entidad_tipo: "maquina", entidad_id: maquinaId }, { query: { enabled: !!maquinaId } as any });
   const { data: mantenimientos } = useGetMantenimientos({ maquina_id: maquinaId }, { query: { enabled: !!maquinaId } as any });
   const [openMant, setOpenMant] = useState(false);
@@ -48,7 +54,7 @@ export function MaquinaFicha() {
   const queryClient = useQueryClient();
   const { data: documentos } = useGetDocumentos({ entidad_tipo: "maquina", entidad_id: maquinaId } as any, { query: { enabled: !!maquinaId } as any });
 
-  const { data: alquileres } = useQuery({
+  const { data: alquileres, refetch: refetchAlquileres } = useQuery({
     queryKey: ["alquileres", maquinaId],
     queryFn: async () => {
       const res = await fetch(`/api/alquileres/${maquinaId}`, {
@@ -57,7 +63,9 @@ export function MaquinaFicha() {
       if (!res.ok) throw new Error("Error fetching alquileres");
       return res.json();
     },
-    enabled: !!maquinaId
+    enabled: !!maquinaId,
+    refetchInterval: 15000,
+    staleTime: 0
   });
 
   const alquilerActivo = alquileres?.find((a: any) => a.estado === "en_curso");
@@ -71,7 +79,9 @@ export function MaquinaFicha() {
       if (!res.ok) throw new Error("Error fetching historial");
       return res.json();
     },
-    enabled: !!maquinaId
+    enabled: !!maquinaId,
+    refetchInterval: 15000,
+    staleTime: 0
   });
 
   const { data: telemetriaLive } = useQuery({
@@ -404,7 +414,14 @@ export function MaquinaFicha() {
                 size="sm" 
                 variant="ghost" 
                 className="h-8 w-8 p-0 text-slate-500 hover:text-primary"
-                onClick={() => refetchHistorial()}
+                onClick={() => {
+                  refetchHistorial();
+                  refetchMaquina();
+                  refetchAlquileres();
+                  queryClient.invalidateQueries({ queryKey: ["historial-uso", maquinaId] });
+                  queryClient.invalidateQueries({ queryKey: ["alquileres", maquinaId] });
+                  queryClient.invalidateQueries({ queryKey: ["telemetria-live", maquinaId] });
+                }}
                 title="Actualizar historial satelital"
               >
                 <RefreshCw className="h-4 w-4" />
@@ -564,7 +581,14 @@ export function MaquinaFicha() {
                           ) : "—"}
                         </td>
                         <td className="py-3 px-3 font-semibold text-slate-800">
-                          {a.horas_trabajadas ? `${a.horas_trabajadas} h` : "—"}
+                          {(() => {
+                            if (a.horas_trabajadas) return `${a.horas_trabajadas} h`;
+                            if (a.estado === "en_curso" && maquina?.horometro && a.horometro_inicio) {
+                              const diff = Math.max(0, Number(maquina.horometro) - Number(a.horometro_inicio));
+                              return `${diff.toFixed(1)} h`;
+                            }
+                            return "—";
+                          })()}
                         </td>
                         <td className="py-3 px-3">
                           {a.estado === "en_curso" ? (
