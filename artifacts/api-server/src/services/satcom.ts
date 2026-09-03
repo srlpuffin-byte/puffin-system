@@ -23,6 +23,15 @@ export interface SatcomPosition {
   };
 }
 
+export function isPositionEngineOn(position: any): boolean {
+  if (!position) return false;
+  if (position.attributes?.ignition === true) return true;
+  if (position.attributes?.motion === true) return true;
+  if (typeof position.speed === "number" && position.speed > 0.5) return true;
+  if (position.attributes?.io0 === true) return true;
+  return false;
+}
+
 export class SatcomClient {
   private static getHeaders() {
     return {

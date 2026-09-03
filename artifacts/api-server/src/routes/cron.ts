@@ -381,7 +381,8 @@ cronRouter.get("/sync-satcom", async (req, res) => {
       const position = positionsMap.get(device.positionId);
       if (!position) continue;
 
-      const currentIgnition = !!position.attributes?.ignition;
+      const { isPositionEngineOn } = await import("../services/satcom.js");
+      const currentIgnition = isPositionEngineOn(position);
       const currentHorometro = position.attributes?.hours ? (position.attributes.hours / 3600000).toFixed(1) : "0";
 
       // Obtener el último evento registrado en historial_uso

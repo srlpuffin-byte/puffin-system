@@ -15,6 +15,7 @@ import {
   incidentesTable,
   alertasTable,
   documentosTable,
+  alquileresTable,
 } from "@workspace/db/schema";
 import { eq, like, or, and, desc, ilike, notInArray } from "drizzle-orm";
 import crypto from "crypto";
@@ -588,6 +589,22 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         required: ["tipo", "fecha_vencimiento", "entidad_tipo", "busqueda_entidad"],
       },
     },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_alquileres",
+      description: "Consulta los contratos y registros de alquiler de maquinaria de la empresa. Muestra qué máquinas están en alquiler, cliente, fechas de inicio y fin, horómetros iniciales y finales, horas trabajadas y estado (en_curso o finalizado).",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre_maquina: { type: "string", description: "Filtrar por nombre o modelo de la máquina (opcional)" },
+          cliente: { type: "string", description: "Filtrar por cliente/proyecto que alquiló (opcional)" },
+          estado: { type: "string", description: "Filtrar por estado: 'en_curso', 'finalizado' o 'todos' (opcional)" },
+        },
+        required: [],
+      },
+    },
   }
 ];
 
@@ -760,8 +777,9 @@ LO QUE PUEDO CONSULTAR (acceso total a la BD):
 📸 Fotografías y Comprobantes: Si piden imagen de chata, operario, DNI, o comprobante/ticket de gasto, USÁ LA HERRAMIENTA 'enviar_fotografia'. Si te mandan una foto para asignarla a un empleado o máquina, usá 'actualizar_fotografia'.
 📊 Google Sheets: cualquier dato en las planillas (tus acciones de escritura ya sincronizan solas). SI TE PIDEN EL TOTAL GENERAL DE EGRESOS o CORROBORAR, usá 'auditar_egresos_sheets' para comparar DB vs Sheets.
 📡 Rastreo Satelital GPS: Podés consultar la ubicación en tiempo real, velocidad y estado (encendido/apagado) de cualquier vehículo con GPS. Usá la herramienta 'consultar_rastreo'.
+🚜 Alquileres de Maquinaria: Podés consultar contratos y máquinas alquiladas, clientes, horas trabajadas y horómetros con la herramienta 'consultar_alquileres'.
 📑 Excel de Gastos: Si el usuario pide un Excel, planilla o reporte descargable de gastos, usá 'generar_excel_gastos'.
-🔍 Consulta SQL Avanzada: Si ninguna herramienta cubre la pregunta, usá 'ejecutar_consulta_sql_lectura' para hacer un SELECT directo. Tablas: empleados, proyectos, maquinas, egresos, jornadas, combustible, incidentes, alertas, documentos, fotografias, mantenimientos.
+🔍 Consulta SQL Avanzada: Si ninguna herramienta cubre la pregunta, usá 'ejecutar_consulta_sql_lectura' para hacer un SELECT directo. Tablas: empleados, proyectos, maquinas, egresos, jornadas, combustible, incidentes, alertas, documentos, fotografias, mantenimientos, alquileres.
 🚨 Incidentes: Usá 'registrar_incidente' para cargar accidentes, roturas o robos.
 🔔 Alertas: Usá 'registrar_alerta' para crear avisos o sanciones.
 📋 Documentos/Vencimientos: Usá 'registrar_documento' para cargar licencias, seguros, VTV.
@@ -769,6 +787,7 @@ LO QUE PUEDO CONSULTAR (acceso total a la BD):
 REGLAS DE OPERACIÓN:
 - SIEMPRE usá las herramientas para buscar datos. Nunca inventés información.
 - CONTEXTO DE CONVERSACIÓN: Si el usuario hace una pregunta de seguimiento corta, inferí el tema del mensaje anterior.
+- REGLA CRÍTICA DE ALQUILERES: La empresa gestiona alquileres de máquinas. TODOS los gastos, costos o egresos de alquiler se agregan obligatoriamente al proyecto/centro de costos 'RMG e hijas' (salvo que el usuario especifique explícitamente otro).
 - Cuando no encontrés algo, decilo claramente.
 - Respondé siempre de forma concisa y profesional.
 
@@ -863,6 +882,8 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
           toolResult = await executeResumenOperativo(functionArgs.fecha);
         } else if (functionName === "consultar_rastreo") {
           toolResult = await executeConsultarRastreo(functionArgs.nombre_maquina);
+        } else if (functionName === "consultar_alquileres") {
+          toolResult = await executeConsultarAlquileres(functionArgs);
         } else if (functionName === "adjuntar_comprobante") {
           const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
           toolResult = await executeAdjuntarComprobante(functionArgs, imgUrl);
@@ -1328,7 +1349,7 @@ async function executeConsultarInventario(termino?: string, estado?: string, ord
 
 async function executeConsultarRastreo(nombreMaquina?: string) {
   try {
-    const { SatcomClient } = await import("./satcom.js");
+    const { SatcomClient, isPositionEngineOn } = await import("./satcom.js");
     const { isNotNull } = await import("drizzle-orm");
     
     // Get all machines with GPS linked
@@ -1364,18 +1385,75 @@ async function executeConsultarRastreo(nombreMaquina?: string) {
       const device = devices.find(d => d.id === m.satcom_id);
       const position = device ? positionsMap.get(device.positionId) : null;
       const velocidad = position ? Math.round(position.speed * 1.852) : 0;
-      const encendido = position?.attributes?.ignition ? "🟢 Encendido" : "🔴 Apagado";
+      const encendido = isPositionEngineOn(position) ? "🟢 Encendido" : "🔴 Apagado";
+      const horometro = position?.attributes?.hours ? ` | ⏱️ ${(position.attributes.hours / 3600000).toFixed(1)} hs` : "";
       const lat = position?.latitude?.toFixed(5) || "?";
       const lng = position?.longitude?.toFixed(5) || "?";
       const gmapsLink = position ? `https://maps.google.com/?q=${position.latitude},${position.longitude}` : "";
       
-      return `• *${m.nombre}* (${m.tipo})\n  ${encendido} | 🚗 ${velocidad} km/h\n  📍 ${gmapsLink || "Sin posición"}`;
+      return `• *${m.nombre}* (${m.tipo})\n  ${encendido} | 🚗 ${velocidad} km/h${horometro}\n  📍 ${gmapsLink || "Sin posición"}`;
     });
     
     return `📡 Rastreo GPS — ${filteredMaquinas.length} vehículo(s):\n\n${lineas.join("\n\n")}`;
   } catch (e: any) {
     console.error("Error en consultar_rastreo:", e);
     return "Error al consultar el sistema de rastreo satelital. Intentá de nuevo en unos segundos.";
+  }
+}
+
+async function executeConsultarAlquileres(args: { nombre_maquina?: string; cliente?: string; estado?: string; }) {
+  try {
+    const { ilike, and, eq, desc } = await import("drizzle-orm");
+    let query = db.select({
+      id: alquileresTable.id,
+      maquina_id: alquileresTable.maquina_id,
+      maquina_nombre: maquinasTable.nombre,
+      maquina_tipo: maquinasTable.tipo,
+      cliente: alquileresTable.cliente,
+      fecha_inicio: alquileresTable.fecha_inicio,
+      fecha_fin: alquileresTable.fecha_fin,
+      horometro_inicio: alquileresTable.horometro_inicio,
+      horometro_fin: alquileresTable.horometro_fin,
+      horas_trabajadas: alquileresTable.horas_trabajadas,
+      estado: alquileresTable.estado,
+    })
+    .from(alquileresTable)
+    .leftJoin(maquinasTable, eq(alquileresTable.maquina_id, maquinasTable.id))
+    .$dynamic();
+
+    const conditions: any[] = [];
+    if (args.estado && args.estado !== "todos") {
+      conditions.push(eq(alquileresTable.estado, args.estado));
+    }
+    if (args.cliente) {
+      conditions.push(ilike(alquileresTable.cliente, `%${args.cliente}%`));
+    }
+    if (args.nombre_maquina) {
+      conditions.push(ilike(maquinasTable.nombre, `%${args.nombre_maquina}%`));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+
+    query = query.orderBy(desc(alquileresTable.id)).limit(50);
+    const results = await query;
+
+    if (results.length === 0) {
+      return "No se encontraron contratos o registros de alquiler con los filtros indicados.";
+    }
+
+    const lineas = results.map(a => {
+      const estadoBadge = a.estado === "en_curso" ? "🟣 En Curso" : "⚪ Finalizado";
+      const finStr = a.fecha_fin ? ` al ${a.fecha_fin}` : " (vigente)";
+      const horasStr = a.horas_trabajadas ? ` | ${a.horas_trabajadas} hs trabajadas` : "";
+      return `• *${a.maquina_nombre || "Máquina #" + a.maquina_id}* (${a.maquina_tipo || "Maquinaria"}) — ${estadoBadge}\n  Cliente/Destino: *${a.cliente}*\n  Período: ${a.fecha_inicio}${finStr}${horasStr}\n  Horómetro: ${a.horometro_inicio}h inicio → ${a.horometro_fin || "actual"}h fin`;
+    });
+
+    return `🚜 Contratos de Alquiler (${results.length}):\n\n${lineas.join("\n\n")}\n\n💡 _Nota: Los gastos relacionados a alquileres se imputan al proyecto 'RMG e hijas'._`;
+  } catch (e: any) {
+    console.error("Error en consultar_alquileres:", e);
+    return `Error consultando alquileres: ${e.message}`;
   }
 }
 
@@ -1670,6 +1748,12 @@ async function executeRegistrarGasto(args: {
       if (proyecto) {
         centroCostosResuelto = proyecto.lugar;
       }
+    } else if (
+      (args.categoria && args.categoria.toLowerCase().includes("alquiler")) ||
+      (args.concepto && args.concepto.toLowerCase().includes("alquiler"))
+    ) {
+      // Regla de negocio: gastos de alquiler se imputan a "RMG e hijas"
+      centroCostosResuelto = "RMG e hijas";
     }
 
     const [egreso] = await db.insert(egresosTable).values({

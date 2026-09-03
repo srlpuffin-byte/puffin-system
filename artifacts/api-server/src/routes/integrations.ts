@@ -3,7 +3,7 @@ import { requireAuth } from "../middleware/auth";
 import { db } from "@workspace/db";
 import { maquinasTable, fotografiasTable, proyectosTable } from "@workspace/db";
 import { eq, isNotNull, and, inArray, not } from "drizzle-orm";
-import { SatcomClient } from "../services/satcom";
+import { SatcomClient, isPositionEngineOn } from "../services/satcom.js";
 
 export const integrationsRouter = Router();
 
@@ -183,7 +183,7 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
         lat: position?.latitude || null,
         lng: position?.longitude || null,
         velocidad_kmh: position ? Math.round(position.speed * 1.852) : null,
-        encendido: position?.attributes?.ignition || false,
+        encendido: isPositionEngineOn(position),
         is_unlinked: false,
         imagen_url: fotografiasMap.get(m.id) || null,
         proyecto_lugar: maquinasProyectoMap.get(m.id) || null,
@@ -202,7 +202,7 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
         lat: position?.latitude || null,
         lng: position?.longitude || null,
         velocidad_kmh: position ? Math.round(position.speed * 1.852) : null,
-        encendido: position?.attributes?.ignition || false,
+        encendido: isPositionEngineOn(position),
         is_unlinked: true,
         proyecto_lugar: null,
       });
@@ -249,7 +249,7 @@ integrationsRouter.get("/xpert/telemetria", requireAuth, async (req, res) => {
       maquina_id: parseInt(maquina_id as string),
       posicion: { lat: position.latitude, lng: position.longitude },
       velocidad_kmh: position.speed * 1.852,
-      estado: position.attributes?.ignition ? "encendido" : "apagado",
+      estado: isPositionEngineOn(position) ? "encendido" : "apagado",
       horas_motor_acumuladas: position.attributes?.hours ? position.attributes.hours / 3600000 : 0,
       kilometraje_acumulado: position.attributes?.distance ? position.attributes.distance / 1000 : 0,
       ultima_actualizacion: new Date().toISOString()

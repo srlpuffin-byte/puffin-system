@@ -1,7 +1,7 @@
 import { db } from "@workspace/db";
 import { maquinasTable, historialUsoTable } from "@workspace/db/schema";
 import { isNotNull, eq, desc } from "drizzle-orm";
-import { SatcomClient } from "./satcom.js";
+import { SatcomClient, isPositionEngineOn } from "./satcom.js";
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 
@@ -27,7 +27,7 @@ async function syncSatcomHistory() {
       const position = positionsMap.get(device.positionId);
       if (!position) continue;
 
-      const currentIgnition = !!position.attributes?.ignition;
+      const currentIgnition = isPositionEngineOn(position);
       const currentHorometro = position.attributes?.hours ? (position.attributes.hours / 3600000).toFixed(1) : "0";
 
       const [ultimoEvento] = await db
