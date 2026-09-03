@@ -610,7 +610,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 
 
 // Números de administradores autorizados
-const ADMIN_PHONES = ["3472629600", "3572665637", "3572400877"];
+const ADMIN_PHONES = ["3472629600", "3572538350", "3572665637", "3572400877"];
 
 // Obtener o crear sesión — con fallback si la tabla no existe aún
 async function obtenerSesion(phone: string) {

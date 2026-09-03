@@ -12,6 +12,7 @@ export async function getAdminPhones(): Promise<string[]> {
 
   // Teléfonos principales de administradores / directivos
   phoneSet.add("5493472629600"); // Sebastián / Dirección
+  phoneSet.add("5493572538350"); // Administración / Directivo
   phoneSet.add("5493572665637"); // Pía Gelso
   phoneSet.add("5493572400877"); // Marcelo Gelso
 
