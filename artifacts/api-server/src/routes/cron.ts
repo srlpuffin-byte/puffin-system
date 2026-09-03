@@ -11,12 +11,15 @@ export const cronRouter = Router();
 // Este endpoint debe estar protegido por un token de cron
 const CRON_SECRET = process.env.CRON_SECRET || "puffin_cron_secret";
 
-cronRouter.get("/alertas-diarias", async (req, res) => {
+function verifyCronToken(req: any, res: any, next: any) {
   const token = req.headers.authorization?.split(" ")[1] || req.query.token;
-
   if (token !== CRON_SECRET) {
     return res.status(401).json({ error: "Unauthorized cron execution" });
   }
+  next();
+}
+
+cronRouter.get("/alertas-diarias", verifyCronToken, async (req, res) => {
 
   try {
     const today = new Date();
