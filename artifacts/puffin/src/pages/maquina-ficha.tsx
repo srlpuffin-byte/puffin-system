@@ -74,6 +74,23 @@ export function MaquinaFicha() {
     enabled: !!maquinaId
   });
 
+  const { data: telemetriaLive } = useQuery({
+    queryKey: ["telemetria-live", maquinaId],
+    queryFn: async () => {
+      try {
+        const res = await fetch(`/api/integrations/xpert/telemetria?maquina_id=${maquinaId}`, {
+          headers: { Authorization: `Bearer ${getAuthToken()}` }
+        });
+        if (!res.ok) return null;
+        return res.json();
+      } catch {
+        return null;
+      }
+    },
+    enabled: !!maquinaId && !!maquina?.satcom_id,
+    refetchInterval: 30000 // Actualiza cada 30 segundos en vivo
+  });
+
   const handleDeleteFoto = async (id: number) => {
     if (confirm("¿Estás seguro de eliminar esta fotografía?")) {
       try {
@@ -338,22 +355,23 @@ export function MaquinaFicha() {
             </div>
 
             <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-              {historialUso && historialUso.length > 0 && (
-                <>
-                  {historialUso[0].evento === "encendido" ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                      </span>
-                      MOTOR ENCENDIDO
+              {(() => {
+                const isEngineOn = telemetriaLive ? telemetriaLive.estado === "encendido" : (historialUso && historialUso[0]?.evento === "encendido");
+                return isEngineOn ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-200 text-slate-700 border border-slate-300">
-                      <span className="h-2 w-2 rounded-full bg-slate-400"></span>
-                      MOTOR APAGADO
-                    </span>
-                  )}
+                    MOTOR ENCENDIDO
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-200 text-slate-700 border border-slate-300">
+                    <span className="h-2 w-2 rounded-full bg-slate-400"></span>
+                    MOTOR APAGADO
+                  </span>
+                );
+              })()}
 
                   <Badge variant="outline" className="text-xs font-medium bg-white">
                     {historialUso.length} eventos
