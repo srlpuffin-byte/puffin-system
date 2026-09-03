@@ -594,7 +594,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "consultar_alquileres",
-      description: "Consulta los contratos y registros de alquiler de maquinaria de la empresa. Muestra qué máquinas están en alquiler, cliente, fechas de inicio y fin, horómetros iniciales y finales, horas trabajadas y estado (en_curso o finalizado).",
+      description: "Consulta y realiza el seguimiento exhaustivo de los contratos de alquiler de maquinaria (especialmente la excavadora). Muestra cliente/obra, fecha de inicio, horómetro inicial, horómetro actual en vivo, horas trabajadas acumuladas en el alquiler, estado del motor (encendida/apagada) y ubicación satelital. Úsala SIEMPRE que el usuario pregunte por el alquiler de la excavadora, seguimiento de alquileres, horas acumuladas, etc.",
       parameters: {
         type: "object",
         properties: {
@@ -777,7 +777,7 @@ LO QUE PUEDO CONSULTAR (acceso total a la BD):
 📸 Fotografías y Comprobantes: Si piden imagen de chata, operario, DNI, o comprobante/ticket de gasto, USÁ LA HERRAMIENTA 'enviar_fotografia'. Si te mandan una foto para asignarla a un empleado o máquina, usá 'actualizar_fotografia'.
 📊 Google Sheets: cualquier dato en las planillas (tus acciones de escritura ya sincronizan solas). SI TE PIDEN EL TOTAL GENERAL DE EGRESOS o CORROBORAR, usá 'auditar_egresos_sheets' para comparar DB vs Sheets.
 📡 Rastreo Satelital GPS: Podés consultar la ubicación en tiempo real, velocidad y estado (encendido/apagado) de cualquier vehículo con GPS. Usá la herramienta 'consultar_rastreo'.
-🚜 Alquileres de Maquinaria: Podés consultar contratos y máquinas alquiladas, clientes, horas trabajadas y horómetros con la herramienta 'consultar_alquileres'.
+🚜 Alquileres y Telemetría: Podés consultar contratos, máquinas alquiladas, clientes, horas trabajadas acumuladas, estado de motor en tiempo real y ubicación GPS con la herramienta 'consultar_alquileres'. Usala siempre que pregunten por el alquiler de la excavadora o seguimiento de alquileres.
 📑 Excel de Gastos: Si el usuario pide un Excel, planilla o reporte descargable de gastos, usá 'generar_excel_gastos'.
 🔍 Consulta SQL Avanzada: Si ninguna herramienta cubre la pregunta, usá 'ejecutar_consulta_sql_lectura' para hacer un SELECT directo. Tablas: empleados, proyectos, maquinas, egresos, jornadas, combustible, incidentes, alertas, documentos, fotografias, mantenimientos, alquileres.
 🚨 Incidentes: Usá 'registrar_incidente' para cargar accidentes, roturas o robos.
@@ -1404,11 +1404,14 @@ async function executeConsultarRastreo(nombreMaquina?: string) {
 async function executeConsultarAlquileres(args: { nombre_maquina?: string; cliente?: string; estado?: string; }) {
   try {
     const { ilike, and, eq, desc } = await import("drizzle-orm");
+    const { historialUsoTable } = await import("@workspace/db/schema");
+
     let query = db.select({
       id: alquileresTable.id,
       maquina_id: alquileresTable.maquina_id,
       maquina_nombre: maquinasTable.nombre,
       maquina_tipo: maquinasTable.tipo,
+      maquina_horometro: maquinasTable.horometro,
       cliente: alquileresTable.cliente,
       fecha_inicio: alquileresTable.fecha_inicio,
       fecha_fin: alquileresTable.fecha_fin,
@@ -1443,14 +1446,54 @@ async function executeConsultarAlquileres(args: { nombre_maquina?: string; clien
       return "No se encontraron contratos o registros de alquiler con los filtros indicados.";
     }
 
-    const lineas = results.map(a => {
-      const estadoBadge = a.estado === "en_curso" ? "🟣 En Curso" : "⚪ Finalizado";
-      const finStr = a.fecha_fin ? ` al ${a.fecha_fin}` : " (vigente)";
-      const horasStr = a.horas_trabajadas ? ` | ${a.horas_trabajadas} hs trabajadas` : "";
-      return `• *${a.maquina_nombre || "Máquina #" + a.maquina_id}* (${a.maquina_tipo || "Maquinaria"}) — ${estadoBadge}\n  Cliente/Destino: *${a.cliente}*\n  Período: ${a.fecha_inicio}${finStr}${horasStr}\n  Horómetro: ${a.horometro_inicio}h inicio → ${a.horometro_fin || "actual"}h fin`;
-    });
+    const lineas: string[] = [];
 
-    return `🚜 Contratos de Alquiler (${results.length}):\n\n${lineas.join("\n\n")}\n\n💡 _Nota: Los gastos relacionados a alquileres se imputan al proyecto 'RMG e hijas'._`;
+    for (const a of results) {
+      if (a.estado === "en_curso") {
+        const hInicio = parseFloat(a.horometro_inicio || "0");
+        const hActual = parseFloat(a.maquina_horometro || "0");
+        const horasEnCurso = Math.max(0, hActual - hInicio);
+
+        // Obtener último evento satelital para saber si está encendida ahora
+        let motorStr = "⚪ Estado desconocido";
+        let gpsStr = "";
+        try {
+          const [ultimo] = await db
+            .select()
+            .from(historialUsoTable)
+            .where(eq(historialUsoTable.maquina_id, a.maquina_id))
+            .orderBy(desc(historialUsoTable.fecha_hora))
+            .limit(1);
+
+          if (ultimo) {
+            motorStr = ultimo.evento === "encendido" ? "🟢 Motor ENCENDIDO (en marcha)" : "⚪ Motor APAGADO (detenida)";
+            if (ultimo.ubicacion_lat && ultimo.ubicacion_lng) {
+              gpsStr = `https://maps.google.com/?q=${ultimo.ubicacion_lat},${ultimo.ubicacion_lng}`;
+            }
+          }
+        } catch (_) {}
+
+        lineas.push(
+          `• *${a.maquina_nombre || "Máquina #" + a.maquina_id}* (${a.maquina_tipo || "Maquinaria"}) — 🟣 *EN CURSO*\n` +
+          `  👤 Cliente / Destino: *${a.cliente}*\n` +
+          `  ⚡ Estado en vivo: *${motorStr}*\n` +
+          `  ⏱️ Horómetro Inicio: ${a.horometro_inicio} hs → *Actual: ${a.maquina_horometro || hActual} hs*\n` +
+          `  ⏳ *Horas Trabajadas Acumuladas:* *${horasEnCurso.toFixed(1)} hs*\n` +
+          `  📅 Fecha de Inicio: ${a.fecha_inicio} (Vigente)\n` +
+          (gpsStr ? `  📍 Ubicación GPS: ${gpsStr}\n` : "") +
+          `  💼 Imputación de gastos: RMG e hijas`
+        );
+      } else {
+        lineas.push(
+          `• *${a.maquina_nombre || "Máquina #" + a.maquina_id}* (${a.maquina_tipo || "Maquinaria"}) — ⚪ Finalizado\n` +
+          `  👤 Cliente: *${a.cliente}*\n` +
+          `  📅 Período: ${a.fecha_inicio} al ${a.fecha_fin || "N/D"}\n` +
+          `  ⏱️ Horas Trabajadas: *${a.horas_trabajadas || "0"} hs* (${a.horometro_inicio}h → ${a.horometro_fin || "0"}h)`
+        );
+      }
+    }
+
+    return `🚜 *SEGUIMIENTO DE ALQUILERES (${results.length})*\n\n${lineas.join("\n\n")}\n\n💡 _Nota: Todos los gastos asociados a alquileres se imputan automáticamente al proyecto 'RMG e hijas'._`;
   } catch (e: any) {
     console.error("Error en consultar_alquileres:", e);
     return `Error consultando alquileres: ${e.message}`;

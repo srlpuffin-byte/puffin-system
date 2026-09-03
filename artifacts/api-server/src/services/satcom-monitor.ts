@@ -77,6 +77,18 @@ async function syncSatcomHistory() {
           .where(eq(maquinasTable.id, maq.id));
 
         console.log(`[SATCOM MONITOR] ${maq.nombre}: Cambio a ${nuevoEstado} (Horometro: ${newHorometroStr})`);
+
+        // Notificar a administradores y hacer seguimiento exhaustivo del alquiler si es excavadora o alquilada
+        const { procesarEventoTelemetriaAlquiler } = await import("./alquiler-tracker.js");
+        procesarEventoTelemetriaAlquiler({
+          maquina: maq,
+          nuevoEstado,
+          horometro: newHorometroStr,
+          latitude: position.latitude,
+          longitude: position.longitude,
+          ubicacionTexto: "Base de Operaciones (Satcom)",
+          ultimoEventoFechaHora: ultimoEvento?.fecha_hora,
+        }).catch(err => console.error("[SATCOM MONITOR] Error en telemetría alquiler:", err));
       }
     }
   } catch (e) {

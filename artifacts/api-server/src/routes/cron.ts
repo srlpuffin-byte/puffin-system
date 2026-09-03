@@ -431,6 +431,18 @@ cronRouter.get("/sync-satcom", async (req, res) => {
           .set({ horometro: newHorometroStr })
           .where(eq(maquinasTable.id, maq.id));
 
+        // Notificar a administradores y hacer seguimiento exhaustivo del alquiler si es excavadora o alquilada
+        const { procesarEventoTelemetriaAlquiler } = await import("../services/alquiler-tracker.js");
+        procesarEventoTelemetriaAlquiler({
+          maquina: maq,
+          nuevoEstado,
+          horometro: newHorometroStr,
+          latitude: position.latitude,
+          longitude: position.longitude,
+          ubicacionTexto: "Base de Operaciones (Satcom)",
+          ultimoEventoFechaHora: ultimoEvento?.fecha_hora,
+        }).catch(err => console.error("[CRON SYNC-SATCOM] Error en telemetría alquiler:", err));
+
         nuevosEventos++;
         logs.push(`${maq.nombre}: Cambió a ${nuevoEstado} (H: ${newHorometroStr})`);
       }
@@ -447,3 +459,14 @@ cronRouter.get("/sync-satcom", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
+
+cronRouter.get("/alquileres-check", async (req, res) => {
+  try {
+    const { alquileresTable } = await import("@workspace/db/schema");
+    const alqs = await db.select().from(alquileresTable);
+    return res.json(alqs);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+

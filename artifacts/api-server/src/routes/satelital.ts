@@ -64,6 +64,18 @@ router.post("/webhook", async (req, res) => {
       entidad_nombre: maquina.nombre,
     });
 
+    // Notificar a administradores y hacer seguimiento del alquiler si aplica
+    const { procesarEventoTelemetriaAlquiler } = await import("../services/alquiler-tracker.js");
+    procesarEventoTelemetriaAlquiler({
+      maquina,
+      nuevoEstado: data.evento,
+      horometro: data.horometro.toString(),
+      latitude: data.ubicacion_lat || 0,
+      longitude: data.ubicacion_lng || 0,
+      ubicacionTexto: data.ubicacion_texto,
+      ultimoEventoFechaHora: data.fecha_hora,
+    }).catch(err => console.error("[SATELITAL WEBHOOK] Error en telemetría alquiler:", err));
+
     return res.json({ success: true, message: "Evento registrado y alerta creada" });
   } catch (error) {
     console.error(error);
