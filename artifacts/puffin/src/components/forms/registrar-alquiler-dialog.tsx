@@ -51,7 +51,7 @@ export function RegistrarAlquilerDialog({ open, onOpenChange, maquina, alquilerA
           },
           body: JSON.stringify({
             fecha_fin: fecha,
-            horometro_fin: parseFloat(horometro),
+            horometro_fin: parseFloat(horometro.toString().replace(",", ".")),
           }),
         });
 
@@ -68,7 +68,7 @@ export function RegistrarAlquilerDialog({ open, onOpenChange, maquina, alquilerA
           body: JSON.stringify({
             cliente,
             fecha_inicio: fecha,
-            horometro_inicio: parseFloat(horometro),
+            horometro_inicio: parseFloat(horometro.toString().replace(",", ".")),
           }),
         });
 
