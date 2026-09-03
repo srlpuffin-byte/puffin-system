@@ -111,8 +111,10 @@ router.use(healthRouter);
 router.use("/auth", authRouter);
 import { whatsappRouter } from "./whatsapp";
 import { cronRouter } from "./cron";
+import satelitalRouter from "./satelital";
 
 router.use("/webhook/whatsapp", whatsappRouter);
+router.use("/webhook/satelital", satelitalRouter);
 router.use("/cron", cronRouter);
 // Integraciones can sometimes be called by webhooks, but we should secure it if it's internal.
 // For now, let's leave it without requireAuth if it acts as a webhook receiver, or with it if it's UI driven.

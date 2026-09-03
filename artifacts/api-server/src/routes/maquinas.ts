@@ -166,6 +166,27 @@ router.get("/:id", async (req, res) => {
   return res.json({ ...maquina, horometro: Number(maquina.horometro), kilometros: Number(maquina.kilometros) });
 });
 
+router.get("/:id/historial-uso", async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+  
+  try {
+    const { historialUsoTable } = await import("@workspace/db/schema");
+    const { desc } = await import("drizzle-orm");
+    
+    const historial = await db.select()
+      .from(historialUsoTable)
+      .where(eq(historialUsoTable.maquina_id, id))
+      .orderBy(desc(historialUsoTable.fecha_hora))
+      .limit(100);
+      
+    return res.json(historial);
+  } catch (err: any) {
+    req.log?.error(err);
+    return res.status(500).json({ error: "Error al obtener historial de uso" });
+  }
+});
+
 router.put("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);

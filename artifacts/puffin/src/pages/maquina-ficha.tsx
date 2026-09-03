@@ -12,9 +12,9 @@ import { RegistrarCargaDialog } from "@/components/forms/registrar-carga-dialog"
 import { ReportarIncidenteDialog } from "@/components/forms/reportar-incidente-dialog";
 import { EditarMaquinaDialog } from "@/components/forms/editar-maquina-dialog";
 import { HistorialMaquinaDialog } from "@/components/forms/historial-maquina-dialog";
-import { History, AlertTriangle, Trash2, Star, FileText, Plus, ExternalLink } from "lucide-react";
+import { History, AlertTriangle, Trash2, Star, FileText, Plus, ExternalLink, Satellite, Power, PowerOff } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getAuthToken } from "@/hooks/use-auth";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
@@ -43,6 +43,42 @@ export function MaquinaFicha() {
 
   const queryClient = useQueryClient();
   const { data: documentos } = useGetDocumentos({ entidad_tipo: "maquina", entidad_id: maquinaId } as any, { query: { enabled: !!maquinaId } as any });
+
+  const { data: historialUso, refetch: refetchHistorial } = useQuery({
+    queryKey: ["historial-uso", maquinaId],
+    queryFn: async () => {
+      const res = await fetch(`/api/maquinas/${maquinaId}/historial-uso`, {
+        headers: { Authorization: `Bearer ${getAuthToken()}` }
+      });
+      if (!res.ok) throw new Error("Error fetching historial");
+      return res.json();
+    },
+    enabled: !!maquinaId
+  });
+
+  const handleSimulateSatelite = async (evento: "encendido" | "apagado") => {
+    try {
+      const currentHorometro = parseFloat(maquina?.horometro?.toString() || "0");
+      const nuevoHorometro = evento === "apagado" ? currentHorometro + 0.5 : currentHorometro;
+      
+      const res = await fetch("/api/webhook/satelital/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }, // Assuming webhook might not need auth in a real scenario, or we pass it
+        body: JSON.stringify({
+          maquina_id: maquinaId,
+          evento,
+          horometro: nuevoHorometro,
+          ubicacion_texto: "Base de Operaciones (Simulado)"
+        })
+      });
+      if (!res.ok) throw new Error("Error webhook");
+      toast.success(`Evento de ${evento} simulado con éxito.`);
+      refetchHistorial();
+      queryClient.invalidateQueries({ queryKey: ["/api/maquinas"] });
+    } catch(e) {
+      toast.error("Error al simular evento satelital");
+    }
+  };
 
   const handleDeleteFoto = async (id: number) => {
     if (confirm("¿Estás seguro de eliminar esta fotografía?")) {
@@ -292,7 +328,56 @@ export function MaquinaFicha() {
             )}
           </CardContent>
         </Card>
+        <Card className="mt-6">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <Satellite className="h-5 w-5 text-blue-500" /> Historial de Uso Satelital
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="text-green-600 border-green-200 hover:bg-green-50" onClick={() => handleSimulateSatelite("encendido")}>
+                <Power className="w-4 h-4 mr-1" /> Encendido
+              </Button>
+              <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleSimulateSatelite("apagado")}>
+                <PowerOff className="w-4 h-4 mr-1" /> Apagado
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {historialUso && historialUso.length > 0 ? (
+              <div className="space-y-4 mt-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-300 before:to-transparent">
+                {historialUso.map((evento: any) => (
+                  <div key={evento.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                    <div className={`flex items-center justify-center w-10 h-10 rounded-full border-4 border-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 ${evento.evento === 'encendido' ? 'bg-green-500' : 'bg-slate-400'}`}>
+                      {evento.evento === 'encendido' ? <Power className="text-white w-4 h-4" /> : <PowerOff className="text-white w-4 h-4" />}
+                    </div>
+                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded border border-slate-200 bg-white shadow-sm">
+                      <div className="flex items-center justify-between mb-1">
+                        <Badge variant="outline" className={evento.evento === 'encendido' ? 'text-green-600' : 'text-slate-600'}>
+                          {evento.evento.toUpperCase()}
+                        </Badge>
+                        <time className="text-xs font-medium text-slate-500">
+                          {format(new Date(evento.fecha_hora), "dd/MM/yyyy HH:mm", { locale: es })}
+                        </time>
+                      </div>
+                      <div className="text-sm text-slate-600">
+                        Horómetro: <strong className="text-slate-800">{evento.horometro} h</strong>
+                      </div>
+                      {evento.ubicacion_texto && (
+                        <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                          📍 {evento.ubicacion_texto}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-6">No hay registros satelitales.</p>
+            )}
+          </CardContent>
+        </Card>
         </div>
+
 
         <div className="space-y-4">
           {maquina.categoria === "maquinaria" && (
