@@ -2477,10 +2477,19 @@ async function executeGenerarExcelGastos(from: string, args: { desde?: string, h
 async function executeConsultaSQL(query: string) {
   try {
     const { sql } = await import("drizzle-orm");
-    if (!query.toLowerCase().trim().startsWith("select")) {
+    const clean = (query || "").trim();
+    const lower = clean.toLowerCase();
+
+    if (!lower.startsWith("select")) {
       return "❌ Error: Solo se permiten consultas SELECT por seguridad.";
     }
-    const { rows } = await db.execute(sql.raw(query));
+
+    // Prevenir sentencias encadenadas o mutaciones peligrosas
+    if (lower.includes(";") || /\b(drop|delete|update|insert|alter|truncate|grant|revoke|create)\b/i.test(lower)) {
+      return "❌ Error de seguridad: La consulta contiene comandos de modificación o encadenamiento no permitidos.";
+    }
+
+    const { rows } = await db.execute(sql.raw(clean));
     if (rows.length === 0) return "La consulta no devolvió resultados.";
     let res = JSON.stringify(rows.slice(0, 50));
     if (rows.length > 50) res += `\n... (mostrando 50 de ${rows.length} resultados)`;

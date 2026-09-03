@@ -1,5 +1,5 @@
-const BASE_URL = "https://satcom.rastreo.com.ar/api";
-const TOKEN = "wycuxj26ptcymd0wvpjs5v7mx6ildm";
+const BASE_URL = process.env.SATCOM_BASE_URL || "https://satcom.rastreo.com.ar/api";
+const TOKEN = process.env.SATCOM_TOKEN || "wycuxj26ptcymd0wvpjs5v7mx6ildm";
 
 export interface SatcomDevice {
   id: number;
