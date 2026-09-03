@@ -460,13 +460,3 @@ cronRouter.get("/sync-satcom", async (req, res) => {
   }
 });
 
-cronRouter.get("/alquileres-check", async (req, res) => {
-  try {
-    const { alquileresTable } = await import("@workspace/db/schema");
-    const alqs = await db.select().from(alquileresTable);
-    return res.json(alqs);
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
