@@ -16,7 +16,7 @@ const webhookSchema = z.object({
   fecha_hora: z.string().optional(),
 });
 
-router.post("/webhook", async (req, res) => {
+router.post(["/", "/webhook"], async (req, res) => {
   try {
     const data = webhookSchema.parse(req.body);
 
