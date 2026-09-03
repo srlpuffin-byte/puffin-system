@@ -19,6 +19,27 @@ function verifyCronToken(req: any, res: any, next: any) {
   next();
 }
 
+cronRouter.get("/test-alerta-whatsapp", verifyCronToken, async (req, res) => {
+  try {
+    const { procesarEventoTelemetriaAlquiler, getAdminPhones } = await import("../services/alquiler-tracker.js");
+    const phones = await getAdminPhones();
+    const [maquina] = await db.select().from(maquinasTable).where(eq(maquinasTable.id, 159));
+    
+    await procesarEventoTelemetriaAlquiler({
+      maquina,
+      nuevoEstado: "encendido",
+      horometro: maquina.horometro || "2586.7",
+      latitude: -32.01184,
+      longitude: -60.318775,
+      ubicacionTexto: "Entre Ríos (Obra Francisco)",
+    });
+
+    return res.json({ success: true, phonesNotified: phones });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 cronRouter.get("/alertas-diarias", verifyCronToken, async (req, res) => {
 
   try {

@@ -3,7 +3,14 @@ import { maquinasTable, historialUsoTable } from "@workspace/db/schema";
 import { isNotNull, eq, desc } from "drizzle-orm";
 import { SatcomClient, isPositionEngineOn } from "./satcom.js";
 
-const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
+const CHECK_INTERVAL_MS = 30 * 1000; // 30 segundos para respuesta inmediata al encendido
+
+function getUbicacionLabel(lat: number, lng: number): string {
+  if (lat <= -31.95 && lng >= -60.45) return "Entre Ríos (Obra Francisco)";
+  if (lat >= -31.45 && lng <= -60.70) return "Base Santa Fe / Recreo";
+  if (lat < -31.5 && lat > -31.85 && lng < -60.45 && lng > -60.75) return "En Traslado (Ruta Santa Fe - Paraná)";
+  return "Ubicación Satelital (Satcom)";
+}
 
 async function syncSatcomHistory() {
   try {
@@ -61,6 +68,7 @@ async function syncSatcomHistory() {
         }
 
         const newHorometroStr = newHorometro.toFixed(1);
+        const ubicacionTexto = getUbicacionLabel(position.latitude, position.longitude);
 
         await db.insert(historialUsoTable).values({
           maquina_id: maq.id,
@@ -68,7 +76,7 @@ async function syncSatcomHistory() {
           horometro: newHorometroStr,
           ubicacion_lat: position.latitude.toString(),
           ubicacion_lng: position.longitude.toString(),
-          ubicacion_texto: "Base de Operaciones (Satcom)"
+          ubicacion_texto: ubicacionTexto
         });
 
         // Actualizar el horómetro maestro de la máquina
@@ -76,7 +84,7 @@ async function syncSatcomHistory() {
           .set({ horometro: newHorometroStr })
           .where(eq(maquinasTable.id, maq.id));
 
-        console.log(`[SATCOM MONITOR] ${maq.nombre}: Cambio a ${nuevoEstado} (Horometro: ${newHorometroStr})`);
+        console.log(`[SATCOM MONITOR] ${maq.nombre}: Cambio a ${nuevoEstado} (Horometro: ${newHorometroStr}) en ${ubicacionTexto}`);
 
         // Notificar a administradores y hacer seguimiento exhaustivo del alquiler si es excavadora o alquilada
         const { procesarEventoTelemetriaAlquiler } = await import("./alquiler-tracker.js");
@@ -86,7 +94,7 @@ async function syncSatcomHistory() {
           horometro: newHorometroStr,
           latitude: position.latitude,
           longitude: position.longitude,
-          ubicacionTexto: "Base de Operaciones (Satcom)",
+          ubicacionTexto,
           ultimoEventoFechaHora: ultimoEvento?.fecha_hora,
         }).catch(err => console.error("[SATCOM MONITOR] Error en telemetría alquiler:", err));
       }

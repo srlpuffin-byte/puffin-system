@@ -11,6 +11,7 @@ export async function getAdminPhones(): Promise<string[]> {
   const phoneSet = new Set<string>();
 
   // Teléfonos principales de administradores / directivos
+  phoneSet.add("5493472629600"); // Sebastián / Dirección
   phoneSet.add("5493572665637"); // Pía Gelso
   phoneSet.add("5493572400877"); // Marcelo Gelso
 
