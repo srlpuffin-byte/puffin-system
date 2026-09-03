@@ -32,7 +32,7 @@ const router: IRouter = Router();
 import { google } from "googleapis";
 import { db } from "@workspace/db";
 import { egresosTable } from "@workspace/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, ilike, eq, or } from "drizzle-orm";
 
 router.get("/sync-egresos-sheet", async (req, res) => {
   try {
