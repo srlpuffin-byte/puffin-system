@@ -108,6 +108,17 @@ router.get("/debug-proyectos-map", async (req, res) => {
   }
 });
 
+router.get("/debug-maquinas", async (req, res) => {
+  try {
+    const { maquinasTable, historialUsoTable } = await import("@workspace/db/schema");
+    const m = await db.select().from(maquinasTable);
+    const h = await db.select().from(historialUsoTable).orderBy(desc(historialUsoTable.id)).limit(10);
+    return res.json({ maquinas: m, historial: h });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 router.use(healthRouter);
 router.use("/auth", authRouter);
 import { whatsappRouter } from "./whatsapp";
