@@ -72,30 +72,6 @@ export function MaquinaFicha() {
     enabled: !!maquinaId
   });
 
-  const handleSimulateSatelite = async (evento: "encendido" | "apagado") => {
-    try {
-      const currentHorometro = parseFloat(maquina?.horometro?.toString() || "0");
-      const nuevoHorometro = evento === "apagado" ? currentHorometro + 0.5 : currentHorometro;
-      
-      const res = await fetch("/api/webhook/satelital/webhook", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }, // Assuming webhook might not need auth in a real scenario, or we pass it
-        body: JSON.stringify({
-          maquina_id: maquinaId,
-          evento,
-          horometro: nuevoHorometro,
-          ubicacion_texto: "Base de Operaciones (Simulado)"
-        })
-      });
-      if (!res.ok) throw new Error("Error webhook");
-      toast.success(`Evento de ${evento} simulado con éxito.`);
-      refetchHistorial();
-      queryClient.invalidateQueries({ queryKey: ["/api/maquinas"] });
-    } catch(e) {
-      toast.error("Error al simular evento satelital");
-    }
-  };
-
   const handleDeleteFoto = async (id: number) => {
     if (confirm("¿Estás seguro de eliminar esta fotografía?")) {
       try {
@@ -350,14 +326,6 @@ export function MaquinaFicha() {
             <CardTitle className="flex items-center gap-2">
               <Satellite className="h-5 w-5 text-blue-500" /> Historial de Uso Satelital
             </CardTitle>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="text-green-600 border-green-200 hover:bg-green-50" onClick={() => handleSimulateSatelite("encendido")}>
-                <Power className="w-4 h-4 mr-1" /> Encendido
-              </Button>
-              <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleSimulateSatelite("apagado")}>
-                <PowerOff className="w-4 h-4 mr-1" /> Apagado
-              </Button>
-            </div>
           </CardHeader>
           <CardContent>
             {historialUso && historialUso.length > 0 ? (
