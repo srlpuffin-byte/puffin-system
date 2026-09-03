@@ -108,17 +108,6 @@ router.get("/debug-proyectos-map", async (req, res) => {
   }
 });
 
-router.get("/fix-horometro-159", async (req, res) => {
-  try {
-    const { maquinasTable, historialUsoTable } = await import("@workspace/db/schema");
-    await db.update(maquinasTable).set({ horometro: "2858.0" }).where(eq(maquinasTable.id, 159));
-    await db.update(historialUsoTable).set({ horometro: "2858.0" }).where(eq(historialUsoTable.maquina_id, 159));
-    return res.json({ success: true, message: "Excavadora rmg (159) e historial satelital actualizados exitosamente a 2858.0 hs" });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
 router.use(healthRouter);
 router.use("/auth", authRouter);
 import { whatsappRouter } from "./whatsapp";
