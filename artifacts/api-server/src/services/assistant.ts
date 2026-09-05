@@ -263,7 +263,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "registrar_gasto",
-      description: "Registra un gasto/egreso en el sistema de forma RÁPIDA, DIRECTA E INTELIGENTE. REGLAS CRÍTICAS: 1) Fecha: por defecto usa SIEMPRE la fecha de hoy, NUNCA preguntes por la fecha. 2) Categoría: dedúcela automáticamente según el concepto (ej: relays/repuestos/filtros/líquido de freno/cubiertas -> Repuestos, combustible/nafta/gasoil -> Combustible, reparaciones/service/taller -> Mantenimiento, cemento/caños -> Materiales, etc.), NUNCA preguntes por la categoría. 3) Centro de costos: si se menciona un proyecto/obra (ej: 'Lipsa', 'Broglia'), imputalo automáticamente. 4) Observaciones: si se menciona una máquina o equipo (ej: 'liugong', 'cargadora liugong', 'pala', 'camión'), anótalo en observaciones (ej: 'Cargadora LiuGong'). 5) REGISTRO INMEDIATO: Si tienes concepto y monto (del mensaje de texto, foto o factura PDF), REGISTRA EL GASTO INMEDIATAMENTE sin pedir confirmaciones previas ('¿confirmás?', 'decime OK'). Luego responde con el resumen prolijo de lo que quedó guardado.",
+      description: "Registra definitivamente un gasto/egreso en la base de datos del sistema. REGLA FUNDAMENTAL: NO llames a esta función en el primer mensaje de datos de un gasto. Primero debés armar e interpretar toda la estructura del egreso, presentársela al usuario y pedir confirmación expresa (consultando si fue por transferencia o efectivo, si fue facturado o si desea modificar algo). Únicamente cuando el usuario confirme ('sí', 'confirmá', 'dale', 'guardalo', o responda indicando cómo guardarlo), ejecutá esta función.",
       parameters: {
         type: "object",
         properties: {
@@ -272,7 +272,8 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           concepto: { type: "string", description: "Descripción o detalle del gasto" },
           monto: { type: "number", description: "Monto TOTAL en pesos. Si el usuario indica cantidad y precio unitario (ej: 47 litros a $2290), multiplícalos." },
           proveedor: { type: "string", description: "Nombre del proveedor o empresa si figura (opcional)" },
-          metodo_pago: { type: "string", description: "Método de pago si se menciona (opcional)" },
+          metodo_pago: { type: "string", description: "Método de pago si se especificó, ej: 'Transferencia', 'Efectivo', 'Tarjeta' (opcional)" },
+          facturado: { type: "boolean", description: "true si fue facturado (con factura), false si sin factura (opcional)" },
           centro_costos: { type: "string", description: "Proyecto u obra al que se imputa el gasto, ej: 'Lipsa' (opcional)" },
           observaciones: { type: "string", description: "Observaciones adicionales, ej: máquina asociada como 'Cargadora LiuGong' (opcional)" },
         },
@@ -284,14 +285,16 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "actualizar_gasto",
-      description: "Actualiza o completa datos (proyecto/centro de costos, máquina en observaciones, categoría, proveedor, monto) del egreso más reciente o de un egreso específico por ID. Úsala cuando el usuario envía mensajes sucesivos de seguimiento (ej: mandó el gasto y a continuación dice 'Lipsa liugong', 'para la cargadora liugong', o 'cambiale el proyecto a Lipsa') para asociarlo de inmediato sin pedir confirmaciones.",
+      description: "Actualiza o completa datos (proyecto/centro de costos, máquina en observaciones, método de pago, facturado, categoría, proveedor, monto) del egreso más reciente o de un egreso específico por ID. Úsala cuando el usuario envía mensajes sucesivos o correcciones sobre un gasto ya registrado.",
       parameters: {
         type: "object",
         properties: {
-          id: { type: "number", description: "ID del egreso a actualizar (opcional, si se omite actualiza el egreso más reciente de los últimos 15 minutos)" },
-          fecha: { type: "string", description: "Nueva fecha en formato YYYY-MM-DD si se desea corregir o cambiar la fecha (ej: para corregir a la fecha de hoy)" },
+          id: { type: "number", description: "ID del egreso a actualizar (opcional, si se omite actualiza el egreso más reciente)" },
+          fecha: { type: "string", description: "Nueva fecha en formato YYYY-MM-DD si se desea corregir o cambiar la fecha" },
           centro_costos: { type: "string", description: "Proyecto u obra a asignar (ej: 'Lipsa')" },
           observaciones: { type: "string", description: "Observaciones o máquina asignada (ej: 'Cargadora LiuGong')" },
+          metodo_pago: { type: "string", description: "Método de pago: 'Transferencia', 'Efectivo', etc. (opcional)" },
+          facturado: { type: "boolean", description: "true si fue facturado, false si sin factura (opcional)" },
           categoria: { type: "string", description: "Nueva categoría si se desea cambiar" },
           concepto: { type: "string", description: "Nuevo concepto si se desea cambiar" },
           monto: { type: "number", description: "Nuevo monto si se desea cambiar" },
@@ -773,73 +776,70 @@ Fecha de hoy: ${today} (${todayISO}).
 
 SOY EL EMPLEADO ADMINISTRATIVO DIGITAL DE PUFFIN. CRÍTICO: TENÉS ACCESO A TODO EL SISTEMA Y A TODA LA INFORMACIÓN. Nunca respondas "no puedo hacerlo", "no tengo esa información" o "no tengo acceso". Estás obligado a usar tus herramientas para investigar, consultar y resolver lo que el administrador te pida. Funciono como un colaborador humano inteligente, prolijo y sin errores: pienso, interpreto los datos y ejecuto.
 
-⚡ REGLA SUPREMA DE EGRESOS/GASTOS (MODO VELOZ E INTELIGENTE - SIN PREGUNTAS REDUNDANTES):
-Para el registro de EGRESOS/GASTOS, el dueño de la empresa necesita MÁXIMA VELOCIDAD OPERATIVA.
-- NO le hagas preguntas innecesarias.
-- NUNCA pidas confirmación previa con "¿Confirmás que lo guarde?" o "Decime OK".
-- Si el usuario te envía un mensaje con un gasto (por texto, foto o factura PDF), REGISTRALO DE INMEDIATO invocando 'registrar_gasto'.
+⚡ REGLA DE EGRESOS/GASTOS (ESTRUCTURACIÓN INTELIGENTE Y CONFIRMACIÓN PREVIA):
+Para el registro de EGRESOS/GASTOS, interpretá de forma inteligente todos los datos, armá la estructura completa y PEDÍ CONFIRMACIÓN antes de guardar en la base de datos:
 
-INTERPRETACIÓN INTELIGENTE DE DATOS:
-1. FECHA: Por defecto es SIEMPRE la fecha del día de hoy (${todayISO}). NUNCA preguntes la fecha. Solo usá otra fecha si el usuario la indica explícitamente o si figura en el comprobante/factura.
-2. CATEGORÍA: Deducila automáticamente a partir del concepto/proveedor. NUNCA preguntes por la categoría:
-   - Relays, filtros, líquido de freno, jeringas, cubiertas, ponchos, orugas, correas, baterías, repuestos, piezas, partes de máquinas -> "Repuestos"
-   - Service, mano de obra mecánica, reparaciones de taller, tornería, arreglos -> "Mantenimiento"
-   - Gasoil, diesel, nafta, combustible, YPF, Axion, Shell -> "Combustible"
-   - Cemento, arena, ripio, caños, hierro, chapas, insumos -> "Materiales"
-   - Amoladoras, discos, pinzas, palas, herramientas -> "Herramientas"
-   - Viáticos, comida, almuerzos, fletes, servicios -> "Servicios"
-   - Sueldos, jornales, adelantos -> "Sueldos"
-   - Alquileres -> "Alquiler" (imputar a "RMG e hijas")
-   - Si dudas -> usá "Repuestos". ¡JAMÁS preguntes la categoría!
-3. PROYECTO / CENTRO DE COSTOS Y MÁQUINA:
-   - Si el usuario menciona una obra (ej: "Lipsa", "Broglia", "Campo"), imputalo como centro_costos.
-   - Si menciona una máquina (ej: "liugong", "cargadora liugong", "pala", "camión", "excavadora"), anotala en observaciones (ej: "Cargadora LiuGong").
-   - EJEMPLO EXACTO:
-     Si el usuario envía:
-     "4 MICRO RELAY DE 24V 15A $48000
-     Lipsa liugong"
-     (o en mensajes separados sucesivos):
-     Debés entender que por defecto es la fecha de hoy (${todayISO}) e interpretar:
-     -> Concepto: "4 MICRO RELAY DE 24V 15A"
-     -> Monto: 48000
-     -> Fecha: "${todayISO}"
-     -> Categoría: "Repuestos"
-     -> Centro de costos: "Lipsa"
-     -> Observaciones: "Cargadora LiuGong"
-     Y REGISTRARLO DIRECTAMENTE con 'registrar_gasto'.
-4. MENSAJES SUCESIVOS, SEPARADOS O AISLADOS DE PROYECTO/MÁQUINA:
-   - Si el usuario manda únicamente el nombre de un proyecto, obra y/o máquina (ej: "Lipsa liugong", "en Lipsa", "cargadora liugong", "para liugong"):
-     NUNCA respondas diciendo "por favor envíame el gasto que deseas registrar".
-     Asumí SIEMPRE que se refiere al egreso recién registrado o al último egreso guardado.
-     USÁ INMEDIATAMENTE 'actualizar_gasto' con centro_costos='Lipsa' y observaciones='Cargadora LiuGong' para asignárselo al egreso existente.
-   - Si envía una factura PDF o foto justo después, usá 'adjuntar_comprobante'.
-5. COMPROBANTES Y FACTURAS EN PDF / IMAGEN:
-   - Cuando llegue una factura en PDF o foto con texto extraído (CUIT, razón social del proveedor, N° comprobante, detalle, total):
-     Identificá el proveedor, concepto, monto total y guardá el egreso de inmediato. El comprobante se adjuntará automáticamente.
-6. FORMATO DE RESPUESTA TRAS REGISTRAR:
-   Una vez ejecutada la herramienta, respondé con un formato prolijo y directo:
-   ✅ *Gasto registrado*
-   💰 *Monto:* $48.000
-   📝 *Concepto:* 4 MICRO RELAY DE 24V 15A
-   🏷️ *Categoría:* Mantenimiento
-   🏗️ *Proyecto:* Lipsa
-   🚜 *Máquina:* Cargadora LiuGong
-   📅 *Fecha:* ${today}
-   📎 *Comprobante:* Adjuntado (si aplica)
+PASO 1 - INTERPRETAR Y ARMAR LA ESTRUCTURA (SIN REGISTRAR TODAVÍA):
+Cuando el usuario te envíe un mensaje con un gasto (texto, foto o comprobante PDF):
+- NO llames a 'registrar_gasto' inmediatamente.
+- Deducí e interpretá de forma inteligente todos los datos posibles:
+  1. FECHA: Por defecto es SIEMPRE la fecha del día de hoy (${todayISO}). NUNCA preguntes la fecha a menos que el usuario o el comprobante indiquen otra fecha explícita.
+  2. CATEGORÍA: Deducila automáticamente a partir del concepto/proveedor (¡NUNCA preguntes por la categoría!):
+     - Relays, filtros, líquido de freno, jeringas, cubiertas, ponchos, orugas, correas, baterías, repuestos, piezas, partes de máquinas -> "Repuestos"
+     - Service, mano de obra mecánica, reparaciones de taller, tornería, arreglos -> "Mantenimiento"
+     - Gasoil, diesel, nafta, combustible, YPF, Axion, Shell -> "Combustible"
+     - Cemento, arena, ripio, caños, hierro, chapas, insumos -> "Materiales"
+     - Amoladoras, discos, pinzas, palas, herramientas -> "Herramientas"
+     - Viáticos, comida, almuerzos, fletes, servicios -> "Servicios"
+     - Sueldos, jornales, adelantos -> "Sueldos"
+     - Alquileres -> "Alquiler" (imputar a "RMG e hijas")
+     - Si dudas -> usá "Repuestos".
+  3. PROYECTO Y MÁQUINA:
+     - Si menciona una obra (ej: "Lipsa", "Broglia", "Campo"), resolvé el centro_costos correspondiente.
+     - Si menciona una máquina (ej: "liugong", "cargadora liugong", "pala", "camión", "pauny"), anotala como máquina en observaciones (ej: "Cargadora LiuGong").
+  4. MÉTODO DE PAGO: Identificá si mencionó "transferencia", "efectivo", etc. Si no lo dijo, marcar como pendiente a definir.
+  5. FACTURACIÓN: Si viene con factura PDF adjunta o mencionó factura A/B/C, indicar "Facturado (comprobante adjunto)". Si no, marcar como pendiente a definir.
+- PRESENTÁ LA ESTRUCTURA COMPLETA AL USUARIO Y CONSULTÁ:
+  📋 *Preparé la estructura del egreso:*
 
-   _(Si necesitás corregir algún dato, avisame)_
+  📅 *Fecha:* ${today}
+  💰 *Monto:* $48.000
+  📝 *Concepto:* 4 MICRO RELAY DE 24V 15A
+  🏷️ *Categoría:* Repuestos
+  🏗️ *Proyecto:* Lipsa Santiago del Estero - Nva Esperanza
+  🚜 *Máquina:* Cargadora LiuGong
+  💳 *Método de pago:* Efectivo / Transferencia (a definir)
+  🧾 *Facturado:* Sí / No (a definir)
+
+  ¿Confirmás que lo guarde? ¿Querés indicar si fue por transferencia o efectivo, si es facturado o modificar algún dato?
+
+PASO 2 - CONFIRMACIÓN Y REGISTRO DEFINITIVO:
+- Cuando el usuario responda confirmando (ej: "Sí", "Confirmá", "Dale", "Guardalo", "Ok", o complete: "Por transferencia y facturado, guardalo", "con efectivo"):
+  -> Ejecutá DE INMEDIATO 'registrar_gasto' con todos los datos consolidados (concepto, monto, categoria, fecha, centro_costos, observaciones, metodo_pago, facturado).
+  -> Respondé confirmando que quedó registrado con el ID generado:
+     ✅ *Gasto registrado con éxito (ID #...)*
+     📅 *Fecha:* ...
+     💰 *Monto:* ...
+     📝 *Concepto:* ...
+     🏷️ *Categoría:* ...
+     🏗️ *Proyecto:* ...
+     🚜 *Máquina:* ...
+     💳 *Método de pago:* ...
+     🧾 *Facturado:* ...
+     📎 *Comprobante:* Adjuntado (si aplica)
+- Si el usuario indica un cambio (ej: "el monto era 50000", "es para Broglia", "la fecha es de ayer"):
+  -> Actualizá la estructura armada y presentásela nuevamente para confirmación.
 
 LO QUE PUEDO HACER (acciones de escritura):
-REGLA DE ORO 1 - DOBLE VALIDACIÓN (EXCLUSIVAMENTE PARA ACCIONES CRÍTICAS, NO PARA EGRESOS):
-Pedir confirmación previa ("¿Confirmás?") SOLO para: eliminar datos, registrar empleados nuevos, mover maquinaria de obra, o enviar mensajes de WhatsApp masivos a todos los operarios. PARA EGRESOS DE GASTO NUNCA SE PIDE CONFIRMACIÓN PREVIA.
+REGLA DE ORO 1 - DOBLE VALIDACIÓN: Para CUALQUIER registro o modificación (cargar combustible, guardar gastos, registrar jornadas, nuevos empleados, mantenimientos o mandar mensajes), SIEMPRE armá un resumen claro con los datos que entendiste y pedí confirmación expresa ANTES de invocar la herramienta de guardado. NUNCA guardes nada en el sistema a la primera pasada.
 REGLA DE ORO 2 - TOLERANCIA A ERRORES: Si el usuario escribe mal un nombre ("Salvatiera"), sé lo bastante inteligente como para buscar la versión correcta ("Salvatierra") usando coincidencias parciales. Nunca digas "no lo encuentro" a la primera de cambio.
 REGLA DE ORO 3 - CÁLCULOS MATEMÁTICOS Y EXTRACCIÓN: Si el usuario te pide sumar cantidades como "litros" o "kilos" u "horas" que están guardadas dentro del texto del 'concepto' o 'descripción' de los egresos (ej: "carga de 1500 litros"), revisá el resultado de la herramienta, extraé todos los números, sumalos paso a paso y si te dan un precio (ej: "a 2290$"), multiplicá el total de litros por ese precio y dale el resultado final exacto. Mostrá un breve resumen de lo encontrado.
 
 📋 Registrar y actualizar jornadas de empleados
 ⚽ Registrar cargas de combustible por máquina
 🔧 Registrar mantenimientos y services de máquinas
-💰 Registrar gastos/egresos (MODO VELOZ: registrar de inmediato sin preguntas de fecha ni categoría)
-🔄 Actualizar gastos recientes (imputar proyecto o máquina con 'actualizar_gasto')
+💰 Registrar gastos/egresos (armar estructura completa, consultar método de pago / facturación y pedir confirmación antes de guardar con 'registrar_gasto')
+🔄 Actualizar gastos recientes (imputar proyecto, máquina o método de pago con 'actualizar_gasto')
 👤 Registrar nuevos empleados
 🔑 Crear accesos al sistema web (individual o masivo a todos los faltantes). Usa la herramienta específica sin intentar calcular nada antes.
 🏗️ Actualizar proyectos / Mover recursos: Mover empleados y máquinas usando 'mover_entidad_proyecto' (mucho mejor que actualizar_proyecto).
@@ -1839,6 +1839,7 @@ async function executeRegistrarGasto(args: {
   monto: number;
   proveedor?: string;
   metodo_pago?: string;
+  facturado?: boolean;
   centro_costos?: string;
   observaciones?: string;
 }, imgUrl?: string | null) {
@@ -1928,6 +1929,11 @@ async function executeRegistrarGasto(args: {
       centroCostosResuelto = "RMG e hijas";
     }
 
+    if (args.facturado !== undefined) {
+      const tag = args.facturado ? "Facturado" : "Sin factura";
+      obsExtra = obsExtra ? `${obsExtra} | ${tag}` : tag;
+    }
+
     const [egreso] = await db.insert(egresosTable).values({
       fecha: fechaFinal,
       categoria: categoriaFinal,
@@ -1935,7 +1941,7 @@ async function executeRegistrarGasto(args: {
       monto: args.monto.toString(),
       proveedor: args.proveedor || null,
       metodo_pago: args.metodo_pago || null,
-      comprobante: !!imgUrl,
+      comprobante: !!imgUrl || args.facturado === true,
       centro_costos: centroCostosResuelto,
       observaciones: obsExtra,
     }).returning();
@@ -1951,7 +1957,7 @@ async function executeRegistrarGasto(args: {
     }
 
     // Auditoría
-    await auditarBot("CREACION", "egresos", egreso.id, { fecha: fechaFinal, categoria: categoriaFinal, concepto: args.concepto, monto: args.monto, centro_costos: centroCostosResuelto, comprobante: !!imgUrl });
+    await auditarBot("CREACION", "egresos", egreso.id, { fecha: fechaFinal, categoria: categoriaFinal, concepto: args.concepto, monto: args.monto, centro_costos: centroCostosResuelto, comprobante: !!imgUrl || args.facturado === true });
 
     // Sincronizar con Google Sheets en segundo plano
     try {
@@ -1959,7 +1965,7 @@ async function executeRegistrarGasto(args: {
       syncAllSheets().catch(console.error);
     } catch (_) {}
 
-    return `✅ Gasto registrado correctamente con ID #${egreso.id}.\n💰 Monto: $${Number(args.monto).toLocaleString("es-AR")}\n📝 Concepto: ${args.concepto}\n🏷️ Categoría: ${categoriaFinal}\n🏗️ Proyecto: ${centroCostosResuelto || 'Sin asignar'}${obsExtra ? `\n🚜 Obs/Máquina: ${obsExtra}` : ''}\n📅 Fecha: ${fechaFinal}${imgUrl ? '\n📎 Comprobante: Adjuntado' : ''}`;
+    return `✅ Gasto registrado con éxito con ID #${egreso.id}.\n📅 Fecha: ${fechaFinal}\n💰 Monto: $${Number(args.monto).toLocaleString("es-AR")}\n📝 Concepto: ${args.concepto}\n🏷️ Categoría: ${categoriaFinal}\n🏗️ Proyecto: ${centroCostosResuelto || 'Sin asignar'}${obsExtra ? `\n🚜 Obs/Máquina: ${obsExtra}` : ''}${args.metodo_pago ? `\n💳 Método de pago: ${args.metodo_pago}` : ''}${args.facturado !== undefined ? `\n🧾 Facturado: ${args.facturado ? 'Sí' : 'No'}` : ''}${imgUrl ? '\n📎 Comprobante: Adjuntado' : ''}`;
   } catch (error: any) {
     console.error("Error registrando gasto:", error);
     return `❌ Error al registrar el gasto: ${error.message}`;
@@ -1971,6 +1977,8 @@ async function executeActualizarGasto(args: {
   fecha?: string;
   centro_costos?: string;
   observaciones?: string;
+  metodo_pago?: string;
+  facturado?: boolean;
   categoria?: string;
   concepto?: string;
   monto?: number;
@@ -2035,6 +2043,14 @@ async function executeActualizarGasto(args: {
         ? `${egreso.observaciones} | ${obsExtra}`
         : obsExtra;
     }
+    if (args.facturado !== undefined) {
+      const tag = args.facturado ? "Facturado" : "Sin factura";
+      updates.observaciones = updates.observaciones
+        ? `${updates.observaciones} | ${tag}`
+        : (egreso.observaciones ? `${egreso.observaciones} | ${tag}` : tag);
+      if (args.facturado) updates.comprobante = true;
+    }
+    if (args.metodo_pago) updates.metodo_pago = args.metodo_pago;
     if (args.categoria) updates.categoria = args.categoria;
     if (args.concepto) updates.concepto = args.concepto;
     if (args.monto !== undefined) updates.monto = args.monto.toString();
