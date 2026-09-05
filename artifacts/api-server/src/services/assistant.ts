@@ -285,11 +285,11 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "actualizar_gasto",
-      description: "Actualiza o completa datos (proyecto/centro de costos, máquina en observaciones, método de pago, facturado, categoría, proveedor, monto) del egreso más reciente o de un egreso específico por ID. Úsala cuando el usuario envía mensajes sucesivos o correcciones sobre un gasto ya registrado.",
+      description: "Actualiza un egreso PREVIAMENTE REGISTRADO únicamente cuando el usuario pide explícitamente modificar un gasto anterior existente en el sistema indicando su ID (ej: 'en el gasto #15 cambiá el proyecto a Lipsa', 'corregí el monto del gasto #12 a 5000'). PROHIBIDO ABSOLUTAMENTE usar esta función si el usuario está enviando una factura, comprobante o los datos de un gasto nuevo.",
       parameters: {
         type: "object",
         properties: {
-          id: { type: "number", description: "ID del egreso a actualizar (opcional, si se omite actualiza el egreso más reciente)" },
+          id: { type: "number", description: "ID numérico del egreso a actualizar (ej: 15). Obligatorio para modificar un gasto del sistema, salvo que el usuario esté modificando inmediatamente el gasto recién creado en esta conversación." },
           fecha: { type: "string", description: "Nueva fecha en formato YYYY-MM-DD si se desea corregir o cambiar la fecha" },
           centro_costos: { type: "string", description: "Proyecto u obra a asignar (ej: 'Lipsa')" },
           observaciones: { type: "string", description: "Observaciones o máquina asignada (ej: 'Cargadora LiuGong')" },
@@ -709,7 +709,7 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
 
   // Comando especial para limpiar historial (útil al cambiar de modelo)
   if (text.trim().toLowerCase() === "reset") {
-    await db.update(whatsappSesionesTable).set({ messages: [] }).where(eq(whatsappSesionesTable.phone, senderPhone));
+    await db.update(whatsappSesionesTable).set({ messages: [], datos_pendientes: null }).where(eq(whatsappSesionesTable.phone, senderPhone));
     await sendWhatsAppMessage(from, "✅ Memoria borrada. Arrancamos de cero con el nuevo modelo.");
     return;
   }
@@ -810,11 +810,14 @@ Para el registro de EGRESOS/GASTOS, interpretá de forma inteligente todos los d
 PASO 1 - INTERPRETAR Y ARMAR LA ESTRUCTURA (SIN REGISTRAR TODAVÍA):
 Cuando el usuario te envíe un mensaje con un gasto (texto, foto o comprobante PDF):
 - NO llames a 'registrar_gasto' inmediatamente.
+- PROHIBIDO TERMINANTEMENTE llamar a 'actualizar_gasto' cuando el usuario envía un nuevo gasto, factura o comprobante. 'actualizar_gasto' es SOLO para modificar un gasto previo existente en la BD cuando el usuario lo pide explícitamente por ID.
 - Deducí e interpretá de forma inteligente todos los datos posibles:
   0. CONCEPTO Y MONTO DESDE LA FACTURA/PDF:
-     - Si el mensaje incluye contenido extraído de una factura o comprobante PDF: EXTRAÉ OBLIGATORIAMENTE el concepto/repuesto (ej: "Filtro de gasoil", "Micro relay") y el monto total en pesos (ej: 8000, 48000).
-     - El Concepto del egreso es el ítem, repuesto o servicio adquirido (ej: "Filtro de gasoil"). NUNCA uses el nombre de la máquina ("Cargadora LiuGong") como concepto si en la factura figura el ítem.
-     - El monto es el total de la factura. NUNCA pongas "(no fue especificado)" si en el texto del comprobante aparece el precio o total.
+     - Si el mensaje incluye contenido extraído de una factura o comprobante PDF:
+       * BUSCÁ EL ARTÍCULO/REPUESTO/SERVICIO que figura en el comprobante (ej: "Filtro de gasoil", "4 MICRO RELAY 24V", "Aceite 15w40") y asignalo OBLIGATORIAMENTE al Concepto.
+       * NUNCA uses el nombre de la máquina ("Cargadora LiuGong") ni del proyecto ("Lipsa") como Concepto cuando haya una factura adjunta con los ítems comprados.
+       * EXTRAÉ EL MONTO TOTAL de la factura (ej: 8000, 48000). NUNCA pongas "(no fue especificado)" si en el texto del comprobante aparece el precio, subtotal o total facturado.
+     - PROVEEDOR Y FECHA: Si en la factura figura la Razón Social / Proveedor (ej: "GUTIERREZ HUGO FERMIN") y la Fecha de Emisión (ej: "01/09/2026"), extraelas.
   1. FECHA: Por defecto es la fecha de emisión de la factura si figura (ej: 01/09/2026), o la fecha de hoy (${todayISO}).
   2. CATEGORÍA: Deducila automáticamente a partir del concepto/proveedor (¡NUNCA preguntes por la categoría!):
      - Relays, filtros, líquido de freno, jeringas, cubiertas, ponchos, orugas, correas, baterías, repuestos, piezas, partes de máquinas -> "Repuestos"
@@ -827,7 +830,7 @@ Cuando el usuario te envíe un mensaje con un gasto (texto, foto o comprobante P
      - Alquileres -> "Alquiler" (imputar a "RMG e hijas")
      - Si dudas -> usá "Repuestos".
   3. PROYECTO Y MÁQUINA:
-     - Si menciona una obra (ej: "Lipsa", "Broglia", "Campo"), resolvé el centro_costos correspondiente.
+     - Si menciona una obra (ej: "Lipsa", "Broglia", "Campo"), resolvé el centro_costos correspondiente (ej: "Lipsa Santiago del Estero - Nva Esperanza").
      - Si menciona una máquina (ej: "liugong", "cargadora liugong", "pala", "camión", "pauny"), anotala como máquina en observaciones (ej: "Cargadora LiuGong").
   4. MÉTODO DE PAGO: Identificá si mencionó "transferencia", "efectivo", etc. Si no lo dijo, marcar como pendiente a definir.
   5. FACTURACIÓN: Si viene con factura PDF adjunta o mencionó factura A/B/C, indicar "Facturado (comprobante adjunto)". Si no, marcar como pendiente a definir.
@@ -991,13 +994,14 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
           toolResult = await executeEnviarMensaje(functionArgs.mensaje, functionArgs.numero, functionArgs.nombre_empleado, functionArgs.todos);
         } else if (functionName === "registrar_gasto") {
           const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
-          toolResult = await executeRegistrarGasto(functionArgs, imgUrl);
+          toolResult = await executeRegistrarGasto(functionArgs, imgUrl, sesion);
           if (imgUrl && sesion.datos_pendientes) {
             (sesion.datos_pendientes as any).ultima_imagen_url = null;
           }
         } else if (functionName === "actualizar_gasto") {
           const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
-          toolResult = await executeActualizarGasto(functionArgs, imgUrl);
+          const ultimoId = (sesion.datos_pendientes as any)?.ultimo_egreso_id || null;
+          toolResult = await executeActualizarGasto(functionArgs, imgUrl, ultimoId);
           if (imgUrl && sesion.datos_pendientes) {
             (sesion.datos_pendientes as any).ultima_imagen_url = null;
           }
@@ -1903,7 +1907,7 @@ async function executeRegistrarGasto(args: {
   facturado?: boolean;
   centro_costos?: string;
   observaciones?: string;
-}, imgUrl?: string | null) {
+}, imgUrl?: string | null, sesion?: any) {
   try {
     const fechaFinal = args.fecha || getArgentinaTodayISO();
 
@@ -2007,6 +2011,13 @@ async function executeRegistrarGasto(args: {
       observaciones: obsExtra,
     }).returning();
 
+    if (sesion) {
+      if (!sesion.datos_pendientes || typeof sesion.datos_pendientes !== "object") {
+        sesion.datos_pendientes = {};
+      }
+      sesion.datos_pendientes.ultimo_egreso_id = egreso.id;
+    }
+
     if (imgUrl && egreso && egreso.id) {
       let finalComprobanteUrl = imgUrl;
       try {
@@ -2053,22 +2064,17 @@ async function executeActualizarGasto(args: {
   concepto?: string;
   monto?: number;
   proveedor?: string;
-}, imgUrl?: string | null) {
+}, imgUrl?: string | null, ultimoEgresoId?: number | null) {
   try {
     let egreso: typeof egresosTable.$inferSelect | undefined;
-    if (args.id) {
-      const [found] = await db.select().from(egresosTable).where(eq(egresosTable.id, args.id)).limit(1);
+    const targetId = args.id || ultimoEgresoId;
+    if (targetId) {
+      const [found] = await db.select().from(egresosTable).where(eq(egresosTable.id, targetId)).limit(1);
       egreso = found;
-    } else {
-      // Tomar el egreso más reciente del sistema
-      const [recent] = await db.select().from(egresosTable)
-        .orderBy(desc(egresosTable.id))
-        .limit(1);
-      egreso = recent;
     }
 
     if (!egreso) {
-      return "❌ No encontré ningún egreso reciente para actualizar. Podés indicarme el ID del egreso o los datos para cargarlo.";
+      return "❌ Para actualizar un gasto existente es necesario indicar el número de ID (ej: 'actualizar egreso #12'). Si lo que deseás es registrar un gasto nuevo, confirmame para registrarlo.";
     }
 
     let centroCostosResuelto = egreso.centro_costos;

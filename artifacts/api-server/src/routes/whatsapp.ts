@@ -15,31 +15,49 @@ const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || "puffin_secret_token";
 async function extractPdfText(buffer: Buffer): Promise<string> {
   if (!buffer || buffer.length < 10) return "";
 
-  // 1. Intento con pdf-parse
+  // 1. Intento primario con unpdf (100% puro JS, estándar Web, sin binarios nativos ni canvas)
+  try {
+    const { extractText } = await import("unpdf");
+    const parsed = await extractText(new Uint8Array(buffer));
+    const fullText = Array.isArray(parsed?.text) ? parsed.text.join("\n") : (parsed?.text || "");
+    if (fullText && fullText.trim().length > 10) {
+      const cleaned = fullText
+        .split("\n")
+        .map((l: string) => l.trim())
+        .filter(Boolean)
+        .join("\n");
+      console.log(`[PDF] Texto extraído exitosamente con unpdf (${cleaned.length} caracteres, ${parsed.totalPages} páginas)`);
+      return cleaned;
+    }
+  } catch (unpdfErr) {
+    console.warn("[PDF] Advertencia con unpdf:", unpdfErr);
+  }
+
+  // 2. Intento secundario con pdf-parse
   try {
     const pdfModule = await import("pdf-parse");
-    if ((pdfModule as any).PDFParse) {
-      const parser = new (pdfModule as any).PDFParse({ data: buffer });
-      const parsedResult = await parser.getText();
-      const text = parsedResult?.text || parsedResult?.pages?.map((p: any) => p.text).join("\n") || "";
-      if (text && text.trim().length > 15) {
-        const cleaned = text
-          .split("\n")
-          .map((l: string) => l.trim())
-          .filter(Boolean)
-          .join("\n");
-        console.log(`[PDF] Texto extraído exitosamente con PDFParse v2 (${cleaned.length} caracteres)`);
-        return cleaned;
-      }
-    } else if (typeof (pdfModule as any).default === "function") {
+    if (typeof (pdfModule as any).default === "function") {
       const parsedResult = await (pdfModule as any).default(buffer);
-      if (parsedResult?.text?.trim()?.length > 15) {
+      if (parsedResult?.text?.trim()?.length > 10) {
         const cleaned = parsedResult.text
           .split("\n")
           .map((l: string) => l.trim())
           .filter(Boolean)
           .join("\n");
         console.log(`[PDF] Texto extraído con pdf-parse v1 (${cleaned.length} caracteres)`);
+        return cleaned;
+      }
+    } else if ((pdfModule as any).PDFParse) {
+      const parser = new (pdfModule as any).PDFParse({ data: buffer });
+      const parsedResult = await parser.getText();
+      const text = parsedResult?.text || parsedResult?.pages?.map((p: any) => p.text).join("\n") || "";
+      if (text && text.trim().length > 10) {
+        const cleaned = text
+          .split("\n")
+          .map((l: string) => l.trim())
+          .filter(Boolean)
+          .join("\n");
+        console.log(`[PDF] Texto extraído exitosamente con PDFParse v2 (${cleaned.length} caracteres)`);
         return cleaned;
       }
     }
@@ -85,6 +103,18 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
         if (combined.trim().length > 0 && !/^[\x00-\x1F\x7F]+$/.test(combined)) {
           extractedWords.push(combined.trim());
         }
+      }
+
+      // Buscar operadores hex Tj: <00460069...> Tj común en fuentes Unicode AFIP
+      const hexMatches = decompressed.match(/<([0-9a-fA-F\s]+)>\s*Tj/g) || [];
+      for (const hm of hexMatches) {
+        const hex = hm.slice(1, hm.lastIndexOf(">")).replace(/\s+/g, "");
+        let str = "";
+        for (let i = 0; i < hex.length; i += 2) {
+          const code = parseInt(hex.substr(i, 2), 16);
+          if (code >= 32 && code <= 126) str += String.fromCharCode(code);
+        }
+        if (str.trim()) extractedWords.push(str.trim());
       }
     }
 
@@ -256,13 +286,15 @@ whatsappRouter.post("/", async (req, res) => {
             const base64 = await downloadWhatsAppMedia(mediaId);
             if (base64) {
               batch.mediaBase64 = base64;
-              // Si es un PDF, extraer el texto para que la IA lo interprete directamente
-              if (message.document.mime_type?.includes("pdf") || docName.toLowerCase().endsWith(".pdf")) {
-                const base64Data = base64.includes(";base64,") ? base64.split(";base64,")[1] : base64;
-                const buffer = Buffer.from(base64Data.trim(), "base64");
+              const base64Data = base64.includes(";base64,") ? base64.split(";base64,")[1] : base64;
+              const buffer = Buffer.from(base64Data.trim(), "base64");
+              const isPdf = message.document.mime_type?.includes("pdf") ||
+                            docName.toLowerCase().endsWith(".pdf") ||
+                            buffer.slice(0, 10).toString("latin1").includes("%PDF");
+              if (isPdf) {
                 const extractedText = await extractPdfText(buffer);
                 if (extractedText && extractedText.trim()) {
-                  docHeader += `\n\n--- CONTENIDO EXTRAÍDO DE LA FACTURA/PDF (${docName}) ---\n${extractedText.slice(0, 4000)}`;
+                  docHeader += `\n\n--- CONTENIDO EXTRAÍDO DE LA FACTURA/PDF (${docName}) ---\n${extractedText.slice(0, 8000)}`;
                   console.log(`[Webhook] ✅ Texto extraído exitosamente de PDF ${docName} (${extractedText.length} caracteres)`);
                 } else {
                   console.warn(`[Webhook] ⚠️ No se pudo extraer texto del PDF ${docName}`);
