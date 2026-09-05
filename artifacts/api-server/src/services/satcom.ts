@@ -28,15 +28,17 @@ export interface SatcomPosition {
   };
 }
 
-export function isPositionEngineOn(position: any, deviceStatus?: string): boolean {
+export function isPositionEngineOn(position: any, deviceStatus?: string, checkRealtimeLiveness: boolean = false): boolean {
   if (!position) return false;
-  if (deviceStatus === "offline") return false;
+  if (checkRealtimeLiveness && deviceStatus === "offline") return false;
 
-  // Si el paquete tiene más de 15 minutos de antigüedad, la máquina no está en marcha activa
-  const timestamp = position.fixTime || position.deviceTime;
-  if (timestamp) {
-    const ageMinutes = (Date.now() - new Date(timestamp).getTime()) / (1000 * 60);
-    if (ageMinutes > 15) return false;
+  // Si se solicita verificar si está en marcha en vivo en este preciso instante
+  if (checkRealtimeLiveness) {
+    const timestamp = position.fixTime || position.deviceTime;
+    if (timestamp) {
+      const ageMinutes = (Date.now() - new Date(timestamp).getTime()) / (1000 * 60);
+      if (ageMinutes > 15) return false;
+    }
   }
 
   if (position.attributes?.ignition === true) return true;

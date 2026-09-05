@@ -2646,7 +2646,7 @@ export function TrazadorMapa({
         // Horómetro Satcom en vivo
         const horometroSatcom = maquinaAuditada.horometro_horas 
           ? maquinaAuditada.horometro_horas.toLocaleString("es-AR")
-          : (estadisticasAuditoria?.horometro_actual ? estadisticasAuditoria.horometro_actual.toLocaleString("es-AR") : "4.775,2");
+          : (estadisticasAuditoria?.horometro_actual ? estadisticasAuditoria.horometro_actual.toLocaleString("es-AR") : "0,0");
 
         return (
           <div className="absolute top-20 right-3 z-[1001] max-w-sm w-[calc(100%-24px)] sm:w-[360px] bg-slate-950/95 border-2 border-cyan-500/70 rounded-xl p-3.5 shadow-2xl backdrop-blur-md text-white text-xs space-y-2.5 animate-in fade-in slide-in-from-top-3 duration-200">
@@ -2748,7 +2748,7 @@ export function TrazadorMapa({
                 <span className="text-sm font-extrabold font-mono text-emerald-400">
                   {estadisticasAuditoria?.horas_marcha !== undefined 
                     ? `${estadisticasAuditoria.horas_marcha} h` 
-                    : "5.4 h"}
+                    : "0.0 h"}
                 </span>
               </div>
 

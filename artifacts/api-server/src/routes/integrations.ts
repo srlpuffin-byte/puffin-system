@@ -349,8 +349,69 @@ integrationsRouter.get("/xpert/track", requireAuth, async (req, res) => {
     // Ordenar cronológicamente
     positions.sort((a, b) => new Date(a.fixTime || a.deviceTime || 0).getTime() - new Date(b.fixTime || b.deviceTime || 0).getTime());
 
-    // Mapear puntos limpios
-    const puntos = positions.map(p => {
+    // 1. Filtrar deriva de GPS (Jitter) mientras la máquina está estacionada / motor apagado
+    // Elimina micro-desplazamientos de antena que generan falsos zig-zags en el mapa
+    const cleanPositions: typeof positions = [];
+    let lastCleanPos: (typeof positions)[0] | null = null;
+    let totalMovingDistMeters = 0;
+
+    for (let i = 0; i < positions.length; i++) {
+      const p = positions[i];
+      const isEngine = isPositionEngineOn(p);
+      const spdKmh = (p.speed || 0) * 1.852;
+
+      if (!lastCleanPos) {
+        cleanPositions.push(p);
+        lastCleanPos = p;
+        continue;
+      }
+
+      const dLat = (p.latitude - lastCleanPos.latitude) * Math.PI / 180;
+      const dLng = (p.longitude - lastCleanPos.longitude) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lastCleanPos.latitude * Math.PI / 180) * Math.cos(p.latitude * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distMeters = 6371000 * c;
+
+      // Si el motor está apagado, la velocidad es nula y la distancia es menor a 25 metros, es jitter estático
+      if (!isEngine && spdKmh < 0.5 && distMeters < 25) {
+        continue;
+      }
+
+      if (distMeters > 5 && (isEngine || spdKmh > 0.8 || distMeters > 25)) {
+        totalMovingDistMeters += distMeters;
+      }
+
+      cleanPositions.push(p);
+      lastCleanPos = p;
+    }
+
+    // Asegurar que la última posición absoluta del reporte siempre esté incluida
+    const absoluteLastPos = positions[positions.length - 1];
+    if (cleanPositions.length > 0 && cleanPositions[cleanPositions.length - 1].id !== absoluteLastPos.id) {
+      cleanPositions.push(absoluteLastPos);
+    }
+
+    const filteredPositions = cleanPositions.length >= 2 ? cleanPositions : positions;
+
+    // 2. Delimitar la jornada operativa: Si la máquina estuvo estacionada durante horas previas y luego
+    // arrancó, el Punto de Inicio debe coincidir con el comienzo de su actividad real (evitando horas nocturnas ociosas)
+    const activeIndices: number[] = [];
+    for (let i = 0; i < filteredPositions.length; i++) {
+      if (isPositionEngineOn(filteredPositions[i]) || (filteredPositions[i].speed || 0) > 0.5) {
+        activeIndices.push(i);
+      }
+    }
+
+    let displayPositions = filteredPositions;
+    if (activeIndices.length > 0) {
+      const firstActiveIdx = Math.max(0, activeIndices[0] - 1);
+      displayPositions = filteredPositions.slice(firstActiveIdx);
+    }
+
+    // Mapear puntos limpios listos para el mapa
+    const puntos = displayPositions.map(p => {
       const spdKmh = typeof p.speed === "number" ? Math.round(p.speed * 1.852 * 10) / 10 : 0;
       return {
         lat: p.latitude,
@@ -362,15 +423,14 @@ integrationsRouter.get("/xpert/track", requireAuth, async (req, res) => {
       };
     });
 
-    // Calcular estadísticas de la jornada
+    // Calcular estadísticas precisas de la jornada
     let maxSpeed = 0;
     let sumSpeedMoving = 0;
     let countMoving = 0;
-    let totalDistKm = 0;
     let totalEngineMs = 0;
 
-    for (let i = 0; i < positions.length; i++) {
-      const p = positions[i];
+    for (let i = 0; i < displayPositions.length; i++) {
+      const p = displayPositions[i];
       const spdKmh = (p.speed || 0) * 1.852;
       if (spdKmh > maxSpeed) maxSpeed = spdKmh;
       if (spdKmh > 1.5) {
@@ -379,33 +439,58 @@ integrationsRouter.get("/xpert/track", requireAuth, async (req, res) => {
       }
 
       if (i > 0) {
-        const prev = positions[i - 1];
+        const prev = displayPositions[i - 1];
         const tPrev = new Date(prev.fixTime || prev.deviceTime || 0).getTime();
         const tCurr = new Date(p.fixTime || p.deviceTime || 0).getTime();
         const dt = tCurr - tPrev;
-        if (dt > 0 && dt < 15 * 60 * 1000 && isPositionEngineOn(p)) {
+        if (dt > 0 && dt < 30 * 60 * 1000 && isPositionEngineOn(p)) {
           totalEngineMs += dt;
-        }
-
-        if (p.attributes?.distance) {
-          totalDistKm += p.attributes.distance / 1000;
-        } else {
-          const dLat = (p.latitude - prev.latitude) * Math.PI / 180;
-          const dLng = (p.longitude - prev.longitude) * Math.PI / 180;
-          const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(prev.latitude * Math.PI / 180) * Math.cos(p.latitude * Math.PI / 180) *
-            Math.sin(dLng / 2) * Math.sin(dLng / 2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          totalDistKm += 6371 * c;
         }
       }
     }
 
+    // Horas de marcha: delta de horómetro Satcom como primera prioridad
+    let horasMarcha = 0;
+    const pStart = displayPositions[0];
+    const pEnd = displayPositions[displayPositions.length - 1];
+
+    if (pStart?.attributes?.hours !== undefined && pEnd?.attributes?.hours !== undefined) {
+      const deltaH = (pEnd.attributes.hours - pStart.attributes.hours) / 3600000;
+      if (deltaH >= 0 && deltaH <= 24) {
+        horasMarcha = Math.round(deltaH * 10) / 10;
+      }
+    }
+    if (horasMarcha === 0 && totalEngineMs > 0) {
+      horasMarcha = Math.round((totalEngineMs / 3600000) * 10) / 10;
+    }
+
+    // Kilómetros recorridos: delta de odómetro Satcom como primera prioridad
+    let kmRecorridos = 0;
+    if (pStart?.attributes?.totalDistance !== undefined && pEnd?.attributes?.totalDistance !== undefined) {
+      const deltaKm = (pEnd.attributes.totalDistance - pStart.attributes.totalDistance) / 1000;
+      if (deltaKm >= 0 && deltaKm <= 2000) {
+        kmRecorridos = Math.round(deltaKm * 10) / 10;
+      }
+    }
+    if (kmRecorridos === 0 && totalMovingDistMeters > 0) {
+      kmRecorridos = Math.round((totalMovingDistMeters / 1000) * 10) / 10;
+    }
+
     const lastPos = positions[positions.length - 1];
-    const horometroActual = lastPos?.attributes?.hours ? Math.round((lastPos.attributes.hours / 3600000) * 10) / 10 : null;
-    const odometroActual = lastPos?.attributes?.totalDistance ? Math.round((lastPos.attributes.totalDistance / 1000) * 10) / 10 : null;
+    // Horómetro actual total del equipo
+    const lastWithHours = [...positions].reverse().find(p => p.attributes?.hours !== undefined && p.attributes.hours > 0);
+    const horometroActual = lastWithHours?.attributes?.hours 
+      ? Math.round((lastWithHours.attributes.hours / 3600000) * 10) / 10 
+      : (lastPos?.attributes?.hours ? Math.round((lastPos.attributes.hours / 3600000) * 10) / 10 : null);
+
+    // Odómetro actual total del equipo
+    const lastWithOdo = [...positions].reverse().find(p => p.attributes?.totalDistance !== undefined && p.attributes.totalDistance > 0);
+    const odometroActual = lastWithOdo?.attributes?.totalDistance 
+      ? Math.round((lastWithOdo.attributes.totalDistance / 1000) * 10) / 10 
+      : (lastPos?.attributes?.totalDistance ? Math.round((lastPos.attributes.totalDistance / 1000) * 10) / 10 : null);
+
     const currentSpeedKmh = lastPos && typeof lastPos.speed === "number" ? Math.round(lastPos.speed * 1.852) : 0;
-    const isEngineRunning = isPositionEngineOn(lastPos);
+    const isEngineRunning = isPositionEngineOn(lastPos, undefined, true);
 
     let actividadActual = "Apagado / Estacionado";
     if (currentSpeedKmh > 40) {
@@ -424,8 +509,8 @@ integrationsRouter.get("/xpert/track", requireAuth, async (req, res) => {
       tipo: tipoEquipo,
       puntos,
       estadisticas: {
-        horas_marcha: Math.round((totalEngineMs / 3600000) * 10) / 10,
-        km_recorridos: Math.round(totalDistKm * 10) / 10,
+        horas_marcha: horasMarcha,
+        km_recorridos: kmRecorridos,
         velocidad_maxima: Math.round(maxSpeed * 10) / 10,
         velocidad_promedio: countMoving > 0 ? Math.round((sumSpeedMoving / countMoving) * 10) / 10 : 0,
         horometro_actual: horometroActual,
