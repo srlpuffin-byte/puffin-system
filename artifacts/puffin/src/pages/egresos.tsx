@@ -61,13 +61,18 @@ export function Egresos() {
   const [filterMetodo, setFilterMetodo] = useState("todos");
   const [filterSearch, setFilterSearch] = useState("");
 
-  const { data: egresosResp, isLoading } = useGetEgresos({
+  const { data: egresosResp, isLoading, refetch } = useGetEgresos({
     page,
     limit: 50,
     ...(filterCategoria !== "todos" ? { categoria: filterCategoria } : {}),
     ...(filterProyecto !== "todos" ? { centro_costos: filterProyecto } : {}),
     ...(filterMetodo !== "todos" ? { metodo_pago: filterMetodo } : {}),
     ...(filterSearch ? { search: filterSearch } : {}),
+  }, {
+    query: {
+      refetchOnMount: true,
+      staleTime: 0,
+    }
   });
   const egresos = egresosResp?.data;
   const paginationMeta = egresosResp?.meta;
@@ -144,8 +149,7 @@ export function Egresos() {
     }
     
     const payload = {
-      // Enviamos mediodía UTC para evitar cruzar la medianoche en cualquier zona horaria
-      fecha: form.fecha + "T12:00:00.000Z",
+      fecha: form.fecha,
       concepto: form.concepto,
       categoria: form.categoria,
       monto: parseFloat(form.monto),
@@ -168,7 +172,8 @@ export function Egresos() {
               });
             }
             toast.success("Egreso actualizado");
-            queryClient.invalidateQueries({ queryKey: ["getEgresos"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/egresos"] });
+            refetch();
             setOpenDialog(false);
             resetForm();
           }).catch(() => toast.error("Error al actualizar egreso"));
@@ -193,7 +198,8 @@ export function Egresos() {
               }
             }
             toast.success("Egreso registrado y sincronizado con Google Sheets");
-            queryClient.invalidateQueries({ queryKey: ["getEgresos"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/egresos"] });
+            refetch();
             setOpenDialog(false);
             resetForm();
           },
@@ -213,7 +219,9 @@ export function Egresos() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`Google Sheets actualizado con ${data.rowsCount} registros`);
+        toast.success(`Google Sheets actualizado con ${data.rowsCount || ''} registros`);
+        queryClient.invalidateQueries({ queryKey: ["/api/egresos"] });
+        refetch();
       } else {
         toast.error(data.error || "Error al sincronizar");
       }
