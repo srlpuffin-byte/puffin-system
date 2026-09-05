@@ -1604,6 +1604,24 @@ export function Americangis() {
                   </label>
                   <Button
                     size="sm"
+                    onClick={() => {
+                      const validas = maquinasGps.filter(m => m.lat !== null && m.lng !== null);
+                      if (validas.length > 0) {
+                        setMostrarMaquinasGps(true);
+                        setMaquinaEnFoco({ lat: validas[0].lat!, lng: validas[0].lng! });
+                        setActiveTab("mapa");
+                        toast.success(`Mostrando ${validas.length} máquinas en el mapa satelital`);
+                      } else {
+                        toast.info("No hay máquinas con coordenadas GPS activas en este momento");
+                      }
+                    }}
+                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs h-8 gap-1.5 shadow"
+                  >
+                    <Tractor className="h-3.5 w-3.5" />
+                    Ver Flota en Mapa ({maquinasGps.filter(m => m.lat !== null).length})
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => {
                       refetchMaquinasGps();

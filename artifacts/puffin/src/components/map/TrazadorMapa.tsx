@@ -163,6 +163,7 @@ export function TrazadorMapa({
   const baseLayersRef = useRef<{ [key: string]: any }>({});
   
   const [activeLayer, setActiveLayer] = useState<"hybrid" | "satellite" | "streets">("hybrid");
+  const [mapReady, setMapReady] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [cursorCoords, setCursorCoords] = useState<LatLng | null>(null);
   const [currentSnap, setCurrentSnap] = useState<SnapResult | null>(null);
@@ -226,7 +227,21 @@ export function TrazadorMapa({
         setCursorCoords(rawPt);
       });
 
+      // Inyectar estilos para que los pins personalizados no tengan borde blanco de Leaflet
+      if (!document.getElementById("custom-map-styles")) {
+        const style = document.createElement("style");
+        style.id = "custom-map-styles";
+        style.innerHTML = `
+          .custom-machine-pin, .custom-wp-icon, .custom-corner-badge {
+            background: transparent !important;
+            border: none !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
       mapRef.current = map;
+      setMapReady(true);
 
       if (polygon.length >= 3) {
         const bounds = L.latLngBounds(polygon.map((p) => [p.lat, p.lng]));
@@ -238,6 +253,7 @@ export function TrazadorMapa({
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
+        setMapReady(false);
       }
     };
   }, []);
@@ -969,7 +985,7 @@ export function TrazadorMapa({
 
   // Renderizar Máquinas con Telemetría GPS Xpert Satcom
   useEffect(() => {
-    if (!maquinasGroupRef.current || !window.L) return;
+    if (!mapReady || !mapRef.current || !maquinasGroupRef.current || !window.L) return;
     const L = window.L;
     const group = maquinasGroupRef.current;
     group.clearLayers();
@@ -979,90 +995,120 @@ export function TrazadorMapa({
     maquinas.forEach((m) => {
       if (m.lat === null || m.lng === null) return;
       const pt: LatLng = { lat: m.lat, lng: m.lng };
-      const dentroDelLote = esPuntoEnPoligono(pt, polygon);
-      const auditoria = calcularDesvioPasada(pt, lineas);
+      const tieneLote = polygon.length >= 3;
+      const dentroDelLote = tieneLote ? esPuntoEnPoligono(pt, polygon) : false;
+      const auditoria = lineas.length > 0 ? calcularDesvioPasada(pt, lineas) : { lineaCercana: null, desvioMeters: 0, estaAlineado: true, calidad: "excelente" as const };
 
-      const statusColor = m.encendido ? "#22c55e" : "#94a3b8";
+      const statusColor = m.encendido ? "#22c55e" : "#ef4444";
       const iconHtml = `
-        <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%); cursor: pointer;">
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; width: 140px; margin-left: -70px; margin-top: -55px; pointer-events: auto; cursor: pointer;">
+          <!-- Etiqueta superior: Nombre de la máquina -->
           <div style="
             background: rgba(15, 23, 42, 0.95);
             color: #ffffff;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 800;
-            padding: 2px 6px;
-            border-radius: 4px;
-            border: 1px solid ${statusColor};
+            padding: 2px 8px;
+            border-radius: 6px;
+            border: 1.5px solid ${statusColor};
             white-space: nowrap;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.7);
             margin-bottom: 2px;
-          ">
-            🚜 ${m.nombre}
-          </div>
-          <div style="
-            width: 32px;
-            height: 32px;
-            background: #0f172a;
-            border: 2.5px solid ${statusColor};
-            border-radius: 50%;
             display: flex;
             align-items: center;
-            justify-content: center;
-            box-shadow: 0 0 10px ${m.encendido ? 'rgba(34, 197, 94, 0.7)' : 'rgba(0,0,0,0.4)'};
-            font-size: 15px;
+            gap: 4px;
           ">
-            🚜
+            <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: ${statusColor}; box-shadow: 0 0 6px ${statusColor};"></span>
+            <span>🚜 ${m.nombre}</span>
           </div>
+
+          <!-- Ícono central de tractor con Pin -->
+          <div style="position: relative; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
+            <div style="
+              width: 36px;
+              height: 36px;
+              background: #0f172a;
+              border: 3px solid ${statusColor};
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              box-shadow: 0 0 15px ${statusColor}, inset 0 0 8px rgba(0,0,0,0.8);
+              font-size: 18px;
+            ">
+              🚜
+            </div>
+            <div style="
+              position: absolute;
+              bottom: -6px;
+              left: 50%;
+              transform: translateX(-50%);
+              width: 0;
+              height: 0;
+              border-left: 6px solid transparent;
+              border-right: 6px solid transparent;
+              border-top: 7px solid ${statusColor};
+            "></div>
+          </div>
+
+          <!-- Badge inferior: Velocidad y Auditoría de Pasada -->
           <div style="
-            background: ${dentroDelLote ? (auditoria.estaAlineado ? "#15803d" : "#b45309") : "#b91c1c"};
+            margin-top: 6px;
+            background: ${tieneLote ? (dentroDelLote ? (auditoria.estaAlineado ? "rgba(21, 128, 61, 0.95)" : "rgba(180, 83, 9, 0.95)") : "rgba(185, 28, 28, 0.95)") : (m.encendido ? "rgba(21, 128, 61, 0.95)" : "rgba(30, 41, 59, 0.95)")};
             color: #ffffff;
-            font-size: 9px;
+            font-size: 10px;
             font-weight: 800;
             font-family: monospace;
-            padding: 1px 4px;
-            border-radius: 3px;
-            margin-top: 2px;
+            padding: 2px 6px;
+            border-radius: 4px;
             white-space: nowrap;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.2);
           ">
-            ${m.velocidad_kmh ? `${m.velocidad_kmh.toFixed(0)} km/h` : "0 km/h"} · ${dentroDelLote ? (auditoria.desvioMeters ? `±${auditoria.desvioMeters}m` : "En Eje") : "Fuera de Lote"}
+            ${m.velocidad_kmh !== null ? `${m.velocidad_kmh.toFixed(0)} km/h` : "0 km/h"}${tieneLote ? ` · ${dentroDelLote ? (auditoria.lineaCercana ? `±${auditoria.desvioMeters}m` : "En Eje") : "Fuera Lote"}` : (m.encendido ? " · En Marcha" : " · Detenido")}
           </div>
         </div>
       `;
 
       const divIcon = L.divIcon({
-        className: "custom-machine-marker",
+        className: "custom-machine-pin",
         html: iconHtml,
         iconSize: [0, 0],
         iconAnchor: [0, 0],
       });
 
-      const marker = L.marker([m.lat, m.lng], { icon: divIcon });
+      const marker = L.marker([m.lat, m.lng], { icon: divIcon, zIndexOffset: 1000 });
 
       const popupContent = `
         <div style="font-family: sans-serif; font-size: 12px; min-width: 220px; padding: 4px; color: #1e293b;">
           <div style="font-weight: 900; font-size: 14px; border-bottom: 2px solid ${statusColor}; padding-bottom: 4px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
             <span>🚜 ${m.nombre}</span>
-            <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${m.encendido ? '#dcfce7; color: #166534;' : '#f1f5f9; color: #475569;'}">
-              ${m.encendido ? '🟢 En Marcha' : '⚪ Detenido'}
+            <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${m.encendido ? '#dcfce7; color: #166534;' : '#fef2f2; color: #991b1b;'}">
+              ${m.encendido ? '🟢 En Marcha' : '🔴 Detenido'}
             </span>
           </div>
           <div style="display: grid; gap: 4px; font-size: 11px;">
-            <div><b>Velocidad:</b> ${m.velocidad_kmh ? `${m.velocidad_kmh.toFixed(1)} km/h` : '0.0 km/h'}</div>
+            <div><b>Tipo:</b> ${m.tipo || "Maquinaria"}</div>
+            <div><b>Velocidad:</b> ${m.velocidad_kmh !== null ? `${m.velocidad_kmh.toFixed(1)} km/h` : '0.0 km/h'}</div>
             <div><b>Posición:</b> ${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}</div>
+            ${m.proyecto_lugar ? `<div><b>Proyecto:</b> ${m.proyecto_lugar}</div>` : ''}
             <div style="border-top: 1px solid #e2e8f0; margin-top: 4px; padding-top: 4px;">
               <b>Auditoría en Lote:</b>
               <div style="margin-top: 2px;">
-                ${dentroDelLote ? `
-                  <span style="color: #166534; font-weight: bold;">📍 Dentro del perímetro delimitado</span><br/>
-                  ${auditoria.lineaCercana ? `
-                    <b>Pasada más cercana:</b> ${auditoria.lineaCercana.nombre}<br/>
-                    <b>Desvío del eje:</b> <span style="color: ${auditoria.calidad === 'excelente' ? '#166534' : auditoria.calidad === 'buena' ? '#ca8a04' : '#dc2626'}; font-weight: bold;">
-                      ${auditoria.desvioMeters} m (${auditoria.calidad === 'excelente' ? '✓ Excelente / Centrado' : auditoria.calidad === 'buena' ? 'Aceptable' : '⚠️ Desalineado'})
-                    </span>
-                  ` : ''}
-                ` : `
-                  <span style="color: #dc2626; font-weight: bold;">⚠️ Fuera del lote delimitado</span>
+                ${tieneLote ? (
+                  dentroDelLote ? `
+                    <span style="color: #166534; font-weight: bold;">📍 Dentro del perímetro delimitado</span><br/>
+                    ${auditoria.lineaCercana ? `
+                      <b>Pasada más cercana:</b> ${auditoria.lineaCercana.nombre}<br/>
+                      <b>Desvío del eje:</b> <span style="color: ${auditoria.calidad === 'excelente' ? '#166534' : auditoria.calidad === 'buena' ? '#ca8a04' : '#dc2626'}; font-weight: bold;">
+                        ${auditoria.desvioMeters} m (${auditoria.calidad === 'excelente' ? '✓ Excelente / Centrado' : auditoria.calidad === 'buena' ? 'Aceptable' : '⚠️ Desalineado'})
+                      </span>
+                    ` : ''}
+                  ` : `
+                    <span style="color: #dc2626; font-weight: bold;">⚠️ Fuera del lote delimitado</span>
+                  `
+                ) : `
+                  <span style="color: #64748b;">(Delimite el terreno para auditar pasadas y desvíos)</span>
                 `}
               </div>
             </div>
@@ -1073,7 +1119,7 @@ export function TrazadorMapa({
       marker.bindPopup(popupContent);
       group.addLayer(marker);
     });
-  }, [maquinas, mostrarMaquinas, polygon, lineas]);
+  }, [mapReady, maquinas, mostrarMaquinas, polygon, lineas]);
 
   // Renderizar Track Histórico de la Máquina (recorrido real)
   useEffect(() => {
@@ -1324,17 +1370,27 @@ export function TrazadorMapa({
           </div>
         </div>
 
-        {/* Botón para ver u ocultar máquinas Xpert Satcom en tiempo real */}
+        {/* Botón para ver y enfocar máquinas Xpert Satcom en tiempo real */}
         {maquinas && maquinas.length > 0 && (
           <Button
             size="sm"
             variant="outline"
-            onClick={onToggleMostrarMaquinas}
+            onClick={() => {
+              const validas = maquinas.filter((m) => m.lat !== null && m.lng !== null);
+              if (!mostrarMaquinas) {
+                onToggleMostrarMaquinas?.();
+              }
+              if (validas.length > 0 && mapRef.current && window.L) {
+                const bounds = window.L.latLngBounds(validas.map((m) => [m.lat, m.lng]));
+                mapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+                toast.success(`Enfocando ${validas.length} máquinas Xpert Satcom en el mapa`);
+              }
+            }}
             className={`text-xs h-7 gap-1 ${mostrarMaquinas ? "bg-emerald-500 text-slate-950 font-black shadow" : "bg-slate-800/90 border-slate-600 text-slate-200 hover:bg-slate-700"}`}
-            title="Mostrar u ocultar la posición en tiempo real de las máquinas Xpert Satcom"
+            title="Clic para enfocar y ver todas las máquinas Xpert Satcom en el mapa"
           >
             <Tractor className="h-3.5 w-3.5" />
-            {mostrarMaquinas ? `🛰️ Satcom (${maquinas.filter(m => m.lat !== null).length})` : "🛰️ Ver Máquinas"}
+            🚜 Satcom ({maquinas.filter(m => m.lat !== null).length})
           </Button>
         )}
 
