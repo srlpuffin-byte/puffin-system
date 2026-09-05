@@ -23,7 +23,9 @@ import {
   MapPin,
   User,
   Package,
+  Plus,
 } from "lucide-react";
+import { RegistrarCargaDialog } from "@/components/forms/registrar-carga-dialog";
 
 function prioridadColor(p: string) {
   if (p === "roja") return "bg-red-100 border-red-300 text-red-800";
@@ -57,6 +59,7 @@ function formatFechaCorta(iso: string) {
 export function Panel() {
   const { data: user } = useGetMe();
   const isEmpleado = user?.rol?.toLowerCase() === "empleado";
+  const [openRegistrarCombustible, setOpenRegistrarCombustible] = React.useState(false);
 
   const { data: resumen, isLoading } = useGetDashboardResumen();
   const { data: alertasData } = useGetAlertas({ estado: "activa" });
@@ -208,45 +211,131 @@ export function Panel() {
       )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="pt-5 pb-5 text-center">
-            <Droplets className="h-7 w-7 text-blue-500 mx-auto mb-1" />
-            <div className="text-2xl font-bold tracking-tight text-slate-800">
-              {Number(resumen?.litros_mes ?? 0).toLocaleString("es-AR")} L
-            </div>
-            <p className="text-xs text-muted-foreground mt-1 font-medium">Combustible (últimos 30 días)</p>
-            {(resumen as any)?.litros_mes_calendario !== undefined && (
-              <p className="text-[11px] text-blue-600 font-semibold mt-0.5">
-                {Number((resumen as any).litros_mes_calendario).toLocaleString("es-AR")} L este mes
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="pt-5 pb-5 text-center">
-            <Clock className="h-7 w-7 text-orange-500 mx-auto mb-1" />
-            <div className="text-2xl font-bold tracking-tight text-slate-800">
-              {Number(resumen?.horas_mes ?? 0).toLocaleString("es-AR")} h
-            </div>
-            <p className="text-xs text-muted-foreground mt-1 font-medium">Horas trabajadas</p>
-          </CardContent>
-        </Card>
+        <Link href="/combustible">
+          <Card className="border-l-4 border-l-blue-500 hover:shadow-md transition-all cursor-pointer h-full group bg-card">
+            <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full">
+              <div className="flex items-center justify-between gap-1 mb-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-100 transition-colors shrink-0">
+                    <Droplets className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </div>
+                  <span className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider truncate">Combustible</span>
+                </div>
+                <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+              </div>
+
+              <div>
+                <div className="text-2xl sm:text-3xl font-black tracking-tight text-blue-700">
+                  {Number(resumen?.litros_mes ?? 0).toLocaleString("es-AR")} <span className="text-base sm:text-lg font-bold text-slate-600">L</span>
+                </div>
+                <p className="text-[11px] sm:text-xs text-muted-foreground font-medium mt-0.5">Últimos 30 días</p>
+                {(resumen as any)?.litros_mes_calendario !== undefined && (
+                  <p className="text-[10px] sm:text-[11px] text-blue-600 font-semibold mt-1 flex items-center gap-1">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                    <span className="truncate">{Number((resumen as any).litros_mes_calendario).toLocaleString("es-AR")} L este mes</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-3 pt-2 sm:pt-2.5 border-t border-slate-100 flex items-center justify-between gap-1">
+                <span className="text-[10px] sm:text-[11px] font-semibold text-blue-600 hover:underline">Ver detalle</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setOpenRegistrarCombustible(true);
+                  }}
+                  className="px-2 py-0.5 sm:py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] sm:text-[11px] font-bold shadow-sm transition-colors flex items-center gap-1 shrink-0"
+                  title="Registrar carga de combustible ahora"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Cargar</span>
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/jornadas">
+          <Card className="border-l-4 border-l-orange-500 hover:shadow-md transition-all cursor-pointer h-full group bg-card">
+            <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full">
+              <div className="flex items-center justify-between gap-1 mb-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-orange-50 text-orange-600 group-hover:bg-orange-100 transition-colors shrink-0">
+                    <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </div>
+                  <span className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider truncate">Jornadas</span>
+                </div>
+                <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground group-hover:text-orange-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+              </div>
+
+              <div>
+                <div className="text-2xl sm:text-3xl font-black tracking-tight text-orange-600">
+                  {Number(resumen?.horas_mes ?? 0).toLocaleString("es-AR")} <span className="text-base sm:text-lg font-bold text-slate-600">h</span>
+                </div>
+                <p className="text-[11px] sm:text-xs text-muted-foreground font-medium mt-0.5">Horas mes</p>
+              </div>
+
+              <div className="mt-3 pt-2 sm:pt-2.5 border-t border-slate-100 flex items-center justify-between gap-1">
+                <span className="text-[10px] sm:text-[11px] font-semibold text-orange-600 hover:underline">Ver jornadas</span>
+                <span className="text-[10px] text-muted-foreground hidden sm:inline">En vivo</span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
         {!isEmpleado && (
           <>
-            <Card>
-              <CardContent className="pt-5 pb-5 text-center">
-                <Settings className="h-7 w-7 text-slate-500 mx-auto mb-1" />
-                <div className="text-2xl font-bold">{resumen?.mantenimientos_mes ?? 0}</div>
-                <p className="text-xs text-muted-foreground mt-1">Mantenimientos</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-5 pb-5 text-center">
-                <CheckCircle2 className="h-7 w-7 text-green-500 mx-auto mb-1" />
-                <div className="text-2xl font-bold">{resumen?.disponibilidad ?? 0}%</div>
-                <p className="text-xs text-muted-foreground mt-1">Disponibilidad</p>
-              </CardContent>
-            </Card>
+            <Link href="/mantenimientos">
+              <Card className="border-l-4 border-l-slate-500 hover:shadow-md transition-all cursor-pointer h-full group bg-card">
+                <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full">
+                  <div className="flex items-center justify-between gap-1 mb-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                      <div className="p-1.5 sm:p-2 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-slate-200 transition-colors shrink-0">
+                        <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+                      </div>
+                      <span className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider truncate">Mantenimiento</span>
+                    </div>
+                    <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+                  </div>
+                  <div>
+                    <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-800">
+                      {resumen?.mantenimientos_mes ?? 0}
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-muted-foreground font-medium mt-0.5">Servicios mes</p>
+                  </div>
+                  <div className="mt-3 pt-2 sm:pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-slate-600 hover:underline">Historial</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/maquinas">
+              <Card className="border-l-4 border-l-green-500 hover:shadow-md transition-all cursor-pointer h-full group bg-card">
+                <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full">
+                  <div className="flex items-center justify-between gap-1 mb-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                      <div className="p-1.5 sm:p-2 rounded-lg bg-green-50 text-green-600 group-hover:bg-green-100 transition-colors shrink-0">
+                        <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                      </div>
+                      <span className="text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider truncate">Flota</span>
+                    </div>
+                    <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground group-hover:text-green-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+                  </div>
+                  <div>
+                    <div className="text-2xl sm:text-3xl font-black tracking-tight text-green-600">
+                      {resumen?.disponibilidad ?? 0}%
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-muted-foreground font-medium mt-0.5">Disponibilidad</p>
+                  </div>
+                  <div className="mt-3 pt-2 sm:pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-green-600 hover:underline">Ver flota</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           </>
         )}
       </div>
@@ -496,7 +585,6 @@ export function Panel() {
         </div>
       </div>
 
-      {!isEmpleado && (
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Link href="/jornadas">
           <Card className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-primary">
@@ -522,32 +610,67 @@ export function Panel() {
             </CardContent>
           </Card>
         </Link>
-        <Link href="/reportes">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-green-500">
-            <CardContent className="pt-4 pb-4 flex items-center gap-3">
-              <TrendingUp className="h-5 w-5 text-green-500" />
-              <div>
-                <p className="text-sm font-semibold">Reportes</p>
-                <p className="text-xs text-muted-foreground">Ver indicadores</p>
-              </div>
-              <ArrowRight className="h-4 w-4 ml-auto text-muted-foreground" />
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/calendario">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-purple-500">
-            <CardContent className="pt-4 pb-4 flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-purple-500" />
-              <div>
-                <p className="text-sm font-semibold">Calendario</p>
-                <p className="text-xs text-muted-foreground">Ver eventos</p>
-              </div>
-              <ArrowRight className="h-4 w-4 ml-auto text-muted-foreground" />
-            </CardContent>
-          </Card>
-        </Link>
+        {!isEmpleado ? (
+          <>
+            <Link href="/reportes">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-green-500">
+                <CardContent className="pt-4 pb-4 flex items-center gap-3">
+                  <TrendingUp className="h-5 w-5 text-green-500" />
+                  <div>
+                    <p className="text-sm font-semibold">Reportes</p>
+                    <p className="text-xs text-muted-foreground">Ver indicadores</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 ml-auto text-muted-foreground" />
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/calendario">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-purple-500">
+                <CardContent className="pt-4 pb-4 flex items-center gap-3">
+                  <Calendar className="h-5 w-5 text-purple-500" />
+                  <div>
+                    <p className="text-sm font-semibold">Calendario</p>
+                    <p className="text-xs text-muted-foreground">Ver eventos</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 ml-auto text-muted-foreground" />
+                </CardContent>
+              </Card>
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link href="/mis-datos">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-green-500">
+                <CardContent className="pt-4 pb-4 flex items-center gap-3">
+                  <User className="h-5 w-5 text-green-500" />
+                  <div>
+                    <p className="text-sm font-semibold">Mis Datos</p>
+                    <p className="text-xs text-muted-foreground">Ficha personal</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 ml-auto text-muted-foreground" />
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/calendario">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-purple-500">
+                <CardContent className="pt-4 pb-4 flex items-center gap-3">
+                  <Calendar className="h-5 w-5 text-purple-500" />
+                  <div>
+                    <p className="text-sm font-semibold">Calendario</p>
+                    <p className="text-xs text-muted-foreground">Ver eventos</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 ml-auto text-muted-foreground" />
+                </CardContent>
+              </Card>
+            </Link>
+          </>
+        )}
       </div>
-      )}
+
+      <RegistrarCargaDialog 
+        open={openRegistrarCombustible} 
+        onOpenChange={setOpenRegistrarCombustible} 
+      />
     </div>
   );
 }

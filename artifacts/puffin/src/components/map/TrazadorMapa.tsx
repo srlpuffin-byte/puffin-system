@@ -154,8 +154,11 @@ interface TrazadorMapaProps {
   maquinas?: MaquinaGpsPunto[];
   mostrarMaquinas?: boolean;
   onToggleMostrarMaquinas?: () => void;
+  isAdmin?: boolean;
+  mostrarAuditoriaAdmin?: boolean;
+  onToggleMostrarAuditoriaAdmin?: () => void;
   trackHistorico?: Array<LatLng & { speed_kmh?: number; rumbo?: number; fixTime?: string; encendido?: boolean }>;
-  maquinaEnFoco?: (LatLng & { timestamp?: number }) | null;
+  maquinaEnFoco?: (LatLng & { timestamp?: number; device_id?: number | null; maquina_id?: number | null; nombre?: string }) | null;
   activeTab?: string;
   // Auditoría Satcom en Tiempo Real
   maquinaAuditadaId?: string | number | null;
@@ -206,6 +209,9 @@ export function TrazadorMapa({
   maquinas = [],
   mostrarMaquinas = true,
   onToggleMostrarMaquinas,
+  isAdmin = false,
+  mostrarAuditoriaAdmin = false,
+  onToggleMostrarAuditoriaAdmin,
   trackHistorico = [],
   maquinaEnFoco = null,
   activeTab = "mapa",
@@ -239,31 +245,16 @@ export function TrazadorMapa({
   const edgeLabelsGroupRef = useRef<any>(null);
   const cornerBadgesGroupRef = useRef<any>(null);
   const maquinasGroupRef = useRef<any>(null);
-  const liveTrailGroupRef = useRef<any>(null);
   const trackGroupRef = useRef<any>(null);
   const baseLayersRef = useRef<{ [key: string]: any }>({});
   
-  // Referencia persistente para cinemática continua suave a 60 FPS (sin efecto resorte ni frenadas)
+  // Referencia persistente para vehículos en el mapa vinculada estrictamente al GPS
   const animatedVehiclesRef = useRef<Map<string, {
     id: string;
     data: MaquinaGpsPunto;
     currentLat: number;
     currentLng: number;
-    lastGpsLat: number;
-    lastGpsLng: number;
-    lastFixTime: string | null;
-    currentSpeedKmh: number;
-    targetSpeedKmh: number;
-    currentCourse: number;
-    targetCourse: number;
-    isMoving: boolean;
-    hasPendingCorrection: boolean;
-    targetGpsLat: number;
-    targetGpsLng: number;
     marker: any;
-    liveTrailLine?: any;
-    liveTrailPoints: [number, number][];
-    distanceSinceLastTrailPoint: number;
   }>>(new Map());
 
   const [seguirVehiculoActivo, setSeguirVehiculoActivo] = useState<boolean>(false);
@@ -306,11 +297,26 @@ export function TrazadorMapa({
 
     let pt: LatLng | null = null;
     let nombre = "Máquina Xpert Satcom";
+    let targetMarker: any = null;
 
     if (target && "lat" in target && "lng" in target && target.lat !== null && target.lng !== null) {
       pt = { lat: Number(target.lat), lng: Number(target.lng) };
       if ("nombre" in target && (target as any).nombre) {
         nombre = (target as any).nombre;
+      }
+      const devId = (target as any).device_id;
+      const maqId = (target as any).maquina_id;
+      if (devId || maqId) {
+        for (const [, veh] of animatedVehiclesRef.current.entries()) {
+          if (
+            (devId && String(veh.data.device_id) === String(devId)) ||
+            (maqId && String(veh.data.maquina_id) === String(maqId))
+          ) {
+            pt = { lat: veh.currentLat || pt.lat, lng: veh.currentLng || pt.lng };
+            targetMarker = veh.marker;
+            break;
+          }
+        }
       }
     } else {
       const validas = maquinas.filter((m) => m.lat !== null && m.lng !== null);
@@ -319,6 +325,16 @@ export function TrazadorMapa({
       if (chosen && chosen.lat !== null && chosen.lng !== null) {
         pt = { lat: Number(chosen.lat), lng: Number(chosen.lng) };
         nombre = chosen.nombre;
+        for (const [, veh] of animatedVehiclesRef.current.entries()) {
+          if (
+            (chosen.device_id && String(veh.data.device_id) === String(chosen.device_id)) ||
+            (chosen.maquina_id && String(veh.data.maquina_id) === String(chosen.maquina_id))
+          ) {
+            pt = { lat: veh.currentLat || pt.lat, lng: veh.currentLng || pt.lng };
+            targetMarker = veh.marker;
+            break;
+          }
+        }
       }
     }
 
@@ -331,18 +347,33 @@ export function TrazadorMapa({
       onToggleMostrarMaquinas();
     }
 
-    map.flyTo([pt.lat, pt.lng], 16, { animate: true, duration: 0.8 });
+    map.flyTo([pt.lat, pt.lng], 17, { animate: true, duration: 0.8 });
 
-    setTimeout(() => {
+    const openMarkerPopup = () => {
+      if (targetMarker) {
+        targetMarker.openPopup?.();
+        return;
+      }
       if (maquinasGroupRef.current) {
+        let minDist = Infinity;
+        let found: any = null;
         maquinasGroupRef.current.eachLayer((layer: any) => {
           const lpos = layer.getLatLng?.();
-          if (lpos && Math.abs(lpos.lat - pt!.lat) < 0.0001 && Math.abs(lpos.lng - pt!.lng) < 0.0001) {
-            layer.openPopup?.();
+          if (lpos) {
+            const d = Math.hypot(lpos.lat - pt!.lat, lpos.lng - pt!.lng);
+            if (d < minDist && d < 0.005) {
+              minDist = d;
+              found = layer;
+            }
           }
         });
+        if (found) found.openPopup?.();
       }
-    }, 400);
+    };
+
+    openMarkerPopup();
+    setTimeout(openMarkerPopup, 150);
+    setTimeout(openMarkerPopup, 450);
 
     toast.success(`Centrando mapa en ${nombre}`);
   };
@@ -391,7 +422,6 @@ export function TrazadorMapa({
       edgeLabelsGroupRef.current = L.layerGroup().addTo(map);
       cornerBadgesGroupRef.current = L.layerGroup().addTo(map);
       maquinasGroupRef.current = L.layerGroup().addTo(map);
-      liveTrailGroupRef.current = L.layerGroup().addTo(map);
       trackGroupRef.current = L.layerGroup().addTo(map);
 
       // Movimiento del cursor con Autoayuda / Snapping Inteligente
@@ -1282,7 +1312,7 @@ export function TrazadorMapa({
     }
   }, [interactionMode, abPoints]);
 
-  // Enfocar mapa en máquina seleccionada con reintentos para asegurar renderizado en cambio de tabs
+  // Enfocar mapa en máquina seleccionada con reintentos para sincronizar cambios de pestaña
   useEffect(() => {
     if (!mapRef.current || !maquinaEnFoco || !window.L) return undefined;
     const map = mapRef.current;
@@ -1290,35 +1320,62 @@ export function TrazadorMapa({
     const ejecutarEnfoque = () => {
       if (!map) return;
       map.invalidateSize();
-      const lat = Number(maquinaEnFoco.lat);
-      const lng = Number(maquinaEnFoco.lng);
+      let lat = Number(maquinaEnFoco.lat);
+      let lng = Number(maquinaEnFoco.lng);
       if (isNaN(lat) || isNaN(lng)) return;
 
-      map.flyTo([lat, lng], 16, { animate: true, duration: 0.8 });
+      let targetMarker: any = null;
 
-      // Abrir el popup del marcador si está creado
-      if (maquinasGroupRef.current) {
+      // 1. Buscar en animatedVehiclesRef por device_id o maquina_id
+      if (maquinaEnFoco.device_id || maquinaEnFoco.maquina_id) {
+        for (const [, veh] of animatedVehiclesRef.current.entries()) {
+          const matchDev = maquinaEnFoco.device_id && String(veh.data.device_id) === String(maquinaEnFoco.device_id);
+          const matchMaq = maquinaEnFoco.maquina_id && String(veh.data.maquina_id) === String(maquinaEnFoco.maquina_id);
+          if (matchDev || matchMaq) {
+            lat = veh.currentLat || lat;
+            lng = veh.currentLng || lng;
+            targetMarker = veh.marker;
+            break;
+          }
+        }
+      }
+
+      // 2. Si no se encontró por ID, buscar en maquinasGroupRef por proximidad
+      if (!targetMarker && maquinasGroupRef.current) {
+        let minDist = Infinity;
         maquinasGroupRef.current.eachLayer((layer: any) => {
           const lpos = layer.getLatLng?.();
-          if (lpos && Math.abs(lpos.lat - lat) < 0.0001 && Math.abs(lpos.lng - lng) < 0.0001) {
-            layer.openPopup?.();
+          if (lpos) {
+            const d = Math.hypot(lpos.lat - lat, lpos.lng - lng);
+            if (d < minDist && d < 0.005) {
+              minDist = d;
+              targetMarker = layer;
+              lat = lpos.lat;
+              lng = lpos.lng;
+            }
           }
         });
+      }
+
+      map.flyTo([lat, lng], 17, { animate: true, duration: 0.8 });
+
+      if (targetMarker) {
+        targetMarker.openPopup?.();
       }
     };
 
     // Reintentos automáticos para sincronizar con transiciones de pestañas
     ejecutarEnfoque();
-    const t1 = setTimeout(ejecutarEnfoque, 120);
-    const t2 = setTimeout(ejecutarEnfoque, 350);
-    const t3 = setTimeout(ejecutarEnfoque, 700);
+    const t1 = setTimeout(ejecutarEnfoque, 100);
+    const t2 = setTimeout(ejecutarEnfoque, 300);
+    const t3 = setTimeout(ejecutarEnfoque, 650);
 
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [maquinaEnFoco]);
+  }, [maquinaEnFoco, activeTab]);
 
   // Invalidar tamaño cuando la pestaña activa pasa a ser 'mapa'
   useEffect(() => {
@@ -1340,11 +1397,9 @@ export function TrazadorMapa({
     if (!mapReady || !mapRef.current || !maquinasGroupRef.current || !window.L) return undefined;
     const L = window.L;
     const group = maquinasGroupRef.current;
-    const trailGroup = liveTrailGroupRef.current;
 
     if (!mostrarMaquinas || !maquinas || maquinas.length === 0) {
       group.clearLayers();
-      if (trailGroup) trailGroup.clearLayers();
       animatedVehiclesRef.current.clear();
       return undefined;
     }
@@ -1479,141 +1534,86 @@ export function TrazadorMapa({
 
       const popupContent = `
         <div style="font-family: sans-serif; font-size: 12px; min-width: 250px; padding: 4px; color: #1e293b;">
-          <div style="font-weight: 900; font-size: 14px; border-bottom: 2px solid ${statusColor}; padding-bottom: 4px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
-            <span>🚜 ${m.nombre}</span>
-            <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${isOffline ? '#f1f5f9; color: #475569;' : (m.encendido ? '#dcfce7; color: #166534;' : '#fef3c7; color: #92400e;')}">
-              ${isOffline ? '🔴 Fuera de Línea' : (m.encendido ? '🟢 En Marcha' : '🟡 Detenido')}
-            </span>
+          <div style="font-weight: 900; font-size: 14px; border-bottom: 2px solid ${statusColor}; padding-bottom: 4px; margin-bottom: 6px;">
+            🚜 ${m.nombre}
           </div>
           <div style="display: grid; gap: 5px; font-size: 11px;">
-            <div><b>Tipo:</b> ${m.tipo || "Maquinaria"}</div>
-            <div><b>Conexión:</b> ${isOnline ? '🟢 En Línea (Transmitiendo en vivo)' : '🔴 Desconectado'}</div>
+            <div><b>Conexión:</b> ${isOnline ? '🟢 En Línea' : '🔴 Desconectado'}</div>
             <div><b>Velocidad Actual:</b> <b>${velDisplay.toFixed(1)} km/h</b> (Rumbo: ${rumbo}°)</div>
             ${m.horometro_horas ? `<div><b>Horómetro Satcom:</b> <b>${m.horometro_horas.toLocaleString("es-AR")} hrs</b></div>` : ''}
             <div><b>Último Reporte:</b> <span style="font-weight: bold; color: ${isOffline ? '#dc2626' : '#166534'};">${tiempoReporte}</span></div>
             <div><b>Coordenadas:</b> ${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}</div>
           </div>
+          ${isAdmin ? `
           <div style="margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 6px; display: flex; gap: 4px;">
             <button id="btn-audit-${key}" style="flex: 1; background: #06b6d4; color: #ffffff; border: none; border-radius: 4px; padding: 5px 8px; font-weight: bold; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
               📊 Auditar Trayectoria y Horas
             </button>
           </div>
+          ` : ''}
         </div>
       `;
 
-      let animated = animatedVehiclesRef.current.get(key);
+      const animated = animatedVehiclesRef.current.get(key);
 
       if (!animated) {
         const divIcon = L.divIcon({
           className: "custom-machine-pin",
           html: buildIconHtml(velDisplay, rumbo),
-          iconSize: [0, 0],
-          iconAnchor: [0, 0],
+          iconSize: [44, 60],
+          iconAnchor: [22, 30],
         });
 
         const marker = L.marker([m.lat, m.lng], { icon: divIcon, zIndexOffset: 1000 });
         marker.bindPopup(popupContent);
 
         marker.on("click", () => {
-          if (onSelectMaquina) onSelectMaquina(m);
-          setPanelAuditoriaAbierto(true);
+          if (isAdmin) {
+            if (onSelectMaquina) onSelectMaquina(m);
+            setPanelAuditoriaAbierto(true);
+          }
         });
 
         marker.on("popupopen", () => {
-          const btn = document.getElementById(`btn-audit-${key}`);
-          if (btn) {
-            btn.onclick = () => {
-              if (onSelectMaquina) onSelectMaquina(m);
-              setPanelAuditoriaAbierto(true);
-              marker.closePopup();
-            };
+          if (isAdmin) {
+            const btn = document.getElementById(`btn-audit-${key}`);
+            if (btn) {
+              btn.onclick = () => {
+                if (onSelectMaquina) onSelectMaquina(m);
+                setPanelAuditoriaAbierto(true);
+                marker.closePopup();
+              };
+            }
           }
         });
 
         group.addLayer(marker);
 
-        let liveTrailLine: any = null;
-        if (trailGroup) {
-          liveTrailLine = L.polyline([[m.lat, m.lng]], {
-            color: "#06b6d4",
-            weight: 3,
-            opacity: 0.85,
-            dashArray: "4, 6",
-          });
-          trailGroup.addLayer(liveTrailLine);
-        }
-
-        animated = {
+        const newAnimated = {
           id: key,
           data: m,
           currentLat: m.lat,
           currentLng: m.lng,
-          lastGpsLat: m.lat,
-          lastGpsLng: m.lng,
-          lastFixTime: m.fix_time || null,
-          currentSpeedKmh: isOffline ? 0 : velDisplay,
-          targetSpeedKmh: isOffline ? 0 : velDisplay,
-          currentCourse: rumbo,
-          targetCourse: rumbo,
-          isMoving,
-          hasPendingCorrection: false,
-          targetGpsLat: m.lat,
-          targetGpsLng: m.lng,
           marker,
-          liveTrailLine,
-          liveTrailPoints: [[m.lat, m.lng]],
-          distanceSinceLastTrailPoint: 0,
         };
 
-        animatedVehiclesRef.current.set(key, animated);
+        animatedVehiclesRef.current.set(key, newAnimated);
       } else {
         animated.data = m;
-        animated.targetSpeedKmh = isOffline ? 0 : velDisplay;
-        if (typeof m.rumbo === "number") {
-          animated.targetCourse = m.rumbo;
-        }
-        animated.isMoving = !isOffline && (animated.targetSpeedKmh > 1.5 || animated.currentSpeedKmh > 1.5);
-
-        // Detectar si este reporte de Satcom contiene un paquete de coordenadas GPS nuevo
-        const isNewGpsPoint = 
-          m.lat !== animated.lastGpsLat || 
-          m.lng !== animated.lastGpsLng || 
-          (m.fix_time && m.fix_time !== animated.lastFixTime);
-
-        if (isNewGpsPoint) {
-          const latRad = (animated.currentLat * Math.PI) / 180;
-          const dLatMeters = (m.lat - animated.currentLat) * 111320;
-          const dLngMeters = (m.lng - animated.currentLng) * 111320 * (Math.cos(latRad) || 1);
-          const distanceToNewFix = Math.hypot(dLatMeters, dLngMeters);
-
-          animated.lastGpsLat = m.lat;
-          animated.lastGpsLng = m.lng;
-          animated.lastFixTime = m.fix_time || null;
-
-          if (distanceToNewFix > 600) {
-            // Salto grande inicial o de telemetría: reubicar directamente
-            animated.currentLat = m.lat;
-            animated.currentLng = m.lng;
-            animated.targetGpsLat = m.lat;
-            animated.targetGpsLng = m.lng;
-            animated.hasPendingCorrection = false;
-            animated.marker.setLatLng([m.lat, m.lng]);
-          } else {
-            // Desvío normal en ruta o lote: activar absorción suave sin frenar el vehículo
-            animated.targetGpsLat = m.lat;
-            animated.targetGpsLng = m.lng;
-            animated.hasPendingCorrection = true;
-          }
-        }
-
+        animated.currentLat = m.lat;
+        animated.currentLng = m.lng;
+        animated.marker.setLatLng([m.lat, m.lng]);
         animated.marker.setPopupContent(popupContent);
-        const iconDiv = animated.marker.getElement();
-        if (iconDiv) {
-          const badgeEl = iconDiv.querySelector(".vehicle-speed-badge");
+        
+        const iconEl = animated.marker.getElement();
+        if (iconEl) {
+          const cone = iconEl.querySelector(".vehicle-arrow-cone") as HTMLElement;
+          if (cone) cone.style.transform = `rotate(${rumbo}deg)`;
+          const badgeEl = iconEl.querySelector(".vehicle-speed-badge");
           if (badgeEl) {
             badgeEl.textContent = isOffline 
               ? `🔴 Offline · ${m.ultima_velocidad_reportada ? `Últ. ${m.ultima_velocidad_reportada} km/h` : "Sin señal"}`
-              : `${velDisplay.toFixed(0)} km/h · ${Math.round(animated.currentCourse)}°${tieneLote ? ` · ${dentroDelLote ? (auditoria.lineaCercana ? `±${auditoria.desvioMeters}m` : "En Eje") : "Fuera Lote"}` : (velDisplay > 0 ? " · En Marcha" : " · Detenido")}`;
+              : `${velDisplay.toFixed(0)} km/h · ${rumbo}°${tieneLote ? ` · ${dentroDelLote ? (auditoria.lineaCercana ? `±${auditoria.desvioMeters}m` : "En Eje") : "Fuera Lote"}` : (velDisplay > 0 ? " · En Marcha" : " · Detenido")}`;
           }
         }
       }
@@ -1622,225 +1622,36 @@ export function TrazadorMapa({
     animatedVehiclesRef.current.forEach((veh, key) => {
       if (!currentKeys.has(key)) {
         group.removeLayer(veh.marker);
-        if (veh.liveTrailLine && trailGroup) {
-          trailGroup.removeLayer(veh.liveTrailLine);
-        }
         animatedVehiclesRef.current.delete(key);
       }
     });
     return undefined;
-  }, [mapReady, maquinas, mostrarMaquinas, polygon, lineas, maquinaAuditadaId, onSelectMaquina]);
+  }, [mapReady, maquinas, mostrarMaquinas, polygon, lineas, maquinaAuditadaId, onSelectMaquina, isAdmin]);
 
-  // Motor Cinemático de Movimiento en Tiempo Real a 60 FPS (Dead-Reckoning e Interpolación Suave)
+  // Motor Cinemático - Dummy mantenedor de compatibilidad
   useEffect(() => {
-    if (!mapReady || !mapRef.current) return undefined;
-    const map = mapRef.current;
-    let animId: number;
-    let lastTime = performance.now();
-
-    const animateTick = (time: number) => {
-      const dt = Math.min((time - lastTime) / 1000, 0.1); // Máximo 100ms para estabilidad
-      lastTime = time;
-
-      animatedVehiclesRef.current.forEach((veh) => {
-        if (!veh.marker) return;
-
-        // 1. Suavizado progresivo de velocidad (transición orgánica de aceleración/frenado)
-        const speedDiff = veh.targetSpeedKmh - veh.currentSpeedKmh;
-        if (Math.abs(speedDiff) > 0.1) {
-          const maxAcc = 20 * dt; // hasta 20 km/h por segundo
-          if (Math.abs(speedDiff) <= maxAcc) {
-            veh.currentSpeedKmh = veh.targetSpeedKmh;
-          } else {
-            veh.currentSpeedKmh += Math.sign(speedDiff) * maxAcc;
-          }
-        } else {
-          veh.currentSpeedKmh = veh.targetSpeedKmh;
-        }
-
-        // 2. Suavizado de rumbo (giro orgánico de dirección)
-        let diffCourse = (veh.targetCourse - veh.currentCourse) % 360;
-        if (diffCourse < -180) diffCourse += 360;
-        if (diffCourse > 180) diffCourse -= 360;
-        if (Math.abs(diffCourse) > 0.5) {
-          const maxTurn = 60 * dt; // hasta 60 grados por segundo de rotación
-          if (Math.abs(diffCourse) <= maxTurn) {
-            veh.currentCourse = veh.targetCourse;
-          } else {
-            veh.currentCourse = (veh.currentCourse + Math.sign(diffCourse) * maxTurn + 360) % 360;
-          }
-        } else {
-          veh.currentCourse = veh.targetCourse;
-        }
-
-        // 3. Cinemática de desplazamiento continuo
-        if (veh.currentSpeedKmh > 1.0) {
-          // El vehículo está en marcha activa: AVANCE CONTINUO ININTERRUMPIDO
-          const baseDistMeters = (veh.currentSpeedKmh / 3.6) * dt;
-          veh.distanceSinceLastTrailPoint += baseDistMeters;
-
-          const rad = (veh.currentCourse * Math.PI) / 180;
-          const latRad = (veh.currentLat * Math.PI) / 180;
-          const cosLat = Math.cos(latRad) || 1;
-
-          // Vector de avance principal ininterrumpido hacia adelante
-          const dLatBase = (baseDistMeters * Math.cos(rad)) / 111320;
-          const dLngBase = (baseDistMeters * Math.sin(rad)) / (111320 * cosLat);
-
-          // Vector de corrección suave hacia el GPS (para converger sin tirones)
-          let dLatCorr = 0;
-          let dLngCorr = 0;
-
-          if (veh.hasPendingCorrection) {
-            const errorLat = veh.targetGpsLat - veh.currentLat;
-            const errorLng = veh.targetGpsLng - veh.currentLng;
-            const errorMeters = Math.hypot(errorLat * 111320, errorLng * 111320 * cosLat);
-
-            if (errorMeters < 1.5) {
-              // Ya convergió a menos de 1.5m del reporte satelital
-              veh.hasPendingCorrection = false;
-            } else {
-              // Absorber suavemente en una ventana de 3.5 segundos
-              // CRUCIAL: Limitar la corrección a un máximo del 35% de la velocidad base
-              // Esto GARANTIZA matemáticamente que la velocidad nunca baja a 0 (nunca se traba)
-              // y nunca se dispara bruscamente hacia adelante.
-              const maxCorrSpeedMeters = (veh.currentSpeedKmh / 3.6) * 0.35;
-              const corrSpeedMeters = Math.min(errorMeters / 3.5, maxCorrSpeedMeters);
-              const corrDist = corrSpeedMeters * dt;
-              const factor = corrDist / errorMeters;
-              dLatCorr = errorLat * factor;
-              dLngCorr = errorLng * factor;
-            }
-          }
-
-          veh.currentLat += dLatBase + dLatCorr;
-          veh.currentLng += dLngBase + dLngCorr;
-          veh.marker.setLatLng([veh.currentLat, veh.currentLng]);
-
-          // Actualizar estela en vivo cada 12 metros recorridos
-          if (veh.distanceSinceLastTrailPoint >= 12 && veh.liveTrailLine) {
-            veh.distanceSinceLastTrailPoint = 0;
-            veh.liveTrailPoints.push([veh.currentLat, veh.currentLng]);
-            if (veh.liveTrailPoints.length > 80) {
-              veh.liveTrailPoints.shift();
-            }
-            veh.liveTrailLine.setLatLngs(veh.liveTrailPoints);
-          }
-        } else {
-          // Vehículo detenido / ralentí / estacionado
-          // Deslizar suavemente hasta la coordenada exacta de detención
-          const dLat = (veh.targetGpsLat - veh.currentLat);
-          const dLng = (veh.targetGpsLng - veh.currentLng);
-          if (Math.abs(dLat) > 0.000001 || Math.abs(dLng) > 0.000001) {
-            veh.currentLat += dLat * Math.min(dt * 3, 1.0);
-            veh.currentLng += dLng * Math.min(dt * 3, 1.0);
-            veh.marker.setLatLng([veh.currentLat, veh.currentLng]);
-          }
-        }
-
-        // 4. Orientación de la flecha / cono en el icono
-        const markerEl = veh.marker.getElement();
-        if (markerEl) {
-          const arrowEl = markerEl.querySelector(".vehicle-arrow-cone");
-          if (arrowEl) {
-            (arrowEl as HTMLElement).style.transform = `rotate(${Math.round(veh.currentCourse)}deg)`;
-          }
-        }
-
-        // 5. Seguimiento automático de cámara si está activo
-        const isAudited = maquinaAuditadaId && (
-          String(veh.data.device_id) === String(maquinaAuditadaId) ||
-          String(veh.data.maquina_id) === String(maquinaAuditadaId)
-        );
-
-        if (isAudited && seguirVehiculoActivo) {
-          map.panTo([veh.currentLat, veh.currentLng], { animate: false });
-        }
-      });
-
-      animId = requestAnimationFrame(animateTick);
-    };
-
-    animId = requestAnimationFrame(animateTick);
-
-    return () => {
-      cancelAnimationFrame(animId);
-    };
+    return () => {};
   }, [mapReady, maquinaAuditadaId, seguirVehiculoActivo]);
 
-  // Renderizar Track Histórico de la Máquina (recorrido real auditado con inicio 🏁 y fin 🎯)
+  // Renderizar Traza Satelital Histórica
   useEffect(() => {
-    if (!trackGroupRef.current || !window.L || !mapRef.current) return undefined;
+    if (!mapRef.current || !trackGroupRef.current || !window.L) return undefined;
+    if (!isAdmin || !mostrarAuditoriaAdmin || !trackHistorico || trackHistorico.length < 2) {
+      trackGroupRef.current.clearLayers();
+      return undefined;
+    }
     const L = window.L;
     const map = mapRef.current;
     const group = trackGroupRef.current;
     group.clearLayers();
 
-    if (!trackHistorico || trackHistorico.length < 2) return undefined;
-
     const latLngs = trackHistorico.map((p) => [p.lat, p.lng]);
-
-    // Línea de resplandor exterior
-    const trackGlow = L.polyline(latLngs, {
-      color: "#0891b2",
-      weight: 6,
-      opacity: 0.35,
-    });
-
-    // Línea de traza principal
-    const trackLine = L.polyline(latLngs, {
-      color: "#06b6d4",
-      weight: 3.5,
-      opacity: 0.95,
-      dashArray: "6, 8",
-    });
-
-    // Marcador de Inicio de Recorrido (🏁)
-    const firstPt = trackHistorico[0];
-    const startIcon = L.divIcon({
-      className: "custom-wp-icon",
-      html: `
-        <div style="
-          background: #0f172a;
-          border: 2px solid #22c55e;
-          color: #ffffff;
-          border-radius: 50%;
-          width: 28px;
-          height: 28px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 14px;
-          box-shadow: 0 0 12px #22c55e;
-        ">
-          🏁
-        </div>
-      `,
-      iconSize: [28, 28],
-      iconAnchor: [14, 14],
-    });
-    const startMarker = L.marker([firstPt.lat, firstPt.lng], { icon: startIcon });
-    startMarker.bindPopup(`
-      <div style="font-family:sans-serif;font-size:11.5px;padding:3px;">
-        <b style="color:#16a34a;">🏁 Inicio de Jornada / Traza</b><br/>
-        <span>Puntos totales: <b>${trackHistorico.length}</b></span><br/>
-        ${firstPt.fixTime ? `<span style="color:#64748b;">Hora: ${new Date(firstPt.fixTime).toLocaleTimeString("es-AR")}</span>` : ""}
-      </div>
-    `);
-
-    group.addLayer(trackGlow);
+    const trackLine = L.polyline(latLngs, { color: "#06b6d4", weight: 3, opacity: 0.95 });
     group.addLayer(trackLine);
-    group.addLayer(startMarker);
-
-    try {
-      const bounds = trackLine.getBounds();
-      if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
-      }
-    } catch (e) {}
+    try { map.fitBounds(trackLine.getBounds(), { padding: [60, 60] }); } catch (e) {}
 
     return undefined;
-  }, [trackHistorico]);
+  }, [trackHistorico, isAdmin, mostrarAuditoriaAdmin]);
 
   const handleLocalizarGPS = () => {
     if (!navigator.geolocation) {
@@ -1934,18 +1745,20 @@ export function TrazadorMapa({
                 const validas = maquinas.filter(m => m.lat !== null && m.lng !== null);
                 const chosen = (maquinaAuditadaId ? validas.find(m => String(m.device_id) === String(maquinaAuditadaId) || String(m.maquina_id) === String(maquinaAuditadaId)) : null) || validas.find(m => m.estado_satcom === "online") || validas[0];
                 if (chosen) {
-                  if (onSelectMaquina) onSelectMaquina(chosen);
-                  setPanelAuditoriaAbierto(true);
+                  if (isAdmin && onSelectMaquina) {
+                    onSelectMaquina(chosen);
+                    setPanelAuditoriaAbierto(true);
+                  }
                   handleCentrarEnMaquina(chosen);
                 }
               }}
               className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold border transition-colors shadow ${
-                maquinaAuditadaId ? "bg-cyan-600 text-white border-cyan-400 shadow-[0_0_10px_#06b6d4]" : (mostrarMaquinas ? "bg-emerald-600 text-white border-emerald-500 animate-pulse" : "bg-slate-800 text-emerald-400 border-slate-700")
+                isAdmin && maquinaAuditadaId ? "bg-cyan-600 text-white border-cyan-400 shadow-[0_0_10px_#06b6d4]" : (mostrarMaquinas ? "bg-emerald-600 text-white border-emerald-500 animate-pulse" : "bg-slate-800 text-emerald-400 border-slate-700")
               }`}
-              title="Auditar máquina Xpert Satcom en tiempo real"
+              title={isAdmin ? "Auditar máquina Xpert Satcom en tiempo real" : "Enfocar máquina en el mapa"}
             >
               <Tractor className="h-3 w-3" />
-              <span>{maquinaAuditadaId ? "Auditando" : "Máq"}</span>
+              <span>{isAdmin && maquinaAuditadaId ? "Auditando" : "Máq"}</span>
             </button>
           )}
 
@@ -2009,8 +1822,8 @@ export function TrazadorMapa({
 
         <div className="h-4 w-[1px] bg-slate-700 mx-0.5" />
 
-        {/* Selector y Auditoría Rápida de Máquinas Satcom */}
-        {maquinas && maquinas.length > 0 && (
+        {/* Selector y Auditoría Rápida de Máquinas Satcom (Solo Administrador) */}
+        {isAdmin && maquinas && maquinas.length > 0 && (
           <div className="flex items-center gap-1 bg-slate-800/90 rounded p-0.5 border border-slate-700">
             <Tractor className="h-3.5 w-3.5 text-amber-400 ml-1.5 shrink-0" />
             <select
@@ -2209,6 +2022,24 @@ export function TrazadorMapa({
           >
             <Tractor className="h-3.5 w-3.5" />
             🚜 Satcom ({maquinas.filter(m => m.lat !== null).length})
+          </Button>
+        )}
+
+        {/* Toggle para Auditar Camino / Traza Satelital (Solo Administrador) */}
+        {isAdmin && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onToggleMostrarAuditoriaAdmin}
+            className={`text-xs h-7 gap-1 font-bold ${
+              mostrarAuditoriaAdmin
+                ? "bg-cyan-500 text-slate-950 font-black shadow"
+                : "bg-slate-800/90 border-slate-600 text-slate-200 hover:bg-slate-700"
+            }`}
+            title="Activar o desactivar la traza satelital y el panel de auditoría (Solo Administradores)"
+          >
+            <Route className="h-3.5 w-3.5 text-cyan-400" />
+            Auditar Camino: {mostrarAuditoriaAdmin ? "ON" : "OFF"}
           </Button>
         )}
 
@@ -2544,8 +2375,10 @@ export function TrazadorMapa({
         </div>
       )}
 
-      {/* Panel Flotante de Auditoría Satcom en Tiempo Real (Qué Hace, Traza y Horas en Vivo) */}
+      {/* Panel Flotante de Auditoría Satcom en Tiempo Real (Solo Administradores) */}
       {(() => {
+        if (!isAdmin || !mostrarAuditoriaAdmin) return null;
+
         const maquinaAuditada = maquinas.find(m => 
           (maquinaAuditadaId && (String(m.device_id) === String(maquinaAuditadaId) || String(m.maquina_id) === String(maquinaAuditadaId)))
         ) || null;
@@ -2611,6 +2444,9 @@ export function TrazadorMapa({
                   onClick={() => {
                     if (onSelectMaquina) onSelectMaquina(null);
                     setPanelAuditoriaAbierto(false);
+                    if (onToggleMostrarAuditoriaAdmin && mostrarAuditoriaAdmin) {
+                      onToggleMostrarAuditoriaAdmin();
+                    }
                   }}
                   className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800"
                   title="Cerrar panel de auditoría"
@@ -2831,6 +2667,23 @@ export function TrazadorMapa({
               >
                 <Tractor className="h-4 w-4 text-emerald-400" />
                 🚜 Enfocar Máquina Xpert Satcom en Vivo
+              </Button>
+            )}
+            {isAdmin && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (onToggleMostrarAuditoriaAdmin) onToggleMostrarAuditoriaAdmin();
+                  setMobileMenuModal(false);
+                }}
+                className={`justify-start h-10 gap-2 text-xs font-bold ${
+                  mostrarAuditoriaAdmin
+                    ? "border-cyan-500 bg-cyan-950/60 text-cyan-300"
+                    : "border-slate-700 bg-slate-800 text-slate-300"
+                }`}
+              >
+                <Route className="h-4 w-4 text-cyan-400" />
+                📊 Auditar Camino: {mostrarAuditoriaAdmin ? "Activado (Ocultar)" : "Desactivado (Mostrar)"}
               </Button>
             )}
             <Button
