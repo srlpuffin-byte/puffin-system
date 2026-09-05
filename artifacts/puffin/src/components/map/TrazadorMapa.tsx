@@ -149,7 +149,8 @@ interface TrazadorMapaProps {
   mostrarMaquinas?: boolean;
   onToggleMostrarMaquinas?: () => void;
   trackHistorico?: LatLng[];
-  maquinaEnFoco?: LatLng | null;
+  maquinaEnFoco?: (LatLng & { timestamp?: number }) | null;
+  activeTab?: string;
   // Nuevas props para Guiado de Cabina & Secuencia de Labor
   pasadaActivaId?: string | null;
   proximaPasadaId?: string | null;
@@ -187,6 +188,7 @@ export function TrazadorMapa({
   onToggleMostrarMaquinas,
   trackHistorico = [],
   maquinaEnFoco = null,
+  activeTab = "mapa",
   pasadaActivaId = null,
   proximaPasadaId = null,
   pasadasCompletadasIds = [],
@@ -235,6 +237,7 @@ export function TrazadorMapa({
   const handleCentrarEnPasadaActiva = (line?: LineSegment | null) => {
     const target = line || lineas.find(l => l.id === pasadaActivaId) || lineas[0];
     if (target && mapRef.current && window.L) {
+      mapRef.current.invalidateSize();
       const bounds = window.L.latLngBounds([
         [target.start.lat, target.start.lng],
         [target.end.lat, target.end.lng]
@@ -242,6 +245,54 @@ export function TrazadorMapa({
       mapRef.current.fitBounds(bounds, { padding: [80, 80], maxZoom: 17 });
       toast.info(`Centrando en ${target.nombre}`);
     }
+  };
+
+  const handleCentrarEnMaquina = (target?: LatLng | MaquinaGpsPunto | null) => {
+    if (!mapRef.current || !window.L) return;
+    const map = mapRef.current;
+    map.invalidateSize();
+
+    let pt: LatLng | null = null;
+    let nombre = "Máquina Xpert Satcom";
+
+    if (target && "lat" in target && "lng" in target && target.lat !== null && target.lng !== null) {
+      pt = { lat: Number(target.lat), lng: Number(target.lng) };
+      if ("nombre" in target && (target as any).nombre) {
+        nombre = (target as any).nombre;
+      }
+    } else {
+      const validas = maquinas.filter((m) => m.lat !== null && m.lng !== null);
+      const onlineOne = validas.find((m) => m.estado_satcom === "online");
+      const chosen = onlineOne || validas[0];
+      if (chosen && chosen.lat !== null && chosen.lng !== null) {
+        pt = { lat: Number(chosen.lat), lng: Number(chosen.lng) };
+        nombre = chosen.nombre;
+      }
+    }
+
+    if (!pt || isNaN(pt.lat) || isNaN(pt.lng)) {
+      toast.info("No hay coordenadas GPS de maquinaria disponibles para enfocar.");
+      return;
+    }
+
+    if (!mostrarMaquinas && onToggleMostrarMaquinas) {
+      onToggleMostrarMaquinas();
+    }
+
+    map.flyTo([pt.lat, pt.lng], 16, { animate: true, duration: 0.8 });
+
+    setTimeout(() => {
+      if (maquinasGroupRef.current) {
+        maquinasGroupRef.current.eachLayer((layer: any) => {
+          const lpos = layer.getLatLng?.();
+          if (lpos && Math.abs(lpos.lat - pt!.lat) < 0.0001 && Math.abs(lpos.lng - pt!.lng) < 0.0001) {
+            layer.openPopup?.();
+          }
+        });
+      }
+    }, 400);
+
+    toast.success(`Centrando mapa en ${nombre}`);
   };
 
   const auditoria = useMemo(() => auditarRectitudLote(polygon), [polygon]);
@@ -1170,11 +1221,58 @@ export function TrazadorMapa({
     }
   }, [interactionMode, abPoints]);
 
-  // Enfocar mapa en máquina seleccionada
+  // Enfocar mapa en máquina seleccionada con reintentos para asegurar renderizado en cambio de tabs
   useEffect(() => {
-    if (!mapRef.current || !maquinaEnFoco) return;
-    mapRef.current.flyTo([maquinaEnFoco.lat, maquinaEnFoco.lng], 16, { animate: true, duration: 1 });
+    if (!mapRef.current || !maquinaEnFoco || !window.L) return undefined;
+    const map = mapRef.current;
+
+    const ejecutarEnfoque = () => {
+      if (!map) return;
+      map.invalidateSize();
+      const lat = Number(maquinaEnFoco.lat);
+      const lng = Number(maquinaEnFoco.lng);
+      if (isNaN(lat) || isNaN(lng)) return;
+
+      map.flyTo([lat, lng], 16, { animate: true, duration: 0.8 });
+
+      // Abrir el popup del marcador si está creado
+      if (maquinasGroupRef.current) {
+        maquinasGroupRef.current.eachLayer((layer: any) => {
+          const lpos = layer.getLatLng?.();
+          if (lpos && Math.abs(lpos.lat - lat) < 0.0001 && Math.abs(lpos.lng - lng) < 0.0001) {
+            layer.openPopup?.();
+          }
+        });
+      }
+    };
+
+    // Reintentos automáticos para sincronizar con transiciones de pestañas
+    ejecutarEnfoque();
+    const t1 = setTimeout(ejecutarEnfoque, 120);
+    const t2 = setTimeout(ejecutarEnfoque, 350);
+    const t3 = setTimeout(ejecutarEnfoque, 700);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
   }, [maquinaEnFoco]);
+
+  // Invalidar tamaño cuando la pestaña activa pasa a ser 'mapa'
+  useEffect(() => {
+    if (activeTab === "mapa" && mapRef.current) {
+      const map = mapRef.current;
+      map.invalidateSize();
+      const t = setTimeout(() => {
+        map.invalidateSize();
+      }, 150);
+      return () => {
+        clearTimeout(t);
+      };
+    }
+    return undefined;
+  }, [activeTab]);
 
   // Renderizar Máquinas con Telemetría GPS Xpert Satcom
   useEffect(() => {
@@ -1447,6 +1545,20 @@ export function TrazadorMapa({
             </button>
           )}
 
+          {/* Chip para Enfocar Máquina Satcom en Celular */}
+          {maquinas && maquinas.some(m => m.lat !== null && m.lng !== null) && (
+            <button
+              onClick={() => handleCentrarEnMaquina()}
+              className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold border transition-colors shadow ${
+                mostrarMaquinas ? "bg-emerald-600 text-white border-emerald-500 animate-pulse" : "bg-slate-800 text-emerald-400 border-slate-700"
+              }`}
+              title="Centrar mapa en la máquina Xpert Satcom"
+            >
+              <Tractor className="h-3 w-3" />
+              <span>Máq</span>
+            </button>
+          )}
+
           {/* Herramientas Rápidas Modal */}
           <button
             onClick={() => setMobileMenuModal(true)}
@@ -1663,19 +1775,9 @@ export function TrazadorMapa({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => {
-              const validas = maquinas.filter((m) => m.lat !== null && m.lng !== null);
-              if (!mostrarMaquinas) {
-                onToggleMostrarMaquinas?.();
-              }
-              if (validas.length > 0 && mapRef.current && window.L) {
-                const bounds = window.L.latLngBounds(validas.map((m) => [m.lat, m.lng]));
-                mapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
-                toast.success(`Enfocando ${validas.length} máquinas Xpert Satcom en el mapa`);
-              }
-            }}
+            onClick={() => handleCentrarEnMaquina()}
             className={`text-xs h-7 gap-1 ${mostrarMaquinas ? "bg-emerald-500 text-slate-950 font-black shadow" : "bg-slate-800/90 border-slate-600 text-slate-200 hover:bg-slate-700"}`}
-            title="Clic para enfocar y ver todas las máquinas Xpert Satcom en el mapa"
+            title="Clic para enfocar y ver la máquina Xpert Satcom en el mapa"
           >
             <Tractor className="h-3.5 w-3.5" />
             🚜 Satcom ({maquinas.filter(m => m.lat !== null).length})
@@ -1966,11 +2068,24 @@ export function TrazadorMapa({
                   const activa = lineas.find(l => l.id === pasadaActivaId) || lineas[0];
                   if (activa) handleCentrarEnPasadaActiva(activa);
                 }}
-                className="h-9 px-2.5 text-xs font-bold border-slate-700 bg-slate-900 text-amber-400 hover:bg-slate-800"
+                className="h-9 px-2 text-xs font-bold border-slate-700 bg-slate-900 text-amber-400 hover:bg-slate-800"
                 title="Centrar mapa en la pasada actual"
               >
-                🎯 Centrar
+                🎯 Pasada
               </Button>
+
+              {maquinas && maquinas.some(m => m.lat !== null && m.lng !== null) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleCentrarEnMaquina()}
+                  className="h-9 px-2 text-xs font-bold border-emerald-500/60 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 flex items-center gap-1"
+                  title="Centrar mapa en la máquina / tractor GPS"
+                >
+                  <Tractor className="h-3.5 w-3.5 text-emerald-400" />
+                  <span className="hidden sm:inline">Máquina</span>
+                </Button>
+              )}
 
               {onToggleOrdenSecuencia && (
                 <Button
@@ -2106,6 +2221,19 @@ export function TrazadorMapa({
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-2 py-2">
+            {maquinas && maquinas.some(m => m.lat !== null && m.lng !== null) && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  handleCentrarEnMaquina();
+                  setMobileMenuModal(false);
+                }}
+                className="justify-start h-10 border-emerald-600/50 bg-emerald-950/40 text-emerald-300 gap-2 text-xs"
+              >
+                <Tractor className="h-4 w-4 text-emerald-400" />
+                🚜 Enfocar Máquina Xpert Satcom en Vivo
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => {

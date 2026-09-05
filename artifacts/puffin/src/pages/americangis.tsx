@@ -113,7 +113,7 @@ export function Americangis() {
 
   const [mostrarMaquinasGps, setMostrarMaquinasGps] = useState<boolean>(true);
   const [trackAuditoria, setTrackAuditoria] = useState<LatLng[]>([]);
-  const [maquinaEnFoco, setMaquinaEnFoco] = useState<LatLng | null>(null);
+  const [maquinaEnFoco, setMaquinaEnFoco] = useState<(LatLng & { timestamp?: number }) | null>(null);
   const [nombreTrackCargado, setNombreTrackCargado] = useState<string | null>(null);
 
   const handleCargarArchivoTrack = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1051,6 +1051,7 @@ export function Americangis() {
             onToggleMostrarMaquinas={() => setMostrarMaquinasGps(!mostrarMaquinasGps)}
             trackHistorico={trackAuditoria}
             maquinaEnFoco={maquinaEnFoco}
+            activeTab={activeTab}
             pasadaActivaId={pasadaActivaId}
             proximaPasadaId={proximaPasadaId}
             pasadasCompletadasIds={pasadasCompletadasIds}
@@ -1317,6 +1318,28 @@ export function Americangis() {
 
                     {/* Selector de Orden / Invertir Secuencia */}
                     <div className="flex items-center gap-2 flex-wrap">
+                      {maquinasGps.some(m => m.lat !== null && m.lng !== null) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const validas = maquinasGps.filter(m => m.lat !== null && m.lng !== null);
+                            const onlineOnes = validas.filter(m => m.estado_satcom === "online");
+                            const foco = onlineOnes.length > 0 ? onlineOnes[0] : validas[0];
+                            if (foco && foco.lat !== null && foco.lng !== null) {
+                              setMostrarMaquinasGps(true);
+                              setMaquinaEnFoco({ lat: Number(foco.lat), lng: Number(foco.lng), timestamp: Date.now() });
+                              setActiveTab("mapa");
+                              toast.success(`Centrando mapa en ${foco.nombre}`);
+                            }
+                          }}
+                          className="border-emerald-500/60 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 text-xs h-9 px-3 gap-1.5 font-bold shadow"
+                        >
+                          <Tractor className="h-3.5 w-3.5 text-emerald-400" />
+                          <span>Ir a la Máquina</span>
+                        </Button>
+                      )}
+
                       <Button
                         size="sm"
                         onClick={handleToggleOrdenSecuencia}
@@ -2025,9 +2048,9 @@ export function Americangis() {
                       const validas = maquinasGps.filter(m => m.lat !== null && m.lng !== null);
                       const onlineOnes = validas.filter(m => m.estado_satcom === "online");
                       const foco = onlineOnes.length > 0 ? onlineOnes[0] : validas[0];
-                      if (foco) {
+                      if (foco && foco.lat !== null && foco.lng !== null) {
                         setMostrarMaquinasGps(true);
-                        setMaquinaEnFoco({ lat: foco.lat!, lng: foco.lng! });
+                        setMaquinaEnFoco({ lat: Number(foco.lat), lng: Number(foco.lng), timestamp: Date.now() });
                         setActiveTab("mapa");
                         toast.success(`Mostrando flota en el mapa satelital. Enfocado en ${foco.nombre}`);
                       } else {
@@ -2174,11 +2197,12 @@ export function Americangis() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => {
-                                  setMaquinaEnFoco(pt);
+                                  setMostrarMaquinasGps(true);
+                                  setMaquinaEnFoco({ lat: Number(pt.lat), lng: Number(pt.lng), timestamp: Date.now() });
                                   setActiveTab("mapa");
                                   toast.info(`Centrando mapa en ${m.nombre}`);
                                 }}
-                                className="h-7 text-xs border-slate-700 bg-slate-900 hover:bg-slate-800 text-amber-400 gap-1 px-2.5"
+                                className="h-7 text-xs border-slate-700 bg-slate-900 hover:bg-slate-800 text-amber-400 gap-1 px-2.5 font-bold"
                                 title="Ver en el mapa interactivo"
                               >
                                 <Crosshair className="h-3 w-3" /> Ver en Mapa
