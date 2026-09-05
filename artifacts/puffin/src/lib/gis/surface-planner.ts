@@ -1030,4 +1030,275 @@ export function generarPasadasDesdeLineaBase(
   });
 }
 
+export interface BordeMetrica {
+  index: number;
+  nombre: string;
+  from: LatLng;
+  to: LatLng;
+  distanciaMetros: number;
+  rumboGrados: number;
+  headingName: string;
+  anguloEsquinaGrados?: number;
+  esEscuadra?: boolean;
+}
+
+export interface AuditoriaLote {
+  bordes: BordeMetrica[];
+  esCuadradoRecto: boolean;
+  scoreRectitud: number; // 0 a 100%
+  diferenciaLadosOpuestosMeters: number;
+  mensajeSeguridad: string;
+}
+
+/**
+ * Calcula las métricas exactas de cada borde del perímetro:
+ * distancia precisa en metros, rumbo y ángulo de cada esquina
+ */
+export function calcularBordesPerimetro(polygon: LatLng[]): BordeMetrica[] {
+  if (polygon.length < 2) return [];
+  const n = polygon.length;
+  const bordes: BordeMetrica[] = [];
+
+  const origin = calcularCentroide(polygon);
+  const mPts = polygon.map((p) => proyectarLocal(p, origin));
+  const edgeCount = n >= 3 ? n : n - 1;
+
+  for (let i = 0; i < edgeCount; i++) {
+    const j = (i + 1) % n;
+    const p1 = polygon[i];
+    const p2 = polygon[j];
+    const dist = Math.round(calcularDistanciaMetros(p1, p2) * 10) / 10;
+    const rumbo = Math.round(calcularRumboGrados(p1, p2) * 10) / 10;
+
+    // Calcular ángulo de la esquina en p1
+    let anguloEsquina: number | undefined = undefined;
+    let esEscuadra: boolean | undefined = undefined;
+
+    if (n >= 3) {
+      const prevIdx = (i - 1 + n) % n;
+      const mPrev = mPts[prevIdx];
+      const mCur = mPts[i];
+      const mNext = mPts[j];
+
+      const vIn = { x: mPrev.x - mCur.x, y: mPrev.y - mCur.y };
+      const vOut = { x: mNext.x - mCur.x, y: mNext.y - mCur.y };
+
+      const dot = vIn.x * vOut.x + vIn.y * vOut.y;
+      const magIn = Math.hypot(vIn.x, vIn.y);
+      const magOut = Math.hypot(vOut.x, vOut.y);
+
+      if (magIn > 0 && magOut > 0) {
+        const cosTheta = Math.max(-1, Math.min(1, dot / (magIn * magOut)));
+        const angDeg = Math.round(Math.acos(cosTheta) * (180 / Math.PI) * 10) / 10;
+        anguloEsquina = angDeg;
+        esEscuadra = Math.abs(angDeg - 90) <= 3.0; // Margen de escuadra
+      }
+    }
+
+    bordes.push({
+      index: i + 1,
+      nombre: `Lado ${i + 1} (P${i + 1} → P${j + 1})`,
+      from: p1,
+      to: p2,
+      distanciaMetros: dist,
+      rumboGrados: rumbo,
+      headingName: obtenerNombreRumbo(rumbo),
+      anguloEsquinaGrados: anguloEsquina,
+      esEscuadra,
+    });
+  }
+
+  return bordes;
+}
+
+/**
+ * Realiza una auditoría completa de cuadratura y rectitud del lote
+ */
+export function auditarRectitudLote(polygon: LatLng[]): AuditoriaLote {
+  const bordes = calcularBordesPerimetro(polygon);
+  if (polygon.length !== 4) {
+    return {
+      bordes,
+      esCuadradoRecto: false,
+      scoreRectitud: polygon.length > 2 ? 70 : 0,
+      diferenciaLadosOpuestosMeters: 0,
+      mensajeSeguridad: polygon.length < 3 ? "Delimite el terreno para auditar la rectitud." : `Polígono de ${polygon.length} lados irregulares.`,
+    };
+  }
+
+  // Comparar lados opuestos (Lado 1 vs Lado 3, Lado 2 vs Lado 4)
+  const l1 = bordes[0].distanciaMetros;
+  const l2 = bordes[1].distanciaMetros;
+  const l3 = bordes[2].distanciaMetros;
+  const l4 = bordes[3].distanciaMetros;
+
+  const diff13 = Math.abs(l1 - l3);
+  const diff24 = Math.abs(l2 - l4);
+  const maxDiff = Math.max(diff13, diff24);
+
+  const todasEscuadras = bordes.every((b) => b.esEscuadra === true);
+  const ladosParalelos = maxDiff <= 5; // Menos de 5m de diferencia
+
+  const esCuadradoRecto = todasEscuadras && ladosParalelos;
+  let score = 100 - Math.min(60, maxDiff);
+  if (!todasEscuadras) score -= 20;
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  let mensaje = "";
+  if (esCuadradoRecto) {
+    mensaje = "✅ Lote 100% Derecho: Esquinas a escuadra (90°) y lados paralelos verificados.";
+  } else if (todasEscuadras) {
+    mensaje = `⚠️ Esquinas a 90°, pero los lados opuestos difieren por ${maxDiff.toFixed(1)}m.`;
+  } else {
+    mensaje = `⚠️ El terreno presenta ligeras desviaciones angulares. Presiona "Cuadrar y Enderezar a 90°" para calibrarlo a la perfección.`;
+  }
+
+  return {
+    bordes,
+    esCuadradoRecto,
+    scoreRectitud: score,
+    diferenciaLadosOpuestosMeters: Math.round(maxDiff * 10) / 10,
+    mensajeSeguridad: mensaje,
+  };
+}
+
+/**
+ * Endereza un polígono de 4 esquinas para convertirlo en un rectángulo con escuadras matemáticas exactas de 90°
+ */
+export function enderezarPoligonoCuadrado(polygon: LatLng[]): LatLng[] {
+  if (polygon.length !== 4) return polygon;
+
+  const origin = calcularCentroide(polygon);
+  const mPts = polygon.map((p) => proyectarLocal(p, origin));
+
+  const dx = mPts[1].x - mPts[0].x;
+  const dy = mPts[1].y - mPts[0].y;
+  const lenBase = Math.hypot(dx, dy);
+  if (lenBase <= 0) return polygon;
+
+  const ux = dx / lenBase;
+  const uy = dy / lenBase;
+  const vx = -uy;
+  const vy = ux;
+
+  const lateral1 = (mPts[2].x - mPts[1].x) * vx + (mPts[2].y - mPts[1].y) * vy;
+  const lateral2 = (mPts[3].x - mPts[0].x) * vx + (mPts[3].y - mPts[0].y) * vy;
+  const H = (lateral1 + lateral2) / 2;
+
+  const newM0 = mPts[0];
+  const newM1 = { x: newM0.x + lenBase * ux, y: newM0.y + lenBase * uy };
+  const newM2 = { x: newM1.x + H * vx, y: newM1.y + H * vy };
+  const newM3 = { x: newM0.x + H * vx, y: newM0.y + H * vy };
+
+  return [
+    desproyectarLocal(newM0, origin),
+    desproyectarLocal(newM1, origin),
+    desproyectarLocal(newM2, origin),
+    desproyectarLocal(newM3, origin),
+  ];
+}
+
+/**
+ * Suaviza de forma inteligente un polígono dibujado groseramente
+ * aplicando el algoritmo de Chaikin para generar curvas naturales
+ * (para alambrados curvos, costas, bajos, cortinas forestales o cañadas).
+ */
+export function suavizarBordesCurvos(polygon: LatLng[], iteraciones: number = 1): LatLng[] {
+  if (polygon.length < 3) return polygon;
+  let pts = [...polygon];
+
+  for (let it = 0; it < iteraciones; it++) {
+    const newPts: LatLng[] = [];
+    const n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const p1 = pts[i];
+      const p2 = pts[(i + 1) % n];
+
+      // Punto a 25% y punto a 75%
+      const q: LatLng = {
+        lat: 0.75 * p1.lat + 0.25 * p2.lat,
+        lng: 0.75 * p1.lng + 0.25 * p2.lng,
+      };
+      const r: LatLng = {
+        lat: 0.25 * p1.lat + 0.75 * p2.lat,
+        lng: 0.25 * p1.lng + 0.75 * p2.lng,
+      };
+      newPts.push(q, r);
+    }
+    pts = newPts;
+  }
+
+  return pts;
+}
+
+/**
+ * Proyecta una línea recta maestra a través del centro del lote
+ * de borde a borde (horizontal 90°, vertical 0° o con cualquier rumbo).
+ */
+export function proyectarEjeCentral(polygon: LatLng[], rumboGrados: number): LineSegment | null {
+  if (polygon.length < 3) return null;
+  const origin = calcularCentroide(polygon);
+  const metricPts = polygon.map((p) => proyectarLocal(p, origin));
+
+  const theta = (rumboGrados * Math.PI) / 180;
+  const sinT = Math.sin(theta);
+  const cosT = Math.cos(theta);
+
+  // En el sistema rotado (u, v), el eje central que pasa por el centroide tiene v = 0
+  const rotPts = metricPts.map((pt) => ({
+    u: pt.x * sinT + pt.y * cosT,
+    v: pt.x * cosT - pt.y * sinT,
+  }));
+
+  const v = 0;
+  const n = rotPts.length;
+  const intersections: number[] = [];
+
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const p1 = rotPts[i];
+    const p2 = rotPts[j];
+
+    if ((v >= p1.v && v < p2.v) || (v >= p2.v && v < p1.v)) {
+      if (Math.abs(p2.v - p1.v) > 1e-7) {
+        const u = p1.u + ((v - p1.v) * (p2.u - p1.u)) / (p2.v - p1.v);
+        intersections.push(u);
+      }
+    }
+  }
+
+  intersections.sort((a, b) => a - b);
+  if (intersections.length < 2) return null;
+
+  const uStart = intersections[0];
+  const uEnd = intersections[intersections.length - 1];
+
+  const mStart = {
+    x: uStart * sinT + v * cosT,
+    y: uStart * cosT - v * sinT,
+  };
+  const mEnd = {
+    x: uEnd * sinT + v * cosT,
+    y: uEnd * cosT - v * sinT,
+  };
+
+  const start = desproyectarLocal(mStart, origin);
+  const end = desproyectarLocal(mEnd, origin);
+  const dist = Math.round(calcularDistanciaMetros(start, end) * 10) / 10;
+  const brng = Math.round(calcularRumboGrados(start, end) * 10) / 10;
+
+  return {
+    id: `eje-${Date.now()}`,
+    index: 1,
+    nombre: `Eje Central (${Math.round(rumboGrados)}° ${obtenerNombreRumbo(rumboGrados)})`,
+    start,
+    end,
+    lengthMeters: dist,
+    bearing: brng,
+    headingName: obtenerNombreRumbo(brng),
+    tipo: "calle_manual",
+  };
+}
+
+
 

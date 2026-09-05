@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { 
   LatLng, 
   LineSegment, 
@@ -8,7 +8,11 @@ import {
   obtenerNombreRumbo,
   calcularSnapInteligente,
   autoCompletarCuartoVertice,
-  SnapResult
+  SnapResult,
+  calcularBordesPerimetro,
+  auditarRectitudLote,
+  enderezarPoligonoCuadrado,
+  suavizarBordesCurvos
 } from "@/lib/gis/surface-planner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -119,6 +123,8 @@ export function TrazadorMapa({
   const rubberbandLayerRef = useRef<any>(null);
   const snapIndicatorRef = useRef<any>(null);
   const abMarkersRef = useRef<any[]>([]);
+  const edgeLabelsGroupRef = useRef<any>(null);
+  const cornerBadgesGroupRef = useRef<any>(null);
   const baseLayersRef = useRef<{ [key: string]: any }>({});
   
   const [activeLayer, setActiveLayer] = useState<"hybrid" | "satellite" | "streets">("hybrid");
@@ -132,6 +138,8 @@ export function TrazadorMapa({
   const [measureResult, setMeasureResult] = useState<{ dist: number; bearing: number } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const auditoria = useMemo(() => auditarRectitudLote(polygon), [polygon]);
 
   // Inicializar Leaflet
   useEffect(() => {
@@ -171,6 +179,8 @@ export function TrazadorMapa({
       waypointsGroupRef.current = L.layerGroup().addTo(map);
       measureLayerRef.current = L.layerGroup().addTo(map);
       rubberbandLayerRef.current = L.layerGroup().addTo(map);
+      edgeLabelsGroupRef.current = L.layerGroup().addTo(map);
+      cornerBadgesGroupRef.current = L.layerGroup().addTo(map);
 
       // Movimiento del cursor con Autoayuda / Snapping Inteligente
       map.on("mousemove", (e: any) => {
@@ -437,6 +447,13 @@ export function TrazadorMapa({
     midpointMarkersRef.current.forEach((m) => map.removeLayer(m));
     midpointMarkersRef.current = [];
 
+    if (edgeLabelsGroupRef.current) {
+      edgeLabelsGroupRef.current.clearLayers();
+    }
+    if (cornerBadgesGroupRef.current) {
+      cornerBadgesGroupRef.current.clearLayers();
+    }
+
     if (polygon.length === 0) return;
 
     const latLngs = polygon.map((p) => [p.lat, p.lng]);
@@ -555,6 +572,98 @@ export function TrazadorMapa({
         midpointMarkersRef.current.push(midMarker);
       }
     });
+
+    // Renderizar Etiquetas Permanentes de Distancia y Rumbo en cada Lado del Perímetro
+    if (polygon.length >= 2) {
+      const bordes = calcularBordesPerimetro(polygon);
+      bordes.forEach((borde) => {
+        // Punto medio del lado
+        const midLat = (borde.from.lat + borde.to.lat) / 2;
+        const midLng = (borde.from.lng + borde.to.lng) / 2;
+        const distText = borde.distanciaMetros >= 100 
+          ? `${Math.round(borde.distanciaMetros).toLocaleString("es-AR")} m` 
+          : `${borde.distanciaMetros.toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m`;
+
+        const labelHtml = `
+          <div style="
+            background: rgba(15, 23, 42, 0.94);
+            border: 1.5px solid #22c55e;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.75), 0 0 10px rgba(34, 197, 94, 0.35);
+            color: #ffffff;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            font-weight: 800;
+            white-space: nowrap;
+            pointer-events: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transform: translate(-50%, -50%);
+          ">
+            <span style="color: #4ade80; font-size: 10px; font-weight: 900;">L${borde.index}:</span>
+            <span style="color: #ffffff; font-weight: 900; font-size: 12px;">${distText}</span>
+            <span style="color: #94a3b8; font-size: 10px; font-weight: 600;">(${Math.round(borde.rumboGrados)}° ${borde.headingName})</span>
+          </div>
+        `;
+
+        const labelIcon = L.divIcon({
+          className: "custom-edge-dist-label",
+          html: labelHtml,
+          iconSize: [0, 0],
+          iconAnchor: [0, 0],
+        });
+
+        const edgeMarker = L.marker([midLat, midLng], {
+          icon: labelIcon,
+          interactive: false,
+        });
+
+        edgeLabelsGroupRef.current?.addLayer(edgeMarker);
+
+        // Ángulo de esquina si está delimitado (polygon.length >= 3)
+        if (borde.anguloEsquinaGrados !== undefined && polygon.length >= 3) {
+          const isEscuadra = borde.esEscuadra === true;
+          const cornerHtml = `
+            <div style="
+              background: ${isEscuadra ? "rgba(6, 182, 212, 0.95)" : "rgba(245, 158, 11, 0.95)"};
+              color: #0f172a;
+              border: 1.5px solid #ffffff;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+              padding: 1.5px 6px;
+              border-radius: 4px;
+              font-family: ui-monospace, monospace;
+              font-size: 10.5px;
+              font-weight: 900;
+              white-space: nowrap;
+              pointer-events: none;
+              display: inline-flex;
+              align-items: center;
+              gap: 3px;
+              transform: translate(-50%, -180%);
+            ">
+              <span>📐 ${borde.anguloEsquinaGrados.toFixed(1)}°</span>
+              ${isEscuadra ? '<span style="font-weight:900;">✓</span>' : ""}
+            </div>
+          `;
+
+          const cornerIcon = L.divIcon({
+            className: "custom-corner-badge",
+            html: cornerHtml,
+            iconSize: [0, 0],
+            iconAnchor: [0, 0],
+          });
+
+          const cornerMarker = L.marker([borde.from.lat, borde.from.lng], {
+            icon: cornerIcon,
+            interactive: false,
+          });
+
+          cornerBadgesGroupRef.current?.addLayer(cornerMarker);
+        }
+      });
+    }
   }, [polygon, interactionMode, onPolygonChange]);
 
   // Renderizar Pasadas Automáticas
@@ -921,6 +1030,69 @@ export function TrazadorMapa({
           </Button>
         )}
 
+        {/* Autoayuda: Cuadrar a 90° exacto si hay 4 puntos */}
+        {polygon.length === 4 && (
+          <Button
+            size="sm"
+            onClick={() => {
+              const enderezado = enderezarPoligonoCuadrado(polygon);
+              onPolygonChange(enderezado);
+              toast.success("¡Lote enderezado a escuadra perfecta de 90°!");
+            }}
+            className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs h-7 gap-1 shadow"
+            title="Ajusta matemáticamente las 4 esquinas a 90° exactos y lados opuestos paralelos"
+          >
+            <Square className="h-3.5 w-3.5" /> Cuadrar a 90°
+          </Button>
+        )}
+
+        {/* Inteligencia: Suavizar Curvas del Perímetro */}
+        {polygon.length >= 3 && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              const suavizado = suavizarBordesCurvos(polygon, 1);
+              onPolygonChange(suavizado);
+              toast.success("Bordes suavizados con curvas geodésicas");
+            }}
+            className="bg-slate-800/90 border-slate-600 hover:bg-slate-700 text-xs h-7 gap-1 text-cyan-300"
+            title="Inteligencia de contorno: Convierte aristas toscas en curvas continuas para alambrados curvos o cañadas"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-cyan-400" /> Suavizar Curvas
+          </Button>
+        )}
+
+        {/* Tirar Recta Horizontal o Vertical Rápida */}
+        {polygon.length >= 3 && (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (onRumboChange) onRumboChange(90);
+                toast.success("Rectas orientadas Horizontalmente (Este-Oeste / 90°)");
+              }}
+              className={`text-xs h-7 gap-1 ${rumboGrados === 90 ? "bg-amber-500 text-slate-950 font-bold" : "bg-slate-800/90 border-slate-600 text-slate-200 hover:bg-slate-700"}`}
+              title="Tirar rectas horizontales de borde a borde (Este-Oeste / 90°)"
+            >
+              ➡️ Horizontal
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (onRumboChange) onRumboChange(0);
+                toast.success("Rectas orientadas Verticalmente (Norte-Sur / 0°)");
+              }}
+              className={`text-xs h-7 gap-1 ${rumboGrados === 0 ? "bg-amber-500 text-slate-950 font-bold" : "bg-slate-800/90 border-slate-600 text-slate-200 hover:bg-slate-700"}`}
+              title="Tirar rectas verticales de borde a borde (Norte-Sur / 0°)"
+            >
+              ⬆️ Vertical
+            </Button>
+          </>
+        )}
+
         {/* Toggle Autoayuda / Snapping Inteligente */}
         <Button
           size="sm"
@@ -1091,6 +1263,51 @@ export function TrazadorMapa({
         <div className="absolute top-28 left-1/2 -translate-x-1/2 z-[1000] bg-cyan-950/90 border border-cyan-500/60 backdrop-blur-md text-white text-xs font-semibold px-4 py-2 rounded-full shadow-2xl flex items-center gap-2">
           <Ruler className="h-4 w-4 text-cyan-300" />
           {measurePoints.length === 0 ? "Haga clic en el primer punto a medir" : "Haga clic en el segundo punto"}
+        </div>
+      )}
+
+      {/* HUD de Seguridad y Auditoría de Rectitud en Pantalla */}
+      {polygon.length >= 3 && (
+        <div className="absolute bottom-11 left-3 z-[1000] bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-lg p-2.5 text-xs text-white shadow-2xl flex items-center gap-3 max-w-[95%]">
+          <div
+            className={`h-3 w-3 rounded-full shrink-0 ${
+              auditoria.esCuadradoRecto
+                ? "bg-green-500 shadow-[0_0_8px_#22c55e]"
+                : auditoria.scoreRectitud >= 80
+                ? "bg-amber-400 shadow-[0_0_8px_#f59e0b]"
+                : "bg-red-500"
+            }`}
+          />
+          <div className="space-y-0.5">
+            <div className="font-bold flex items-center gap-1.5 text-xs">
+              {auditoria.esCuadradoRecto ? (
+                <span className="text-green-400 font-black">
+                  ✅ Terreno 100% Derecho (Escuadras 90° Verificadas)
+                </span>
+              ) : (
+                <span className="text-amber-400 font-bold">
+                  Auditoría de Rectitud: {auditoria.scoreRectitud}%
+                </span>
+              )}
+            </div>
+            <div className="text-[11px] text-slate-300">
+              {auditoria.mensajeSeguridad}
+            </div>
+          </div>
+          {polygon.length === 4 && !auditoria.esCuadradoRecto && (
+            <Button
+              size="sm"
+              onClick={() => {
+                const enderezado = enderezarPoligonoCuadrado(polygon);
+                onPolygonChange(enderezado);
+                toast.success("¡Lote enderezado a escuadra perfecta de 90°!");
+              }}
+              className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs h-7 px-2.5 shadow shrink-0 gap-1"
+              title="Ajusta las 4 esquinas exactamente a 90°"
+            >
+              <Square className="h-3 w-3" /> Enderezar a 90°
+            </Button>
+          )}
         </div>
       )}
 

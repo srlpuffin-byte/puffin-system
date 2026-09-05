@@ -16,7 +16,12 @@ import {
   descargarArchivo,
   generarLotePorMedidas,
   calcularCentroide,
-  generarPasadasDesdeLineaBase 
+  generarPasadasDesdeLineaBase,
+  calcularBordesPerimetro,
+  auditarRectitudLote,
+  enderezarPoligonoCuadrado,
+  suavizarBordesCurvos,
+  proyectarEjeCentral
 } from "@/lib/gis/surface-planner";
 import { TrazadorMapa, MapInteractionMode } from "@/components/map/TrazadorMapa";
 import { useGetProyectos } from "@/hooks/use-proyectos";
@@ -109,6 +114,11 @@ export function Americangis() {
   // Cálculos métricos de la superficie
   const metricas = useMemo(() => {
     return calcularMetricasPoligono(polygon);
+  }, [polygon]);
+
+  // Auditoría de rectitud, escuadras y distancias del perímetro
+  const auditoria = useMemo(() => {
+    return auditarRectitudLote(polygon);
   }, [polygon]);
 
   // Generador geométrico de pasadas paralelas rectas
@@ -242,6 +252,40 @@ export function Americangis() {
     if (!isNaN(rumbo)) setRumboGrados(rumbo);
     setDialogMedidasOpen(false);
     toast.success(`Lote de ${ancho}m x ${largo}m generado (${((ancho * largo) / 10000).toFixed(2)} Ha)`);
+  };
+
+  // Tirar recta horizontal (Este-Oeste / 90°)
+  const handleTirarRectaHorizontal = () => {
+    setRumboGrados(90);
+    toast.success("Rumbo de pasadas calibrado en HORIZONTAL (Este-Oeste / 90°)");
+  };
+
+  // Tirar recta vertical (Norte-Sur / 0°)
+  const handleTirarRectaVertical = () => {
+    setRumboGrados(0);
+    toast.success("Rumbo de pasadas calibrado en VERTICAL (Norte-Sur / 0°)");
+  };
+
+  // Ajuste inteligente: Suavizar curvas del perímetro (alambrados, cañadas, bajos)
+  const handleSuavizarCurvas = () => {
+    if (polygon.length < 3) {
+      toast.error("Delimite al menos 3 puntos del terreno para suavizar.");
+      return;
+    }
+    const suavizado = suavizarBordesCurvos(polygon, 1);
+    setPolygon(suavizado);
+    toast.success("¡Curvas naturales aplicadas al perímetro con éxito!");
+  };
+
+  // Ajuste inteligente: Cuadrar y enderezar a 90° (Escuadra matemática)
+  const handleEnderezarCuadrado = () => {
+    if (polygon.length !== 4) {
+      toast.error("El lote debe tener 4 esquinas para calibrar a escuadra perfecta de 90°.");
+      return;
+    }
+    const enderezado = enderezarPoligonoCuadrado(polygon);
+    setPolygon(enderezado);
+    toast.success("¡Lote enderezado! Esquinas a 90° exactos y lados opuestos paralelos.");
   };
 
   // Borrar calle manual individual
@@ -615,6 +659,80 @@ export function Americangis() {
               />
             </div>
           </div>
+
+          <div className="h-[1px] bg-slate-800" />
+
+          {/* Barra de Inteligencia de Perímetro y Duplicación hasta el Final */}
+          <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                Inteligencia de Contorno:
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSuavizarCurvas}
+                disabled={polygon.length < 3}
+                className="h-7 text-xs border-slate-700 bg-slate-900 hover:bg-slate-800 text-cyan-300 gap-1 px-2.5"
+                title="Ajuste Inteligente: Convierte aristas toscas en curvas suaves para alambrados curvos o cañadas"
+              >
+                <Sparkles className="h-3 w-3 text-cyan-400" />
+                Suavizar Curvas
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleEnderezarCuadrado}
+                disabled={polygon.length !== 4}
+                className="h-7 text-xs border-slate-700 bg-slate-900 hover:bg-slate-800 text-emerald-300 gap-1 px-2.5"
+                title="Ajusta las 4 esquinas exactamente a 90° y lados paralelos"
+              >
+                <Square className="h-3 w-3 text-emerald-400" />
+                Cuadrar a 90° (Escuadra)
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-slate-300">
+                Tirar Recta:
+              </span>
+              <Button
+                size="sm"
+                variant={rumboGrados === 90 ? "default" : "outline"}
+                onClick={handleTirarRectaHorizontal}
+                className={`h-7 text-xs gap-1 px-2.5 ${rumboGrados === 90 ? "bg-amber-500 text-slate-950 font-bold" : "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"}`}
+                title="Tirar rectas horizontales de borde a borde (Este-Oeste / 90°)"
+              >
+                ➡️ Horizontal (E-O)
+              </Button>
+              <Button
+                size="sm"
+                variant={rumboGrados === 0 ? "default" : "outline"}
+                onClick={handleTirarRectaVertical}
+                className={`h-7 text-xs gap-1 px-2.5 ${rumboGrados === 0 ? "bg-amber-500 text-slate-950 font-bold" : "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"}`}
+                title="Tirar rectas verticales de borde a borde (Norte-Sur / 0°)"
+              >
+                ⬆️ Vertical (N-S)
+              </Button>
+
+              <div className="h-4 w-[1px] bg-slate-800 hidden sm:block mx-1" />
+
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (polygon.length < 3) {
+                    toast.error("Delimite primero el terreno para duplicar las pasadas");
+                    return;
+                  }
+                  toast.success(`¡Tiradas ${lineas.length} líneas rectas cada ${anchoCalle}m hasta el final del lote!`);
+                }}
+                className="h-7 text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 font-black gap-1.5 shadow"
+              >
+                🚜 Duplicar cada {anchoCalle}m ({lineas.length} rectas)
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -708,9 +826,187 @@ export function Americangis() {
               </span>
             </div>
             <div>
-              💡 <i>Arrastre los puntos verdes intermedios para insertar nuevos vértices en cualquier arista del lote.</i>
+              💡 <i>Arrastre los puntos verdes intermedios para insertar nuevos vértices o ajustar curvas en el lote.</i>
             </div>
           </div>
+
+          {/* Panel de Seguridad: Distancia de cada lado del perímetro y control de escuadras */}
+          <Card className="border-slate-800 bg-slate-900/80 shadow-xl overflow-hidden mt-4">
+            <CardHeader className="pb-3 border-b border-slate-800/80 bg-slate-950/40">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className={`p-2 rounded-lg ${auditoria.esCuadradoRecto ? "bg-green-500/15 text-green-400" : "bg-amber-500/15 text-amber-400"}`}>
+                    <Square className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base text-white flex items-center gap-2">
+                      Auditoría de Perímetro y Seguridad de Rectitud
+                      {polygon.length >= 3 && (
+                        <Badge className={`text-xs font-bold ${auditoria.esCuadradoRecto ? "bg-green-600 text-white" : "bg-amber-500 text-slate-950"}`}>
+                          {auditoria.esCuadradoRecto ? "100% Escuadra Perfecta" : `Rectitud: ${auditoria.scoreRectitud}%`}
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Distancias exactas de cada lado del lote, verificación de ángulos a 90° y paralelismo para maquinaria.
+                    </CardDescription>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {polygon.length >= 3 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSuavizarCurvas}
+                      className="gap-1.5 border-slate-700 bg-slate-800 text-cyan-300 text-xs h-8 hover:bg-slate-700"
+                    >
+                      <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                      Suavizar Curvas
+                    </Button>
+                  )}
+
+                  {polygon.length === 4 && (
+                    <Button
+                      size="sm"
+                      onClick={handleEnderezarCuadrado}
+                      className="gap-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs h-8 shadow"
+                    >
+                      <Square className="h-3.5 w-3.5" />
+                      Cuadrar y Enderezar a 90°
+                    </Button>
+                  )}
+
+                  {auditoria.bordes[0] && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const r = Math.round(auditoria.bordes[0].rumboGrados);
+                        setRumboGrados(r);
+                        toast.success(`Rumbo de pasadas alineado al Lado 1: ${r}°`);
+                      }}
+                      className="gap-1.5 border-slate-700 bg-slate-800 text-slate-200 text-xs h-8"
+                    >
+                      <Compass className="h-3.5 w-3.5 text-amber-400" />
+                      Alinear a Lado 1 ({Math.round(auditoria.bordes[0].rumboGrados)}°)
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-4 space-y-4">
+              {polygon.length < 2 ? (
+                <div className="py-6 text-center text-muted-foreground text-xs">
+                  <Square className="h-8 w-8 mx-auto text-slate-600 mb-2" />
+                  Delimite al menos 2 puntos en el mapa o presione "Crear por Medidas" para ver las distancias exactas de cada lado del perímetro.
+                </div>
+              ) : (
+                <>
+                  {/* Banner de Estado de Seguridad */}
+                  <div className={`p-3 rounded-lg border text-xs flex items-start sm:items-center justify-between gap-3 ${
+                    auditoria.esCuadradoRecto
+                      ? "bg-green-950/30 border-green-500/40 text-green-200"
+                      : polygon.length === 4
+                      ? "bg-amber-950/30 border-amber-500/40 text-amber-200"
+                      : "bg-slate-950/60 border-slate-800 text-slate-300"
+                  }`}>
+                    <div className="flex items-center gap-2.5">
+                      <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${auditoria.esCuadradoRecto ? "bg-green-400 animate-pulse" : "bg-amber-400"}`} />
+                      <div>
+                        <b className="font-bold">{auditoria.mensajeSeguridad}</b>
+                        <p className="text-[11px] opacity-80 mt-0.5">
+                          {auditoria.esCuadradoRecto
+                            ? "Seguridad total: Al tirar las líneas rectas cada " + anchoCalle + "m, todas saldrán 100% paralelas y llegarán al final sin cruzarse."
+                            : "Para garantizar que las líneas salgan perfectamente rectas y paralelas al trabajar con la máquina, use el botón de cuadrar o snapping."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cuadrícula de Lados y Distancias */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {auditoria.bordes.map((b) => (
+                      <div
+                        key={b.index}
+                        className="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 space-y-2 hover:border-slate-700 transition-all"
+                      >
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-black text-slate-300 flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-green-500" />
+                            {b.nombre}
+                          </span>
+                          {b.anguloEsquinaGrados !== undefined && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] font-mono px-1.5 py-0 ${
+                                b.esEscuadra
+                                  ? "bg-cyan-950/60 text-cyan-300 border-cyan-500/50"
+                                  : "bg-amber-950/60 text-amber-300 border-amber-500/50"
+                              }`}
+                            >
+                              📐 {b.anguloEsquinaGrados}° {b.esEscuadra ? "✓" : ""}
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="text-xl font-black text-white font-mono tracking-tight">
+                            {b.distanciaMetros >= 100
+                              ? `${Math.round(b.distanciaMetros).toLocaleString("es-AR")} m`
+                              : `${b.distanciaMetros.toLocaleString("es-AR", { minimumFractionDigits: 1 })} m`}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                            <Compass className="h-3 w-3 text-amber-400" />
+                            <span>Rumbo: <b className="text-slate-200">{Math.round(b.rumboGrados)}°</b> ({b.headingName})</span>
+                          </div>
+                        </div>
+
+                        <div className="pt-1 text-[10px] text-slate-500 font-mono border-t border-slate-800/60 flex justify-between">
+                          <span>Desde: P{b.index}</span>
+                          <span>Hasta: P{b.index === polygon.length ? 1 : b.index + 1}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Comparativa de Paralelismo en 4 Lados */}
+                  {polygon.length === 4 && auditoria.bordes.length === 4 && (
+                    <div className="bg-slate-950/40 border border-slate-800 rounded-lg p-3 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+                      <div className="flex items-center justify-between border-b md:border-b-0 md:border-r border-slate-800 pb-2 md:pb-0 md:pr-4">
+                        <span className="text-slate-400">
+                          ↔️ <b>Frente (L1)</b> vs <b>Fondo (L3)</b>:
+                        </span>
+                        <div className="text-right">
+                          <span className="text-white font-bold">
+                            {Math.round(auditoria.bordes[0].distanciaMetros)}m vs {Math.round(auditoria.bordes[2].distanciaMetros)}m
+                          </span>
+                          <span className={`ml-2 text-[11px] font-bold ${Math.abs(auditoria.bordes[0].distanciaMetros - auditoria.bordes[2].distanciaMetros) <= 2 ? "text-green-400" : "text-amber-400"}`}>
+                            (Dif: {Math.abs(auditoria.bordes[0].distanciaMetros - auditoria.bordes[2].distanciaMetros).toFixed(1)}m)
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between md:pl-2">
+                        <span className="text-slate-400">
+                          ↕️ <b>Lateral Der (L2)</b> vs <b>Lateral Izq (L4)</b>:
+                        </span>
+                        <div className="text-right">
+                          <span className="text-white font-bold">
+                            {Math.round(auditoria.bordes[1].distanciaMetros)}m vs {Math.round(auditoria.bordes[3].distanciaMetros)}m
+                          </span>
+                          <span className={`ml-2 text-[11px] font-bold ${Math.abs(auditoria.bordes[1].distanciaMetros - auditoria.bordes[3].distanciaMetros) <= 2 ? "text-green-400" : "text-amber-400"}`}>
+                            (Dif: {Math.abs(auditoria.bordes[1].distanciaMetros - auditoria.bordes[3].distanciaMetros).toFixed(1)}m)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* PESTAÑA 2: PLANILLA DE COORDENADAS A-B */}
