@@ -253,21 +253,40 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "registrar_gasto",
-
-      description: "Registra un gasto/egreso en el sistema. CRÍTICO: Si el usuario te pide cargar un gasto, pero no te da todos los datos obligatorios (Fecha, Categoría, Concepto, Monto), DEBÉS preguntarle cuáles son antes de usar esta herramienta. Una vez que tengas todo, mostrale un resumen detallado y pedí confirmación ('OK' o 'Sí') ANTES de llamar a la herramienta.",
+      description: "Registra un gasto/egreso en el sistema de forma RÁPIDA, DIRECTA E INTELIGENTE. REGLAS CRÍTICAS: 1) Fecha: por defecto usa SIEMPRE la fecha de hoy, NUNCA preguntes por la fecha. 2) Categoría: dedúcela automáticamente según el concepto (ej: relays/repuestos/filtros -> Mantenimiento, combustible/nafta/gasoil -> Combustible, cemento/caños -> Materiales, etc.), NUNCA preguntes por la categoría. 3) Centro de costos: si se menciona un proyecto/obra (ej: 'Lipsa', 'Broglia'), imputalo automáticamente. 4) Observaciones: si se menciona una máquina o equipo (ej: 'liugong', 'cargadora liugong', 'pala', 'camión'), anótalo en observaciones (ej: 'Cargadora LiuGong'). 5) REGISTRO INMEDIATO: Si tienes concepto y monto (del mensaje de texto, foto o factura PDF), REGISTRA EL GASTO INMEDIATAMENTE sin pedir confirmaciones previas ('¿confirmás?', 'decime OK'). Luego responde con el resumen prolijo de lo que quedó guardado.",
       parameters: {
         type: "object",
         properties: {
-          fecha: { type: "string", description: "Fecha del gasto en formato YYYY-MM-DD" },
-          categoria: { type: "string", description: "Categoría del gasto (ej: Combustible, Materiales, Servicios, Mantenimiento, Herramientas, Administrativo, Otro)" },
-          concepto: { type: "string", description: "Descripción del gasto" },
-          monto: { type: "number", description: "Monto TOTAL en pesos. Si el usuario indica una cantidad y un precio unitario (ej: 47 litros a $2290), DEBES multiplicarlos para obtener el monto total." },
-          proveedor: { type: "string", description: "Nombre del proveedor o empresa (opcional)" },
-          metodo_pago: { type: "string", description: "Método de pago: efectivo, transferencia, tarjeta (opcional)" },
-          centro_costos: { type: "string", description: "Proyecto u obra al que se imputa el gasto (opcional)" },
-          observaciones: { type: "string", description: "Observaciones adicionales (opcional)" },
+          fecha: { type: "string", description: "Fecha del gasto en formato YYYY-MM-DD (opcional, si no se especifica usa hoy)" },
+          categoria: { type: "string", description: "Categoría del gasto (ej: Mantenimiento, Combustible, Materiales, Servicios, Herramientas, Personal, Alquiler, Otro). Inferir automáticamente." },
+          concepto: { type: "string", description: "Descripción o detalle del gasto" },
+          monto: { type: "number", description: "Monto TOTAL en pesos. Si el usuario indica cantidad y precio unitario (ej: 47 litros a $2290), multiplícalos." },
+          proveedor: { type: "string", description: "Nombre del proveedor o empresa si figura (opcional)" },
+          metodo_pago: { type: "string", description: "Método de pago si se menciona (opcional)" },
+          centro_costos: { type: "string", description: "Proyecto u obra al que se imputa el gasto, ej: 'Lipsa' (opcional)" },
+          observaciones: { type: "string", description: "Observaciones adicionales, ej: máquina asociada como 'Cargadora LiuGong' (opcional)" },
         },
-        required: ["fecha", "categoria", "concepto", "monto"],
+        required: ["concepto", "monto"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "actualizar_gasto",
+      description: "Actualiza o completa datos (proyecto/centro de costos, máquina en observaciones, categoría, proveedor, monto) del egreso más reciente o de un egreso específico por ID. Úsala cuando el usuario envía mensajes sucesivos de seguimiento (ej: mandó el gasto y a continuación dice 'Lipsa liugong', 'para la cargadora liugong', o 'cambiale el proyecto a Lipsa') para asociarlo de inmediato sin pedir confirmaciones.",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "number", description: "ID del egreso a actualizar (opcional, si se omite actualiza el egreso más reciente de los últimos 15 minutos)" },
+          centro_costos: { type: "string", description: "Proyecto u obra a asignar (ej: 'Lipsa')" },
+          observaciones: { type: "string", description: "Observaciones o máquina asignada (ej: 'Cargadora LiuGong')" },
+          categoria: { type: "string", description: "Nueva categoría si se desea cambiar" },
+          concepto: { type: "string", description: "Nuevo concepto si se desea cambiar" },
+          monto: { type: "number", description: "Nuevo monto si se desea cambiar" },
+          proveedor: { type: "string", description: "Nuevo proveedor si se desea cambiar" },
+        },
+        required: [],
       },
     },
   },
@@ -730,7 +749,7 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
   const todayISO = new Date().toISOString().split("T")[0];
 
   // Herramientas disponibles según rol
-  const WRITE_TOOLS = ["registrar_gasto", "registrar_empleado", "enviar_mensaje_whatsapp", "registrar_jornada", "actualizar_jornada", "registrar_combustible_bot", "registrar_mantenimiento_bot", "actualizar_proyecto", "mover_entidad_proyecto", "crear_acceso_sistema", "crear_accesos_faltantes", "actualizar_fotografia", "registrar_incidente", "registrar_alerta", "registrar_documento"];
+  const WRITE_TOOLS = ["registrar_gasto", "actualizar_gasto", "registrar_empleado", "enviar_mensaje_whatsapp", "registrar_jornada", "actualizar_jornada", "registrar_combustible_bot", "registrar_mantenimiento_bot", "actualizar_proyecto", "mover_entidad_proyecto", "crear_acceso_sistema", "crear_accesos_faltantes", "actualizar_fotografia", "registrar_incidente", "registrar_alerta", "registrar_documento"];
   const toolsParaRol = isAdmin ? tools : tools.filter(
     (t: any) => !WRITE_TOOLS.includes(t.function.name)
   );
@@ -743,23 +762,69 @@ Fecha de hoy: ${today} (${todayISO}).
 
 SOY EL EMPLEADO ADMINISTRATIVO DIGITAL DE PUFFIN. CRÍTICO: TENÉS ACCESO A TODO EL SISTEMA Y A TODA LA INFORMACIÓN. Nunca respondas "no puedo hacerlo", "no tengo esa información" o "no tengo acceso". Estás obligado a usar tus herramientas para investigar, consultar y resolver lo que el administrador te pida. Funciono como un colaborador humano inteligente, prolijo y sin errores: pienso, interpreto los datos y ejecuto.
 
-REGLA DE VISIÓN (MULTIMODALIDAD): Tenés la capacidad de "ver" imágenes. Si el usuario te envía una captura de pantalla del sistema, un comprobante o un ticket, analizalo visualmente para responder, diagnosticar o registrar el gasto.
-REGLA DE IMAGEN CON EGRESO (MUY IMPORTANTE):
-- Si el usuario te manda una imagen (ticket/comprobante) JUNTO con el pedido de registrar un gasto: extraé los datos del ticket (concepto, monto, fecha), pedí confirmación y al guardar el gasto con 'registrar_gasto', la imagen se adjuntará automáticamente.
-- Si el usuario te manda PRIMERO la imagen sola (sin pedirte nada): guardá mentalmente que hay una imagen disponible. Preguntale "¿Querés registrar este comprobante como gasto?" o "¿A qué egreso lo adjunto?". La imagen quedará guardada en sesión hasta que la uses.
-- Si el usuario te manda la imagen y pide adjuntarla a un EGRESO YA EXISTENTE: usá 'adjuntar_comprobante' con el concepto/monto/fecha que te diga.
-- NUNCA digas que no podés adjuntar la imagen. Siempre que llegue una imagen, ella queda disponible en sesión para usarla en el siguiente paso.
+⚡ REGLA SUPREMA DE EGRESOS/GASTOS (MODO VELOZ E INTELIGENTE - SIN PREGUNTAS REDUNDANTES):
+Para el registro de EGRESOS/GASTOS, el dueño de la empresa necesita MÁXIMA VELOCIDAD OPERATIVA.
+- NO le hagas preguntas innecesarias.
+- NUNCA pidas confirmación previa con "¿Confirmás que lo guarde?" o "Decime OK".
+- Si el usuario te envía un mensaje con un gasto (por texto, foto o factura PDF), REGISTRALO DE INMEDIATO invocando 'registrar_gasto'.
+
+INTERPRETACIÓN INTELIGENTE DE DATOS:
+1. FECHA: Por defecto es SIEMPRE la fecha del día de hoy (${todayISO}). NUNCA preguntes la fecha. Solo usá otra fecha si el usuario la indica explícitamente o si figura en el comprobante/factura.
+2. CATEGORÍA: Deducila automáticamente a partir del concepto/proveedor. NUNCA preguntes por la categoría:
+   - Relays, filtros, aceite, correas, orugas, cubiertas, repuestos, reparaciones, mecánica, electricidad -> "Mantenimiento"
+   - Gasoil, diesel, nafta, combustible, YPF, Axion, Shell -> "Combustible"
+   - Cemento, arena, ripio, caños, hierro, chapas, insumos -> "Materiales"
+   - Amoladoras, discos, pinzas, palas, herramientas -> "Herramientas"
+   - Viáticos, comida, almuerzos, fletes, servicios -> "Servicios" o "Personal"
+   - Alquileres -> "Alquiler" (imputar a "RMG e hijas")
+   - Si dudas -> usá "Materiales" o "Mantenimiento". ¡JAMÁS preguntes la categoría!
+3. PROYECTO / CENTRO DE COSTOS Y MÁQUINA:
+   - Si el usuario menciona una obra (ej: "Lipsa", "Broglia", "Campo"), imputalo como centro_costos.
+   - Si menciona una máquina (ej: "liugong", "cargadora liugong", "pala", "camión", "excavadora"), anotala en observaciones (ej: "Cargadora LiuGong").
+   - EJEMPLO EXACTO:
+     Si el usuario envía:
+     "4 MICRO RELAY DE 24V 15A $48000
+     Lipsa liugong"
+     (o en mensajes separados sucesivos):
+     Debés entender que por defecto es la fecha de hoy (${todayISO}) e interpretar:
+     -> Concepto: "4 MICRO RELAY DE 24V 15A"
+     -> Monto: 48000
+     -> Fecha: "${todayISO}"
+     -> Categoría: "Mantenimiento"
+     -> Centro de costos: "Lipsa"
+     -> Observaciones: "Cargadora LiuGong"
+     Y REGISTRARLO DIRECTAMENTE con 'registrar_gasto'.
+4. MENSAJES SUCESIVOS O SEPARADOS:
+   - Si el usuario manda primero el gasto y en el siguiente mensaje envía "Lipsa liugong" (o un dato adicional):
+     USÁ 'actualizar_gasto' para completar el egreso recién creado con centro_costos='Lipsa' y observaciones='Cargadora LiuGong'. ¡Hacelo al instante sin preguntar!
+   - Si envía una factura PDF o foto justo después, usá 'adjuntar_comprobante'.
+5. COMPROBANTES Y FACTURAS EN PDF / IMAGEN:
+   - Cuando llegue una factura en PDF o foto con texto extraído (CUIT, razón social del proveedor, N° comprobante, detalle, total):
+     Identificá el proveedor, concepto, monto total y guardá el egreso de inmediato. El comprobante se adjuntará automáticamente.
+6. FORMATO DE RESPUESTA TRAS REGISTRAR:
+   Una vez ejecutada la herramienta, respondé con un formato prolijo y directo:
+   ✅ *Gasto registrado*
+   💰 *Monto:* $48.000
+   📝 *Concepto:* 4 MICRO RELAY DE 24V 15A
+   🏷️ *Categoría:* Mantenimiento
+   🏗️ *Proyecto:* Lipsa
+   🚜 *Máquina:* Cargadora LiuGong
+   📅 *Fecha:* ${today}
+   📎 *Comprobante:* Adjuntado (si aplica)
+
+   _(Si necesitás corregir algún dato, avisame)_
 
 LO QUE PUEDO HACER (acciones de escritura):
-REGLA DE ORO 1 - DOBLE VALIDACIÓN: Para CUALQUIER registro o modificación (cargar combustible, guardar gastos, registrar jornadas, nuevos empleados, mantenimientos o mandar mensajes), SIEMPRE armá un resumen claro con los datos que entendiste y pedí confirmación expresa (ej: "¿Está todo correcto para registrarlo?", "¿Confirmás que lo guarde?") ANTES de invocar la herramienta. NUNCA guardes nada en el sistema a la primera pasada.
-REGLA DE ORO 2 - DATOS FALTANTES: Nunca tires error si falta un dato. Sé proactivo. Si te piden registrar algo y falta un dato obligatorio (ej: importe de un gasto), preguntá amablemente ("Perfecto, ¿qué importe le pongo?") antes de llamar a la herramienta.
-REGLA DE ORO 3 - TOLERANCIA A ERRORES: Si el usuario escribe mal un nombre ("Salvatiera"), sé lo bastante inteligente como para buscar la versión correcta ("Salvatierra") usando coincidencias parciales. Nunca digas "no lo encuentro" a la primera de cambio.
-REGLA DE ORO 4 - CÁLCULOS MATEMÁTICOS Y EXTRACCIÓN: Si el usuario te pide sumar cantidades como "litros" o "kilos" u "horas" que están guardadas dentro del texto del 'concepto' o 'descripción' de los egresos (ej: "carga de 1500 litros"), revisá el resultado de la herramienta, extraé todos los números, sumalos paso a paso y si te dan un precio (ej: "a 2290$"), multiplicá el total de litros por ese precio y dale el resultado final exacto. Mostrá un breve resumen de lo encontrado.
+REGLA DE ORO 1 - DOBLE VALIDACIÓN (EXCLUSIVAMENTE PARA ACCIONES CRÍTICAS, NO PARA EGRESOS):
+Pedir confirmación previa ("¿Confirmás?") SOLO para: eliminar datos, registrar empleados nuevos, mover maquinaria de obra, o enviar mensajes de WhatsApp masivos a todos los operarios. PARA EGRESOS DE GASTO NUNCA SE PIDE CONFIRMACIÓN PREVIA.
+REGLA DE ORO 2 - TOLERANCIA A ERRORES: Si el usuario escribe mal un nombre ("Salvatiera"), sé lo bastante inteligente como para buscar la versión correcta ("Salvatierra") usando coincidencias parciales. Nunca digas "no lo encuentro" a la primera de cambio.
+REGLA DE ORO 3 - CÁLCULOS MATEMÁTICOS Y EXTRACCIÓN: Si el usuario te pide sumar cantidades como "litros" o "kilos" u "horas" que están guardadas dentro del texto del 'concepto' o 'descripción' de los egresos (ej: "carga de 1500 litros"), revisá el resultado de la herramienta, extraé todos los números, sumalos paso a paso y si te dan un precio (ej: "a 2290$"), multiplicá el total de litros por ese precio y dale el resultado final exacto. Mostrá un breve resumen de lo encontrado.
 
 📋 Registrar y actualizar jornadas de empleados
 ⚽ Registrar cargas de combustible por máquina
 🔧 Registrar mantenimientos y services de máquinas
-💰 Registrar gastos/egresos. (Preguntá por Fecha, Categoría, Concepto y Monto si no te los dan).
+💰 Registrar gastos/egresos (MODO VELOZ: registrar de inmediato sin preguntas de fecha ni categoría)
+🔄 Actualizar gastos recientes (imputar proyecto o máquina con 'actualizar_gasto')
 👤 Registrar nuevos empleados
 🔑 Crear accesos al sistema web (individual o masivo a todos los faltantes). Usa la herramienta específica sin intentar calcular nada antes.
 🏗️ Actualizar proyectos / Mover recursos: Mover empleados y máquinas usando 'mover_entidad_proyecto' (mucho mejor que actualizar_proyecto).
@@ -851,6 +916,12 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
         } else if (functionName === "registrar_gasto") {
           const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
           toolResult = await executeRegistrarGasto(functionArgs, imgUrl);
+          if (imgUrl && sesion.datos_pendientes) {
+            (sesion.datos_pendientes as any).ultima_imagen_url = null;
+          }
+        } else if (functionName === "actualizar_gasto") {
+          const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
+          toolResult = await executeActualizarGasto(functionArgs, imgUrl);
           if (imgUrl && sesion.datos_pendientes) {
             (sesion.datos_pendientes as any).ultima_imagen_url = null;
           }
@@ -1747,8 +1818,8 @@ async function executeEnviarFotografia(from: string, tipo_entidad: string, busqu
 }
 
 async function executeRegistrarGasto(args: {
-  fecha: string;
-  categoria: string;
+  fecha?: string;
+  categoria?: string;
   concepto: string;
   monto: number;
   proveedor?: string;
@@ -1757,9 +1828,28 @@ async function executeRegistrarGasto(args: {
   observaciones?: string;
 }, imgUrl?: string | null) {
   try {
-    // Idempotencia: evitar duplicados si el usuario confirma dos veces o Meta reintenta el webhook.
-    // Si existe un egreso con la misma fecha, concepto y monto creado en los últimos 60 segundos,
-    // devolvemos el ID existente sin crear uno nuevo.
+    const fechaFinal = args.fecha || new Date().toISOString().split("T")[0];
+
+    // Inferir categoría automáticamente si no se especificó
+    let categoriaFinal = args.categoria;
+    if (!categoriaFinal) {
+      const c = `${args.concepto || ""} ${args.observaciones || ""} ${args.centro_costos || ""}`.toLowerCase();
+      if (/relay|filtro|aceite|repuesto|mecanic|cubierta|oruga|correa|bateria|freno|service|reparac/i.test(c)) {
+        categoriaFinal = "Mantenimiento";
+      } else if (/gasoil|combustible|nafta|ypf|axion|shell|litro/i.test(c)) {
+        categoriaFinal = "Combustible";
+      } else if (/cemento|caño|arena|ripio|hierro|chapa|alambre|tornillo|disco/i.test(c)) {
+        categoriaFinal = "Materiales";
+      } else if (/alquiler|rmg/i.test(c)) {
+        categoriaFinal = "Alquiler";
+      } else if (/viatico|almuerzo|comida|flete/i.test(c)) {
+        categoriaFinal = "Servicios";
+      } else {
+        categoriaFinal = "Materiales";
+      }
+    }
+
+    // Idempotencia: evitar duplicados si el usuario o webhook reintenta en 60s
     const { gte: gteOp } = await import("drizzle-orm");
     const hace60seg = new Date(Date.now() - 60_000);
     const [existente] = await db
@@ -1767,7 +1857,7 @@ async function executeRegistrarGasto(args: {
       .from(egresosTable)
       .where(
         and(
-          eq(egresosTable.fecha, args.fecha),
+          eq(egresosTable.fecha, fechaFinal),
           eq(egresosTable.concepto, args.concepto),
           eq(egresosTable.monto, args.monto.toString()),
           gteOp(egresosTable.createdAt, hace60seg)
@@ -1780,35 +1870,55 @@ async function executeRegistrarGasto(args: {
       return `✅ Gasto ya registrado (ID #${existente.id}). Monto: $${Number(args.monto).toLocaleString("es-AR")} — ${args.concepto}.`;
     }
 
-    // Resolver nombre completo del proyecto desde la BD si se proporcionó centro_costos
-    let centroCostosResuelto = args.centro_costos || null;
+    // Resolver nombre completo del proyecto y separar posibles referencias a máquinas
+    let centroCostosResuelto: string | null = args.centro_costos || null;
+    let obsExtra: string | null = args.observaciones || null;
+
     if (args.centro_costos) {
-      const t = `%${args.centro_costos.toLowerCase()}%`;
+      const ccLower = args.centro_costos.toLowerCase();
       const [proyecto] = await db.select({ lugar: proyectosTable.lugar })
         .from(proyectosTable)
-        .where(ilike(proyectosTable.lugar, t))
+        .where(ilike(proyectosTable.lugar, `%${ccLower}%`))
         .limit(1);
+
       if (proyecto) {
         centroCostosResuelto = proyecto.lugar;
+      } else {
+        // Si el usuario puso múltiples palabras (ej: "Lipsa liugong"), buscar palabra por palabra
+        const palabras = ccLower.split(/\s+/);
+        for (const p of palabras) {
+          if (p.length < 3) continue;
+          const [pMatch] = await db.select({ lugar: proyectosTable.lugar })
+            .from(proyectosTable)
+            .where(ilike(proyectosTable.lugar, `%${p}%`))
+            .limit(1);
+          if (pMatch) {
+            centroCostosResuelto = pMatch.lugar;
+            const resto = palabras.filter(x => x !== p).join(" ");
+            if (resto && !obsExtra) {
+              obsExtra = resto.includes("liugong") ? "Cargadora LiuGong" : resto;
+            }
+            break;
+          }
+        }
       }
     } else if (
-      (args.categoria && args.categoria.toLowerCase().includes("alquiler")) ||
+      (categoriaFinal && categoriaFinal.toLowerCase().includes("alquiler")) ||
       (args.concepto && args.concepto.toLowerCase().includes("alquiler"))
     ) {
-      // Regla de negocio: gastos de alquiler se imputan a "RMG e hijas"
       centroCostosResuelto = "RMG e hijas";
     }
 
     const [egreso] = await db.insert(egresosTable).values({
-      fecha: args.fecha,
-      categoria: args.categoria,
+      fecha: fechaFinal,
+      categoria: categoriaFinal,
       concepto: args.concepto,
       monto: args.monto.toString(),
       proveedor: args.proveedor || null,
       metodo_pago: args.metodo_pago || null,
       comprobante: !!imgUrl,
       centro_costos: centroCostosResuelto,
-      observaciones: args.observaciones || null,
+      observaciones: obsExtra,
     }).returning();
 
     if (imgUrl && egreso && egreso.id) {
@@ -1822,18 +1932,118 @@ async function executeRegistrarGasto(args: {
     }
 
     // Auditoría
-    await auditarBot("CREACION", "egresos", egreso.id, { fecha: args.fecha, categoria: args.categoria, concepto: args.concepto, monto: args.monto, centro_costos: args.centro_costos, comprobante: !!imgUrl });
+    await auditarBot("CREACION", "egresos", egreso.id, { fecha: fechaFinal, categoria: categoriaFinal, concepto: args.concepto, monto: args.monto, centro_costos: centroCostosResuelto, comprobante: !!imgUrl });
 
-    // Intentar sincronizar con Google Sheets (no bloquear si falla)
+    // Sincronizar con Google Sheets en segundo plano
     try {
       const { syncAllSheets } = await import("./sync-sheets.js");
       syncAllSheets().catch(console.error);
     } catch (_) {}
 
-    return `✅ Gasto registrado correctamente con ID #${egreso.id}. Monto: $${Number(args.monto).toLocaleString("es-AR")} — ${args.concepto}.`;
+    return `✅ Gasto registrado correctamente con ID #${egreso.id}.\n💰 Monto: $${Number(args.monto).toLocaleString("es-AR")}\n📝 Concepto: ${args.concepto}\n🏷️ Categoría: ${categoriaFinal}\n🏗️ Proyecto: ${centroCostosResuelto || 'Sin asignar'}${obsExtra ? `\n🚜 Obs/Máquina: ${obsExtra}` : ''}\n📅 Fecha: ${fechaFinal}${imgUrl ? '\n📎 Comprobante: Adjuntado' : ''}`;
   } catch (error: any) {
     console.error("Error registrando gasto:", error);
     return `❌ Error al registrar el gasto: ${error.message}`;
+  }
+}
+
+async function executeActualizarGasto(args: {
+  id?: number;
+  centro_costos?: string;
+  observaciones?: string;
+  categoria?: string;
+  concepto?: string;
+  monto?: number;
+  proveedor?: string;
+}, imgUrl?: string | null) {
+  try {
+    let egreso: typeof egresosTable.$inferSelect | undefined;
+    if (args.id) {
+      const [found] = await db.select().from(egresosTable).where(eq(egresosTable.id, args.id)).limit(1);
+      egreso = found;
+    } else {
+      // Tomar el egreso más reciente de los últimos 15 minutos
+      const hace15min = new Date(Date.now() - 15 * 60 * 1000);
+      const { gte: gteOp } = await import("drizzle-orm");
+      const [recent] = await db.select().from(egresosTable)
+        .where(gteOp(egresosTable.createdAt, hace15min))
+        .orderBy(desc(egresosTable.id))
+        .limit(1);
+      egreso = recent;
+    }
+
+    if (!egreso) {
+      return "❌ No encontré ningún egreso reciente para actualizar. Podés indicarme el ID del egreso o los datos para cargarlo.";
+    }
+
+    let centroCostosResuelto = egreso.centro_costos;
+    let obsExtra = args.observaciones || null;
+
+    if (args.centro_costos) {
+      const ccLower = args.centro_costos.toLowerCase();
+      const [proyecto] = await db.select({ lugar: proyectosTable.lugar })
+        .from(proyectosTable)
+        .where(ilike(proyectosTable.lugar, `%${ccLower}%`))
+        .limit(1);
+
+      if (proyecto) {
+        centroCostosResuelto = proyecto.lugar;
+      } else {
+        const palabras = ccLower.split(/\s+/);
+        for (const p of palabras) {
+          if (p.length < 3) continue;
+          const [pMatch] = await db.select({ lugar: proyectosTable.lugar })
+            .from(proyectosTable)
+            .where(ilike(proyectosTable.lugar, `%${p}%`))
+            .limit(1);
+          if (pMatch) {
+            centroCostosResuelto = pMatch.lugar;
+            const resto = palabras.filter(x => x !== p).join(" ");
+            if (resto && !obsExtra) {
+              obsExtra = resto.includes("liugong") ? "Cargadora LiuGong" : resto;
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    const updates: Partial<typeof egresosTable.$inferInsert> = {};
+    if (centroCostosResuelto) updates.centro_costos = centroCostosResuelto;
+    if (obsExtra) {
+      updates.observaciones = egreso.observaciones 
+        ? `${egreso.observaciones} | ${obsExtra}`
+        : obsExtra;
+    }
+    if (args.categoria) updates.categoria = args.categoria;
+    if (args.concepto) updates.concepto = args.concepto;
+    if (args.monto !== undefined) updates.monto = args.monto.toString();
+    if (args.proveedor) updates.proveedor = args.proveedor;
+    if (imgUrl) updates.comprobante = true;
+
+    await db.update(egresosTable).set(updates).where(eq(egresosTable.id, egreso.id));
+
+    if (imgUrl) {
+      await db.insert(fotografiasTable).values({
+        empresa_id: 1,
+        entidad_tipo: "egreso",
+        entidad_id: egreso.id,
+        url: imgUrl,
+        descripcion: "Comprobante cargado por WhatsApp",
+      });
+    }
+
+    await auditarBot("ACTUALIZACION", "egresos", egreso.id, updates);
+
+    try {
+      const { syncAllSheets } = await import("./sync-sheets.js");
+      syncAllSheets().catch(console.error);
+    } catch (_) {}
+
+    return `✅ Egreso #${egreso.id} actualizado con éxito:\n🏗️ Proyecto: ${centroCostosResuelto || 'Sin asignar'}${updates.observaciones ? `\n🚜 Obs/Máquina: ${updates.observaciones}` : ''}\n💰 Monto: $${Number(updates.monto || egreso.monto).toLocaleString("es-AR")} — ${updates.concepto || egreso.concepto}.`;
+  } catch (error: any) {
+    console.error("Error actualizando egreso:", error);
+    return `❌ Error al actualizar el egreso: ${error.message}`;
   }
 }
 

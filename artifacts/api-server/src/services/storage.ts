@@ -33,6 +33,7 @@ export async function uploadImage(filename: string, base64Data: string): Promise
       const uploadResult = await cloudinary.uploader.upload(dataUri, {
         public_id: safeFilename.split('.')[0], // Usar nombre de archivo base sin extensión
         folder: 'puffin-system', // Carpeta dentro de Cloudinary
+        resource_type: 'auto', // Soporta imágenes, PDFs y otros documentos
       });
       
       return uploadResult.secure_url;

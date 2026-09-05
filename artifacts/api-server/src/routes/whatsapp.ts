@@ -62,6 +62,40 @@ whatsappRouter.post("/", async (req, res) => {
         }
       }
 
+      // Soporte para documentos (Facturas en PDF, comprobantes, etc.)
+      if (msgType === "document" && message.document) {
+        const docName = message.document.filename || "documento.pdf";
+        const docCaption = message.document.caption ? `${message.document.caption}\n` : "";
+        msgBody = `${docCaption}[Documento/Factura PDF adjunto: ${docName}]`;
+        const mediaId = message.document.id;
+        if (mediaId) {
+          console.log(`[Webhook] Descargando documento ${mediaId} (${docName}) de ${from}...`);
+          const base64 = await downloadWhatsAppMedia(mediaId);
+          if (base64) {
+            imageBase64 = base64;
+            // Si es un PDF, extraer el texto para que la IA lo interprete directamente
+            if (message.document.mime_type?.includes("pdf") || docName.toLowerCase().endsWith(".pdf")) {
+              try {
+                const { PDFParse } = await import("pdf-parse");
+                const base64Data = base64.includes(";base64,") ? base64.split(";base64,")[1] : base64;
+                const buffer = Buffer.from(base64Data, "base64");
+                const parser = new PDFParse({ data: buffer });
+                const parsedResult = await parser.getText();
+                if (parsedResult && parsedResult.text && parsedResult.text.trim()) {
+                  const cleanedText = parsedResult.text.replace(/\s+/g, " ").trim();
+                  msgBody += `\n\n--- CONTENIDO EXTRAÍDO DE LA FACTURA/PDF (${docName}) ---\n${cleanedText.slice(0, 3000)}`;
+                  console.log(`[Webhook] Texto extraído exitosamente de PDF ${docName} (${cleanedText.length} caracteres)`);
+                }
+              } catch (pdfErr) {
+                console.warn(`[Webhook] No se pudo extraer texto del PDF ${docName}:`, pdfErr);
+              }
+            }
+          } else {
+            console.warn(`[Webhook] No se pudo descargar el documento ${mediaId}`);
+          }
+        }
+      }
+
       // Ignorar mensajes enviados por el propio bot (evitar loop)
       const botPhoneNumber = process.env.WHATSAPP_PHONE_NUMBER_ID || "";
       const botDisplayNumber = change.metadata?.display_phone_number?.replace(/\D/g, "") || "";
