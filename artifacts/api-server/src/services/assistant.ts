@@ -805,9 +805,11 @@ INTERPRETACIÓN INTELIGENTE DE DATOS:
      -> Centro de costos: "Lipsa"
      -> Observaciones: "Cargadora LiuGong"
      Y REGISTRARLO DIRECTAMENTE con 'registrar_gasto'.
-4. MENSAJES SUCESIVOS O SEPARADOS:
-   - Si el usuario manda primero el gasto y en el siguiente mensaje envía "Lipsa liugong" (o un dato adicional):
-     USÁ 'actualizar_gasto' para completar el egreso recién creado con centro_costos='Lipsa' y observaciones='Cargadora LiuGong'. ¡Hacelo al instante sin preguntar!
+4. MENSAJES SUCESIVOS, SEPARADOS O AISLADOS DE PROYECTO/MÁQUINA:
+   - Si el usuario manda únicamente el nombre de un proyecto, obra y/o máquina (ej: "Lipsa liugong", "en Lipsa", "cargadora liugong", "para liugong"):
+     NUNCA respondas diciendo "por favor envíame el gasto que deseas registrar".
+     Asumí SIEMPRE que se refiere al egreso recién registrado o al último egreso guardado.
+     USÁ INMEDIATAMENTE 'actualizar_gasto' con centro_costos='Lipsa' y observaciones='Cargadora LiuGong' para asignárselo al egreso existente.
    - Si envía una factura PDF o foto justo después, usá 'adjuntar_comprobante'.
 5. COMPROBANTES Y FACTURAS EN PDF / IMAGEN:
    - Cuando llegue una factura en PDF o foto con texto extraído (CUIT, razón social del proveedor, N° comprobante, detalle, total):
@@ -1974,11 +1976,8 @@ async function executeActualizarGasto(args: {
       const [found] = await db.select().from(egresosTable).where(eq(egresosTable.id, args.id)).limit(1);
       egreso = found;
     } else {
-      // Tomar el egreso más reciente de los últimos 15 minutos
-      const hace15min = new Date(Date.now() - 15 * 60 * 1000);
-      const { gte: gteOp } = await import("drizzle-orm");
+      // Tomar el egreso más reciente del sistema
       const [recent] = await db.select().from(egresosTable)
-        .where(gteOp(egresosTable.createdAt, hace15min))
         .orderBy(desc(egresosTable.id))
         .limit(1);
       egreso = recent;

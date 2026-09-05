@@ -6,6 +6,54 @@ export const whatsappRouter = Router();
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || "puffin_secret_token";
 
+// Cola / Buffer para agrupar mensajes continuos que llegan con segundos de diferencia
+// (ej: primero el texto del gasto, a continuación "Lipsa liugong" y luego la foto/PDF)
+interface PendingBatch {
+  texts: string[];
+  imageBase64?: string;
+  timer: NodeJS.Timeout;
+}
+
+const pendingBatches = new Map<string, PendingBatch>();
+const DEBOUNCE_MS = 2000; // 2 segundos para agrupar ráfagas de mensajes del mismo remitente
+
+function queueWhatsAppMessage(from: string, msgBody: string, imageBase64?: string) {
+  const existing = pendingBatches.get(from);
+  if (existing) {
+    clearTimeout(existing.timer);
+    if (msgBody) existing.texts.push(msgBody);
+    if (imageBase64) existing.imageBase64 = imageBase64;
+
+    existing.timer = setTimeout(async () => {
+      pendingBatches.delete(from);
+      const combinedText = existing.texts.filter(Boolean).join("\n");
+      console.log(`[Webhook] Procesando lote continuo de ${from} (${existing.texts.length} mensajes combinados):\n${combinedText}`);
+      try {
+        await handleWhatsAppMessage(from, combinedText, existing.imageBase64);
+      } catch (err) {
+        console.error(`[Webhook] Error procesando lote de ${from}:`, err);
+      }
+    }, DEBOUNCE_MS);
+  } else {
+    const texts = msgBody ? [msgBody] : [];
+    const batch: PendingBatch = {
+      texts,
+      imageBase64,
+      timer: setTimeout(async () => {
+        pendingBatches.delete(from);
+        const combinedText = batch.texts.filter(Boolean).join("\n");
+        console.log(`[Webhook] Procesando mensaje de ${from}:\n${combinedText}`);
+        try {
+          await handleWhatsAppMessage(from, combinedText, batch.imageBase64);
+        } catch (err) {
+          console.error(`[Webhook] Error procesando mensaje de ${from}:`, err);
+        }
+      }, DEBOUNCE_MS),
+    };
+    pendingBatches.set(from, batch);
+  }
+}
+
 // Endpoint para la validación de webhook de Meta
 whatsappRouter.get("/", (req, res) => {
   const mode = req.query["hub.mode"];
@@ -111,8 +159,8 @@ whatsappRouter.post("/", async (req, res) => {
         return;
       }
 
-      console.log(`[Webhook] Mensaje entrante de ${from} (tipo: ${msgType}): ${msgBody}`);
-      await handleWhatsAppMessage(from, msgBody || "", imageBase64);
+      console.log(`[Webhook] Mensaje encolado de ${from} (tipo: ${msgType}): ${msgBody}`);
+      queueWhatsAppMessage(from, msgBody || "", imageBase64);
 
     } catch (error) {
       console.error("[Webhook] Error procesando mensaje:", error);
