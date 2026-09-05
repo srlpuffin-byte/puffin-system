@@ -19,6 +19,7 @@ import {
   Bot,
   Satellite,
   Map,
+  Compass,
   UserCog,
   ChevronDown,
   ChevronRight,
@@ -66,6 +67,7 @@ const NAV_GROUPS: NavGroup[] = [
     defaultOpen: true,
     items: [
       { icon: Map, label: "Proyectos", href: "/proyectos" },
+      { icon: Compass, label: "Trazado y Calles A-B", href: "/americangis" },
       { icon: Users, label: "Operarios", href: "/operarios" },
       { icon: Truck, label: "Maquinaria", href: "/maquinas" },
       { icon: Clock, label: "Jornadas", href: "/jornadas" },

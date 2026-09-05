@@ -1,98 +1,1287 @@
-import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect, useMemo } from "react";
+import { 
+  LatLng, 
+  LineSegment, 
+  Waypoint,
+  WaypointTipo,
+  LotePlan,
+  calcularMetricasPoligono, 
+  generarLineasGuia, 
+  encontrarRumboBordeMasLargo,
+  obtenerNombreRumbo,
+  parsearCoordenadas,
+  generarKML, 
+  generarCSV, 
+  generarGeoJSON, 
+  descargarArchivo,
+  generarLotePorMedidas,
+  calcularCentroide 
+} from "@/lib/gis/surface-planner";
+import { TrazadorMapa, MapInteractionMode } from "@/components/map/TrazadorMapa";
+import { useGetProyectos } from "@/hooks/use-proyectos";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Layers, Grid3x3, Route, Shield, Settings } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { 
+  Compass, 
+  MapPin, 
+  Layers, 
+  Download, 
+  FileSpreadsheet, 
+  Check, 
+  Copy, 
+  Sparkles, 
+  Smartphone, 
+  Save, 
+  Clock, 
+  Activity,
+  AlertTriangle,
+  Plus,
+  Trash2,
+  Route,
+  Square,
+  Magnet,
+  Target,
+  Edit3
+} from "lucide-react";
+import { toast } from "sonner";
 
-const FEATURES = [
-  { icon: Grid3x3, label: "Lotes y Campos", desc: "Definición de lotes, campos y sectores de trabajo" },
-  { icon: MapPin, label: "Geocercas", desc: "Áreas permitidas, prohibidas y zonas de trabajo" },
-  { icon: Route, label: "Recorridos", desc: "Trazado y seguimiento de rutas autorizadas" },
-  { icon: Shield, label: "Áreas de cobertura", desc: "Control de cobertura realizada por máquina" },
-  { icon: Layers, label: "Obras y Sectores", desc: "Gestión de obras activas por ubicación" },
-  { icon: Settings, label: "Configuración", desc: "Integración con servidor AmericanGIS" },
-];
+const ANCHOS_PRESET = [3, 4.5, 6, 9, 12, 15, 20, 30, 50];
 
 export function Americangis() {
+  const { data: proyectos } = useGetProyectos();
+
+  // Estados principales del trazado
+  const [nombreLote, setNombreLote] = useState("Lote 01 - Trazado Recto");
+  const [proyectoSeleccionado, setProyectoSeleccionado] = useState<string>("");
+  const [polygon, setPolygon] = useState<LatLng[]>([]);
+  const [anchoCalle, setAnchoCalle] = useState<number>(12);
+  const [rumboGrados, setRumboGrados] = useState<number>(90);
+  const [alternarSentido, setAlternarSentido] = useState<boolean>(true);
+  const [interactionMode, setInteractionMode] = useState<MapInteractionMode>("none");
+  const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("mapa");
+  
+  // Elementos avanzados de campo
+  const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
+  const [callesManuales, setCallesManuales] = useState<LineSegment[]>([]);
+  const [lotesGuardados, setLotesGuardados] = useState<LotePlan[]>([]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Diálogo para ingreso manual de coordenadas
+  const [dialogCoordsOpen, setDialogCoordsOpen] = useState(false);
+  const [textoCoordsInput, setTextoCoordsInput] = useState("");
+
+  // Diálogo para generar lote por medidas exactas
+  const [dialogMedidasOpen, setDialogMedidasOpen] = useState(false);
+  const [medidaAncho, setMedidaAncho] = useState("400");
+  const [medidaLargo, setMedidaLargo] = useState("600");
+  const [medidaRumbo, setMedidaRumbo] = useState("90");
+
+  // Diálogo para nuevo waypoint
+  const [dialogWpOpen, setDialogWpOpen] = useState(false);
+  const [wpNombre, setWpNombre] = useState("");
+  const [wpTipo, setWpTipo] = useState<WaypointTipo>("mojon");
+  const [wpLat, setWpLat] = useState("");
+  const [wpLng, setWpLng] = useState("");
+  const [wpRadio, setWpRadio] = useState("10");
+  const [wpNotas, setWpNotas] = useState("");
+
+  // Cargar biblioteca de lotes guardados
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("puffin_trazados_lotes");
+      if (saved) {
+        setLotesGuardados(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error("Error cargando lotes:", e);
+    }
+  }, []);
+
+  // Cálculos métricos de la superficie
+  const metricas = useMemo(() => {
+    return calcularMetricasPoligono(polygon);
+  }, [polygon]);
+
+  // Generador geométrico de pasadas paralelas rectas
+  const lineas: LineSegment[] = useMemo(() => {
+    if (polygon.length < 3) return [];
+    return generarLineasGuia(polygon, anchoCalle, rumboGrados, alternarSentido);
+  }, [polygon, anchoCalle, rumboGrados, alternarSentido]);
+
+  // Distancia total acumulada
+  const distanciaTotalMeters = useMemo(() => {
+    const distAuto = lineas.reduce((acc, l) => acc + l.lengthMeters, 0);
+    const distManual = callesManuales.reduce((acc, l) => acc + l.lengthMeters, 0);
+    return distAuto + distManual;
+  }, [lineas, callesManuales]);
+
+  // Estimación de horas de máquina (7.5 km/h promedio)
+  const horasEstimadas = useMemo(() => {
+    if (distanciaTotalMeters === 0) return 0;
+    const km = distanciaTotalMeters / 1000;
+    return Math.round((km / 7.5) * 10) / 10;
+  }, [distanciaTotalMeters]);
+
+  // Objeto Plan completo
+  const planActual: LotePlan = useMemo(() => {
+    return {
+      id: `lote-${Date.now()}`,
+      nombre: nombreLote,
+      proyectoId: proyectoSeleccionado || undefined,
+      fechaCreacion: new Date().toISOString(),
+      polygon,
+      areaM2: metricas.areaM2,
+      areaHectareas: metricas.areaHectareas,
+      perimetroMeters: metricas.perimetroMeters,
+      anchoCalleMeters: anchoCalle,
+      rumboGrados,
+      alternarSentido,
+      lineas,
+      callesManuales,
+      waypoints,
+      distanciaTotalMeters,
+    };
+  }, [
+    nombreLote,
+    proyectoSeleccionado,
+    polygon,
+    metricas,
+    anchoCalle,
+    rumboGrados,
+    alternarSentido,
+    lineas,
+    callesManuales,
+    waypoints,
+    distanciaTotalMeters,
+  ]);
+
+  // Auto-alinear con lado más largo
+  const handleAlinearBordeMasLargo = () => {
+    if (polygon.length < 2) {
+      toast.error("Delimite primero el terreno con al menos 2 puntos");
+      return;
+    }
+    const rumboOptimo = encontrarRumboBordeMasLargo(polygon);
+    setRumboGrados(rumboOptimo);
+    toast.success(`Rumbo calibrado a ${rumboOptimo}° (${obtenerNombreRumbo(rumboOptimo)})`);
+  };
+
+  // Guardar en biblioteca
+  const handleGuardarLote = () => {
+    if (polygon.length < 3) {
+      toast.error("Delimite una superficie cerrada antes de guardar");
+      return;
+    }
+    try {
+      const nuevoLote: LotePlan = { ...planActual, id: `lote-${Date.now()}` };
+      const actualizados = [nuevoLote, ...lotesGuardados.filter((l) => l.nombre !== nuevoLote.nombre)];
+      setLotesGuardados(actualizados);
+      localStorage.setItem("puffin_trazados_lotes", JSON.stringify(actualizados));
+      toast.success(`Lote "${nombreLote}" guardado`);
+    } catch (e) {
+      toast.error("Error al guardar");
+    }
+  };
+
+  // Cargar lote guardado
+  const handleCargarLote = (lote: LotePlan) => {
+    setNombreLote(lote.nombre);
+    setPolygon(lote.polygon);
+    setAnchoCalle(lote.anchoCalleMeters);
+    setRumboGrados(lote.rumboGrados);
+    setAlternarSentido(lote.alternarSentido);
+    setCallesManuales(lote.callesManuales || []);
+    setWaypoints(lote.waypoints || []);
+    if (lote.proyectoId) setProyectoSeleccionado(lote.proyectoId);
+    toast.info(`Lote "${lote.nombre}" cargado`);
+  };
+
+  // Agregar coordenadas manuales al polígono
+  const handleAgregarCoordsManual = () => {
+    const lineas = textoCoordsInput.split("\n");
+    const nuevosPuntos: LatLng[] = [];
+
+    for (const l of lineas) {
+      const parsed = parsearCoordenadas(l);
+      if (parsed) nuevosPuntos.push(parsed);
+    }
+
+    if (nuevosPuntos.length === 0) {
+      toast.error("No se detectaron coordenadas válidas. Use formato: -32.8908, -64.3496");
+      return;
+    }
+
+    setPolygon([...polygon, ...nuevosPuntos]);
+    setTextoCoordsInput("");
+    setDialogCoordsOpen(false);
+    toast.success(`${nuevosPuntos.length} puntos agregados al polígono`);
+  };
+
+  // Generar lote rectangular por medidas exactas
+  const handleGenerarLotePorMedidas = () => {
+    const ancho = parseFloat(medidaAncho);
+    const largo = parseFloat(medidaLargo);
+    const rumbo = parseFloat(medidaRumbo);
+    if (isNaN(ancho) || isNaN(largo) || ancho <= 0 || largo <= 0) {
+      toast.error("Ingrese medidas válidas en metros");
+      return;
+    }
+
+    const centro = polygon.length >= 3 ? calcularCentroide(polygon) : { lat: -32.8908, lng: -64.3496 };
+    const nuevoRect = generarLotePorMedidas(centro, ancho, largo, isNaN(rumbo) ? 90 : rumbo);
+    setPolygon(nuevoRect);
+    if (!isNaN(rumbo)) setRumboGrados(rumbo);
+    setDialogMedidasOpen(false);
+    toast.success(`Lote de ${ancho}m x ${largo}m generado (${((ancho * largo) / 10000).toFixed(2)} Ha)`);
+  };
+
+  // Crear nuevo waypoint desde diálogo
+  const handleCrearWaypointManual = () => {
+    const latNum = parseFloat(wpLat);
+    const lngNum = parseFloat(wpLng);
+    if (isNaN(latNum) || isNaN(lngNum)) {
+      toast.error("Ingrese coordenadas válidas");
+      return;
+    }
+
+    const nuevo: Waypoint = {
+      id: `wp-${Date.now()}`,
+      nombre: wpNombre || `Punto ${waypoints.length + 1}`,
+      tipo: wpTipo,
+      lat: latNum,
+      lng: lngNum,
+      radioSeguridadMeters: parseFloat(wpRadio) || 0,
+      notas: wpNotas,
+    };
+
+    setWaypoints([...waypoints, nuevo]);
+    setDialogWpOpen(false);
+    setWpNombre("");
+    setWpLat("");
+    setWpLng("");
+    setWpNotas("");
+    toast.success(`Waypoint "${nuevo.nombre}" creado`);
+  };
+
+  // Exportar KML
+  const handleDescargarKML = () => {
+    if (polygon.length < 3) {
+      toast.error("Delimite una superficie antes de exportar");
+      return;
+    }
+    const kml = generarKML(planActual);
+    const nombreClean = nombreLote.replace(/\s+/g, "_").toLowerCase();
+    descargarArchivo(kml, `${nombreClean}_avenza.kml`, "application/vnd.google-earth.kml+xml");
+    toast.success("Archivo KML descargado. Compatible al 100% con Avenza Maps y Google Earth");
+  };
+
+  // Exportar CSV
+  const handleDescargarCSV = () => {
+    if (lineas.length === 0 && polygon.length === 0) {
+      toast.error("No hay datos para exportar");
+      return;
+    }
+    const csv = generarCSV(planActual);
+    const nombreClean = nombreLote.replace(/\s+/g, "_").toLowerCase();
+    descargarArchivo(csv, `${nombreClean}_plan_maquinaria.csv`, "text/csv;charset=utf-8;");
+    toast.success("Planilla CSV descargada para banderilleros satelitales");
+  };
+
+  // Exportar GeoJSON
+  const handleDescargarGeoJSON = () => {
+    if (polygon.length < 3) {
+      toast.error("Delimite una superficie antes de exportar");
+      return;
+    }
+    const geojson = generarGeoJSON(planActual);
+    const nombreClean = nombreLote.replace(/\s+/g, "_").toLowerCase();
+    descargarArchivo(geojson, `${nombreClean}.geojson`, "application/geo+json");
+    toast.success("GeoJSON descargado para QGIS / ArcGIS");
+  };
+
+  const handleCopiarCoords = (texto: string, id: string) => {
+    navigator.clipboard.writeText(texto);
+    setCopiedId(id);
+    toast.success("Coordenadas copiadas al portapapeles");
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="rounded-full bg-green-600 p-2">
-          <MapPin className="h-6 w-6 text-white" />
-        </div>
+    <div className="space-y-6 pb-12">
+      {/* Encabezado Profesional */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-primary">AmericanGIS</h1>
-          <p className="text-sm text-muted-foreground">Integración de información geográfica y gestión de áreas</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-black tracking-tight text-primary">
+              Trazador de Lotes y Calles Rectas
+            </h1>
+            <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30 text-xs font-semibold px-2 py-0.5">
+              Guía A-B Geodésica
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Delimitación de superficies, trazado de pasadas paralelas rectas, waypoints y exportación a Avenza Maps & Banderilleros.
+          </p>
         </div>
-        <Badge variant="secondary" className="ml-auto">Integración pendiente</Badge>
+
+        {/* Acciones Superiores */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDialogMedidasOpen(true)}
+            className="gap-1.5 border-slate-700 bg-slate-900/60 hover:bg-slate-800 text-xs h-9 text-slate-200"
+            title="Autoayuda: Crear rectángulo perfecto por ancho y largo"
+          >
+            <Square className="h-4 w-4 text-amber-400" />
+            Crear por Medidas (m)
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDialogCoordsOpen(true)}
+            className="gap-1.5 border-slate-700 bg-slate-900/60 hover:bg-slate-800 text-xs h-9"
+          >
+            <Edit3 className="h-4 w-4 text-cyan-400" />
+            Cargar Coordenadas GPS
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleGuardarLote}
+            className="gap-1.5 border-slate-700 bg-slate-900/60 hover:bg-slate-800 text-xs h-9"
+          >
+            <Save className="h-4 w-4 text-emerald-400" />
+            Guardar Lote
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={handleDescargarKML}
+            className="gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs h-9 shadow-md"
+          >
+            <Smartphone className="h-4 w-4 text-slate-950" />
+            Exportar a Avenza Maps (.kml)
+          </Button>
+        </div>
       </div>
 
-      <Card className="border-l-4 border-l-yellow-500 bg-yellow-50">
-        <CardContent className="pt-4">
-          <p className="text-sm text-yellow-800">
-            Esta integración requiere configurar las credenciales de conexión con el servidor AmericanGIS. 
-            Contactá al administrador del sistema para activar esta funcionalidad.
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card className="border-2 border-dashed border-slate-300">
-        <CardContent className="py-0">
-          <div className="h-72 flex flex-col items-center justify-center text-center gap-4">
-            <div className="rounded-full bg-slate-100 p-6">
-              <Layers className="h-14 w-14 text-slate-400" />
+      {/* Tarjetas KPI de Estado de Obra */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-slate-800/80 bg-slate-900/50 backdrop-blur">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between text-muted-foreground mb-1">
+              <span className="text-xs font-medium uppercase tracking-wider">Superficie Total</span>
+              <MapPin className="h-4 w-4 text-emerald-400" />
             </div>
+            <div className="text-2xl font-black tracking-tight text-white">
+              {metricas.areaHectareas > 0 ? `${metricas.areaHectareas.toLocaleString("es-AR")} Ha` : "0.00 Ha"}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">
+              {metricas.areaM2 > 0 ? `${metricas.areaM2.toLocaleString("es-AR")} m²` : "Sin delimitar"}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-800/80 bg-slate-900/50 backdrop-blur">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between text-muted-foreground mb-1">
+              <span className="text-xs font-medium uppercase tracking-wider">Perímetro Lote</span>
+              <Activity className="h-4 w-4 text-blue-400" />
+            </div>
+            <div className="text-2xl font-black tracking-tight text-white">
+              {metricas.perimetroMeters > 0 ? `${metricas.perimetroMeters.toLocaleString("es-AR")} m` : "0 m"}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {polygon.length} vértices georreferenciados
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-800/80 bg-slate-900/50 backdrop-blur">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between text-muted-foreground mb-1">
+              <span className="text-xs font-medium uppercase tracking-wider">Pasadas / Calles</span>
+              <Compass className="h-4 w-4 text-amber-400" />
+            </div>
+            <div className="text-2xl font-black tracking-tight text-amber-400">
+              {lineas.length} {lineas.length === 1 ? "recta" : "rectas"}
+              {callesManuales.length > 0 && <span className="text-xs text-fuchsia-400 ml-1">+{callesManuales.length} man.</span>}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Separación: <b className="text-white">{anchoCalle} m</b> | Rumbo: <b className="text-white">{rumboGrados}°</b>
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-800/80 bg-slate-900/50 backdrop-blur">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between text-muted-foreground mb-1">
+              <span className="text-xs font-medium uppercase tracking-wider">Metros Lineales</span>
+              <Clock className="h-4 w-4 text-cyan-400" />
+            </div>
+            <div className="text-2xl font-black tracking-tight text-white">
+              {(distanciaTotalMeters / 1000).toFixed(2)} km
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              ~{horasEstimadas} h máq. (a 7.5 km/h)
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Configuración de Superficie y Rumbo */}
+      <Card className="border-slate-800 bg-slate-900/70 shadow-lg">
+        <CardContent className="p-4 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <p className="text-lg font-semibold text-slate-600">Visor de Campos y Lotes</p>
-              <p className="text-sm text-slate-500 mt-1">Una vez configurada la integración, aquí se visualizarán</p>
-              <p className="text-sm text-slate-500">los campos, lotes, recorridos y cobertura de máquinas</p>
+              <label className="text-xs font-semibold text-slate-300 block mb-1">
+                Nombre de la Superficie / Lote
+              </label>
+              <Input
+                value={nombreLote}
+                onChange={(e) => setNombreLote(e.target.value)}
+                placeholder="Ej: Lote 14 - Campo Norte"
+                className="bg-slate-950 border-slate-700 text-sm h-9"
+              />
             </div>
-            <div className="flex gap-2 text-xs text-slate-500">
-              <span className="bg-green-100 text-green-700 px-2 py-1 rounded">Lotes</span>
-              <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">Máquinas</span>
-              <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">Recorridos</span>
-              <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">Cobertura</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {FEATURES.map((f) => (
-          <Card key={f.label} className="opacity-75">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-slate-100 p-2">
-                  <f.icon className="h-5 w-5 text-slate-500" />
-                </div>
-                <div>
-                  <p className="font-semibold text-sm">{f.label}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{f.desc}</p>
+            <div>
+              <label className="text-xs font-semibold text-slate-300 block mb-1">
+                Vincular a Proyecto de Puffin
+              </label>
+              <Select value={proyectoSeleccionado} onValueChange={setProyectoSeleccionado}>
+                <SelectTrigger className="bg-slate-950 border-slate-700 text-sm h-9">
+                  <SelectValue placeholder="Seleccionar proyecto activo..." />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-800 text-white">
+                  {proyectos && proyectos.length > 0 ? (
+                    proyectos.map((p) => (
+                      <SelectItem key={p.id} value={p.id.toString()}>
+                        {p.lugar} ({p.hectareas} Ha)
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      Sin proyectos cargados
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {lotesGuardados.length > 0 && (
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  Cargar Lote de la Biblioteca
+                </label>
+                <Select onValueChange={(val) => {
+                  const encontrado = lotesGuardados.find((l) => l.id === val);
+                  if (encontrado) handleCargarLote(encontrado);
+                }}>
+                  <SelectTrigger className="bg-slate-950 border-slate-700 text-sm h-9 text-slate-300">
+                    <SelectValue placeholder="Seleccionar lote guardado..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-slate-800 text-white">
+                    {lotesGuardados.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.nombre} ({l.areaHectareas} Ha)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          <div className="h-[1px] bg-slate-800" />
+
+          {/* Parámetros de Generación */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            {/* Ancho de calle */}
+            <div className="lg:col-span-5 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-300">
+                  Ancho de Pasada / Calle: <b className="text-amber-400 font-mono text-sm">{anchoCalle} m</b>
+                </span>
+                <span className="text-[11px] text-muted-foreground">Distancia entre ejes</span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {ANCHOS_PRESET.map((ancho) => (
+                  <button
+                    key={ancho}
+                    onClick={() => setAnchoCalle(ancho)}
+                    className={`px-2.5 py-1 text-xs font-medium rounded border transition-colors ${
+                      anchoCalle === ancho
+                        ? "bg-amber-500 text-slate-950 font-bold border-amber-400 shadow"
+                        : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+                    }`}
+                  >
+                    {ancho}m
+                  </button>
+                ))}
+                <div className="flex items-center gap-1 ml-auto">
+                  <Input
+                    type="number"
+                    min="1"
+                    max="500"
+                    step="0.5"
+                    value={anchoCalle}
+                    onChange={(e) => setAnchoCalle(Math.max(1, parseFloat(e.target.value) || 1))}
+                    className="w-16 h-7 text-xs bg-slate-950 border-slate-700 font-mono text-center"
+                  />
+                  <span className="text-xs text-muted-foreground">m</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            </div>
 
-      <Card>
-        <CardHeader><CardTitle className="text-sm">Configuración de conexión</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between items-center py-2 border-b">
-              <span className="text-muted-foreground">Endpoint API</span>
-              <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded">https://api.americangis.com.ar/v1</span>
+            {/* Rumbo */}
+            <div className="lg:col-span-5 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Compass className="h-3.5 w-3.5 text-amber-400" />
+                  Rumbo de Pasada: <b className="text-amber-400 font-mono text-sm">{rumboGrados}°</b> ({obtenerNombreRumbo(rumboGrados)})
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleAlinearBordeMasLargo}
+                  className="h-6 text-[11px] text-amber-400 hover:text-amber-300 hover:bg-amber-950/40 p-1 gap-1"
+                >
+                  <Sparkles className="h-3 w-3" /> Auto-Alinear Lado Largo
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Slider
+                  min={0}
+                  max={359}
+                  step={1}
+                  value={[rumboGrados]}
+                  onValueChange={(val) => setRumboGrados(val[0])}
+                  className="flex-1"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setInteractionMode("draw_ab")}
+                  className="h-7 text-xs border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 gap-1 px-2"
+                >
+                  <Compass className="h-3.5 w-3.5 text-amber-400" />
+                  Trazar A-B
+                </Button>
+              </div>
             </div>
-            <div className="flex justify-between items-center py-2 border-b">
-              <span className="text-muted-foreground">Estado de conexión</span>
-              <Badge variant="secondary">Sin configurar</Badge>
-            </div>
-            <div className="flex justify-between items-center py-2">
-              <span className="text-muted-foreground">Módulo</span>
-              <span className="font-mono text-xs">/integrations/americangis</span>
+
+            {/* Boustrophedon */}
+            <div className="lg:col-span-2 flex items-center justify-end gap-2 pt-2 lg:pt-0">
+              <div className="text-right">
+                <p className="text-xs font-semibold text-slate-300">Ida y Vuelta</p>
+                <p className="text-[10px] text-muted-foreground">Alternar cabeceras</p>
+              </div>
+              <Switch
+                checked={alternarSentido}
+                onCheckedChange={setAlternarSentido}
+              />
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Pestañas de Trabajo */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="bg-slate-900 border border-slate-800 p-1">
+          <TabsTrigger value="mapa" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold">
+            <Layers className="h-3.5 w-3.5" /> Visor Cartográfico y Trazador
+          </TabsTrigger>
+          <TabsTrigger value="coordenadas" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold">
+            <FileSpreadsheet className="h-3.5 w-3.5" /> Calles A-B ({lineas.length + callesManuales.length})
+          </TabsTrigger>
+          <TabsTrigger value="waypoints" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold">
+            <AlertTriangle className="h-3.5 w-3.5" /> Waypoints & Obstáculos ({waypoints.length})
+          </TabsTrigger>
+          <TabsTrigger value="vertices" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold">
+            <MapPin className="h-3.5 w-3.5" /> Vértices del Lote ({polygon.length})
+          </TabsTrigger>
+          <TabsTrigger value="avenza" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold">
+            <Smartphone className="h-3.5 w-3.5" /> Guía Avenza Maps & Celular
+          </TabsTrigger>
+        </TabsList>
+
+        {/* PESTAÑA 1: VISOR SATELITAL */}
+        <TabsContent value="mapa" className="space-y-3 m-0">
+          <TrazadorMapa
+            polygon={polygon}
+            onPolygonChange={setPolygon}
+            lineas={lineas}
+            callesManuales={callesManuales}
+            onCallesManualesChange={setCallesManuales}
+            waypoints={waypoints}
+            onWaypointsChange={setWaypoints}
+            rumboGrados={rumboGrados}
+            onRumboChange={setRumboGrados}
+            interactionMode={interactionMode}
+            setInteractionMode={setInteractionMode}
+            selectedLineId={selectedLineId}
+            onSelectLine={setSelectedLineId}
+            height="620px"
+          />
+
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground bg-slate-900/60 border border-slate-800/80 rounded-lg p-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-green-500" /> Punto A (Inicio)
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Punto B (Fin)
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-4 bg-amber-500 rounded" /> Pasadas Rectas
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-4 bg-fuchsia-500 rounded" /> Calle Manual
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-red-500" /> ⚠️ Obstáculo
+              </span>
+            </div>
+            <div>
+              💡 <i>Arrastre los puntos verdes intermedios para insertar nuevos vértices en cualquier arista del lote.</i>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* PESTAÑA 2: PLANILLA DE COORDENADAS A-B */}
+        <TabsContent value="coordenadas" className="space-y-4 m-0">
+          <Card className="border-slate-800 bg-slate-900/60">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base text-white">
+                  Coordenadas Geodésicas de Calles y Pasadas (A-B)
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Calibrado en sistema WGS84 para carga en pilotos automáticos y banderilleros satelitales.
+                </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDescargarCSV}
+                  className="gap-1 text-xs border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200"
+                >
+                  <Download className="h-3.5 w-3.5 text-emerald-400" /> Descargar CSV / Excel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDescargarGeoJSON}
+                  className="gap-1 text-xs border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200"
+                >
+                  GeoJSON
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {lineas.length === 0 && callesManuales.length === 0 ? (
+                <div className="py-16 text-center text-muted-foreground text-sm">
+                  <Compass className="h-10 w-10 mx-auto text-slate-600 mb-2" />
+                  Delimite una superficie en el mapa para calcular las calles.
+                </div>
+              ) : (
+                <div className="max-h-[500px] overflow-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-950/80 sticky top-0 border-b border-slate-800 text-slate-400 uppercase tracking-wider font-mono">
+                      <tr>
+                        <th className="py-2.5 px-3">Calle</th>
+                        <th className="py-2.5 px-3">Tipo</th>
+                        <th className="py-2.5 px-3">Longitud</th>
+                        <th className="py-2.5 px-3">Rumbo</th>
+                        <th className="py-2.5 px-3">Punto Inicio (A)</th>
+                        <th className="py-2.5 px-3">Punto Fin (B)</th>
+                        <th className="py-2.5 px-3 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-mono">
+                      {/* Calles Manuales */}
+                      {callesManuales.map((line) => (
+                        <tr key={line.id} className="hover:bg-slate-800/40 bg-fuchsia-950/10">
+                          <td className="py-2 px-3 font-bold text-fuchsia-400">
+                            {line.nombre}
+                          </td>
+                          <td className="py-2 px-3 text-slate-400">Manual</td>
+                          <td className="py-2 px-3 text-white">
+                            {line.lengthMeters.toLocaleString("es-AR")} m
+                          </td>
+                          <td className="py-2 px-3 text-slate-300">
+                            {line.bearing}° ({line.headingName})
+                          </td>
+                          <td className="py-2 px-3 text-emerald-400">
+                            {line.start.lat.toFixed(6)}, {line.start.lng.toFixed(6)}
+                          </td>
+                          <td className="py-2 px-3 text-red-400">
+                            {line.end.lat.toFixed(6)}, {line.end.lng.toFixed(6)}
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleCopiarCoords(`${line.start.lat.toFixed(6)}, ${line.start.lng.toFixed(6)}`, line.id)}
+                              className="h-6 px-2 text-[11px]"
+                            >
+                              {copiedId === line.id ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+
+                      {/* Pasadas Automáticas */}
+                      {lineas.map((line) => (
+                        <tr
+                          key={line.id}
+                          onClick={() => setSelectedLineId(line.id)}
+                          className={`hover:bg-slate-800/40 cursor-pointer ${
+                            selectedLineId === line.id ? "bg-amber-500/10 border-l-4 border-amber-500" : ""
+                          }`}
+                        >
+                          <td className="py-2 px-3 font-bold text-amber-400">
+                            {line.nombre}
+                          </td>
+                          <td className="py-2 px-3 text-slate-400">Paralela A-B</td>
+                          <td className="py-2 px-3 text-white">
+                            {line.lengthMeters.toLocaleString("es-AR")} m
+                          </td>
+                          <td className="py-2 px-3 text-slate-300">
+                            {line.bearing}° ({line.headingName})
+                          </td>
+                          <td className="py-2 px-3 text-emerald-400">
+                            {line.start.lat.toFixed(6)}, {line.start.lng.toFixed(6)}
+                          </td>
+                          <td className="py-2 px-3 text-red-400">
+                            {line.end.lat.toFixed(6)}, {line.end.lng.toFixed(6)}
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopiarCoords(`${line.start.lat.toFixed(6)}, ${line.start.lng.toFixed(6)}`, line.id);
+                              }}
+                              className="h-6 px-2 text-[11px] text-slate-400 hover:text-white"
+                            >
+                              {copiedId === line.id ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* PESTAÑA 3: WAYPOINTS Y OBSTÁCULOS */}
+        <TabsContent value="waypoints" className="space-y-4 m-0">
+          <Card className="border-slate-800 bg-slate-900/60">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base text-white">
+                  Waypoints, Puntos de Interés y Obstáculos
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Marque pozos, postes, árboles, tranqueras o casillas para advertir a la máquina en el campo.
+                </CardDescription>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => setDialogWpOpen(true)}
+                className="gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs h-8"
+              >
+                <Plus className="h-3.5 w-3.5" /> Agregar Waypoint
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              {waypoints.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground text-sm">
+                  <AlertTriangle className="h-10 w-10 mx-auto text-slate-600 mb-2" />
+                  No hay waypoints u obstáculos registrados. Haga clic en "+ Waypoint" en el mapa o en el botón de arriba.
+                </div>
+              ) : (
+                <div className="overflow-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 uppercase tracking-wider font-mono">
+                      <tr>
+                        <th className="py-2.5 px-3">Nombre</th>
+                        <th className="py-2.5 px-3">Tipo</th>
+                        <th className="py-2.5 px-3">Coordenadas</th>
+                        <th className="py-2.5 px-3">Radio Seguridad</th>
+                        <th className="py-2.5 px-3">Notas</th>
+                        <th className="py-2.5 px-3 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-mono">
+                      {waypoints.map((wp) => (
+                        <tr key={wp.id} className="hover:bg-slate-800/40">
+                          <td className="py-2.5 px-3 font-bold text-white flex items-center gap-1.5">
+                            {wp.tipo === "obstaculo" ? "⚠️" : wp.tipo === "acceso" ? "🚪" : wp.tipo === "combustible" ? "⛽" : "📍"} {wp.nombre}
+                          </td>
+                          <td className="py-2.5 px-3 uppercase text-[11px] text-slate-300">
+                            {wp.tipo}
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-300">
+                            {wp.lat.toFixed(6)}, {wp.lng.toFixed(6)}
+                          </td>
+                          <td className="py-2.5 px-3 text-amber-400">
+                            {wp.radioSeguridadMeters ? `${wp.radioSeguridadMeters} m` : "Sin radio"}
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-400">
+                            {wp.notas || "-"}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setWaypoints(waypoints.filter((w) => w.id !== wp.id));
+                                toast.info(`Waypoint "${wp.nombre}" eliminado`);
+                              }}
+                              className="h-6 w-6 p-0 text-red-400 hover:text-red-300"
+                              title="Eliminar waypoint"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* PESTAÑA 4: VÉRTICES DEL POLÍGONO */}
+        <TabsContent value="vertices" className="space-y-4 m-0">
+          <Card className="border-slate-800 bg-slate-900/60">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base text-white">
+                  Coordenadas de los Vértices del Lote
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Listado topográfico de las esquinas del terreno georreferenciadas.
+                </CardDescription>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setDialogCoordsOpen(true)}
+                className="gap-1 text-xs border-slate-700 bg-slate-800 text-slate-200"
+              >
+                <Plus className="h-3.5 w-3.5 text-green-400" /> Ingresar Puntos Manualmente
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              {polygon.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground text-sm">
+                  Haga clics en el mapa para delimitar el lote.
+                </div>
+              ) : (
+                <div className="max-h-[450px] overflow-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 uppercase tracking-wider font-mono">
+                      <tr>
+                        <th className="py-2.5 px-3">Vértice</th>
+                        <th className="py-2.5 px-3">Latitud</th>
+                        <th className="py-2.5 px-3">Longitud</th>
+                        <th className="py-2.5 px-3 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-mono">
+                      {polygon.map((p, idx) => (
+                        <tr key={idx} className="hover:bg-slate-800/40">
+                          <td className="py-2 px-3 font-bold text-green-400">
+                            Punto {idx + 1}
+                          </td>
+                          <td className="py-2 px-3 text-white">
+                            {p.lat.toFixed(7)}
+                          </td>
+                          <td className="py-2 px-3 text-white">
+                            {p.lng.toFixed(7)}
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                const updated = polygon.filter((_, i) => i !== idx);
+                                setPolygon(updated);
+                              }}
+                              className="h-6 w-6 p-0 text-red-400 hover:text-red-300"
+                              title="Eliminar vértice"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* PESTAÑA 5: GUÍA PARA AVENZA MAPS */}
+        <TabsContent value="avenza" className="space-y-4 m-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="border-slate-800 bg-slate-900/60">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-amber-500/15 text-amber-400">
+                    <Smartphone className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base text-white">
+                      Uso con la App Avenza Maps
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Trabajo en cabina offline con celular o tablet.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4 text-xs text-slate-300">
+                <ol className="list-decimal pl-4 space-y-2 leading-relaxed">
+                  <li>
+                    Presione <b className="text-amber-400">"Descargar Archivo KML"</b> para obtener el trazado completo (perímetro, líneas rectas A-B numeradas, calles maestras y waypoints).
+                  </li>
+                  <li>
+                    Envíe el archivo al celular o tablet del maquinista (por WhatsApp, Drive o cable).
+                  </li>
+                  <li>
+                    Abra la app <b className="text-white">Avenza Maps</b> o <b className="text-white">Google Earth</b>, toque el botón <b>"+" / Importar</b> y elija el archivo.
+                  </li>
+                  <li>
+                    Avenza ubicará el vehículo con el GPS en tiempo real arriba de la línea recta seleccionada.
+                  </li>
+                  <li>
+                    El maquinista avanza manteniendo el punto GPS centrado en la recta para <b>hacer el trabajo derecho</b>.
+                  </li>
+                </ol>
+
+                <div className="pt-2">
+                  <Button
+                    onClick={handleDescargarKML}
+                    className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold h-10 gap-2 shadow"
+                  >
+                    <Download className="h-4 w-4" />
+                    Descargar KML para Avenza Maps
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-800 bg-slate-900/60">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-400">
+                    <Compass className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base text-white">
+                      Banderilleros y Pilotos Automáticos
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Trimble, Raven, John Deere, Abelardo Cuffia y Plantium.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4 text-xs text-slate-300">
+                <p className="leading-relaxed">
+                  Planilla geodésica compatible con computadoras de guiado de maquinaria agrícola y vial:
+                </p>
+                <div className="space-y-2 bg-slate-950/80 p-3 rounded-lg border border-slate-800 font-mono text-[11px]">
+                  <div><b>Rumbo A-B Base:</b> <span className="text-amber-400">{rumboGrados}°</span></div>
+                  <div><b>Espaciamiento:</b> <span className="text-amber-400">{anchoCalle} m</span></div>
+                  <div><b>Datum:</b> WGS84 (Coordenadas Decimales)</div>
+                </div>
+
+                <div className="pt-2 flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleDescargarCSV}
+                    className="w-full border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 h-10 gap-2"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
+                    Descargar Planilla CSV de Waypoints
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleDescargarGeoJSON}
+                    className="w-full border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 h-9 gap-2 text-xs"
+                  >
+                    Descargar GeoJSON (QGIS / ArcGIS)
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* DIÁLOGO: INGRESO MANUAL DE COORDENADAS GPS */}
+      <Dialog open={dialogCoordsOpen} onOpenChange={setDialogCoordsOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <Target className="h-4 w-4 text-green-400" /> Ingreso de Coordenadas GPS
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-400">
+              Pegue una o más coordenadas (una por línea) en formato: <code className="text-amber-400">Latitud, Longitud</code>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <textarea
+              rows={6}
+              value={textoCoordsInput}
+              onChange={(e) => setTextoCoordsInput(e.target.value)}
+              placeholder="-32.890812, -64.349610&#10;-32.891500, -64.342100&#10;-32.898200, -64.344000"
+              className="w-full rounded-md border border-slate-700 bg-slate-950 p-2.5 font-mono text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Ideal para volcar datos de GPS de mano, actas de catastro o agrimensura.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDialogCoordsOpen(false)}
+              className="border-slate-700 bg-slate-800 text-xs"
+            >
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleAgregarCoordsManual}
+              className="bg-green-600 hover:bg-green-500 text-white font-bold text-xs"
+            >
+              Agregar al Terreno
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO: CREAR WAYPOINT / OBSTÁCULO */}
+      <Dialog open={dialogWpOpen} onOpenChange={setDialogWpOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-400" /> Nuevo Waypoint u Obstáculo
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-400">
+              Registre puntos clave para el operador de la máquina.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-xs">
+            <div>
+              <label className="text-slate-300 font-semibold block mb-1">Nombre / Identificador</label>
+              <Input
+                value={wpNombre}
+                onChange={(e) => setWpNombre(e.target.value)}
+                placeholder="Ej: Poste eléctrico / Tranquera norte"
+                className="bg-slate-950 border-slate-700 h-8 text-xs text-white"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Tipo de Punto</label>
+                <Select value={wpTipo} onValueChange={(val: WaypointTipo) => setWpTipo(val)}>
+                  <SelectTrigger className="bg-slate-950 border-slate-700 h-8 text-xs text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-slate-800 text-white text-xs">
+                    <SelectItem value="mojon">📍 Mojón / Esquina</SelectItem>
+                    <SelectItem value="obstaculo">⚠️ Obstáculo / Peligro</SelectItem>
+                    <SelectItem value="acceso">🚪 Acceso / Tranquera</SelectItem>
+                    <SelectItem value="combustible">⛽ Combustible / Tanque</SelectItem>
+                    <SelectItem value="agua">💧 Aguada / Pozo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Radio Seguridad (m)</label>
+                <Input
+                  type="number"
+                  value={wpRadio}
+                  onChange={(e) => setWpRadio(e.target.value)}
+                  placeholder="10"
+                  className="bg-slate-950 border-slate-700 h-8 text-xs text-white font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Latitud</label>
+                <Input
+                  value={wpLat}
+                  onChange={(e) => setWpLat(e.target.value)}
+                  placeholder="-32.890812"
+                  className="bg-slate-950 border-slate-700 h-8 text-xs text-white font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Longitud</label>
+                <Input
+                  value={wpLng}
+                  onChange={(e) => setWpLng(e.target.value)}
+                  placeholder="-64.349610"
+                  className="bg-slate-950 border-slate-700 h-8 text-xs text-white font-mono"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-slate-300 font-semibold block mb-1">Notas u Observaciones</label>
+              <Input
+                value={wpNotas}
+                onChange={(e) => setWpNotas(e.target.value)}
+                placeholder="Ej: Cable suelto a baja altura / conservar árbol"
+                className="bg-slate-950 border-slate-700 h-8 text-xs text-white"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDialogWpOpen(false)}
+              className="border-slate-700 bg-slate-800 text-xs"
+            >
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleCrearWaypointManual}
+              className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs"
+            >
+              Guardar Waypoint
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO: CREAR LOTE POR MEDIDAS EXACTAS (AUTOAYUDA) */}
+      <Dialog open={dialogMedidasOpen} onOpenChange={setDialogMedidasOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <Square className="h-4 w-4 text-amber-400" /> Crear Lote por Medidas (Asistente)
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-400">
+              Genera un lote perfectamente rectangular con ángulos rectos de 90° y medidas exactas en metros.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Ancho de Frente (m)</label>
+                <Input
+                  type="number"
+                  value={medidaAncho}
+                  onChange={(e) => setMedidaAncho(e.target.value)}
+                  placeholder="400"
+                  className="bg-slate-950 border-slate-700 h-8 text-xs text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Largo de Fondo (m)</label>
+                <Input
+                  type="number"
+                  value={medidaLargo}
+                  onChange={(e) => setMedidaLargo(e.target.value)}
+                  placeholder="600"
+                  className="bg-slate-950 border-slate-700 h-8 text-xs text-white font-mono"
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-slate-300 font-semibold">Orientación / Rumbo del Frente</label>
+                <span className="text-amber-400 font-mono font-bold">{medidaRumbo}° ({obtenerNombreRumbo(parseFloat(medidaRumbo) || 0)})</span>
+              </div>
+              <Slider
+                min={0}
+                max={359}
+                step={1}
+                value={[parseFloat(medidaRumbo) || 0]}
+                onValueChange={(val) => setMedidaRumbo(val[0].toString())}
+              />
+            </div>
+
+            <div className="bg-slate-950/80 p-3 rounded-lg border border-slate-800 space-y-1 text-[11px] font-mono">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Superficie calculada:</span>
+                <span className="text-emerald-400 font-bold">
+                  {((parseFloat(medidaAncho) || 0) * (parseFloat(medidaLargo) || 0) / 10000).toFixed(2)} Ha
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Perímetro total:</span>
+                <span className="text-white">
+                  {((parseFloat(medidaAncho) || 0) * 2 + (parseFloat(medidaLargo) || 0) * 2).toLocaleString()} m
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDialogMedidasOpen(false)}
+              className="border-slate-700 bg-slate-800 text-xs"
+            >
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleGenerarLotePorMedidas}
+              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs"
+            >
+              Generar Lote en el Mapa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+export default Americangis;
