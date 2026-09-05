@@ -190,6 +190,10 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
         lng: position?.longitude || null,
         velocidad_kmh: velocidadActual,
         ultima_velocidad_reportada: rawSpeedKmh,
+        rumbo: position && typeof position.course === "number" ? Math.round(position.course) : null,
+        horometro_horas: position?.attributes?.hours ? Math.round((position.attributes.hours / 3600000) * 10) / 10 : null,
+        odometro_km: position?.attributes?.totalDistance ? Math.round((position.attributes.totalDistance / 1000) * 10) / 10 : null,
+        motion: position?.attributes?.motion ?? (velocidadActual !== null && velocidadActual > 1),
         encendido: isPositionEngineOn(position, estadoSatcom),
         is_unlinked: false,
         imagen_url: fotografiasMap.get(m.id) || null,
@@ -219,6 +223,10 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
         lng: position?.longitude || null,
         velocidad_kmh: velocidadActual,
         ultima_velocidad_reportada: rawSpeedKmh,
+        rumbo: position && typeof position.course === "number" ? Math.round(position.course) : null,
+        horometro_horas: position?.attributes?.hours ? Math.round((position.attributes.hours / 3600000) * 10) / 10 : null,
+        odometro_km: position?.attributes?.totalDistance ? Math.round((position.attributes.totalDistance / 1000) * 10) / 10 : null,
+        motion: position?.attributes?.motion ?? (velocidadActual !== null && velocidadActual > 1),
         encendido: isPositionEngineOn(position, estadoSatcom),
         is_unlinked: true,
         proyecto_lugar: null,
@@ -230,6 +238,163 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: "Failed to fetch map data" });
+  }
+});
+
+// Endpoint de Auditoría de Trayectoria (Track Histórico y Estadísticas de Recorrido)
+integrationsRouter.get("/xpert/track", requireAuth, async (req, res) => {
+  try {
+    const { device_id, maquina_id, horas = "12" } = req.query;
+
+    let targetDeviceId: number | null = null;
+    let nombreEquipo = "Equipo Xpert Satcom";
+    let tipoEquipo = "Maquinaria";
+
+    if (device_id) {
+      targetDeviceId = parseInt(device_id as string, 10);
+      const dev = (await SatcomClient.getDevices()).find(d => d.id === targetDeviceId);
+      if (dev) nombreEquipo = dev.name;
+    } else if (maquina_id) {
+      const maquina = await db
+        .select()
+        .from(maquinasTable)
+        .where(eq(maquinasTable.id, parseInt(maquina_id as string, 10)))
+        .limit(1);
+      if (maquina.length && maquina[0].satcom_id) {
+        targetDeviceId = maquina[0].satcom_id;
+        nombreEquipo = maquina[0].nombre;
+        tipoEquipo = maquina[0].tipo || "Maquinaria";
+      }
+    }
+
+    if (!targetDeviceId) {
+      res.status(400).json({ error: "Debe especificar un device_id o maquina_id vinculado" });
+      return;
+    }
+
+    const horasNum = Math.min(Math.max(parseFloat(horas as string) || 12, 1), 48);
+    const toDate = new Date().toISOString();
+    const fromDate = new Date(Date.now() - horasNum * 3600 * 1000).toISOString();
+
+    const positions = await SatcomClient.getDeviceTrack(targetDeviceId, fromDate, toDate);
+
+    if (!positions || positions.length === 0) {
+      res.json({
+        deviceId: targetDeviceId,
+        nombre: nombreEquipo,
+        tipo: tipoEquipo,
+        puntos: [],
+        estadisticas: {
+          horas_marcha: 0,
+          km_recorridos: 0,
+          velocidad_maxima: 0,
+          velocidad_promedio: 0,
+          horometro_actual: null,
+          odometro_actual: null,
+          actividad_actual: "Sin registros satelitales en el período",
+          ultima_posicion: null,
+        },
+      });
+      return;
+    }
+
+    // Ordenar cronológicamente
+    positions.sort((a, b) => new Date(a.fixTime || a.deviceTime || 0).getTime() - new Date(b.fixTime || b.deviceTime || 0).getTime());
+
+    // Mapear puntos limpios
+    const puntos = positions.map(p => {
+      const spdKmh = typeof p.speed === "number" ? Math.round(p.speed * 1.852 * 10) / 10 : 0;
+      return {
+        lat: p.latitude,
+        lng: p.longitude,
+        speed_kmh: spdKmh,
+        rumbo: typeof p.course === "number" ? Math.round(p.course) : 0,
+        fixTime: p.fixTime || p.deviceTime || null,
+        encendido: isPositionEngineOn(p),
+      };
+    });
+
+    // Calcular estadísticas de la jornada
+    let maxSpeed = 0;
+    let sumSpeedMoving = 0;
+    let countMoving = 0;
+    let totalDistKm = 0;
+    let totalEngineMs = 0;
+
+    for (let i = 0; i < positions.length; i++) {
+      const p = positions[i];
+      const spdKmh = (p.speed || 0) * 1.852;
+      if (spdKmh > maxSpeed) maxSpeed = spdKmh;
+      if (spdKmh > 1.5) {
+        sumSpeedMoving += spdKmh;
+        countMoving++;
+      }
+
+      if (i > 0) {
+        const prev = positions[i - 1];
+        const tPrev = new Date(prev.fixTime || prev.deviceTime || 0).getTime();
+        const tCurr = new Date(p.fixTime || p.deviceTime || 0).getTime();
+        const dt = tCurr - tPrev;
+        if (dt > 0 && dt < 15 * 60 * 1000 && isPositionEngineOn(p)) {
+          totalEngineMs += dt;
+        }
+
+        if (p.attributes?.distance) {
+          totalDistKm += p.attributes.distance / 1000;
+        } else {
+          const dLat = (p.latitude - prev.latitude) * Math.PI / 180;
+          const dLng = (p.longitude - prev.longitude) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(prev.latitude * Math.PI / 180) * Math.cos(p.latitude * Math.PI / 180) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          totalDistKm += 6371 * c;
+        }
+      }
+    }
+
+    const lastPos = positions[positions.length - 1];
+    const horometroActual = lastPos?.attributes?.hours ? Math.round((lastPos.attributes.hours / 3600000) * 10) / 10 : null;
+    const odometroActual = lastPos?.attributes?.totalDistance ? Math.round((lastPos.attributes.totalDistance / 1000) * 10) / 10 : null;
+    const currentSpeedKmh = lastPos && typeof lastPos.speed === "number" ? Math.round(lastPos.speed * 1.852) : 0;
+    const isEngineRunning = isPositionEngineOn(lastPos);
+
+    let actividadActual = "Apagado / Estacionado";
+    if (currentSpeedKmh > 40) {
+      actividadActual = `En tránsito rápido por ruta (${currentSpeedKmh} km/h)`;
+    } else if (currentSpeedKmh > 18) {
+      actividadActual = `En traslado por camino (${currentSpeedKmh} km/h)`;
+    } else if (currentSpeedKmh >= 3) {
+      actividadActual = `Laborando en terreno (${currentSpeedKmh} km/h)`;
+    } else if (isEngineRunning) {
+      actividadActual = "Detenido en ralentí / Cabecera";
+    }
+
+    res.json({
+      deviceId: targetDeviceId,
+      nombre: nombreEquipo,
+      tipo: tipoEquipo,
+      puntos,
+      estadisticas: {
+        horas_marcha: Math.round((totalEngineMs / 3600000) * 10) / 10,
+        km_recorridos: Math.round(totalDistKm * 10) / 10,
+        velocidad_maxima: Math.round(maxSpeed * 10) / 10,
+        velocidad_promedio: countMoving > 0 ? Math.round((sumSpeedMoving / countMoving) * 10) / 10 : 0,
+        horometro_actual: horometroActual,
+        odometro_actual: odometroActual,
+        actividad_actual: actividadActual,
+        ultima_posicion: {
+          lat: lastPos.latitude,
+          lng: lastPos.longitude,
+          velocidad_kmh: currentSpeedKmh,
+          rumbo: typeof lastPos.course === "number" ? Math.round(lastPos.course) : 0,
+          fixTime: lastPos.fixTime || lastPos.deviceTime || null,
+        }
+      },
+    });
+  } catch (e) {
+    console.error("Error fetching satcom track:", e);
+    res.status(500).json({ error: "Failed to fetch device track" });
   }
 });
 
@@ -268,6 +433,7 @@ integrationsRouter.get("/xpert/telemetria", requireAuth, async (req, res) => {
       maquina_id: parseInt(maquina_id as string),
       posicion: { lat: position.latitude, lng: position.longitude },
       velocidad_kmh: position.speed * 1.852,
+      rumbo: typeof position.course === "number" ? Math.round(position.course) : 0,
       estado: isPositionEngineOn(position) ? "encendido" : "apagado",
       horas_motor_acumuladas: position.attributes?.hours ? position.attributes.hours / 3600000 : 0,
       kilometraje_acumulado: position.attributes?.distance ? position.attributes.distance / 1000 : 0,

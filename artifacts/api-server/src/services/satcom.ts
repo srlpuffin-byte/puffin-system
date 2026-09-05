@@ -95,4 +95,19 @@ export class SatcomClient {
       return [];
     }
   }
+
+  static async getDeviceTrack(deviceId: number, from: string, to: string): Promise<SatcomPosition[]> {
+    try {
+      const url = `${BASE_URL}/positions?deviceId=${deviceId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+      const res = await fetch(url, {
+        headers: this.getHeaders(),
+      });
+      if (!res.ok) throw new Error(`Satcom API Error: ${res.statusText}`);
+      const data = (await res.json()) as SatcomPosition[];
+      return Array.isArray(data) ? data : [];
+    } catch (e) {
+      console.error("Error fetching device track from Satcom", e);
+      return [];
+    }
+  }
 }

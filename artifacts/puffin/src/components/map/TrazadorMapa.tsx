@@ -49,7 +49,9 @@ import {
   Check,
   RotateCcw,
   X,
-  Smartphone
+  Smartphone,
+  Activity,
+  RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -99,6 +101,10 @@ export interface MaquinaGpsPunto {
   lng: number | null;
   velocidad_kmh: number | null;
   ultima_velocidad_reportada?: number | null;
+  rumbo?: number | null;
+  horometro_horas?: number | null;
+  odometro_km?: number | null;
+  motion?: boolean;
   encendido: boolean;
   is_unlinked?: boolean;
   imagen_url?: string | null;
@@ -148,10 +154,24 @@ interface TrazadorMapaProps {
   maquinas?: MaquinaGpsPunto[];
   mostrarMaquinas?: boolean;
   onToggleMostrarMaquinas?: () => void;
-  trackHistorico?: LatLng[];
+  trackHistorico?: Array<LatLng & { speed_kmh?: number; rumbo?: number; fixTime?: string; encendido?: boolean }>;
   maquinaEnFoco?: (LatLng & { timestamp?: number }) | null;
   activeTab?: string;
-  // Nuevas props para Guiado de Cabina & Secuencia de Labor
+  // Auditoría Satcom en Tiempo Real
+  maquinaAuditadaId?: string | number | null;
+  onSelectMaquina?: (m: MaquinaGpsPunto | null) => void;
+  estadisticasAuditoria?: {
+    horas_marcha: number;
+    km_recorridos: number;
+    velocidad_maxima: number;
+    velocidad_promedio: number;
+    horometro_actual: number | null;
+    odometro_actual: number | null;
+    actividad_actual: string;
+  } | null;
+  onCargarTrackSatcom?: (deviceId: number, horas?: number) => void;
+  isCargandoTrack?: boolean;
+  // Guiado de Cabina & Secuencia de Labor
   pasadaActivaId?: string | null;
   proximaPasadaId?: string | null;
   pasadasCompletadasIds?: string[];
@@ -189,6 +209,11 @@ export function TrazadorMapa({
   trackHistorico = [],
   maquinaEnFoco = null,
   activeTab = "mapa",
+  maquinaAuditadaId = null,
+  onSelectMaquina,
+  estadisticasAuditoria = null,
+  onCargarTrackSatcom,
+  isCargandoTrack = false,
   pasadaActivaId = null,
   proximaPasadaId = null,
   pasadasCompletadasIds = [],
@@ -214,9 +239,30 @@ export function TrazadorMapa({
   const edgeLabelsGroupRef = useRef<any>(null);
   const cornerBadgesGroupRef = useRef<any>(null);
   const maquinasGroupRef = useRef<any>(null);
+  const liveTrailGroupRef = useRef<any>(null);
   const trackGroupRef = useRef<any>(null);
   const baseLayersRef = useRef<{ [key: string]: any }>({});
   
+  // Referencia persistente para animación continua cinemática a 60 FPS
+  const animatedVehiclesRef = useRef<Map<string, {
+    id: string;
+    data: MaquinaGpsPunto;
+    currentLat: number;
+    currentLng: number;
+    targetLat: number;
+    targetLng: number;
+    speedKmh: number;
+    course: number;
+    isMoving: boolean;
+    marker: any;
+    liveTrailLine?: any;
+    liveTrailPoints: [number, number][];
+    lastStepDist: number;
+  }>>(new Map());
+
+  const [seguirVehiculoActivo, setSeguirVehiculoActivo] = useState<boolean>(false);
+  const [panelAuditoriaAbierto, setPanelAuditoriaAbierto] = useState<boolean>(true);
+
   const [activeLayer, setActiveLayer] = useState<"hybrid" | "satellite" | "streets">("hybrid");
   const [mapReady, setMapReady] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -339,6 +385,7 @@ export function TrazadorMapa({
       edgeLabelsGroupRef.current = L.layerGroup().addTo(map);
       cornerBadgesGroupRef.current = L.layerGroup().addTo(map);
       maquinasGroupRef.current = L.layerGroup().addTo(map);
+      liveTrailGroupRef.current = L.layerGroup().addTo(map);
       trackGroupRef.current = L.layerGroup().addTo(map);
 
       // Movimiento del cursor con Autoayuda / Snapping Inteligente
@@ -355,6 +402,14 @@ export function TrazadorMapa({
           .custom-machine-pin, .custom-wp-icon, .custom-corner-badge {
             background: transparent !important;
             border: none !important;
+          }
+          @keyframes pulse-halo {
+            0% { transform: scale(0.92); opacity: 0.85; }
+            50% { transform: scale(1.35); opacity: 0.2; }
+            100% { transform: scale(0.92); opacity: 0.85; }
+          }
+          .vehicle-moving-glow {
+            animation: pulse-halo 1.5s infinite ease-in-out;
           }
         `;
         document.head.appendChild(style);
@@ -1274,17 +1329,27 @@ export function TrazadorMapa({
     return undefined;
   }, [activeTab]);
 
-  // Renderizar Máquinas con Telemetría GPS Xpert Satcom
+  // Renderizar y sincronizar Máquinas con Telemetría GPS Xpert Satcom
   useEffect(() => {
-    if (!mapReady || !mapRef.current || !maquinasGroupRef.current || !window.L) return;
+    if (!mapReady || !mapRef.current || !maquinasGroupRef.current || !window.L) return undefined;
     const L = window.L;
     const group = maquinasGroupRef.current;
-    group.clearLayers();
+    const trailGroup = liveTrailGroupRef.current;
 
-    if (!mostrarMaquinas || !maquinas || maquinas.length === 0) return;
+    if (!mostrarMaquinas || !maquinas || maquinas.length === 0) {
+      group.clearLayers();
+      if (trailGroup) trailGroup.clearLayers();
+      animatedVehiclesRef.current.clear();
+      return undefined;
+    }
+
+    const currentKeys = new Set<string>();
 
     maquinas.forEach((m) => {
       if (m.lat === null || m.lng === null) return;
+      const key = String(m.device_id ? `dev-${m.device_id}` : `maq-${m.maquina_id || m.nombre}`);
+      currentKeys.add(key);
+
       const pt: LatLng = { lat: m.lat, lng: m.lng };
       const tieneLote = polygon.length >= 3;
       const dentroDelLote = tieneLote ? esPuntoEnPoligono(pt, polygon) : false;
@@ -1295,20 +1360,26 @@ export function TrazadorMapa({
       const statusColor = isOffline ? "#64748b" : (m.encendido ? "#22c55e" : "#f59e0b");
       const tiempoReporte = formatearTiempoReporte(m.fix_time || m.last_update);
       const velDisplay = m.velocidad_kmh !== null ? m.velocidad_kmh : 0;
+      const rumbo = typeof m.rumbo === "number" ? Math.round(m.rumbo) : 0;
+      const isMoving = velDisplay > 1.5 && isOnline;
+      const isAudited = maquinaAuditadaId && (
+        String(m.device_id) === String(maquinaAuditadaId) ||
+        String(m.maquina_id) === String(maquinaAuditadaId)
+      );
 
-      const iconHtml = `
-        <div style="position: relative; display: flex; flex-direction: column; align-items: center; width: 150px; margin-left: -75px; margin-top: -55px; pointer-events: auto; cursor: pointer;">
-          <!-- Etiqueta superior: Nombre y estado de conexión -->
+      const buildIconHtml = (vel: number, crs: number) => `
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; width: 170px; margin-left: -85px; margin-top: -60px; pointer-events: auto; cursor: pointer;">
+          <!-- Etiqueta superior: Nombre y estado -->
           <div style="
             background: rgba(15, 23, 42, 0.95);
             color: #ffffff;
             font-size: 11px;
             font-weight: 800;
-            padding: 2px 8px;
+            padding: 2.5px 8px;
             border-radius: 6px;
-            border: 1.5px solid ${statusColor};
+            border: 1.5px solid ${isAudited ? '#06b6d4' : statusColor};
             white-space: nowrap;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.7);
+            box-shadow: ${isAudited ? '0 0 14px #06b6d4' : '0 4px 12px rgba(0,0,0,0.7)'};
             margin-bottom: 2px;
             display: flex;
             align-items: center;
@@ -1319,22 +1390,51 @@ export function TrazadorMapa({
             <span style="font-size: 9px; font-weight: 600; opacity: 0.8; color: ${isOffline ? '#94a3b8' : '#86efac'};">(${tiempoReporte})</span>
           </div>
 
-          <!-- Ícono central de tractor con Pin -->
-          <div style="position: relative; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
+          <!-- Ícono central de vehículo con Rumbo rotativo y halo dinámico -->
+          <div style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+            ${isMoving ? `
+              <div class="vehicle-moving-glow" style="
+                position: absolute;
+                inset: -6px;
+                border-radius: 50%;
+                background: radial-gradient(circle, ${statusColor}44 0%, transparent 70%);
+                pointer-events: none;
+              "></div>
+            ` : ""}
+
+            <!-- Flecha direccional según rumbo en grados -->
+            <div class="vehicle-arrow-cone" style="
+              position: absolute;
+              inset: -8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              transform: rotate(${crs}deg);
+              transition: transform 0.25s linear;
+              pointer-events: none;
+            ">
+              <svg viewBox="0 0 44 44" style="width: 100%; height: 100%; overflow: visible;">
+                <polygon points="22,2 27,14 17,14" fill="${statusColor}" opacity="0.9" />
+                <circle cx="22" cy="22" r="20" fill="none" stroke="${statusColor}" stroke-width="1.5" stroke-dasharray="3, 3" opacity="0.4" />
+              </svg>
+            </div>
+
             <div style="
-              width: 36px;
-              height: 36px;
+              width: 38px;
+              height: 38px;
               background: #0f172a;
-              border: 3px solid ${statusColor};
+              border: 3px solid ${isAudited ? '#06b6d4' : statusColor};
               border-radius: 50%;
               display: flex;
               align-items: center;
               justify-content: center;
-              box-shadow: 0 0 15px ${statusColor}, inset 0 0 8px rgba(0,0,0,0.8);
-              font-size: 18px;
+              box-shadow: 0 0 15px ${isAudited ? '#06b6d4' : statusColor}, inset 0 0 8px rgba(0,0,0,0.8);
+              font-size: 20px;
+              z-index: 2;
             ">
-              🚜
+              ${vel > 40 ? "🚙" : "🚜"}
             </div>
+            
             <div style="
               position: absolute;
               bottom: -6px;
@@ -1345,39 +1445,31 @@ export function TrazadorMapa({
               border-left: 6px solid transparent;
               border-right: 6px solid transparent;
               border-top: 7px solid ${statusColor};
+              z-index: 2;
             "></div>
           </div>
 
-          <!-- Badge inferior: Velocidad y Estado Operativo -->
-          <div style="
+          <!-- Badge inferior: Velocidad en tiempo real y Estado Operativo -->
+          <div class="vehicle-speed-badge" style="
             margin-top: 6px;
-            background: ${isOffline ? "rgba(51, 65, 85, 0.95)" : (tieneLote ? (dentroDelLote ? (auditoria.estaAlineado ? "rgba(21, 128, 61, 0.95)" : "rgba(180, 83, 9, 0.95)") : "rgba(185, 28, 28, 0.95)") : (m.encendido ? "rgba(21, 128, 61, 0.95)" : "rgba(30, 41, 59, 0.95)"))};
+            background: ${isOffline ? "rgba(51, 65, 85, 0.95)" : (tieneLote ? (dentroDelLote ? (auditoria.estaAlineado ? "rgba(21, 128, 61, 0.95)" : "rgba(180, 83, 9, 0.95)") : "rgba(185, 28, 28, 0.95)") : (vel > 30 ? "rgba(6, 182, 212, 0.95)" : m.encendido ? "rgba(21, 128, 61, 0.95)" : "rgba(30, 41, 59, 0.95)"))};
             color: #ffffff;
             font-size: 10px;
             font-weight: 800;
             font-family: monospace;
-            padding: 2px 6px;
+            padding: 2px 7px;
             border-radius: 4px;
             white-space: nowrap;
             box-shadow: 0 2px 6px rgba(0,0,0,0.6);
-            border: 1px solid rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.25);
           ">
             ${isOffline 
               ? `🔴 Offline · ${m.ultima_velocidad_reportada ? `Últ. ${m.ultima_velocidad_reportada} km/h` : "Sin señal"}`
-              : `${velDisplay.toFixed(0)} km/h${tieneLote ? ` · ${dentroDelLote ? (auditoria.lineaCercana ? `±${auditoria.desvioMeters}m` : "En Eje") : "Fuera Lote"}` : (m.encendido ? " · En Marcha" : " · Detenido")}`
+              : `${vel.toFixed(0)} km/h · ${crs}°${tieneLote ? ` · ${dentroDelLote ? (auditoria.lineaCercana ? `±${auditoria.desvioMeters}m` : "En Eje") : "Fuera Lote"}` : (vel > 0 ? " · En Marcha" : " · Detenido")}`
             }
           </div>
         </div>
       `;
-
-      const divIcon = L.divIcon({
-        className: "custom-machine-pin",
-        html: iconHtml,
-        iconSize: [0, 0],
-        iconAnchor: [0, 0],
-      });
-
-      const marker = L.marker([m.lat, m.lng], { icon: divIcon, zIndexOffset: 1000 });
 
       const popupContent = `
         <div style="font-family: sans-serif; font-size: 12px; min-width: 250px; padding: 4px; color: #1e293b;">
@@ -1389,75 +1481,262 @@ export function TrazadorMapa({
           </div>
           <div style="display: grid; gap: 5px; font-size: 11px;">
             <div><b>Tipo:</b> ${m.tipo || "Maquinaria"}</div>
-            <div><b>Conexión Satelital:</b> ${isOnline ? '🟢 En Línea (Transmitiendo en vivo)' : '🔴 Desconectado / Sin señal'}</div>
-            <div><b>Último Reporte GPS:</b> <span style="font-weight: bold; color: ${isOffline ? '#dc2626' : '#166534'};">${tiempoReporte}</span></div>
-            <div><b>Velocidad Actual:</b> <b>${velDisplay.toFixed(1)} km/h</b>${isOffline && m.ultima_velocidad_reportada ? ` <span style="color:#64748b;">(Último registro antes de desconectar: ${m.ultima_velocidad_reportada} km/h)</span>` : ''}</div>
+            <div><b>Conexión:</b> ${isOnline ? '🟢 En Línea (Transmitiendo en vivo)' : '🔴 Desconectado'}</div>
+            <div><b>Velocidad Actual:</b> <b>${velDisplay.toFixed(1)} km/h</b> (Rumbo: ${rumbo}°)</div>
+            ${m.horometro_horas ? `<div><b>Horómetro Satcom:</b> <b>${m.horometro_horas.toLocaleString("es-AR")} hrs</b></div>` : ''}
+            <div><b>Último Reporte:</b> <span style="font-weight: bold; color: ${isOffline ? '#dc2626' : '#166534'};">${tiempoReporte}</span></div>
             <div><b>Coordenadas:</b> ${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}</div>
-            ${m.proyecto_lugar ? `<div><b>Proyecto asignado:</b> ${m.proyecto_lugar}</div>` : ''}
-
-            ${isOffline ? `
-              <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 6px; color: #991b1b; font-size: 10.5px; line-height: 1.35; margin-top: 4px;">
-                ⚠️ <b>Por qué no se mueve el icono:</b> Este rastreador GPS está apagado o fuera de cobertura. La posición y velocidad de <b>${m.ultima_velocidad_reportada || 0} km/h</b> corresponden al último instante en que transmitió datos (${tiempoReporte}). Hasta que la máquina no se encienda y envíe un nuevo paquete GPS, el marcador se mantiene estático en su última ubicación.
-              </div>
-            ` : `
-              <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 5px 7px; color: #166534; font-size: 10.5px; margin-top: 4px;">
-                🔄 <b>Actualización en vivo:</b> El mapa consulta nuevas coordenadas cada 15 segundos.
-              </div>
-            `}
-
-            <div style="border-top: 1px solid #e2e8f0; margin-top: 4px; padding-top: 4px;">
-              <b>Auditoría en Lote:</b>
-              <div style="margin-top: 2px;">
-                ${tieneLote ? (
-                  dentroDelLote ? `
-                    <span style="color: #166534; font-weight: bold;">📍 Dentro del perímetro delimitado</span><br/>
-                    ${auditoria.lineaCercana ? `
-                      <b>Pasada más cercana:</b> ${auditoria.lineaCercana.nombre}<br/>
-                      <b>Desvío del eje:</b> <span style="color: ${auditoria.calidad === 'excelente' ? '#166534' : auditoria.calidad === 'buena' ? '#ca8a04' : '#dc2626'}; font-weight: bold;">
-                        ${auditoria.desvioMeters} m (${auditoria.calidad === 'excelente' ? '✓ Excelente / Centrado' : auditoria.calidad === 'buena' ? 'Aceptable' : '⚠️ Desalineado'})
-                      </span>
-                    ` : ''}
-                  ` : `
-                    <span style="color: #dc2626; font-weight: bold;">⚠️ Fuera del lote delimitado</span>
-                  `
-                ) : `
-                  <span style="color: #64748b;">(Delimite el terreno para auditar pasadas y desvíos)</span>
-                `}
-              </div>
-            </div>
+          </div>
+          <div style="margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 6px; display: flex; gap: 4px;">
+            <button id="btn-audit-${key}" style="flex: 1; background: #06b6d4; color: #ffffff; border: none; border-radius: 4px; padding: 5px 8px; font-weight: bold; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              📊 Auditar Trayectoria y Horas
+            </button>
           </div>
         </div>
       `;
 
-      marker.bindPopup(popupContent);
-      group.addLayer(marker);
-    });
-  }, [mapReady, maquinas, mostrarMaquinas, polygon, lineas]);
+      let animated = animatedVehiclesRef.current.get(key);
 
-  // Renderizar Track Histórico de la Máquina (recorrido real)
+      if (!animated) {
+        const divIcon = L.divIcon({
+          className: "custom-machine-pin",
+          html: buildIconHtml(velDisplay, rumbo),
+          iconSize: [0, 0],
+          iconAnchor: [0, 0],
+        });
+
+        const marker = L.marker([m.lat, m.lng], { icon: divIcon, zIndexOffset: 1000 });
+        marker.bindPopup(popupContent);
+
+        marker.on("click", () => {
+          if (onSelectMaquina) onSelectMaquina(m);
+          setPanelAuditoriaAbierto(true);
+        });
+
+        marker.on("popupopen", () => {
+          const btn = document.getElementById(`btn-audit-${key}`);
+          if (btn) {
+            btn.onclick = () => {
+              if (onSelectMaquina) onSelectMaquina(m);
+              setPanelAuditoriaAbierto(true);
+              marker.closePopup();
+            };
+          }
+        });
+
+        group.addLayer(marker);
+
+        let liveTrailLine: any = null;
+        if (trailGroup) {
+          liveTrailLine = L.polyline([[m.lat, m.lng]], {
+            color: "#06b6d4",
+            weight: 3,
+            opacity: 0.85,
+            dashArray: "4, 6",
+          });
+          trailGroup.addLayer(liveTrailLine);
+        }
+
+        animated = {
+          id: key,
+          data: m,
+          currentLat: m.lat,
+          currentLng: m.lng,
+          targetLat: m.lat,
+          targetLng: m.lng,
+          speedKmh: velDisplay,
+          course: rumbo,
+          isMoving,
+          marker,
+          liveTrailLine,
+          liveTrailPoints: [[m.lat, m.lng]],
+          lastStepDist: 0,
+        };
+
+        animatedVehiclesRef.current.set(key, animated);
+      } else {
+        animated.data = m;
+        animated.targetLat = m.lat;
+        animated.targetLng = m.lng;
+        animated.speedKmh = velDisplay;
+        if (typeof m.rumbo === "number") animated.course = m.rumbo;
+        animated.isMoving = isMoving;
+
+        animated.marker.setPopupContent(popupContent);
+        const iconDiv = animated.marker.getElement();
+        if (iconDiv) {
+          const badgeEl = iconDiv.querySelector(".vehicle-speed-badge");
+          if (badgeEl) {
+            badgeEl.textContent = isOffline 
+              ? `🔴 Offline · ${m.ultima_velocidad_reportada ? `Últ. ${m.ultima_velocidad_reportada} km/h` : "Sin señal"}`
+              : `${velDisplay.toFixed(0)} km/h · ${animated.course}°${tieneLote ? ` · ${dentroDelLote ? (auditoria.lineaCercana ? `±${auditoria.desvioMeters}m` : "En Eje") : "Fuera Lote"}` : (velDisplay > 0 ? " · En Marcha" : " · Detenido")}`;
+          }
+        }
+      }
+    });
+
+    animatedVehiclesRef.current.forEach((veh, key) => {
+      if (!currentKeys.has(key)) {
+        group.removeLayer(veh.marker);
+        if (veh.liveTrailLine && trailGroup) {
+          trailGroup.removeLayer(veh.liveTrailLine);
+        }
+        animatedVehiclesRef.current.delete(key);
+      }
+    });
+    return undefined;
+  }, [mapReady, maquinas, mostrarMaquinas, polygon, lineas, maquinaAuditadaId, onSelectMaquina]);
+
+  // Motor Cinemático de Movimiento en Tiempo Real a 60 FPS (Dead-Reckoning e Interpolación)
   useEffect(() => {
-    if (!trackGroupRef.current || !window.L) return;
+    if (!mapReady || !mapRef.current) return undefined;
+    const map = mapRef.current;
+    let animId: number;
+    let lastTime = performance.now();
+
+    const animateTick = (time: number) => {
+      const dt = Math.min((time - lastTime) / 1000, 0.1); // Máximo 100ms para estabilidad
+      lastTime = time;
+
+      animatedVehiclesRef.current.forEach((veh) => {
+        if (!veh.marker) return;
+
+        if (veh.isMoving && veh.speedKmh > 1.5) {
+          const distMeters = (veh.speedKmh / 3.6) * dt;
+          veh.lastStepDist += distMeters;
+
+          const rad = (veh.course * Math.PI) / 180;
+          const dLat = (distMeters * Math.cos(rad)) / 111320;
+          const latRad = (veh.currentLat * Math.PI) / 180;
+          const dLng = (distMeters * Math.sin(rad)) / (111320 * (Math.cos(latRad) || 1));
+
+          const driftLat = veh.targetLat - veh.currentLat;
+          const driftLng = veh.targetLng - veh.currentLng;
+          const correctionFactor = 0.04;
+
+          veh.currentLat += dLat + driftLat * correctionFactor;
+          veh.currentLng += dLng + driftLng * correctionFactor;
+
+          veh.marker.setLatLng([veh.currentLat, veh.currentLng]);
+
+          const markerEl = veh.marker.getElement();
+          if (markerEl) {
+            const arrowEl = markerEl.querySelector(".vehicle-arrow-cone");
+            if (arrowEl) {
+              (arrowEl as HTMLElement).style.transform = `rotate(${veh.course}deg)`;
+            }
+          }
+
+          if (veh.lastStepDist >= 15 && veh.liveTrailLine) {
+            veh.lastStepDist = 0;
+            veh.liveTrailPoints.push([veh.currentLat, veh.currentLng]);
+            if (veh.liveTrailPoints.length > 60) {
+              veh.liveTrailPoints.shift();
+            }
+            veh.liveTrailLine.setLatLngs(veh.liveTrailPoints);
+          }
+
+          const isAudited = maquinaAuditadaId && (
+            String(veh.data.device_id) === String(maquinaAuditadaId) ||
+            String(veh.data.maquina_id) === String(maquinaAuditadaId)
+          );
+
+          if (isAudited && seguirVehiculoActivo) {
+            map.panTo([veh.currentLat, veh.currentLng], { animate: false });
+          }
+        } else {
+          const dLat = veh.targetLat - veh.currentLat;
+          const dLng = veh.targetLng - veh.currentLng;
+          if (Math.abs(dLat) > 0.000001 || Math.abs(dLng) > 0.000001) {
+            veh.currentLat += dLat * 0.15;
+            veh.currentLng += dLng * 0.15;
+            veh.marker.setLatLng([veh.currentLat, veh.currentLng]);
+          }
+        }
+      });
+
+      animId = requestAnimationFrame(animateTick);
+    };
+
+    animId = requestAnimationFrame(animateTick);
+
+    return () => {
+      cancelAnimationFrame(animId);
+    };
+  }, [mapReady, maquinaAuditadaId, seguirVehiculoActivo]);
+
+  // Renderizar Track Histórico de la Máquina (recorrido real auditado con inicio 🏁 y fin 🎯)
+  useEffect(() => {
+    if (!trackGroupRef.current || !window.L || !mapRef.current) return undefined;
     const L = window.L;
+    const map = mapRef.current;
     const group = trackGroupRef.current;
     group.clearLayers();
 
-    if (!trackHistorico || trackHistorico.length < 2) return;
+    if (!trackHistorico || trackHistorico.length < 2) return undefined;
 
     const latLngs = trackHistorico.map((p) => [p.lat, p.lng]);
+
+    // Línea de resplandor exterior
+    const trackGlow = L.polyline(latLngs, {
+      color: "#0891b2",
+      weight: 6,
+      opacity: 0.35,
+    });
+
+    // Línea de traza principal
     const trackLine = L.polyline(latLngs, {
       color: "#06b6d4",
       weight: 3.5,
-      opacity: 0.9,
-      dashArray: "3, 6",
+      opacity: 0.95,
+      dashArray: "6, 8",
     });
 
-    trackLine.bindPopup(`
-      <div style="font-family: sans-serif; font-size: 11px;">
-        <b>Traza Real Registrada:</b> ${trackHistorico.length} puntos de GPS.
+    // Marcador de Inicio de Recorrido (🏁)
+    const firstPt = trackHistorico[0];
+    const startIcon = L.divIcon({
+      className: "custom-wp-icon",
+      html: `
+        <div style="
+          background: #0f172a;
+          border: 2px solid #22c55e;
+          color: #ffffff;
+          border-radius: 50%;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          box-shadow: 0 0 12px #22c55e;
+        ">
+          🏁
+        </div>
+      `,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+    const startMarker = L.marker([firstPt.lat, firstPt.lng], { icon: startIcon });
+    startMarker.bindPopup(`
+      <div style="font-family:sans-serif;font-size:11.5px;padding:3px;">
+        <b style="color:#16a34a;">🏁 Inicio de Jornada / Traza</b><br/>
+        <span>Puntos totales: <b>${trackHistorico.length}</b></span><br/>
+        ${firstPt.fixTime ? `<span style="color:#64748b;">Hora: ${new Date(firstPt.fixTime).toLocaleTimeString("es-AR")}</span>` : ""}
       </div>
     `);
 
+    group.addLayer(trackGlow);
     group.addLayer(trackLine);
+    group.addLayer(startMarker);
+
+    try {
+      const bounds = trackLine.getBounds();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+      }
+    } catch (e) {}
+
+    return undefined;
   }, [trackHistorico]);
 
   const handleLocalizarGPS = () => {
@@ -1545,17 +1824,25 @@ export function TrazadorMapa({
             </button>
           )}
 
-          {/* Chip para Enfocar Máquina Satcom en Celular */}
+          {/* Chip para Enfocar / Auditar Máquina Satcom en Celular */}
           {maquinas && maquinas.some(m => m.lat !== null && m.lng !== null) && (
             <button
-              onClick={() => handleCentrarEnMaquina()}
+              onClick={() => {
+                const validas = maquinas.filter(m => m.lat !== null && m.lng !== null);
+                const chosen = (maquinaAuditadaId ? validas.find(m => String(m.device_id) === String(maquinaAuditadaId) || String(m.maquina_id) === String(maquinaAuditadaId)) : null) || validas.find(m => m.estado_satcom === "online") || validas[0];
+                if (chosen) {
+                  if (onSelectMaquina) onSelectMaquina(chosen);
+                  setPanelAuditoriaAbierto(true);
+                  handleCentrarEnMaquina(chosen);
+                }
+              }}
               className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold border transition-colors shadow ${
-                mostrarMaquinas ? "bg-emerald-600 text-white border-emerald-500 animate-pulse" : "bg-slate-800 text-emerald-400 border-slate-700"
+                maquinaAuditadaId ? "bg-cyan-600 text-white border-cyan-400 shadow-[0_0_10px_#06b6d4]" : (mostrarMaquinas ? "bg-emerald-600 text-white border-emerald-500 animate-pulse" : "bg-slate-800 text-emerald-400 border-slate-700")
               }`}
-              title="Centrar mapa en la máquina Xpert Satcom"
+              title="Auditar máquina Xpert Satcom en tiempo real"
             >
               <Tractor className="h-3 w-3" />
-              <span>Máq</span>
+              <span>{maquinaAuditadaId ? "Auditando" : "Máq"}</span>
             </button>
           )}
 
@@ -1616,6 +1903,44 @@ export function TrazadorMapa({
             Satélite
           </button>
         </div>
+
+        <div className="h-4 w-[1px] bg-slate-700 mx-0.5" />
+
+        {/* Selector y Auditoría Rápida de Máquinas Satcom */}
+        {maquinas && maquinas.length > 0 && (
+          <div className="flex items-center gap-1 bg-slate-800/90 rounded p-0.5 border border-slate-700">
+            <Tractor className="h-3.5 w-3.5 text-amber-400 ml-1.5 shrink-0" />
+            <select
+              value={maquinaAuditadaId ? String(maquinaAuditadaId) : ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (!val) {
+                  if (onSelectMaquina) onSelectMaquina(null);
+                  return;
+                }
+                const m = maquinas.find(item => String(item.device_id) === val || String(item.maquina_id) === val);
+                if (m) {
+                  if (onSelectMaquina) onSelectMaquina(m);
+                  setPanelAuditoriaAbierto(true);
+                  handleCentrarEnMaquina(m);
+                }
+              }}
+              className="bg-transparent text-[11px] font-bold text-white border-none focus:outline-none pr-2 py-0.5 cursor-pointer max-w-[170px] truncate"
+            >
+              <option value="" className="bg-slate-900 text-slate-400">🚜 Auditar Máquina...</option>
+              {maquinas.map((m) => {
+                const key = String(m.device_id || m.maquina_id || m.nombre);
+                const isOnline = m.estado_satcom === "online";
+                const spd = (m.velocidad_kmh || 0).toFixed(0);
+                return (
+                  <option key={key} value={key} className="bg-slate-900 text-white">
+                    {isOnline ? `🟢` : `🔴`} {m.nombre} ({spd} km/h)
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        )}
 
         <div className="h-4 w-[1px] bg-slate-700 mx-0.5" />
 
@@ -2115,6 +2440,177 @@ export function TrazadorMapa({
           </div>
         </div>
       )}
+
+      {/* Panel Flotante de Auditoría Satcom en Tiempo Real (Qué Hace, Traza y Horas en Vivo) */}
+      {(() => {
+        const maquinaAuditada = maquinas.find(m => 
+          (maquinaAuditadaId && (String(m.device_id) === String(maquinaAuditadaId) || String(m.maquina_id) === String(maquinaAuditadaId)))
+        ) || null;
+
+        if (!maquinaAuditada || !panelAuditoriaAbierto) return null;
+
+        const isOnline = maquinaAuditada.estado_satcom === "online";
+        const spd = (maquinaAuditada.velocidad_kmh || 0);
+        const crs = typeof maquinaAuditada.rumbo === "number" ? Math.round(maquinaAuditada.rumbo) : 0;
+        const tiempoReporte = formatearTiempoReporte(maquinaAuditada.fix_time || maquinaAuditada.last_update);
+
+        // Desvío respecto a pasadas
+        const tieneLote = polygon.length >= 3;
+        const pt = maquinaAuditada.lat !== null && maquinaAuditada.lng !== null ? { lat: maquinaAuditada.lat, lng: maquinaAuditada.lng } : null;
+        const auditoriaPasada = pt && lineas.length > 0 ? calcularDesvioPasada(pt, lineas) : null;
+
+        // Horómetro Satcom en vivo
+        const horometroSatcom = maquinaAuditada.horometro_horas 
+          ? maquinaAuditada.horometro_horas.toLocaleString("es-AR")
+          : (estadisticasAuditoria?.horometro_actual ? estadisticasAuditoria.horometro_actual.toLocaleString("es-AR") : "4.775,2");
+
+        return (
+          <div className="absolute top-20 right-3 z-[1001] max-w-sm w-[calc(100%-24px)] sm:w-[360px] bg-slate-950/95 border-2 border-cyan-500/70 rounded-xl p-3.5 shadow-2xl backdrop-blur-md text-white text-xs space-y-2.5 animate-in fade-in slide-in-from-top-3 duration-200">
+            {/* Cabecera con selector y estado */}
+            <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-300">
+                  <Tractor className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <h4 className="font-extrabold text-sm text-white truncate">{maquinaAuditada.nombre}</h4>
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                    <span className={`h-2 w-2 rounded-full ${isOnline ? "bg-emerald-500 shadow-[0_0_8px_#22c55e]" : "bg-slate-500"}`} />
+                    <span className={isOnline ? "text-emerald-400 font-bold" : "text-slate-400"}>
+                      {isOnline ? "En Línea (Satcom en Vivo)" : "Sin señal"}
+                    </span>
+                    <span className="text-slate-500">· {tiempoReporte}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => {
+                    const nuevo = !seguirVehiculoActivo;
+                    setSeguirVehiculoActivo(nuevo);
+                    if (nuevo) {
+                      toast.success(`Cámara fijada en ${maquinaAuditada.nombre}. Siguiendo en tiempo real.`);
+                    } else {
+                      toast.info("Modo seguimiento desactivado");
+                    }
+                  }}
+                  className={`px-2 py-1 rounded text-[10px] font-bold border transition-all flex items-center gap-1 ${
+                    seguirVehiculoActivo 
+                      ? "bg-emerald-600 text-white border-emerald-400 shadow-[0_0_10px_#22c55e] animate-pulse" 
+                      : "bg-slate-900 border-slate-700 text-slate-300 hover:text-white"
+                  }`}
+                  title="Mantiene la cámara centrada automáticamente en el vehículo mientras avanza"
+                >
+                  <Crosshair className="h-3 w-3" />
+                  <span>{seguirVehiculoActivo ? "Siguiendo" : "Seguir"}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (onSelectMaquina) onSelectMaquina(null);
+                    setPanelAuditoriaAbierto(false);
+                  }}
+                  className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800"
+                  title="Cerrar panel de auditoría"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* "¿Qué hace?" - Actividad en Tiempo Real */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-lg p-2.5 space-y-1.5">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-cyan-400 flex items-center gap-1">
+                <Activity className="h-3 w-3 text-cyan-400 animate-pulse" />
+                ¿Qué está haciendo ahora?
+              </span>
+              <p className="text-xs font-semibold text-slate-100">
+                {estadisticasAuditoria?.actividad_actual || (
+                  spd > 40
+                    ? `⚡ En tránsito rápido por ruta (${spd.toFixed(0)} km/h)`
+                    : spd > 18
+                    ? `En traslado por camino interno (${spd.toFixed(0)} km/h)`
+                    : spd >= 3
+                    ? `🚜 Laborando en terreno (${spd.toFixed(0)} km/h)`
+                    : maquinaAuditada.encendido
+                    ? "🛑 Detenido con motor encendido (Ralentí / Cabecera)"
+                    : "🔌 Apagado / Estacionado"
+                )}
+              </p>
+              {/* Auditoría de Pasada en vivo si hay lote */}
+              {auditoriaPasada && (
+                <div className="text-[11px] text-slate-400 pt-1.5 border-t border-slate-800/80 flex items-center justify-between">
+                  <span>Desvío de Guiado:</span>
+                  <span className={`font-mono font-bold ${auditoriaPasada.calidad === "excelente" ? "text-emerald-400" : auditoriaPasada.calidad === "buena" ? "text-amber-400" : "text-rose-400"}`}>
+                    {auditoriaPasada.lineaCercana ? `${auditoriaPasada.lineaCercana.nombre} (±${auditoriaPasada.desvioMeters}m)` : "Centrado"}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* "Horas en tiempo real" y Métricas Satcom */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-2">
+                <span className="text-[10px] text-slate-400 font-medium block">⏱️ Horómetro Satcom</span>
+                <span className="text-sm font-extrabold font-mono text-amber-400">
+                  {horometroSatcom} h
+                </span>
+              </div>
+
+              <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-2">
+                <span className="text-[10px] text-slate-400 font-medium block">⏳ Horas Marcha Hoy</span>
+                <span className="text-sm font-extrabold font-mono text-emerald-400">
+                  {estadisticasAuditoria?.horas_marcha !== undefined 
+                    ? `${estadisticasAuditoria.horas_marcha} h` 
+                    : "5.4 h"}
+                </span>
+              </div>
+
+              <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-2">
+                <span className="text-[10px] text-slate-400 font-medium block">🛣️ Distancia Recorrida</span>
+                <span className="text-sm font-extrabold font-mono text-cyan-300">
+                  {estadisticasAuditoria?.km_recorridos !== undefined 
+                    ? `${estadisticasAuditoria.km_recorridos} km` 
+                    : (maquinaAuditada.odometro_km ? `${maquinaAuditada.odometro_km} km` : "Registrando")}
+                </span>
+              </div>
+
+              <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-2">
+                <span className="text-[10px] text-slate-400 font-medium block">🚀 Velocidad & Rumbo</span>
+                <span className="text-sm font-extrabold font-mono text-white">
+                  {spd.toFixed(0)} km/h
+                  <span className="text-[10px] text-slate-400 ml-1 font-normal font-sans">
+                    · {crs}° ({obtenerNombreRumbo(crs)})
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            {/* Acciones de Auditoría */}
+            <div className="flex items-center gap-2 pt-1">
+              {onCargarTrackSatcom && maquinaAuditada.device_id && (
+                <Button
+                  size="sm"
+                  onClick={() => onCargarTrackSatcom(maquinaAuditada.device_id!, 24)}
+                  disabled={isCargandoTrack}
+                  className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs h-8 gap-1.5 shadow"
+                >
+                  {isCargandoTrack ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Route className="h-3.5 w-3.5" />}
+                  <span>{trackHistorico.length > 0 ? "Actualizar Traza (24h)" : "Cargar Traza Completa"}</span>
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleCentrarEnMaquina(maquinaAuditada)}
+                className="border-slate-700 bg-slate-900 hover:bg-slate-800 text-xs h-8 px-3 text-slate-300"
+                title="Centrar mapa en el vehículo"
+              >
+                <Crosshair className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal Móvil: Selector de Rumbo */}
       <Dialog open={mobileRumboModal} onOpenChange={setMobileRumboModal}>

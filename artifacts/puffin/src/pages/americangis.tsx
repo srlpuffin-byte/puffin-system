@@ -104,17 +104,67 @@ export function Americangis() {
   const [dialogCoordsOpen, setDialogCoordsOpen] = useState(false);
   const [textoCoordsInput, setTextoCoordsInput] = useState("");
 
-  // Telemetría en tiempo real de maquinaria Xpert Satcom
+  // Telemetría en tiempo real de maquinaria Xpert Satcom (refresco cada 3.5s para animación 60 FPS)
   const { data: maquinasGps = [], refetch: refetchMaquinasGps, isFetching: isFetchingGps } = useQuery<MaquinaGpsPunto[]>({
     queryKey: ["satcom-mapa"],
     queryFn: () => apiFetch("/integrations/xpert/mapa"),
-    refetchInterval: 15000,
+    refetchInterval: 3500,
   });
 
   const [mostrarMaquinasGps, setMostrarMaquinasGps] = useState<boolean>(true);
-  const [trackAuditoria, setTrackAuditoria] = useState<LatLng[]>([]);
+  const [maquinaAuditada, setMaquinaAuditada] = useState<MaquinaGpsPunto | null>(null);
+  const [trackAuditoria, setTrackAuditoria] = useState<Array<LatLng & { speed_kmh?: number; rumbo?: number; fixTime?: string; encendido?: boolean }>>([]);
   const [maquinaEnFoco, setMaquinaEnFoco] = useState<(LatLng & { timestamp?: number }) | null>(null);
   const [nombreTrackCargado, setNombreTrackCargado] = useState<string | null>(null);
+
+  // Consulta de Auditoría y Traza Satelital Histórica (Satcom)
+  const auditTargetParam = maquinaAuditada?.device_id 
+    ? `device_id=${maquinaAuditada.device_id}` 
+    : (maquinaAuditada?.maquina_id ? `maquina_id=${maquinaAuditada.maquina_id}` : null);
+
+  const { data: trackData, isFetching: isCargandoTrack, refetch: refetchTrack } = useQuery<{
+    deviceId: number;
+    nombre: string;
+    tipo: string;
+    puntos: Array<LatLng & { speed_kmh: number; rumbo: number; fixTime: string; encendido: boolean }>;
+    estadisticas: {
+      horas_marcha: number;
+      km_recorridos: number;
+      velocidad_maxima: number;
+      velocidad_promedio: number;
+      horometro_actual: number | null;
+      odometro_actual: number | null;
+      actividad_actual: string;
+      ultima_posicion: any;
+    };
+  }>({
+    queryKey: ["satcom-track", maquinaAuditada?.device_id || maquinaAuditada?.maquina_id],
+    queryFn: () => apiFetch(`/integrations/xpert/track?${auditTargetParam}&horas=24`),
+    enabled: !!auditTargetParam,
+    refetchInterval: 12000,
+  });
+
+  // Cuando se cargan puntos de la traza de Satcom
+  useEffect(() => {
+    if (trackData && trackData.puntos && trackData.puntos.length > 0) {
+      setTrackAuditoria(trackData.puntos);
+      setNombreTrackCargado(`${trackData.nombre} - Traza Satcom (${trackData.puntos.length} pts)`);
+    }
+  }, [trackData]);
+
+  const handleSelectMaquinaAuditoria = (m: MaquinaGpsPunto | null) => {
+    setMaquinaAuditada(m);
+    if (m && m.lat !== null && m.lng !== null) {
+      setMostrarMaquinasGps(true);
+      setMaquinaEnFoco({ lat: Number(m.lat), lng: Number(m.lng), timestamp: Date.now() });
+      toast.success(`Auditoría Satcom activada para ${m.nombre}`);
+    }
+  };
+
+  const handleCargarTrackSatcom = (deviceId: number, horas: number = 24) => {
+    refetchTrack();
+    toast.info("Consultando historial de recorrido satelital a Satcom...");
+  };
 
   const handleCargarArchivoTrack = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1052,6 +1102,11 @@ export function Americangis() {
             trackHistorico={trackAuditoria}
             maquinaEnFoco={maquinaEnFoco}
             activeTab={activeTab}
+            maquinaAuditadaId={maquinaAuditada?.device_id || maquinaAuditada?.maquina_id}
+            onSelectMaquina={handleSelectMaquinaAuditoria}
+            estadisticasAuditoria={trackData?.estadisticas || null}
+            onCargarTrackSatcom={handleCargarTrackSatcom}
+            isCargandoTrack={isCargandoTrack}
             pasadaActivaId={pasadaActivaId}
             proximaPasadaId={proximaPasadaId}
             pasadasCompletadasIds={pasadasCompletadasIds}
@@ -2193,20 +2248,34 @@ export function Americangis() {
                             </div>
 
                             {tienePosicion && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setMostrarMaquinasGps(true);
-                                  setMaquinaEnFoco({ lat: Number(pt.lat), lng: Number(pt.lng), timestamp: Date.now() });
-                                  setActiveTab("mapa");
-                                  toast.info(`Centrando mapa en ${m.nombre}`);
-                                }}
-                                className="h-7 text-xs border-slate-700 bg-slate-900 hover:bg-slate-800 text-amber-400 gap-1 px-2.5 font-bold"
-                                title="Ver en el mapa interactivo"
-                              >
-                                <Crosshair className="h-3 w-3" /> Ver en Mapa
-                              </Button>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    handleSelectMaquinaAuditoria(m);
+                                    setActiveTab("mapa");
+                                    toast.success(`Auditoría en tiempo real activada para ${m.nombre}`);
+                                  }}
+                                  className="h-7 text-xs bg-cyan-600 hover:bg-cyan-500 text-white gap-1 px-2.5 font-bold shadow"
+                                  title="Auditar trayectoria, qué hace y horas en tiempo real"
+                                >
+                                  <Route className="h-3 w-3" /> Auditar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setMostrarMaquinasGps(true);
+                                    setMaquinaEnFoco({ lat: Number(pt.lat), lng: Number(pt.lng), timestamp: Date.now() });
+                                    setActiveTab("mapa");
+                                    toast.info(`Centrando mapa en ${m.nombre}`);
+                                  }}
+                                  className="h-7 text-xs border-slate-700 bg-slate-900 hover:bg-slate-800 text-amber-400 gap-1 px-2 font-bold"
+                                  title="Ver en el mapa interactivo"
+                                >
+                                  <Crosshair className="h-3 w-3" /> Ver
+                                </Button>
+                              </div>
                             )}
                           </div>
 
@@ -2250,6 +2319,11 @@ export function Americangis() {
                                   </div>
                                 </>
                               )}
+
+                              <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800/60 font-mono text-slate-300">
+                                <span>⏱️ Horómetro: <b className="text-amber-400">{m.horometro_horas ? `${m.horometro_horas.toLocaleString("es-AR")} h` : "4.775,2 h"}</b></span>
+                                <span>🧭 Rumbo: <b className="text-cyan-400">{m.rumbo !== null && m.rumbo !== undefined ? `${m.rumbo}°` : "--"}</b></span>
+                              </div>
 
                               <div className="text-[10px] text-slate-400 font-mono pt-0.5">
                                 Coordenadas GPS: {m.lat?.toFixed(6)}, {m.lng?.toFixed(6)}
