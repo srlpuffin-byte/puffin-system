@@ -65,6 +65,16 @@ if (groqApiKey) {
 const MAX_HISTORY = 8;  // reducido para ahorrar tokens
 const SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 horas
 
+// Fechas en zona horaria oficial de Argentina (UTC-3)
+// Evita que después de las 21:00 hs de Argentina (cuando UTC cambia de día) se guarde la fecha del día siguiente
+export function getArgentinaTodayISO(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date());
+}
+
+export function getArgentinaTodayDisplay(): string {
+  return new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 // Herramientas disponibles para la IA
 const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -279,6 +289,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         type: "object",
         properties: {
           id: { type: "number", description: "ID del egreso a actualizar (opcional, si se omite actualiza el egreso más reciente de los últimos 15 minutos)" },
+          fecha: { type: "string", description: "Nueva fecha en formato YYYY-MM-DD si se desea corregir o cambiar la fecha (ej: para corregir a la fecha de hoy)" },
           centro_costos: { type: "string", description: "Proyecto u obra a asignar (ej: 'Lipsa')" },
           observaciones: { type: "string", description: "Observaciones o máquina asignada (ej: 'Cargadora LiuGong')" },
           categoria: { type: "string", description: "Nueva categoría si se desea cambiar" },
@@ -745,8 +756,8 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
     historialFiltrado.push({ role: "user", content: text });
   }
 
-  const today = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
-  const todayISO = new Date().toISOString().split("T")[0];
+  const today = getArgentinaTodayDisplay();
+  const todayISO = getArgentinaTodayISO();
 
   // Herramientas disponibles según rol
   const WRITE_TOOLS = ["registrar_gasto", "actualizar_gasto", "registrar_empleado", "enviar_mensaje_whatsapp", "registrar_jornada", "actualizar_jornada", "registrar_combustible_bot", "registrar_mantenimiento_bot", "actualizar_proyecto", "mover_entidad_proyecto", "crear_acceso_sistema", "crear_accesos_faltantes", "actualizar_fotografia", "registrar_incidente", "registrar_alerta", "registrar_documento"];
@@ -1215,7 +1226,7 @@ async function executeConsultarProyectos(estado?: string, nombre?: string, orden
 }
 
 async function executeConsultarJornadas(estado?: string, nombreEmpleado?: string, fecha?: string, desde?: string, hasta?: string, fecha_registro?: string) {
-  const hoy = fecha || new Date().toISOString().split("T")[0];
+  const hoy = fecha || getArgentinaTodayISO();
 
   let empId: number | undefined;
   if (nombreEmpleado) {
@@ -1828,7 +1839,7 @@ async function executeRegistrarGasto(args: {
   observaciones?: string;
 }, imgUrl?: string | null) {
   try {
-    const fechaFinal = args.fecha || new Date().toISOString().split("T")[0];
+    const fechaFinal = args.fecha || getArgentinaTodayISO();
 
     // Inferir categoría automáticamente si no se especificó
     let categoriaFinal = args.categoria;
@@ -1949,6 +1960,7 @@ async function executeRegistrarGasto(args: {
 
 async function executeActualizarGasto(args: {
   id?: number;
+  fecha?: string;
   centro_costos?: string;
   observaciones?: string;
   categoria?: string;
@@ -2009,6 +2021,9 @@ async function executeActualizarGasto(args: {
     }
 
     const updates: Partial<typeof egresosTable.$inferInsert> = {};
+    if (args.fecha) {
+      updates.fecha = args.fecha.toLowerCase().includes("hoy") ? getArgentinaTodayISO() : args.fecha;
+    }
     if (centroCostosResuelto) updates.centro_costos = centroCostosResuelto;
     if (obsExtra) {
       updates.observaciones = egreso.observaciones 
@@ -2040,7 +2055,8 @@ async function executeActualizarGasto(args: {
       syncAllSheets().catch(console.error);
     } catch (_) {}
 
-    return `✅ Egreso #${egreso.id} actualizado con éxito:\n🏗️ Proyecto: ${centroCostosResuelto || 'Sin asignar'}${updates.observaciones ? `\n🚜 Obs/Máquina: ${updates.observaciones}` : ''}\n💰 Monto: $${Number(updates.monto || egreso.monto).toLocaleString("es-AR")} — ${updates.concepto || egreso.concepto}.`;
+    const fechaMostrada = updates.fecha || egreso.fecha;
+    return `✅ Egreso #${egreso.id} actualizado con éxito:\n📅 Fecha: ${fechaMostrada}\n🏗️ Proyecto: ${centroCostosResuelto || 'Sin asignar'}${updates.observaciones ? `\n🚜 Obs/Máquina: ${updates.observaciones}` : ''}\n💰 Monto: $${Number(updates.monto || egreso.monto).toLocaleString("es-AR")} — ${updates.concepto || egreso.concepto}.`;
   } catch (error: any) {
     console.error("Error actualizando egreso:", error);
     return `❌ Error al actualizar el egreso: ${error.message}`;
@@ -2174,7 +2190,7 @@ async function executeRegistrarEmpleado(args: { nombre: string; apellido: string
 
 async function executeRegistrarJornada(args: { nombre_empleado: string; nombre_obra: string; fecha?: string; hora_inicio?: string; hora_fin?: string; estado?: string }) {
   try {
-    const hoy = new Date().toISOString().split("T")[0];
+    const hoy = getArgentinaTodayISO();
     const t = `%${args.nombre_empleado.toLowerCase()}%`;
     const [emp] = await db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
       .from(empleadosTable).where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t))).limit(1);
@@ -2205,7 +2221,7 @@ async function executeRegistrarJornada(args: { nombre_empleado: string; nombre_o
 
 async function executeActualizarJornada(args: { nombre_empleado: string; fecha?: string; hora_fin?: string; estado?: string }) {
   try {
-    const hoy = new Date().toISOString().split("T")[0];
+    const hoy = getArgentinaTodayISO();
     const t = `%${args.nombre_empleado.toLowerCase()}%`;
     const [emp] = await db.select({ id: empleadosTable.id, nombre: empleadosTable.nombre, apellido: empleadosTable.apellido })
       .from(empleadosTable).where(or(ilike(empleadosTable.nombre, t), ilike(empleadosTable.apellido, t))).limit(1);
@@ -2237,7 +2253,7 @@ async function executeActualizarJornada(args: { nombre_empleado: string; fecha?:
 
 async function executeRegistrarCombustible(args: { nombre_maquina: string; nombre_empleado?: string; litros: number; importe?: number; estacion?: string; fecha?: string }) {
   try {
-    const hoy = new Date().toISOString().split("T")[0];
+    const hoy = getArgentinaTodayISO();
 
     const [maq] = await db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre })
       .from(maquinasTable).where(ilike(maquinasTable.nombre, `%${args.nombre_maquina}%`)).limit(1);
@@ -2276,7 +2292,7 @@ async function executeRegistrarCombustible(args: { nombre_maquina: string; nombr
 
 async function executeRegistrarMantenimiento(args: { nombre_maquina: string; tipo: string; descripcion?: string; proximo_service?: string; fecha?: string }) {
   try {
-    const hoy = new Date().toISOString().split("T")[0];
+    const hoy = getArgentinaTodayISO();
 
     const [maq] = await db.select({ id: maquinasTable.id, nombre: maquinasTable.nombre })
       .from(maquinasTable).where(ilike(maquinasTable.nombre, `%${args.nombre_maquina}%`)).limit(1);
@@ -2559,7 +2575,7 @@ async function executeLimpiarOperariosDuplicados() {
 
 async function executeResumenOperativo(fechaReq?: string) {
   try {
-    const fecha = fechaReq || new Date().toISOString().split("T")[0];
+    const fecha = fechaReq || getArgentinaTodayISO();
     const { sum, and, eq, gte, lte } = await import("drizzle-orm");
 
     // Jornadas
