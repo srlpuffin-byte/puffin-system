@@ -173,38 +173,57 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
     for (const m of maquinas) {
       const device = devices.find(d => d.id === m.satcom_id);
       const position = device ? positionsMap.get(device.positionId) : null;
+      const estadoSatcom = device?.status || "unknown";
+      const fixTime = position?.fixTime || position?.deviceTime || device?.lastUpdate || null;
+      const isDeviceOffline = estadoSatcom === "offline";
+      const isStale = fixTime ? (Date.now() - new Date(fixTime).getTime()) > 15 * 60 * 1000 : false;
+      const rawSpeedKmh = position && typeof position.speed === "number" ? Math.round(position.speed * 1.852) : null;
+      const velocidadActual = (isDeviceOffline || isStale) ? 0 : rawSpeedKmh;
 
       result.push({
         maquina_id: m.id,
         device_id: device?.id || null,
         nombre: m.nombre,
         tipo: m.tipo,
-        estado_satcom: device?.status || "unknown",
+        estado_satcom: estadoSatcom,
         lat: position?.latitude || null,
         lng: position?.longitude || null,
-        velocidad_kmh: position ? Math.round(position.speed * 1.852) : null,
-        encendido: isPositionEngineOn(position),
+        velocidad_kmh: velocidadActual,
+        ultima_velocidad_reportada: rawSpeedKmh,
+        encendido: isPositionEngineOn(position, estadoSatcom),
         is_unlinked: false,
         imagen_url: fotografiasMap.get(m.id) || null,
         proyecto_lugar: maquinasProyectoMap.get(m.id) || null,
+        fix_time: fixTime,
+        last_update: device?.lastUpdate || null,
       });
     }
 
     // 2. Agregar dispositivos sin vincular
     for (const d of unlinkedDevices) {
       const position = positionsMap.get(d.positionId);
+      const estadoSatcom = d.status || "unknown";
+      const fixTime = position?.fixTime || position?.deviceTime || d.lastUpdate || null;
+      const isDeviceOffline = estadoSatcom === "offline";
+      const isStale = fixTime ? (Date.now() - new Date(fixTime).getTime()) > 15 * 60 * 1000 : false;
+      const rawSpeedKmh = position && typeof position.speed === "number" ? Math.round(position.speed * 1.852) : null;
+      const velocidadActual = (isDeviceOffline || isStale) ? 0 : rawSpeedKmh;
+
       result.push({
         maquina_id: null,
         device_id: d.id,
         nombre: d.name,
         tipo: "GPS sin asignar",
-        estado_satcom: d.status,
+        estado_satcom: estadoSatcom,
         lat: position?.latitude || null,
         lng: position?.longitude || null,
-        velocidad_kmh: position ? Math.round(position.speed * 1.852) : null,
-        encendido: isPositionEngineOn(position),
+        velocidad_kmh: velocidadActual,
+        ultima_velocidad_reportada: rawSpeedKmh,
+        encendido: isPositionEngineOn(position, estadoSatcom),
         is_unlinked: true,
         proyecto_lugar: null,
+        fix_time: fixTime,
+        last_update: d.lastUpdate || null,
       });
     }
 

@@ -85,10 +85,31 @@ export interface MaquinaGpsPunto {
   lat: number | null;
   lng: number | null;
   velocidad_kmh: number | null;
+  ultima_velocidad_reportada?: number | null;
   encendido: boolean;
   is_unlinked?: boolean;
   imagen_url?: string | null;
   proyecto_lugar?: string | null;
+  fix_time?: string | null;
+  last_update?: string | null;
+}
+
+export function formatearTiempoReporte(isoString?: string | null): string {
+  if (!isoString) return "Sin reporte";
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  if (isNaN(diffMs)) return "Reciente";
+  if (diffMs < 0) return "En vivo";
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return `hace ${diffSec}s`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `hace ${diffMin}m`;
+  const diffHoras = Math.floor(diffMin / 60);
+  if (diffHoras < 24) return `hace ${diffHoras}h`;
+  const diffDias = Math.floor(diffHoras / 24);
+  const d = new Date(isoString);
+  const dia = String(d.getDate()).padStart(2, "0");
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  return `hace ${diffDias}d (${dia}/${mes})`;
 }
 
 interface TrazadorMapaProps {
@@ -999,10 +1020,15 @@ export function TrazadorMapa({
       const dentroDelLote = tieneLote ? esPuntoEnPoligono(pt, polygon) : false;
       const auditoria = lineas.length > 0 ? calcularDesvioPasada(pt, lineas) : { lineaCercana: null, desvioMeters: 0, estaAlineado: true, calidad: "excelente" as const };
 
-      const statusColor = m.encendido ? "#22c55e" : "#ef4444";
+      const isOnline = m.estado_satcom === "online";
+      const isOffline = m.estado_satcom === "offline" || !isOnline;
+      const statusColor = isOffline ? "#64748b" : (m.encendido ? "#22c55e" : "#f59e0b");
+      const tiempoReporte = formatearTiempoReporte(m.fix_time || m.last_update);
+      const velDisplay = m.velocidad_kmh !== null ? m.velocidad_kmh : 0;
+
       const iconHtml = `
-        <div style="position: relative; display: flex; flex-direction: column; align-items: center; width: 140px; margin-left: -70px; margin-top: -55px; pointer-events: auto; cursor: pointer;">
-          <!-- Etiqueta superior: Nombre de la máquina -->
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; width: 150px; margin-left: -75px; margin-top: -55px; pointer-events: auto; cursor: pointer;">
+          <!-- Etiqueta superior: Nombre y estado de conexión -->
           <div style="
             background: rgba(15, 23, 42, 0.95);
             color: #ffffff;
@@ -1020,6 +1046,7 @@ export function TrazadorMapa({
           ">
             <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: ${statusColor}; box-shadow: 0 0 6px ${statusColor};"></span>
             <span>🚜 ${m.nombre}</span>
+            <span style="font-size: 9px; font-weight: 600; opacity: 0.8; color: ${isOffline ? '#94a3b8' : '#86efac'};">(${tiempoReporte})</span>
           </div>
 
           <!-- Ícono central de tractor con Pin -->
@@ -1051,10 +1078,10 @@ export function TrazadorMapa({
             "></div>
           </div>
 
-          <!-- Badge inferior: Velocidad y Auditoría de Pasada -->
+          <!-- Badge inferior: Velocidad y Estado Operativo -->
           <div style="
             margin-top: 6px;
-            background: ${tieneLote ? (dentroDelLote ? (auditoria.estaAlineado ? "rgba(21, 128, 61, 0.95)" : "rgba(180, 83, 9, 0.95)") : "rgba(185, 28, 28, 0.95)") : (m.encendido ? "rgba(21, 128, 61, 0.95)" : "rgba(30, 41, 59, 0.95)")};
+            background: ${isOffline ? "rgba(51, 65, 85, 0.95)" : (tieneLote ? (dentroDelLote ? (auditoria.estaAlineado ? "rgba(21, 128, 61, 0.95)" : "rgba(180, 83, 9, 0.95)") : "rgba(185, 28, 28, 0.95)") : (m.encendido ? "rgba(21, 128, 61, 0.95)" : "rgba(30, 41, 59, 0.95)"))};
             color: #ffffff;
             font-size: 10px;
             font-weight: 800;
@@ -1065,7 +1092,10 @@ export function TrazadorMapa({
             box-shadow: 0 2px 6px rgba(0,0,0,0.6);
             border: 1px solid rgba(255,255,255,0.2);
           ">
-            ${m.velocidad_kmh !== null ? `${m.velocidad_kmh.toFixed(0)} km/h` : "0 km/h"}${tieneLote ? ` · ${dentroDelLote ? (auditoria.lineaCercana ? `±${auditoria.desvioMeters}m` : "En Eje") : "Fuera Lote"}` : (m.encendido ? " · En Marcha" : " · Detenido")}
+            ${isOffline 
+              ? `🔴 Offline · ${m.ultima_velocidad_reportada ? `Últ. ${m.ultima_velocidad_reportada} km/h` : "Sin señal"}`
+              : `${velDisplay.toFixed(0)} km/h${tieneLote ? ` · ${dentroDelLote ? (auditoria.lineaCercana ? `±${auditoria.desvioMeters}m` : "En Eje") : "Fuera Lote"}` : (m.encendido ? " · En Marcha" : " · Detenido")}`
+            }
           </div>
         </div>
       `;
@@ -1080,18 +1110,31 @@ export function TrazadorMapa({
       const marker = L.marker([m.lat, m.lng], { icon: divIcon, zIndexOffset: 1000 });
 
       const popupContent = `
-        <div style="font-family: sans-serif; font-size: 12px; min-width: 220px; padding: 4px; color: #1e293b;">
+        <div style="font-family: sans-serif; font-size: 12px; min-width: 250px; padding: 4px; color: #1e293b;">
           <div style="font-weight: 900; font-size: 14px; border-bottom: 2px solid ${statusColor}; padding-bottom: 4px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
             <span>🚜 ${m.nombre}</span>
-            <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${m.encendido ? '#dcfce7; color: #166534;' : '#fef2f2; color: #991b1b;'}">
-              ${m.encendido ? '🟢 En Marcha' : '🔴 Detenido'}
+            <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${isOffline ? '#f1f5f9; color: #475569;' : (m.encendido ? '#dcfce7; color: #166534;' : '#fef3c7; color: #92400e;')}">
+              ${isOffline ? '🔴 Fuera de Línea' : (m.encendido ? '🟢 En Marcha' : '🟡 Detenido')}
             </span>
           </div>
-          <div style="display: grid; gap: 4px; font-size: 11px;">
+          <div style="display: grid; gap: 5px; font-size: 11px;">
             <div><b>Tipo:</b> ${m.tipo || "Maquinaria"}</div>
-            <div><b>Velocidad:</b> ${m.velocidad_kmh !== null ? `${m.velocidad_kmh.toFixed(1)} km/h` : '0.0 km/h'}</div>
-            <div><b>Posición:</b> ${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}</div>
-            ${m.proyecto_lugar ? `<div><b>Proyecto:</b> ${m.proyecto_lugar}</div>` : ''}
+            <div><b>Conexión Satelital:</b> ${isOnline ? '🟢 En Línea (Transmitiendo en vivo)' : '🔴 Desconectado / Sin señal'}</div>
+            <div><b>Último Reporte GPS:</b> <span style="font-weight: bold; color: ${isOffline ? '#dc2626' : '#166534'};">${tiempoReporte}</span></div>
+            <div><b>Velocidad Actual:</b> <b>${velDisplay.toFixed(1)} km/h</b>${isOffline && m.ultima_velocidad_reportada ? ` <span style="color:#64748b;">(Último registro antes de desconectar: ${m.ultima_velocidad_reportada} km/h)</span>` : ''}</div>
+            <div><b>Coordenadas:</b> ${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}</div>
+            ${m.proyecto_lugar ? `<div><b>Proyecto asignado:</b> ${m.proyecto_lugar}</div>` : ''}
+
+            ${isOffline ? `
+              <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 6px; color: #991b1b; font-size: 10.5px; line-height: 1.35; margin-top: 4px;">
+                ⚠️ <b>Por qué no se mueve el icono:</b> Este rastreador GPS está apagado o fuera de cobertura. La posición y velocidad de <b>${m.ultima_velocidad_reportada || 0} km/h</b> corresponden al último instante en que transmitió datos (${tiempoReporte}). Hasta que la máquina no se encienda y envíe un nuevo paquete GPS, el marcador se mantiene estático en su última ubicación.
+              </div>
+            ` : `
+              <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 5px 7px; color: #166534; font-size: 10.5px; margin-top: 4px;">
+                🔄 <b>Actualización en vivo:</b> El mapa consulta nuevas coordenadas cada 15 segundos.
+              </div>
+            `}
+
             <div style="border-top: 1px solid #e2e8f0; margin-top: 4px; padding-top: 4px;">
               <b>Auditoría en Lote:</b>
               <div style="margin-top: 2px;">

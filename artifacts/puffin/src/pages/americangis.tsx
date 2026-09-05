@@ -27,7 +27,7 @@ import {
   calcularDesvioPasada,
   parsearTrackGps
 } from "@/lib/gis/surface-planner";
-import { TrazadorMapa, MapInteractionMode, MaquinaGpsPunto } from "@/components/map/TrazadorMapa";
+import { TrazadorMapa, MapInteractionMode, MaquinaGpsPunto, formatearTiempoReporte } from "@/components/map/TrazadorMapa";
 import { useGetProyectos } from "@/hooks/use-proyectos";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
@@ -1606,11 +1606,13 @@ export function Americangis() {
                     size="sm"
                     onClick={() => {
                       const validas = maquinasGps.filter(m => m.lat !== null && m.lng !== null);
-                      if (validas.length > 0) {
+                      const onlineOnes = validas.filter(m => m.estado_satcom === "online");
+                      const foco = onlineOnes.length > 0 ? onlineOnes[0] : validas[0];
+                      if (foco) {
                         setMostrarMaquinasGps(true);
-                        setMaquinaEnFoco({ lat: validas[0].lat!, lng: validas[0].lng! });
+                        setMaquinaEnFoco({ lat: foco.lat!, lng: foco.lng! });
                         setActiveTab("mapa");
-                        toast.success(`Mostrando ${validas.length} máquinas en el mapa satelital`);
+                        toast.success(`Mostrando flota en el mapa satelital. Enfocado en ${foco.nombre}`);
                       } else {
                         toast.info("No hay máquinas con coordenadas GPS activas en este momento");
                       }
@@ -1638,6 +1640,17 @@ export function Americangis() {
             </CardHeader>
 
             <CardContent className="p-4 space-y-4">
+              {/* Explicación Técnica Operativa de Telemetría GPS */}
+              <div className="bg-slate-950/80 border border-amber-500/30 rounded-lg p-3 text-xs space-y-1">
+                <div className="flex items-center gap-2 font-bold text-amber-400">
+                  <Activity className="h-4 w-4" />
+                  <span>¿Cómo se actualiza la posición y velocidad de las máquinas?</span>
+                </div>
+                <p className="text-slate-300 text-[11.5px] leading-relaxed">
+                  Los localizadores GPS transmiten <b>paquetes periódicos</b> por ráfagas (cada 15 a 60 segundos). La velocidad informada refleja la velocidad instantánea del último paquete emitido. Si una máquina se apaga o pierde cobertura celular, el servidor satelital mantiene fija su última posición y velocidad registrada hasta que vuelva a encenderse y emitir una nueva señal. Puffin consulta y refresca automáticamente los datos cada 15 segundos.
+                </p>
+              </div>
+
               {/* Alerta de Track Cargado si existe */}
               {trackAuditoria.length > 0 && (
                 <div className="bg-cyan-950/40 border border-cyan-500/40 rounded-lg p-3 flex items-center justify-between gap-3 text-xs">
@@ -1664,28 +1677,36 @@ export function Americangis() {
               )}
 
               {/* Métricas de Flota en Lote */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Máquinas con Rastreador GPS</span>
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Rastreadores GPS</span>
                   <div className="text-xl font-bold text-white flex items-center gap-2">
                     <Tractor className="h-4 w-4 text-amber-400" />
-                    {maquinasGps.filter(m => m.lat !== null).length} <span className="text-xs font-normal text-muted-foreground">equipos transmitiendo</span>
+                    {maquinasGps.filter(m => m.lat !== null).length} <span className="text-xs font-normal text-muted-foreground">equipos</span>
                   </div>
                 </div>
 
                 <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Dentro del Perímetro</span>
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">En Línea (En Vivo)</span>
                   <div className="text-xl font-bold text-emerald-400 flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-emerald-400" />
-                    {maquinasGps.filter((m): m is MaquinaGpsPunto & { lat: number; lng: number } => m.lat !== null && m.lng !== null && esPuntoEnPoligono({ lat: m.lat, lng: m.lng }, polygon)).length} <span className="text-xs font-normal text-muted-foreground">en el lote activo</span>
+                    <Activity className="h-4 w-4 text-emerald-400" />
+                    {maquinasGps.filter(m => m.estado_satcom === "online").length} <span className="text-xs font-normal text-muted-foreground">transmitiendo</span>
                   </div>
                 </div>
 
                 <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">En Marcha / Trabajando</span>
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Dentro del Lote</span>
                   <div className="text-xl font-bold text-cyan-400 flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-cyan-400" />
-                    {maquinasGps.filter(m => m.encendido).length} <span className="text-xs font-normal text-muted-foreground">motores encendidos</span>
+                    <MapPin className="h-4 w-4 text-cyan-400" />
+                    {maquinasGps.filter((m): m is MaquinaGpsPunto & { lat: number; lng: number } => m.lat !== null && m.lng !== null && esPuntoEnPoligono({ lat: m.lat, lng: m.lng }, polygon)).length} <span className="text-xs font-normal text-muted-foreground">en perímetro</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Fuera de Línea</span>
+                  <div className="text-xl font-bold text-slate-400 flex items-center gap-2">
+                    <span className="h-3 w-3 rounded-full bg-slate-600 inline-block"></span>
+                    {maquinasGps.filter(m => m.estado_satcom === "offline").length} <span className="text-xs font-normal text-muted-foreground">sin señal</span>
                   </div>
                 </div>
               </div>
@@ -1706,6 +1727,9 @@ export function Americangis() {
                       const pt: LatLng = tienePosicion ? { lat: m.lat!, lng: m.lng! } : { lat: 0, lng: 0 };
                       const dentroDelLote = tienePosicion && polygon.length >= 3 ? esPuntoEnPoligono(pt, polygon) : false;
                       const auditoria = tienePosicion && lineas.length > 0 ? calcularDesvioPasada(pt, lineas) : null;
+                      const isOnline = m.estado_satcom === "online";
+                      const isOffline = m.estado_satcom === "offline" || !isOnline;
+                      const tiempoReporte = formatearTiempoReporte(m.fix_time || m.last_update);
 
                       return (
                         <div
@@ -1714,14 +1738,17 @@ export function Americangis() {
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-bold text-sm text-white">{m.nombre}</span>
-                                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${m.encendido ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                                  {m.encendido ? "🟢 En marcha" : "⚪ Detenido"}
+                                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${isOffline ? 'bg-slate-800 text-slate-400 border-slate-700' : (m.encendido ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/30')}`}>
+                                  {isOffline ? "🔴 Fuera de línea" : (m.encendido ? "🟢 En marcha" : "🟡 Detenido")}
                                 </Badge>
+                                <span className="text-[10px] text-muted-foreground font-mono">
+                                  ⏱️ {tiempoReporte}
+                                </span>
                               </div>
                               <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">
-                                {m.tipo || "Maquinaria"} {m.velocidad_kmh !== null ? `· ${(m.velocidad_kmh || 0).toFixed(1)} km/h` : ""}
+                                {m.tipo || "Maquinaria"} {isOffline ? (m.ultima_velocidad_reportada ? `· Última vel: ${m.ultima_velocidad_reportada} km/h` : "· Sin señal") : `· ${(m.velocidad_kmh || 0).toFixed(1)} km/h`}
                               </p>
                             </div>
 

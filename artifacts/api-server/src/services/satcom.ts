@@ -6,6 +6,7 @@ export interface SatcomDevice {
   name: string;
   uniqueId: string;
   status: string;
+  lastUpdate?: string;
   positionId: number;
 }
 
@@ -15,16 +16,29 @@ export interface SatcomPosition {
   longitude: number;
   speed: number;
   course: number;
+  fixTime?: string;
+  deviceTime?: string;
+  serverTime?: string;
   attributes: {
     ignition?: boolean;
     hours?: number;
     distance?: number;
+    motion?: boolean;
     [key: string]: any;
   };
 }
 
-export function isPositionEngineOn(position: any): boolean {
+export function isPositionEngineOn(position: any, deviceStatus?: string): boolean {
   if (!position) return false;
+  if (deviceStatus === "offline") return false;
+
+  // Si el paquete tiene más de 15 minutos de antigüedad, la máquina no está en marcha activa
+  const timestamp = position.fixTime || position.deviceTime;
+  if (timestamp) {
+    const ageMinutes = (Date.now() - new Date(timestamp).getTime()) / (1000 * 60);
+    if (ageMinutes > 15) return false;
+  }
+
   if (position.attributes?.ignition === true) return true;
   if (position.attributes?.motion === true) return true;
   if (typeof position.speed === "number" && position.speed > 0.5) return true;
