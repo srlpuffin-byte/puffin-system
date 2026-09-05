@@ -2,6 +2,7 @@ import { Router } from "express";
 import zlib from "node:zlib";
 import { handleWhatsAppMessage } from "../services/assistant.js";
 import { downloadWhatsAppMedia } from "../services/whatsapp.js";
+import { transcribeAudio } from "../services/transcription.js";
 
 export const whatsappRouter = Router();
 
@@ -312,6 +313,40 @@ whatsappRouter.post("/", async (req, res) => {
           }
         } else {
           batch.texts.push(docHeader);
+          scheduleBatch(from);
+        }
+      }
+
+      // 4. Manejo de audios y notas de voz (WhatsApp PTT / Audio)
+      else if ((msgType === "audio" || msgType === "voice") && (message.audio || message.voice)) {
+        const audioObj = message.audio || message.voice;
+        const mediaId = audioObj.id;
+        if (mediaId) {
+          batch.activeDownloads++;
+          console.log(`[Webhook] Descargando audio/nota de voz ${mediaId} de ${from}...`);
+          try {
+            const base64 = await downloadWhatsAppMedia(mediaId);
+            if (base64) {
+              const base64Data = base64.includes(";base64,") ? base64.split(";base64,")[1] : base64;
+              const buffer = Buffer.from(base64Data.trim(), "base64");
+              const mimeType = audioObj.mime_type || "audio/ogg";
+              const transcription = await transcribeAudio(buffer, mimeType);
+              if (transcription && transcription.trim()) {
+                console.log(`[Webhook] 🎙️ Audio transcripto de ${from}: "${transcription}"`);
+                batch.texts.push(transcription.trim());
+              } else {
+                console.warn(`[Webhook] ⚠️ No se pudo transcribir el audio ${mediaId}`);
+              }
+            } else {
+              console.error(`[Webhook] ❌ downloadWhatsAppMedia devolvió null para el audio ${mediaId}`);
+            }
+          } catch (err) {
+            console.error(`[Webhook] Error descargando/transcribiendo audio ${mediaId}:`, err);
+          } finally {
+            batch.activeDownloads--;
+            scheduleBatch(from);
+          }
+        } else {
           scheduleBatch(from);
         }
       } else {
