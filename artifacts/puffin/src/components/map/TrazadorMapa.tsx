@@ -243,21 +243,27 @@ export function TrazadorMapa({
   const trackGroupRef = useRef<any>(null);
   const baseLayersRef = useRef<{ [key: string]: any }>({});
   
-  // Referencia persistente para animación continua cinemática a 60 FPS
+  // Referencia persistente para cinemática continua suave a 60 FPS (sin efecto resorte ni frenadas)
   const animatedVehiclesRef = useRef<Map<string, {
     id: string;
     data: MaquinaGpsPunto;
     currentLat: number;
     currentLng: number;
-    targetLat: number;
-    targetLng: number;
-    speedKmh: number;
-    course: number;
+    lastGpsLat: number;
+    lastGpsLng: number;
+    lastFixTime: string | null;
+    currentSpeedKmh: number;
+    targetSpeedKmh: number;
+    currentCourse: number;
+    targetCourse: number;
     isMoving: boolean;
+    hasPendingCorrection: boolean;
+    targetGpsLat: number;
+    targetGpsLng: number;
     marker: any;
     liveTrailLine?: any;
     liveTrailPoints: [number, number][];
-    lastStepDist: number;
+    distanceSinceLastTrailPoint: number;
   }>>(new Map());
 
   const [seguirVehiculoActivo, setSeguirVehiculoActivo] = useState<boolean>(false);
@@ -1542,25 +1548,63 @@ export function TrazadorMapa({
           data: m,
           currentLat: m.lat,
           currentLng: m.lng,
-          targetLat: m.lat,
-          targetLng: m.lng,
-          speedKmh: velDisplay,
-          course: rumbo,
+          lastGpsLat: m.lat,
+          lastGpsLng: m.lng,
+          lastFixTime: m.fix_time || null,
+          currentSpeedKmh: isOffline ? 0 : velDisplay,
+          targetSpeedKmh: isOffline ? 0 : velDisplay,
+          currentCourse: rumbo,
+          targetCourse: rumbo,
           isMoving,
+          hasPendingCorrection: false,
+          targetGpsLat: m.lat,
+          targetGpsLng: m.lng,
           marker,
           liveTrailLine,
           liveTrailPoints: [[m.lat, m.lng]],
-          lastStepDist: 0,
+          distanceSinceLastTrailPoint: 0,
         };
 
         animatedVehiclesRef.current.set(key, animated);
       } else {
         animated.data = m;
-        animated.targetLat = m.lat;
-        animated.targetLng = m.lng;
-        animated.speedKmh = velDisplay;
-        if (typeof m.rumbo === "number") animated.course = m.rumbo;
-        animated.isMoving = isMoving;
+        animated.targetSpeedKmh = isOffline ? 0 : velDisplay;
+        if (typeof m.rumbo === "number") {
+          animated.targetCourse = m.rumbo;
+        }
+        animated.isMoving = !isOffline && (animated.targetSpeedKmh > 1.5 || animated.currentSpeedKmh > 1.5);
+
+        // Detectar si este reporte de Satcom contiene un paquete de coordenadas GPS nuevo
+        const isNewGpsPoint = 
+          m.lat !== animated.lastGpsLat || 
+          m.lng !== animated.lastGpsLng || 
+          (m.fix_time && m.fix_time !== animated.lastFixTime);
+
+        if (isNewGpsPoint) {
+          const latRad = (animated.currentLat * Math.PI) / 180;
+          const dLatMeters = (m.lat - animated.currentLat) * 111320;
+          const dLngMeters = (m.lng - animated.currentLng) * 111320 * (Math.cos(latRad) || 1);
+          const distanceToNewFix = Math.hypot(dLatMeters, dLngMeters);
+
+          animated.lastGpsLat = m.lat;
+          animated.lastGpsLng = m.lng;
+          animated.lastFixTime = m.fix_time || null;
+
+          if (distanceToNewFix > 600) {
+            // Salto grande inicial o de telemetría: reubicar directamente
+            animated.currentLat = m.lat;
+            animated.currentLng = m.lng;
+            animated.targetGpsLat = m.lat;
+            animated.targetGpsLng = m.lng;
+            animated.hasPendingCorrection = false;
+            animated.marker.setLatLng([m.lat, m.lng]);
+          } else {
+            // Desvío normal en ruta o lote: activar absorción suave sin frenar el vehículo
+            animated.targetGpsLat = m.lat;
+            animated.targetGpsLng = m.lng;
+            animated.hasPendingCorrection = true;
+          }
+        }
 
         animated.marker.setPopupContent(popupContent);
         const iconDiv = animated.marker.getElement();
@@ -1569,7 +1613,7 @@ export function TrazadorMapa({
           if (badgeEl) {
             badgeEl.textContent = isOffline 
               ? `🔴 Offline · ${m.ultima_velocidad_reportada ? `Últ. ${m.ultima_velocidad_reportada} km/h` : "Sin señal"}`
-              : `${velDisplay.toFixed(0)} km/h · ${animated.course}°${tieneLote ? ` · ${dentroDelLote ? (auditoria.lineaCercana ? `±${auditoria.desvioMeters}m` : "En Eje") : "Fuera Lote"}` : (velDisplay > 0 ? " · En Marcha" : " · Detenido")}`;
+              : `${velDisplay.toFixed(0)} km/h · ${Math.round(animated.currentCourse)}°${tieneLote ? ` · ${dentroDelLote ? (auditoria.lineaCercana ? `±${auditoria.desvioMeters}m` : "En Eje") : "Fuera Lote"}` : (velDisplay > 0 ? " · En Marcha" : " · Detenido")}`;
           }
         }
       }
@@ -1587,7 +1631,7 @@ export function TrazadorMapa({
     return undefined;
   }, [mapReady, maquinas, mostrarMaquinas, polygon, lineas, maquinaAuditadaId, onSelectMaquina]);
 
-  // Motor Cinemático de Movimiento en Tiempo Real a 60 FPS (Dead-Reckoning e Interpolación)
+  // Motor Cinemático de Movimiento en Tiempo Real a 60 FPS (Dead-Reckoning e Interpolación Suave)
   useEffect(() => {
     if (!mapReady || !mapRef.current) return undefined;
     const map = mapRef.current;
@@ -1601,57 +1645,116 @@ export function TrazadorMapa({
       animatedVehiclesRef.current.forEach((veh) => {
         if (!veh.marker) return;
 
-        if (veh.isMoving && veh.speedKmh > 1.5) {
-          const distMeters = (veh.speedKmh / 3.6) * dt;
-          veh.lastStepDist += distMeters;
+        // 1. Suavizado progresivo de velocidad (transición orgánica de aceleración/frenado)
+        const speedDiff = veh.targetSpeedKmh - veh.currentSpeedKmh;
+        if (Math.abs(speedDiff) > 0.1) {
+          const maxAcc = 20 * dt; // hasta 20 km/h por segundo
+          if (Math.abs(speedDiff) <= maxAcc) {
+            veh.currentSpeedKmh = veh.targetSpeedKmh;
+          } else {
+            veh.currentSpeedKmh += Math.sign(speedDiff) * maxAcc;
+          }
+        } else {
+          veh.currentSpeedKmh = veh.targetSpeedKmh;
+        }
 
-          const rad = (veh.course * Math.PI) / 180;
-          const dLat = (distMeters * Math.cos(rad)) / 111320;
+        // 2. Suavizado de rumbo (giro orgánico de dirección)
+        let diffCourse = (veh.targetCourse - veh.currentCourse) % 360;
+        if (diffCourse < -180) diffCourse += 360;
+        if (diffCourse > 180) diffCourse -= 360;
+        if (Math.abs(diffCourse) > 0.5) {
+          const maxTurn = 60 * dt; // hasta 60 grados por segundo de rotación
+          if (Math.abs(diffCourse) <= maxTurn) {
+            veh.currentCourse = veh.targetCourse;
+          } else {
+            veh.currentCourse = (veh.currentCourse + Math.sign(diffCourse) * maxTurn + 360) % 360;
+          }
+        } else {
+          veh.currentCourse = veh.targetCourse;
+        }
+
+        // 3. Cinemática de desplazamiento continuo
+        if (veh.currentSpeedKmh > 1.0) {
+          // El vehículo está en marcha activa: AVANCE CONTINUO ININTERRUMPIDO
+          const baseDistMeters = (veh.currentSpeedKmh / 3.6) * dt;
+          veh.distanceSinceLastTrailPoint += baseDistMeters;
+
+          const rad = (veh.currentCourse * Math.PI) / 180;
           const latRad = (veh.currentLat * Math.PI) / 180;
-          const dLng = (distMeters * Math.sin(rad)) / (111320 * (Math.cos(latRad) || 1));
+          const cosLat = Math.cos(latRad) || 1;
 
-          const driftLat = veh.targetLat - veh.currentLat;
-          const driftLng = veh.targetLng - veh.currentLng;
-          const correctionFactor = 0.04;
+          // Vector de avance principal ininterrumpido hacia adelante
+          const dLatBase = (baseDistMeters * Math.cos(rad)) / 111320;
+          const dLngBase = (baseDistMeters * Math.sin(rad)) / (111320 * cosLat);
 
-          veh.currentLat += dLat + driftLat * correctionFactor;
-          veh.currentLng += dLng + driftLng * correctionFactor;
+          // Vector de corrección suave hacia el GPS (para converger sin tirones)
+          let dLatCorr = 0;
+          let dLngCorr = 0;
 
-          veh.marker.setLatLng([veh.currentLat, veh.currentLng]);
+          if (veh.hasPendingCorrection) {
+            const errorLat = veh.targetGpsLat - veh.currentLat;
+            const errorLng = veh.targetGpsLng - veh.currentLng;
+            const errorMeters = Math.hypot(errorLat * 111320, errorLng * 111320 * cosLat);
 
-          const markerEl = veh.marker.getElement();
-          if (markerEl) {
-            const arrowEl = markerEl.querySelector(".vehicle-arrow-cone");
-            if (arrowEl) {
-              (arrowEl as HTMLElement).style.transform = `rotate(${veh.course}deg)`;
+            if (errorMeters < 1.5) {
+              // Ya convergió a menos de 1.5m del reporte satelital
+              veh.hasPendingCorrection = false;
+            } else {
+              // Absorber suavemente en una ventana de 3.5 segundos
+              // CRUCIAL: Limitar la corrección a un máximo del 35% de la velocidad base
+              // Esto GARANTIZA matemáticamente que la velocidad nunca baja a 0 (nunca se traba)
+              // y nunca se dispara bruscamente hacia adelante.
+              const maxCorrSpeedMeters = (veh.currentSpeedKmh / 3.6) * 0.35;
+              const corrSpeedMeters = Math.min(errorMeters / 3.5, maxCorrSpeedMeters);
+              const corrDist = corrSpeedMeters * dt;
+              const factor = corrDist / errorMeters;
+              dLatCorr = errorLat * factor;
+              dLngCorr = errorLng * factor;
             }
           }
 
-          if (veh.lastStepDist >= 15 && veh.liveTrailLine) {
-            veh.lastStepDist = 0;
+          veh.currentLat += dLatBase + dLatCorr;
+          veh.currentLng += dLngBase + dLngCorr;
+          veh.marker.setLatLng([veh.currentLat, veh.currentLng]);
+
+          // Actualizar estela en vivo cada 12 metros recorridos
+          if (veh.distanceSinceLastTrailPoint >= 12 && veh.liveTrailLine) {
+            veh.distanceSinceLastTrailPoint = 0;
             veh.liveTrailPoints.push([veh.currentLat, veh.currentLng]);
-            if (veh.liveTrailPoints.length > 60) {
+            if (veh.liveTrailPoints.length > 80) {
               veh.liveTrailPoints.shift();
             }
             veh.liveTrailLine.setLatLngs(veh.liveTrailPoints);
           }
-
-          const isAudited = maquinaAuditadaId && (
-            String(veh.data.device_id) === String(maquinaAuditadaId) ||
-            String(veh.data.maquina_id) === String(maquinaAuditadaId)
-          );
-
-          if (isAudited && seguirVehiculoActivo) {
-            map.panTo([veh.currentLat, veh.currentLng], { animate: false });
-          }
         } else {
-          const dLat = veh.targetLat - veh.currentLat;
-          const dLng = veh.targetLng - veh.currentLng;
+          // Vehículo detenido / ralentí / estacionado
+          // Deslizar suavemente hasta la coordenada exacta de detención
+          const dLat = (veh.targetGpsLat - veh.currentLat);
+          const dLng = (veh.targetGpsLng - veh.currentLng);
           if (Math.abs(dLat) > 0.000001 || Math.abs(dLng) > 0.000001) {
-            veh.currentLat += dLat * 0.15;
-            veh.currentLng += dLng * 0.15;
+            veh.currentLat += dLat * Math.min(dt * 3, 1.0);
+            veh.currentLng += dLng * Math.min(dt * 3, 1.0);
             veh.marker.setLatLng([veh.currentLat, veh.currentLng]);
           }
+        }
+
+        // 4. Orientación de la flecha / cono en el icono
+        const markerEl = veh.marker.getElement();
+        if (markerEl) {
+          const arrowEl = markerEl.querySelector(".vehicle-arrow-cone");
+          if (arrowEl) {
+            (arrowEl as HTMLElement).style.transform = `rotate(${Math.round(veh.currentCourse)}deg)`;
+          }
+        }
+
+        // 5. Seguimiento automático de cámara si está activo
+        const isAudited = maquinaAuditadaId && (
+          String(veh.data.device_id) === String(maquinaAuditadaId) ||
+          String(veh.data.maquina_id) === String(maquinaAuditadaId)
+        );
+
+        if (isAudited && seguirVehiculoActivo) {
+          map.panTo([veh.currentLat, veh.currentLng], { animate: false });
         }
       });
 
