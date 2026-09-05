@@ -12,7 +12,8 @@ import {
   calcularBordesPerimetro,
   auditarRectitudLote,
   enderezarPoligonoCuadrado,
-  suavizarBordesCurvos
+  suavizarBordesCurvos,
+  calcularEjesLote
 } from "@/lib/gis/surface-planner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,6 +91,8 @@ interface TrazadorMapaProps {
   onSelectLine?: (id: string | null) => void;
   height?: string;
   initialCenter?: LatLng;
+  anchoCalle?: number;
+  onAnchoCalleChange?: (ancho: number) => void;
 }
 
 export function TrazadorMapa({
@@ -110,6 +113,8 @@ export function TrazadorMapa({
   onSelectLine,
   height = "640px",
   initialCenter = { lat: -32.8908, lng: -64.3496 },
+  anchoCalle = 5,
+  onAnchoCalleChange,
 }: TrazadorMapaProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -140,6 +145,7 @@ export function TrazadorMapa({
   const [searchQuery, setSearchQuery] = useState("");
 
   const auditoria = useMemo(() => auditarRectitudLote(polygon), [polygon]);
+  const ejes = useMemo(() => calcularEjesLote(polygon), [polygon]);
 
   // Inicializar Leaflet
   useEffect(() => {
@@ -1063,18 +1069,42 @@ export function TrazadorMapa({
           </Button>
         )}
 
-        {/* Tirar Recta Horizontal o Vertical Rápida */}
+        {/* Tirar Rectas Paralelas al Campo (A lo Largo / A lo Ancho / E-O / N-S) */}
         {polygon.length >= 3 && (
           <>
             <Button
               size="sm"
               variant="outline"
               onClick={() => {
+                if (onRumboChange) onRumboChange(ejes.rumboLargo);
+                toast.success(`Pasadas alineadas A LO LARGO del lote (${Math.round(ejes.rumboLargo)}° - 100% Paralelas a alambrado)`);
+              }}
+              className={`text-xs h-7 gap-1 ${rumboGrados === ejes.rumboLargo ? "bg-amber-500 text-slate-950 font-black shadow" : "bg-slate-800/90 border-slate-600 text-slate-200 hover:bg-slate-700"}`}
+              title="Alinear pasadas 100% paralelas al lado más largo del campo (no van cruzadas)"
+            >
+              📏 A lo Largo ({Math.round(ejes.rumboLargo)}°)
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (onRumboChange) onRumboChange(ejes.rumboAncho);
+                toast.success(`Pasadas alineadas A LO ANCHO del lote (${Math.round(ejes.rumboAncho)}° - Transversal a 90°)`);
+              }}
+              className={`text-xs h-7 gap-1 ${rumboGrados === ejes.rumboAncho ? "bg-amber-500 text-slate-950 font-black shadow" : "bg-slate-800/90 border-slate-600 text-slate-200 hover:bg-slate-700"}`}
+              title="Alinear pasadas transversales a 90° de cabecera a cabecera"
+            >
+              📐 A lo Ancho ({Math.round(ejes.rumboAncho)}°)
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
                 if (onRumboChange) onRumboChange(90);
-                toast.success("Rectas orientadas Horizontalmente (Este-Oeste / 90°)");
+                toast.success("Pasadas orientadas Horizontal (Este-Oeste / 90°)");
               }}
               className={`text-xs h-7 gap-1 ${rumboGrados === 90 ? "bg-amber-500 text-slate-950 font-bold" : "bg-slate-800/90 border-slate-600 text-slate-200 hover:bg-slate-700"}`}
-              title="Tirar rectas horizontales de borde a borde (Este-Oeste / 90°)"
+              title="Tirar rectas horizontales geográficas (Este-Oeste / 90°)"
             >
               ➡️ Horizontal
             </Button>
@@ -1083,14 +1113,59 @@ export function TrazadorMapa({
               variant="outline"
               onClick={() => {
                 if (onRumboChange) onRumboChange(0);
-                toast.success("Rectas orientadas Verticalmente (Norte-Sur / 0°)");
+                toast.success("Pasadas orientadas Vertical (Norte-Sur / 0°)");
               }}
               className={`text-xs h-7 gap-1 ${rumboGrados === 0 ? "bg-amber-500 text-slate-950 font-bold" : "bg-slate-800/90 border-slate-600 text-slate-200 hover:bg-slate-700"}`}
-              title="Tirar rectas verticales de borde a borde (Norte-Sur / 0°)"
+              title="Tirar rectas verticales geográficas (Norte-Sur / 0°)"
             >
               ⬆️ Vertical
             </Button>
           </>
+        )}
+
+        {/* Selector de Separación / Distancia entre Calles directamente en el Mapa */}
+        <div className="flex items-center bg-slate-800/95 border border-slate-700 rounded px-2 py-0.5 text-xs text-white gap-1.5 shadow">
+          <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Paso:</span>
+          {[3, 5, 8, 10, 15].map((d) => (
+            <button
+              key={d}
+              onClick={() => onAnchoCalleChange?.(d)}
+              className={`px-1.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+                anchoCalle === d 
+                  ? "bg-amber-500 text-slate-950 shadow" 
+                  : "text-slate-300 hover:text-white hover:bg-slate-700"
+              }`}
+            >
+              {d}m
+            </button>
+          ))}
+          <div className="flex items-center gap-0.5 ml-0.5">
+            <input
+              type="number"
+              min="0.5"
+              max="200"
+              step="0.5"
+              value={anchoCalle}
+              onChange={(e) => onAnchoCalleChange?.(Math.max(0.5, parseFloat(e.target.value) || 1))}
+              className="w-12 h-6 text-xs bg-slate-950 border border-slate-700 text-center font-mono font-bold text-amber-400 rounded"
+            />
+            <span className="text-[10px] text-muted-foreground font-mono">m</span>
+          </div>
+        </div>
+
+        {/* Botón para limpiar calles externas si hay alguna */}
+        {callesManuales.length > 0 && (
+          <Button
+            size="sm"
+            onClick={() => {
+              if (onCallesManualesChange) onCallesManualesChange([]);
+              toast.success("Calles externas eliminadas");
+            }}
+            className="text-xs h-7 bg-red-600 hover:bg-red-500 text-white font-bold px-2 gap-1 shadow"
+            title="Borrar calles que quedaron fuera del perímetro"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Limpiar Calles Fuera del Lote ({callesManuales.length})
+          </Button>
         )}
 
         {/* Toggle Autoayuda / Snapping Inteligente */}

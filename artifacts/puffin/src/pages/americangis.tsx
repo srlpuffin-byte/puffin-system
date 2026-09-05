@@ -21,7 +21,8 @@ import {
   auditarRectitudLote,
   enderezarPoligonoCuadrado,
   suavizarBordesCurvos,
-  proyectarEjeCentral
+  proyectarEjeCentral,
+  calcularEjesLote
 } from "@/lib/gis/surface-planner";
 import { TrazadorMapa, MapInteractionMode } from "@/components/map/TrazadorMapa";
 import { useGetProyectos } from "@/hooks/use-proyectos";
@@ -119,6 +120,11 @@ export function Americangis() {
   // Auditoría de rectitud, escuadras y distancias del perímetro
   const auditoria = useMemo(() => {
     return auditarRectitudLote(polygon);
+  }, [polygon]);
+
+  // Ejes naturales del lote (a lo largo y a lo ancho a 90° - paralelas a alambrados)
+  const ejes = useMemo(() => {
+    return calcularEjesLote(polygon);
   }, [polygon]);
 
   // Generador geométrico de pasadas paralelas rectas
@@ -663,60 +669,145 @@ export function Americangis() {
           <div className="h-[1px] bg-slate-800" />
 
           {/* Barra de Inteligencia de Perímetro y Duplicación hasta el Final */}
-          <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-                Inteligencia de Contorno:
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleSuavizarCurvas}
-                disabled={polygon.length < 3}
-                className="h-7 text-xs border-slate-700 bg-slate-900 hover:bg-slate-800 text-cyan-300 gap-1 px-2.5"
-                title="Ajuste Inteligente: Convierte aristas toscas en curvas suaves para alambrados curvos o cañadas"
-              >
-                <Sparkles className="h-3 w-3 text-cyan-400" />
-                Suavizar Curvas
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleEnderezarCuadrado}
-                disabled={polygon.length !== 4}
-                className="h-7 text-xs border-slate-700 bg-slate-900 hover:bg-slate-800 text-emerald-300 gap-1 px-2.5"
-                title="Ajusta las 4 esquinas exactamente a 90° y lados paralelos"
-              >
-                <Square className="h-3 w-3 text-emerald-400" />
-                Cuadrar a 90° (Escuadra)
-              </Button>
+          <div className="bg-slate-950/90 border border-slate-800 rounded-lg p-3 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Grupo 1: Sentido y Orientación de las Pasadas (Derecho al Campo) */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-bold text-slate-300 flex items-center gap-1">
+                  <Compass className="h-3.5 w-3.5 text-amber-400" />
+                  Sentido de Pasadas:
+                </span>
+
+                <Button
+                  size="sm"
+                  variant={rumboGrados === ejes.rumboLargo ? "default" : "outline"}
+                  onClick={() => {
+                    setRumboGrados(ejes.rumboLargo);
+                    toast.success(`Pasadas alineadas A LO LARGO del lote (${Math.round(ejes.rumboLargo)}° - 100% Paralelas a alambrado)`);
+                  }}
+                  className={`h-7 text-xs gap-1 px-2.5 ${
+                    rumboGrados === ejes.rumboLargo 
+                      ? "bg-amber-500 text-slate-950 font-black shadow" 
+                      : "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                  }`}
+                  title="Alinear pasadas 100% paralelas al lado largo del campo (no van cruzadas)"
+                >
+                  📏 A lo Largo ({Math.round(ejes.rumboLargo)}°)
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant={rumboGrados === ejes.rumboAncho ? "default" : "outline"}
+                  onClick={() => {
+                    setRumboGrados(ejes.rumboAncho);
+                    toast.success(`Pasadas alineadas A LO ANCHO del lote (${Math.round(ejes.rumboAncho)}° - Transversal a 90°)`);
+                  }}
+                  className={`h-7 text-xs gap-1 px-2.5 ${
+                    rumboGrados === ejes.rumboAncho 
+                      ? "bg-amber-500 text-slate-950 font-black shadow" 
+                      : "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                  }`}
+                  title="Alinear pasadas perpendiculares de cabecera a cabecera a 90°"
+                >
+                  📐 A lo Ancho ({Math.round(ejes.rumboAncho)}°)
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant={rumboGrados === 90 ? "default" : "outline"}
+                  onClick={handleTirarRectaHorizontal}
+                  className={`h-7 text-xs gap-1 px-2 ${rumboGrados === 90 ? "bg-amber-500 text-slate-950 font-bold" : "border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800"}`}
+                  title="Horizontal geográfica (Este-Oeste / 90°)"
+                >
+                  ➡️ Horizontal
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant={rumboGrados === 0 ? "default" : "outline"}
+                  onClick={handleTirarRectaVertical}
+                  className={`h-7 text-xs gap-1 px-2 ${rumboGrados === 0 ? "bg-amber-500 text-slate-950 font-bold" : "border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800"}`}
+                  title="Vertical geográfica (Norte-Sur / 0°)"
+                >
+                  ⬆️ Vertical
+                </Button>
+              </div>
+
+              {/* Grupo 2: Inteligencia de Contorno y Limpieza */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSuavizarCurvas}
+                  disabled={polygon.length < 3}
+                  className="h-7 text-xs border-slate-700 bg-slate-900 hover:bg-slate-800 text-cyan-300 gap-1 px-2.5"
+                  title="Ajuste Inteligente: Convierte aristas toscas en curvas suaves para alambrados curvos o cañadas"
+                >
+                  <Sparkles className="h-3 w-3 text-cyan-400" />
+                  Suavizar Curvas
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleEnderezarCuadrado}
+                  disabled={polygon.length !== 4}
+                  className="h-7 text-xs border-slate-700 bg-slate-900 hover:bg-slate-800 text-emerald-300 gap-1 px-2.5"
+                  title="Ajusta las 4 esquinas exactamente a 90° y lados paralelos"
+                >
+                  <Square className="h-3 w-3 text-emerald-400" />
+                  Cuadrar a 90°
+                </Button>
+                {callesManuales.length > 0 && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setCallesManuales([]);
+                      toast.success("Calles externas eliminadas");
+                    }}
+                    className="h-7 text-xs bg-red-600 hover:bg-red-500 text-white font-bold gap-1 px-2.5 shadow animate-pulse"
+                    title="Borrar calles que están fuera del perímetro"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Limpiar Calles Externas ({callesManuales.length})
+                  </Button>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-slate-300">
-                Tirar Recta:
-              </span>
-              <Button
-                size="sm"
-                variant={rumboGrados === 90 ? "default" : "outline"}
-                onClick={handleTirarRectaHorizontal}
-                className={`h-7 text-xs gap-1 px-2.5 ${rumboGrados === 90 ? "bg-amber-500 text-slate-950 font-bold" : "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"}`}
-                title="Tirar rectas horizontales de borde a borde (Este-Oeste / 90°)"
-              >
-                ➡️ Horizontal (E-O)
-              </Button>
-              <Button
-                size="sm"
-                variant={rumboGrados === 0 ? "default" : "outline"}
-                onClick={handleTirarRectaVertical}
-                className={`h-7 text-xs gap-1 px-2.5 ${rumboGrados === 0 ? "bg-amber-500 text-slate-950 font-bold" : "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"}`}
-                title="Tirar rectas verticales de borde a borde (Norte-Sur / 0°)"
-              >
-                ⬆️ Vertical (N-S)
-              </Button>
-
-              <div className="h-4 w-[1px] bg-slate-800 hidden sm:block mx-1" />
+            {/* Grupo 3: Selector de Separación + Botón de Duplicación */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-slate-300">
+                  Separación entre Calles:
+                </span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {[2, 3, 4, 5, 6, 8, 10, 12, 15, 20].map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setAnchoCalle(d)}
+                      className={`px-2.5 py-0.5 text-xs font-bold rounded transition-all ${
+                        anchoCalle === d
+                          ? "bg-amber-500 text-slate-950 shadow scale-105"
+                          : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      }`}
+                    >
+                      {d}m
+                    </button>
+                  ))}
+                  <div className="flex items-center gap-1 ml-1">
+                    <Input
+                      type="number"
+                      min="0.5"
+                      max="500"
+                      step="0.5"
+                      value={anchoCalle}
+                      onChange={(e) => setAnchoCalle(Math.max(0.5, parseFloat(e.target.value) || 1))}
+                      className="w-16 h-7 text-xs bg-slate-900 border-slate-700 text-center font-bold text-amber-400 font-mono"
+                    />
+                    <span className="text-xs text-muted-foreground font-mono">m</span>
+                  </div>
+                </div>
+              </div>
 
               <Button
                 size="sm"
@@ -727,9 +818,9 @@ export function Americangis() {
                   }
                   toast.success(`¡Tiradas ${lineas.length} líneas rectas cada ${anchoCalle}m hasta el final del lote!`);
                 }}
-                className="h-7 text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 font-black gap-1.5 shadow"
+                className="h-8 text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 font-black gap-1.5 shadow px-3.5"
               >
-                🚜 Duplicar cada {anchoCalle}m ({lineas.length} rectas)
+                🚜 Duplicar Pasadas cada {anchoCalle}m ({lineas.length} rectas de borde a borde)
               </Button>
             </div>
           </div>
@@ -758,35 +849,27 @@ export function Americangis() {
 
         {/* PESTAÑA 1: VISOR SATELITAL */}
         <TabsContent value="mapa" className="space-y-3 m-0">
-          {/* Guía Rápida: Cómo generar líneas rectas cada 5 metros hasta el final */}
-          <div className="bg-gradient-to-r from-amber-500/15 via-slate-900/90 to-slate-900 border border-amber-500/40 rounded-lg p-3.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs shadow-lg">
-            <div className="space-y-1">
+          {/* Alerta si hay calles manuales fuera del perímetro */}
+          {callesManuales.length > 0 && (
+            <div className="bg-amber-950/40 border border-amber-500/50 rounded-lg p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-lg">
               <div className="flex items-center gap-2">
-                <span className="bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">
-                  Guía de Trabajo
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                <span className="text-slate-200">
+                  Se detectaron <b className="text-amber-300">{callesManuales.length} calles manuales</b> fuera del perímetro del lote.
                 </span>
-                <b className="text-white text-sm">¿Cómo tirar líneas rectas cada 5 metros hasta el final?</b>
               </div>
-              <p className="text-slate-300 leading-relaxed">
-                <b>Método 1 (Recomendado):</b> Haz clic en <b className="text-green-400">"Delimitar Terreno"</b> y marca las esquinas de tu campo en el mapa (o presiona <b className="text-amber-400">"Crear por Medidas"</b> arriba). El sistema <b>tirará automáticamente líneas rectas cada {anchoCalle} metros de borde a borde hasta el final del lote</b>.
-              </p>
-              {callesManuales.length > 0 && (
-                <p className="text-fuchsia-300 font-medium">
-                  <b>Método 2:</b> Haz clic en la calle violeta del mapa y presiona <b>"🚀 Tirar líneas rectas cada 5m desde esta calle"</b> para proyectar el enrejado paralelo hacia los lados.
-                </p>
-              )}
-            </div>
-
-            {callesManuales.length > 0 && (
               <Button
                 size="sm"
-                onClick={() => handleGenerarPasadasDesdeRecta(callesManuales[0])}
-                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs h-8 whitespace-nowrap shadow border-none shrink-0"
+                onClick={() => {
+                  setCallesManuales([]);
+                  toast.success("Calles externas eliminadas");
+                }}
+                className="bg-red-600 hover:bg-red-500 text-white font-bold text-xs h-7 px-3 shadow shrink-0 gap-1"
               >
-                🚀 Tirar pasadas cada {anchoCalle}m ahora
+                <Trash2 className="h-3 w-3" /> Limpiar Calles Fuera del Lote
               </Button>
-            )}
-          </div>
+            </div>
+          )}
 
           <TrazadorMapa
             polygon={polygon}
@@ -805,6 +888,8 @@ export function Americangis() {
             selectedLineId={selectedLineId}
             onSelectLine={setSelectedLineId}
             height="620px"
+            anchoCalle={anchoCalle}
+            onAnchoCalleChange={setAnchoCalle}
           />
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground bg-slate-900/60 border border-slate-800/80 rounded-lg p-3">
@@ -877,20 +962,33 @@ export function Americangis() {
                     </Button>
                   )}
 
-                  {auditoria.bordes[0] && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const r = Math.round(auditoria.bordes[0].rumboGrados);
-                        setRumboGrados(r);
-                        toast.success(`Rumbo de pasadas alineado al Lado 1: ${r}°`);
-                      }}
-                      className="gap-1.5 border-slate-700 bg-slate-800 text-slate-200 text-xs h-8"
-                    >
-                      <Compass className="h-3.5 w-3.5 text-amber-400" />
-                      Alinear a Lado 1 ({Math.round(auditoria.bordes[0].rumboGrados)}°)
-                    </Button>
+                  {polygon.length >= 3 && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant={rumboGrados === ejes.rumboLargo ? "default" : "outline"}
+                        onClick={() => {
+                          setRumboGrados(ejes.rumboLargo);
+                          toast.success(`Rumbo alineado A LO LARGO del lote (${Math.round(ejes.rumboLargo)}° - 100% Paralelo)`);
+                        }}
+                        className={`gap-1 text-xs h-8 ${rumboGrados === ejes.rumboLargo ? "bg-amber-500 text-slate-950 font-black shadow" : "border-slate-700 bg-slate-800 text-slate-200"}`}
+                      >
+                        <Compass className="h-3.5 w-3.5 text-amber-400" />
+                        A lo Largo ({Math.round(ejes.rumboLargo)}°)
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={rumboGrados === ejes.rumboAncho ? "default" : "outline"}
+                        onClick={() => {
+                          setRumboGrados(ejes.rumboAncho);
+                          toast.success(`Rumbo alineado A LO ANCHO del lote (${Math.round(ejes.rumboAncho)}° - Transversal a 90°)`);
+                        }}
+                        className={`gap-1 text-xs h-8 ${rumboGrados === ejes.rumboAncho ? "bg-amber-500 text-slate-950 font-black shadow" : "border-slate-700 bg-slate-800 text-slate-200"}`}
+                      >
+                        <Compass className="h-3.5 w-3.5 text-amber-400" />
+                        A lo Ancho ({Math.round(ejes.rumboAncho)}°)
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
@@ -963,9 +1061,19 @@ export function Americangis() {
                           </div>
                         </div>
 
-                        <div className="pt-1 text-[10px] text-slate-500 font-mono border-t border-slate-800/60 flex justify-between">
-                          <span>Desde: P{b.index}</span>
-                          <span>Hasta: P{b.index === polygon.length ? 1 : b.index + 1}</span>
+                        <div className="pt-1.5 text-[10px] text-slate-500 font-mono border-t border-slate-800/60 flex items-center justify-between">
+                          <span>P{b.index} → P{b.index === polygon.length ? 1 : b.index + 1}</span>
+                          <button
+                            onClick={() => {
+                              const r = Math.round(b.rumboGrados);
+                              setRumboGrados(r);
+                              toast.success(`Pasadas alineadas con ${b.nombre} (${r}° - 100% Paralelas)`);
+                            }}
+                            className="text-[10px] text-amber-400 hover:text-amber-300 font-bold bg-amber-500/10 hover:bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30 transition-colors"
+                            title={`Alinear pasadas 100% paralelas a ${b.nombre}`}
+                          >
+                            Alinear ({Math.round(b.rumboGrados)}°)
+                          </button>
                         </div>
                       </div>
                     ))}

@@ -1300,5 +1300,45 @@ export function proyectarEjeCentral(polygon: LatLng[], rumboGrados: number): Lin
   };
 }
 
+export interface EjesLote {
+  rumboLargo: number; // Rumbo a lo largo del lote (lado mayor)
+  rumboAncho: number; // Rumbo a lo ancho del lote (perpendicular a 90°)
+  nombreLargo: string;
+  nombreAncho: string;
+}
+
+/**
+ * Calcula los dos rumbos naturales del terreno (a lo largo y a lo ancho a 90°)
+ * garantizando que las pasadas queden 100% paralelas a los alambrados y no cruzadas.
+ */
+export function calcularEjesLote(polygon: LatLng[]): EjesLote {
+  if (polygon.length < 2) {
+    return { rumboLargo: 0, rumboAncho: 90, nombreLargo: "Norte", nombreAncho: "Este" };
+  }
+
+  const bordes = calcularBordesPerimetro(polygon);
+  if (bordes.length === 0) {
+    return { rumboLargo: 0, rumboAncho: 90, nombreLargo: "Norte", nombreAncho: "Este" };
+  }
+
+  let maxBorde = bordes[0];
+  for (const b of bordes) {
+    if (b.distanciaMetros > maxBorde.distanciaMetros) {
+      maxBorde = b;
+    }
+  }
+
+  const rumboLargo = Math.round(maxBorde.rumboGrados * 10) / 10;
+  const rumboAncho = Math.round(((rumboLargo + 90) % 360) * 10) / 10;
+
+  return {
+    rumboLargo,
+    rumboAncho,
+    nombreLargo: `A lo Largo (${Math.round(rumboLargo)}° ${obtenerNombreRumbo(rumboLargo)})`,
+    nombreAncho: `A lo Ancho (${Math.round(rumboAncho)}° ${obtenerNombreRumbo(rumboAncho)})`,
+  };
+}
+
+
 
 
