@@ -13,6 +13,8 @@ const openaiClient = openaiApiKey
   ? new OpenAI({ apiKey: openaiApiKey })
   : null;
 
+const WHISPER_PROMPT = "Transcripción de audios de campo, maquinaria vial, obras y repuestos en Argentina: Lipsa, Broglia, motocompresor, Liugong, Pauny, alternador, gasoil, filtro, cubiertas, fletes, jornales, transferencia.";
+
 /**
  * Transcribe un buffer de audio (nota de voz o archivo de WhatsApp) a texto usando Whisper.
  * Prioridad: Groq whisper-large-v3-turbo → OpenAI whisper-1
@@ -36,6 +38,7 @@ export async function transcribeAudio(buffer: Buffer, mimeType: string = "audio/
         file,
         model: "whisper-large-v3-turbo",
         language: "es",
+        prompt: WHISPER_PROMPT,
         temperature: 0.0,
       });
 
@@ -57,6 +60,7 @@ export async function transcribeAudio(buffer: Buffer, mimeType: string = "audio/
         file,
         model: "whisper-1",
         language: "es",
+        prompt: WHISPER_PROMPT,
         temperature: 0.0,
       });
 

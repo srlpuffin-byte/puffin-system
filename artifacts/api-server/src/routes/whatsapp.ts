@@ -141,7 +141,7 @@ interface PendingBatch {
 }
 
 const pendingBatches = new Map<string, PendingBatch>();
-const DEBOUNCE_MS = 2500; // 2.5 segundos de espera tras el último mensaje/descarga para procesar el lote completo
+const DEBOUNCE_MS = 3500; // 3.5 segundos de espera tras el último mensaje/descarga para agrupar fotos, documentos y audios consecutivos
 
 function getOrCreateBatch(from: string): PendingBatch {
   let batch = pendingBatches.get(from);
