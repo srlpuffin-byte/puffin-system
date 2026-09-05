@@ -7,51 +7,63 @@ export const whatsappRouter = Router();
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || "puffin_secret_token";
 
 // Cola / Buffer para agrupar mensajes continuos que llegan con segundos de diferencia
-// (ej: primero el texto del gasto, a continuación "Lipsa liugong" y luego la foto/PDF)
+// (ej: primero la foto/PDF del comprobante y a continuación "Lipsa cargadora Liugong", o al revés)
 interface PendingBatch {
   texts: string[];
-  imageBase64?: string;
-  timer: NodeJS.Timeout;
+  mediaBase64?: string;
+  activeDownloads: number;
+  timer?: NodeJS.Timeout;
 }
 
 const pendingBatches = new Map<string, PendingBatch>();
-const DEBOUNCE_MS = 2000; // 2 segundos para agrupar ráfagas de mensajes del mismo remitente
+const DEBOUNCE_MS = 2500; // 2.5 segundos de espera tras el último mensaje/descarga para procesar el lote completo
 
-function queueWhatsAppMessage(from: string, msgBody: string, imageBase64?: string) {
-  const existing = pendingBatches.get(from);
-  if (existing) {
-    clearTimeout(existing.timer);
-    if (msgBody) existing.texts.push(msgBody);
-    if (imageBase64) existing.imageBase64 = imageBase64;
-
-    existing.timer = setTimeout(async () => {
-      pendingBatches.delete(from);
-      const combinedText = existing.texts.filter(Boolean).join("\n");
-      console.log(`[Webhook] Procesando lote continuo de ${from} (${existing.texts.length} mensajes combinados):\n${combinedText}`);
-      try {
-        await handleWhatsAppMessage(from, combinedText, existing.imageBase64);
-      } catch (err) {
-        console.error(`[Webhook] Error procesando lote de ${from}:`, err);
-      }
-    }, DEBOUNCE_MS);
-  } else {
-    const texts = msgBody ? [msgBody] : [];
-    const batch: PendingBatch = {
-      texts,
-      imageBase64,
-      timer: setTimeout(async () => {
-        pendingBatches.delete(from);
-        const combinedText = batch.texts.filter(Boolean).join("\n");
-        console.log(`[Webhook] Procesando mensaje de ${from}:\n${combinedText}`);
-        try {
-          await handleWhatsAppMessage(from, combinedText, batch.imageBase64);
-        } catch (err) {
-          console.error(`[Webhook] Error procesando mensaje de ${from}:`, err);
-        }
-      }, DEBOUNCE_MS),
+function getOrCreateBatch(from: string): PendingBatch {
+  let batch = pendingBatches.get(from);
+  if (!batch) {
+    batch = {
+      texts: [],
+      activeDownloads: 0,
     };
     pendingBatches.set(from, batch);
   }
+  // Si entra nueva actividad, cancelamos el timer de disparo prematuro
+  if (batch.timer) {
+    clearTimeout(batch.timer);
+    batch.timer = undefined;
+  }
+  return batch;
+}
+
+function scheduleBatch(from: string) {
+  const batch = pendingBatches.get(from);
+  if (!batch) return;
+
+  // Si todavía hay descargas de imágenes o documentos en curso para este remitente, NO disparamos todavía
+  if (batch.activeDownloads > 0) {
+    return;
+  }
+
+  if (batch.timer) {
+    clearTimeout(batch.timer);
+  }
+
+  // Si no hay texto ni media, limpiar y salir
+  if (batch.texts.length === 0 && !batch.mediaBase64) {
+    pendingBatches.delete(from);
+    return;
+  }
+
+  batch.timer = setTimeout(async () => {
+    pendingBatches.delete(from);
+    const combinedText = batch.texts.filter(Boolean).join("\n\n");
+    console.log(`[Webhook] Procesando lote combinado de ${from} (${batch.texts.length} partes, media adjunto: ${!!batch.mediaBase64}):\n${combinedText}`);
+    try {
+      await handleWhatsAppMessage(from, combinedText, batch.mediaBase64);
+    } catch (err) {
+      console.error(`[Webhook] Error procesando lote de ${from}:`, err);
+    }
+  }, DEBOUNCE_MS);
 }
 
 // Endpoint para la validación de webhook de Meta
@@ -91,58 +103,6 @@ whatsappRouter.post("/", async (req, res) => {
 
       const from: string = message.from;
       const msgType: string = message.type;
-      
-      let msgBody: string | undefined = message.text?.body;
-      let imageBase64: string | undefined = undefined;
-
-      // Soporte para imágenes
-      if (msgType === "image" && message.image) {
-        msgBody = message.image.caption || "[Imagen recibida sin texto]";
-        const mediaId = message.image.id;
-        if (mediaId) {
-          console.log(`[Webhook] Descargando imagen ${mediaId} de ${from}...`);
-          const base64 = await downloadWhatsAppMedia(mediaId);
-          if (base64) {
-            imageBase64 = base64;
-          } else {
-            console.warn(`[Webhook] No se pudo descargar la imagen ${mediaId}`);
-          }
-        }
-      }
-
-      // Soporte para documentos (Facturas en PDF, comprobantes, etc.)
-      if (msgType === "document" && message.document) {
-        const docName = message.document.filename || "documento.pdf";
-        const docCaption = message.document.caption ? `${message.document.caption}\n` : "";
-        msgBody = `${docCaption}[Documento/Factura PDF adjunto: ${docName}]`;
-        const mediaId = message.document.id;
-        if (mediaId) {
-          console.log(`[Webhook] Descargando documento ${mediaId} (${docName}) de ${from}...`);
-          const base64 = await downloadWhatsAppMedia(mediaId);
-          if (base64) {
-            imageBase64 = base64;
-            // Si es un PDF, extraer el texto para que la IA lo interprete directamente
-            if (message.document.mime_type?.includes("pdf") || docName.toLowerCase().endsWith(".pdf")) {
-              try {
-                const { PDFParse } = await import("pdf-parse");
-                const base64Data = base64.includes(";base64,") ? base64.split(";base64,")[1] : base64;
-                const buffer = Buffer.from(base64Data, "base64");
-                const parser = new PDFParse({ data: buffer });
-                const parsedResult = await parser.getText();
-                if (parsedResult && parsedResult.text && parsedResult.text.trim()) {
-                  const cleanedText = parsedResult.text.replace(/\s+/g, " ").trim();
-                  msgBody += `\n\n--- CONTENIDO EXTRAÍDO DE LA FACTURA/PDF (${docName}) ---\n${cleanedText.slice(0, 3000)}`;
-                  console.log(`[Webhook] Texto extraído exitosamente de PDF ${docName} (${cleanedText.length} caracteres)`);
-                }
-              } catch (pdfErr) {
-                console.warn(`[Webhook] No se pudo extraer texto del PDF ${docName}:`, pdfErr);
-              }
-            }
-          } else {
-            console.warn(`[Webhook] No se pudo descargar el documento ${mediaId}`);
-          }
-        }
-      }
 
       // Ignorar mensajes enviados por el propio bot (evitar loop)
       const botPhoneNumber = process.env.WHATSAPP_PHONE_NUMBER_ID || "";
@@ -153,14 +113,92 @@ whatsappRouter.post("/", async (req, res) => {
         return;
       }
 
-      // Ignorar mensajes sin texto ni imagen
-      if (!msgBody && !imageBase64) {
-        console.log(`[Webhook] Ignorando mensaje tipo: ${msgType} de ${from}`);
-        return;
+      const batch = getOrCreateBatch(from);
+
+      // 1. Manejo de mensajes de texto normales
+      if (msgType === "text" && message.text?.body) {
+        const textBody = message.text.body.trim();
+        console.log(`[Webhook] Texto recibido de ${from}: "${textBody}"`);
+        batch.texts.push(textBody);
+        scheduleBatch(from);
       }
 
-      console.log(`[Webhook] Mensaje encolado de ${from} (tipo: ${msgType}): ${msgBody}`);
-      queueWhatsAppMessage(from, msgBody || "", imageBase64);
+      // 2. Manejo de imágenes (fotos de comprobantes, tickets, etc.)
+      else if (msgType === "image" && message.image) {
+        const caption = message.image.caption ? message.image.caption.trim() : "";
+        if (caption) batch.texts.push(caption);
+        const mediaId = message.image.id;
+        if (mediaId) {
+          batch.activeDownloads++;
+          console.log(`[Webhook] Descargando imagen ${mediaId} de ${from}...`);
+          try {
+            const base64 = await downloadWhatsAppMedia(mediaId);
+            if (base64) {
+              batch.mediaBase64 = base64;
+              console.log(`[Webhook] Imagen ${mediaId} descargada correctamente`);
+            }
+          } catch (err) {
+            console.error(`[Webhook] Error descargando imagen ${mediaId}:`, err);
+          } finally {
+            batch.activeDownloads--;
+            scheduleBatch(from);
+          }
+        } else {
+          scheduleBatch(from);
+        }
+      }
+
+      // 3. Manejo de documentos (Facturas en PDF, recibos, etc.)
+      else if (msgType === "document" && message.document) {
+        const docName = message.document.filename || "documento.pdf";
+        const docCaption = message.document.caption ? `${message.document.caption.trim()}\n` : "";
+        let docHeader = `${docCaption}[Documento/Factura PDF adjunto: ${docName}]`;
+        const mediaId = message.document.id;
+
+        if (mediaId) {
+          batch.activeDownloads++;
+          console.log(`[Webhook] Descargando documento ${mediaId} (${docName}) de ${from}...`);
+          try {
+            const base64 = await downloadWhatsAppMedia(mediaId);
+            if (base64) {
+              batch.mediaBase64 = base64;
+              // Si es un PDF, extraer el texto para que la IA lo interprete directamente
+              if (message.document.mime_type?.includes("pdf") || docName.toLowerCase().endsWith(".pdf")) {
+                try {
+                  const { PDFParse } = await import("pdf-parse");
+                  const base64Data = base64.includes(";base64,") ? base64.split(";base64,")[1] : base64;
+                  const buffer = Buffer.from(base64Data, "base64");
+                  const parser = new PDFParse({ data: buffer });
+                  const parsedResult = await parser.getText();
+                  if (parsedResult && parsedResult.text && parsedResult.text.trim()) {
+                    // Preservar saltos de línea para conservar estructura de tablas y conceptos
+                    const cleanedLines = parsedResult.text
+                      .split("\n")
+                      .map((l: string) => l.trim())
+                      .filter(Boolean)
+                      .join("\n");
+                    docHeader += `\n\n--- CONTENIDO EXTRAÍDO DE LA FACTURA/PDF (${docName}) ---\n${cleanedLines.slice(0, 4000)}`;
+                    console.log(`[Webhook] Texto extraído exitosamente de PDF ${docName} (${cleanedLines.length} caracteres)`);
+                  }
+                } catch (pdfErr) {
+                  console.warn(`[Webhook] No se pudo extraer texto del PDF ${docName}:`, pdfErr);
+                }
+              }
+            }
+          } catch (err) {
+            console.error(`[Webhook] Error descargando documento ${mediaId}:`, err);
+          } finally {
+            batch.texts.push(docHeader);
+            batch.activeDownloads--;
+            scheduleBatch(from);
+          }
+        } else {
+          batch.texts.push(docHeader);
+          scheduleBatch(from);
+        }
+      } else {
+        console.log(`[Webhook] Tipo de mensaje recibido no manejado: ${msgType} de ${from}`);
+      }
 
     } catch (error) {
       console.error("[Webhook] Error procesando mensaje:", error);

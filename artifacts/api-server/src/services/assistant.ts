@@ -721,6 +721,23 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
   // Un tool_call sin su tool_result correspondiente rompe la API de OpenAI/Groq,
   // por eso se filtran los pares incompletos pero se mantienen los completos.
   const historial = (sesion.messages as any[]) || [];
+
+  // Sanitizar historial: eliminar cualquier image_url no soportado (como PDFs) de mensajes previos
+  for (const msg of historial) {
+    if (Array.isArray(msg.content)) {
+      msg.content = msg.content.filter((c: any) => {
+        if (c.type === "image_url") {
+          const url = c.image_url?.url || "";
+          return typeof url === "string" && url.startsWith("data:image/");
+        }
+        return true;
+      });
+      if (msg.content.length === 1 && msg.content[0].type === "text") {
+        msg.content = msg.content[0].text;
+      }
+    }
+  }
+
   const historialFiltrado: any[] = [];
   for (let i = 0; i < historial.length; i++) {
     const msg = historial[i];
@@ -744,17 +761,28 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
     }
   }
 
-  // Agregar mensaje del usuario al historial
+  // Guardar siempre el archivo (foto o PDF) en la sesión para adjuntarlo como comprobante del egreso
   if (imageBase64) {
-    historialFiltrado.push({ 
-      role: "user", 
-      content: [
-        { type: "text", text: text },
-        { type: "image_url", image_url: { url: imageBase64 } }
-      ] 
-    });
-    sesion.datos_pendientes = { ...(typeof sesion.datos_pendientes === "object" ? sesion.datos_pendientes : {}), ultima_imagen_url: imageBase64 };
+    sesion.datos_pendientes = { 
+      ...(typeof sesion.datos_pendientes === "object" ? sesion.datos_pendientes : {}), 
+      ultima_imagen_url: imageBase64 
+    };
 
+    // CRÍTICO: Solo enviar como image_url si es un formato de imagen nativo (jpeg, png, webp, gif).
+    // Si es un PDF (data:application/pdf), NUNCA debe enviarse como image_url porque las APIs
+    // de OpenAI/Groq/Gemini fallan con error 400 Bad Request. Para PDFs, el texto ya fue extraído.
+    const isNativeImage = imageBase64.startsWith("data:image/");
+    if (isNativeImage) {
+      historialFiltrado.push({ 
+        role: "user", 
+        content: [
+          { type: "text", text: text },
+          { type: "image_url", image_url: { url: imageBase64 } }
+        ] 
+      });
+    } else {
+      historialFiltrado.push({ role: "user", content: text });
+    }
   } else {
     historialFiltrado.push({ role: "user", content: text });
   }
@@ -888,12 +916,41 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
   ];
 
   try {
-    const response = await openai.chat.completions.create({
-      model: MODEL,
-      messages,
-      tools: toolsParaRol,
-      tool_choice: "auto",
-    });
+    let response;
+    try {
+      response = await openai.chat.completions.create({
+        model: MODEL,
+        messages,
+        tools: toolsParaRol,
+        tool_choice: "auto",
+      });
+    } catch (apiErr: any) {
+      // Si falló por imagen no soportada en el modelo activo (ej: Groq llama-3.1-8b), reintentar solo con texto
+      const hasImageInMessages = messages.some(
+        m => Array.isArray(m.content) && (m.content as any[]).some((c: any) => c.type === "image_url")
+      );
+      if (hasImageInMessages) {
+        console.warn("[Asistente] Falló llamada con image_url en el modelo. Reintentando solo con texto plano:", apiErr?.message);
+        const textOnlyMessages = messages.map(m => {
+          if (Array.isArray(m.content)) {
+            const textPart = (m.content as any[]).find((c: any) => c.type === "text")?.text || "";
+            return {
+              ...m,
+              content: `${textPart}\n[Nota: Comprobante/foto adjunto recibido y archivado para el registro]`.trim(),
+            };
+          }
+          return m;
+        });
+        response = await openai.chat.completions.create({
+          model: MODEL,
+          messages: textOnlyMessages as any,
+          tools: toolsParaRol,
+          tool_choice: "auto",
+        });
+      } else {
+        throw apiErr;
+      }
+    }
 
 
     const responseMessage = response.choices[0].message;
@@ -1947,11 +2004,20 @@ async function executeRegistrarGasto(args: {
     }).returning();
 
     if (imgUrl && egreso && egreso.id) {
+      let finalComprobanteUrl = imgUrl;
+      try {
+        const { uploadImage } = await import("./storage.js");
+        const isPdf = imgUrl.includes("application/pdf") || imgUrl.startsWith("JVBERi");
+        const ext = isPdf ? "pdf" : "jpg";
+        finalComprobanteUrl = await uploadImage(`comprobante_${egreso.id}_${Date.now()}.${ext}`, imgUrl);
+      } catch (e) {
+        console.warn("[Bot] No se pudo subir comprobante a Cloudinary, guardando directo:", e);
+      }
       await db.insert(fotografiasTable).values({
         empresa_id: 1,
         entidad_tipo: "egreso",
         entidad_id: egreso.id,
-        url: imgUrl,
+        url: finalComprobanteUrl,
         descripcion: "Comprobante cargado por WhatsApp",
       });
     }
@@ -2060,11 +2126,20 @@ async function executeActualizarGasto(args: {
     await db.update(egresosTable).set(updates).where(eq(egresosTable.id, egreso.id));
 
     if (imgUrl) {
+      let finalComprobanteUrl = imgUrl;
+      try {
+        const { uploadImage } = await import("./storage.js");
+        const isPdf = imgUrl.includes("application/pdf") || imgUrl.startsWith("JVBERi");
+        const ext = isPdf ? "pdf" : "jpg";
+        finalComprobanteUrl = await uploadImage(`comprobante_${egreso.id}_${Date.now()}.${ext}`, imgUrl);
+      } catch (e) {
+        console.warn("[Bot] No se pudo subir comprobante a Cloudinary, guardando directo:", e);
+      }
       await db.insert(fotografiasTable).values({
         empresa_id: 1,
         entidad_tipo: "egreso",
         entidad_id: egreso.id,
-        url: imgUrl,
+        url: finalComprobanteUrl,
         descripcion: "Comprobante cargado por WhatsApp",
       });
     }
