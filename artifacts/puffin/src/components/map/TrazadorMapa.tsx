@@ -1126,7 +1126,7 @@ export function TrazadorMapa({
         {/* Selector de Separación / Distancia entre Calles directamente en el Mapa */}
         <div className="flex items-center bg-slate-800/95 border border-slate-700 rounded px-2 py-0.5 text-xs text-white gap-1.5 shadow">
           <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Paso:</span>
-          {[3, 5, 8, 10, 15].map((d) => (
+          {[3, 5, 8, 10, 15, 20, 50, 100].map((d) => (
             <button
               key={d}
               onClick={() => onAnchoCalleChange?.(d)}
@@ -1143,11 +1143,11 @@ export function TrazadorMapa({
             <input
               type="number"
               min="0.5"
-              max="200"
-              step="0.5"
+              max="2000"
+              step="1"
               value={anchoCalle}
               onChange={(e) => onAnchoCalleChange?.(Math.max(0.5, parseFloat(e.target.value) || 1))}
-              className="w-12 h-6 text-xs bg-slate-950 border border-slate-700 text-center font-mono font-bold text-amber-400 rounded"
+              className="w-14 h-6 text-xs bg-slate-950 border border-slate-700 text-center font-mono font-bold text-amber-400 rounded"
             />
             <span className="text-[10px] text-muted-foreground font-mono">m</span>
           </div>

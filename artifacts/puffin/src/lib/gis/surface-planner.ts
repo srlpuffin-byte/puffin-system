@@ -242,7 +242,11 @@ export function generarLineasGuia(
   // Calcular pasadas centradas en el lote
   const numPasadas = Math.floor(vSpan / anchoCalleMeters);
   const resto = vSpan - numPasadas * anchoCalleMeters;
-  const vStart = vMin + resto / 2 + anchoCalleMeters / 2;
+  let vStart = vMin + resto / 2 + anchoCalleMeters / 2;
+  // Si el lote es menor al paso solicitado (ej: lote de 80m y paso de 100m), trazar 1 eje central en lugar de quedar vacío
+  if (numPasadas === 0 && vSpan >= minSegmentLengthMeters) {
+    vStart = vMin + vSpan / 2;
+  }
 
   const rawSegments: { u1: number; u2: number; v: number }[] = [];
   const n = rotPts.length;

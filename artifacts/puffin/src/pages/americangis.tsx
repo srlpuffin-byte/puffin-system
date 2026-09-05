@@ -59,7 +59,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-const ANCHOS_PRESET = [3, 5, 6, 8, 10, 12, 15, 20, 25, 30];
+const ANCHOS_PRESET = [3, 5, 8, 10, 15, 20, 30, 50, 100];
 
 export function Americangis() {
   const { data: proyectos } = useGetProyectos();
@@ -581,8 +581,13 @@ export function Americangis() {
             {/* Ancho de calle */}
             <div className="lg:col-span-5 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-300">
+                <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 flex-wrap">
                   Ancho de Pasada / Calle: <b className="text-amber-400 font-mono text-sm">{anchoCalle} m</b>
+                  {anchoCalle >= 50 && (
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono font-bold">
+                      {anchoCalle === 100 ? "Faja de 100m (Picada / Cortafuego)" : `Faja de ${anchoCalle}m`}
+                    </span>
+                  )}
                 </span>
                 <span className="text-[11px] text-muted-foreground">Distancia entre ejes</span>
               </div>
@@ -604,8 +609,8 @@ export function Americangis() {
                   <Input
                     type="number"
                     min="1"
-                    max="500"
-                    step="0.5"
+                    max="2000"
+                    step="1"
                     value={anchoCalle}
                     onChange={(e) => setAnchoCalle(Math.max(1, parseFloat(e.target.value) || 1))}
                     className="w-16 h-7 text-xs bg-slate-950 border-slate-700 font-mono text-center"
@@ -781,7 +786,7 @@ export function Americangis() {
                   Separación entre Calles:
                 </span>
                 <div className="flex items-center gap-1 flex-wrap">
-                  {[2, 3, 4, 5, 6, 8, 10, 12, 15, 20].map((d) => (
+                  {[2, 3, 5, 8, 10, 15, 20, 30, 50, 100].map((d) => (
                     <button
                       key={d}
                       onClick={() => setAnchoCalle(d)}
@@ -798,8 +803,8 @@ export function Americangis() {
                     <Input
                       type="number"
                       min="0.5"
-                      max="500"
-                      step="0.5"
+                      max="2000"
+                      step="1"
                       value={anchoCalle}
                       onChange={(e) => setAnchoCalle(Math.max(0.5, parseFloat(e.target.value) || 1))}
                       className="w-16 h-7 text-xs bg-slate-900 border-slate-700 text-center font-bold text-amber-400 font-mono"
