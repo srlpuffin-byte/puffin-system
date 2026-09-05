@@ -1343,6 +1343,110 @@ export function calcularEjesLote(polygon: LatLng[]): EjesLote {
   };
 }
 
+/**
+ * Determina si una coordenada está dentro del polígono del lote (Ray-Casting Algorithm)
+ */
+export function esPuntoEnPoligono(pt: LatLng, poly: LatLng[]): boolean {
+  if (poly.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].lng, yi = poly[i].lat;
+    const xj = poly[j].lng, yj = poly[j].lat;
+    const intersect = ((yi > pt.lat) !== (yj > pt.lat)) &&
+      (pt.lng < ((xj - xi) * (pt.lat - yi)) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
 
+export interface ResultadoAuditoriaPasada {
+  lineaCercana: LineSegment | null;
+  desvioMeters: number;
+  estaAlineado: boolean;
+  calidad: "excelente" | "buena" | "desalineada";
+}
 
+/**
+ * Calcula la distancia mínima de una máquina a la pasada planificada más cercana
+ * (Cross-Track Error) para auditar si el maquinista va centrado o corrido.
+ */
+export function calcularDesvioPasada(pt: LatLng, lineas: LineSegment[]): ResultadoAuditoriaPasada {
+  if (lineas.length === 0) {
+    return { lineaCercana: null, desvioMeters: 0, estaAlineado: true, calidad: "excelente" };
+  }
 
+  let minDistance = Infinity;
+  let bestLine: LineSegment | null = null;
+
+  for (const line of lineas) {
+    const origin = line.start;
+    const pLocal = proyectarLocal(pt, origin);
+    const bLocal = proyectarLocal(line.end, origin); // aLocal es (0, 0)
+
+    const dx = bLocal.x;
+    const dy = bLocal.y;
+    const lenSq = dx * dx + dy * dy;
+
+    let t = lenSq > 0 ? (pLocal.x * dx + pLocal.y * dy) / lenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+
+    const projX = t * dx;
+    const projY = t * dy;
+
+    const dist = Math.sqrt((pLocal.x - projX) ** 2 + (pLocal.y - projY) ** 2);
+    if (dist < minDistance) {
+      minDistance = dist;
+      bestLine = line;
+    }
+  }
+
+  const desvioMeters = Math.round(minDistance * 10) / 10;
+  let calidad: "excelente" | "buena" | "desalineada" = "excelente";
+  if (desvioMeters > 3.5) calidad = "desalineada";
+  else if (desvioMeters > 1.5) calidad = "buena";
+
+  return {
+    lineaCercana: bestLine,
+    desvioMeters,
+    estaAlineado: desvioMeters <= 2.0,
+    calidad,
+  };
+}
+
+/**
+ * Parser de tracks GPS (GPX o KML de banderilleros Trimble, John Deere o Avenza)
+ */
+export function parsearTrackGps(contenido: string): LatLng[] {
+  const puntos: LatLng[] = [];
+
+  // Intentar parsear como GPX (<trkpt lat="..." lon="...">)
+  const regexTrkpt = /<trkpt[^>]*lat=["']([^"']+)["'][^>]*lon=["']([^"']+)["']/gi;
+  let match;
+  while ((match = regexTrkpt.exec(contenido)) !== null) {
+    const lat = parseFloat(match[1]);
+    const lng = parseFloat(match[2]);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      puntos.push({ lat, lng });
+    }
+  }
+
+  if (puntos.length > 0) return puntos;
+
+  // Intentar parsear como KML (<coordinates>lng,lat,alt ...</coordinates>)
+  const regexKml = /<coordinates[^>]*>([\s\S]*?)<\/coordinates>/gi;
+  while ((match = regexKml.exec(contenido)) !== null) {
+    const rawCoords = match[1].trim().split(/\s+/);
+    for (const tuple of rawCoords) {
+      const parts = tuple.split(",");
+      if (parts.length >= 2) {
+        const lng = parseFloat(parts[0]);
+        const lat = parseFloat(parts[1]);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          puntos.push({ lat, lng });
+        }
+      }
+    }
+  }
+
+  return puntos;
+}

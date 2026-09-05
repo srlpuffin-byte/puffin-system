@@ -2,30 +2,35 @@ import React, { useState, useEffect, useMemo } from "react";
 import { 
   LatLng, 
   LineSegment, 
-  Waypoint,
-  WaypointTipo,
-  LotePlan,
+  Waypoint, 
+  WaypointTipo, 
+  LotePlan, 
   calcularMetricasPoligono, 
   generarLineasGuia, 
-  encontrarRumboBordeMasLargo,
-  obtenerNombreRumbo,
-  parsearCoordenadas,
+  encontrarRumboBordeMasLargo, 
+  obtenerNombreRumbo, 
+  parsearCoordenadas, 
   generarKML, 
   generarCSV, 
   generarGeoJSON, 
-  descargarArchivo,
-  generarLotePorMedidas,
-  calcularCentroide,
-  generarPasadasDesdeLineaBase,
-  calcularBordesPerimetro,
-  auditarRectitudLote,
-  enderezarPoligonoCuadrado,
-  suavizarBordesCurvos,
-  proyectarEjeCentral,
-  calcularEjesLote
+  descargarArchivo, 
+  generarLotePorMedidas, 
+  calcularCentroide, 
+  generarPasadasDesdeLineaBase, 
+  calcularBordesPerimetro, 
+  auditarRectitudLote, 
+  enderezarPoligonoCuadrado, 
+  suavizarBordesCurvos, 
+  proyectarEjeCentral, 
+  calcularEjesLote,
+  esPuntoEnPoligono,
+  calcularDesvioPasada,
+  parsearTrackGps
 } from "@/lib/gis/surface-planner";
-import { TrazadorMapa, MapInteractionMode } from "@/components/map/TrazadorMapa";
+import { TrazadorMapa, MapInteractionMode, MaquinaGpsPunto } from "@/components/map/TrazadorMapa";
 import { useGetProyectos } from "@/hooks/use-proyectos";
+import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,15 +52,20 @@ import {
   Smartphone, 
   Save, 
   Clock, 
-  Activity,
-  AlertTriangle,
-  Plus,
-  Trash2,
-  Route,
-  Square,
-  Magnet,
-  Target,
-  Edit3
+  Activity, 
+  AlertTriangle, 
+  Plus, 
+  Trash2, 
+  Route, 
+  Square, 
+  Magnet, 
+  Target, 
+  Edit3,
+  Tractor,
+  Upload,
+  RefreshCw,
+  Crosshair,
+  FileCheck
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -84,6 +94,38 @@ export function Americangis() {
   // Diálogo para ingreso manual de coordenadas
   const [dialogCoordsOpen, setDialogCoordsOpen] = useState(false);
   const [textoCoordsInput, setTextoCoordsInput] = useState("");
+
+  // Telemetría en tiempo real de maquinaria Xpert Satcom
+  const { data: maquinasGps = [], refetch: refetchMaquinasGps, isFetching: isFetchingGps } = useQuery<MaquinaGpsPunto[]>({
+    queryKey: ["satcom-mapa"],
+    queryFn: () => apiFetch("/integrations/xpert/mapa"),
+    refetchInterval: 15000,
+  });
+
+  const [mostrarMaquinasGps, setMostrarMaquinasGps] = useState<boolean>(true);
+  const [trackAuditoria, setTrackAuditoria] = useState<LatLng[]>([]);
+  const [maquinaEnFoco, setMaquinaEnFoco] = useState<LatLng | null>(null);
+  const [nombreTrackCargado, setNombreTrackCargado] = useState<string | null>(null);
+
+  const handleCargarArchivoTrack = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const contenido = event.target?.result as string;
+      if (!contenido) return;
+      const puntos = parsearTrackGps(contenido);
+      if (puntos.length === 0) {
+        toast.error("No se encontraron coordenadas válidas en el archivo GPX o KML");
+        return;
+      }
+      setTrackAuditoria(puntos);
+      setNombreTrackCargado(file.name);
+      toast.success(`Track cargado: ${puntos.length} puntos GPS listos para auditar sobre el mapa`);
+      setActiveTab("mapa");
+    };
+    reader.readAsText(file);
+  };
 
   // Diálogo para generar lote por medidas exactas
   const [dialogMedidasOpen, setDialogMedidasOpen] = useState(false);
@@ -834,9 +876,12 @@ export function Americangis() {
 
       {/* Pestañas de Trabajo */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="bg-slate-900 border border-slate-800 p-1">
+        <TabsList className="bg-slate-900 border border-slate-800 p-1 flex-wrap h-auto">
           <TabsTrigger value="mapa" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold">
             <Layers className="h-3.5 w-3.5" /> Visor Cartográfico y Trazador
+          </TabsTrigger>
+          <TabsTrigger value="telemetria" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold">
+            <Tractor className="h-3.5 w-3.5" /> Auditoría Xpert Satcom ({maquinasGps.filter(m => m.lat !== null).length})
           </TabsTrigger>
           <TabsTrigger value="coordenadas" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold">
             <FileSpreadsheet className="h-3.5 w-3.5" /> Calles A-B ({lineas.length + callesManuales.length})
@@ -895,6 +940,11 @@ export function Americangis() {
             height="620px"
             anchoCalle={anchoCalle}
             onAnchoCalleChange={setAnchoCalle}
+            maquinas={maquinasGps}
+            mostrarMaquinas={mostrarMaquinasGps}
+            onToggleMostrarMaquinas={() => setMostrarMaquinasGps(!mostrarMaquinasGps)}
+            trackHistorico={trackAuditoria}
+            maquinaEnFoco={maquinaEnFoco}
           />
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground bg-slate-900/60 border border-slate-800/80 rounded-lg p-3">
@@ -1523,6 +1573,215 @@ export function Americangis() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* PESTAÑA: TELEMETRÍA Y AUDITORÍA XPERT SATCOM */}
+        <TabsContent value="telemetria" className="space-y-4">
+          <Card className="border-slate-800 bg-slate-900/60 shadow-lg">
+            <CardHeader className="pb-3 border-b border-slate-800/80">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base font-bold flex items-center gap-2 text-white">
+                    <Tractor className="h-4 w-4 text-emerald-400" />
+                    Telemetría Satelital Xpert Satcom & Auditoría de Pasadas
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-400">
+                    Compara en tiempo real la posición de los rastreadores GPS de las máquinas con el trazado planificado a {anchoCalle}m para auditar desvíos y calidad de labor.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      accept=".gpx,.kml,.geojson"
+                      onChange={handleCargarArchivoTrack}
+                      className="hidden"
+                    />
+                    <div className="inline-flex items-center justify-center rounded-md text-xs font-semibold h-8 px-3 border border-cyan-500/40 bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 gap-1.5 transition-colors shadow">
+                      <Upload className="h-3.5 w-3.5" />
+                      Cargar Track de Banderillero (GPX / KML)
+                    </div>
+                  </label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      refetchMaquinasGps();
+                      toast.success("Posiciones GPS actualizadas desde Xpert Satcom");
+                    }}
+                    disabled={isFetchingGps}
+                    className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs h-8 gap-1.5 text-slate-200"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${isFetchingGps ? "animate-spin text-amber-400" : "text-emerald-400"}`} />
+                    Actualizar GPS
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-4 space-y-4">
+              {/* Alerta de Track Cargado si existe */}
+              {trackAuditoria.length > 0 && (
+                <div className="bg-cyan-950/40 border border-cyan-500/40 rounded-lg p-3 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <FileCheck className="h-4 w-4 text-cyan-400 shrink-0" />
+                    <div>
+                      <span className="font-bold text-cyan-200">Track de labor cargado:</span> {nombreTrackCargado} ({trackAuditoria.length} puntos GPS)
+                      <p className="text-[11px] text-muted-foreground mt-0.5">La traza real de la máquina se muestra en línea punteada cian sobre el mapa para contrastar con las pasadas.</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setTrackAuditoria([]);
+                      setNombreTrackCargado(null);
+                      toast.success("Traza histórica removida");
+                    }}
+                    className="h-7 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/40"
+                  >
+                    Quitar Traza
+                  </Button>
+                </div>
+              )}
+
+              {/* Métricas de Flota en Lote */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Máquinas con Rastreador GPS</span>
+                  <div className="text-xl font-bold text-white flex items-center gap-2">
+                    <Tractor className="h-4 w-4 text-amber-400" />
+                    {maquinasGps.filter(m => m.lat !== null).length} <span className="text-xs font-normal text-muted-foreground">equipos transmitiendo</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Dentro del Perímetro</span>
+                  <div className="text-xl font-bold text-emerald-400 flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-emerald-400" />
+                    {maquinasGps.filter((m): m is MaquinaGpsPunto & { lat: number; lng: number } => m.lat !== null && m.lng !== null && esPuntoEnPoligono({ lat: m.lat, lng: m.lng }, polygon)).length} <span className="text-xs font-normal text-muted-foreground">en el lote activo</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">En Marcha / Trabajando</span>
+                  <div className="text-xl font-bold text-cyan-400 flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-cyan-400" />
+                    {maquinasGps.filter(m => m.encendido).length} <span className="text-xs font-normal text-muted-foreground">motores encendidos</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista de Máquinas con su Auditoría de Pasada */}
+              {maquinasGps.length === 0 ? (
+                <div className="p-8 text-center border border-dashed border-slate-800 rounded-lg text-slate-400 space-y-2">
+                  <p className="text-3xl">🛰️</p>
+                  <p className="text-sm font-semibold text-white">No hay máquinas conectadas a la telemetría Xpert Satcom aún.</p>
+                  <p className="text-xs">Podés vincular los rastreadores en la sección <b className="text-amber-400">GPS y Rastreo</b> de Puffin.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs font-bold text-slate-300">Auditoría en Tiempo Real de Cada Máquina:</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {maquinasGps.map((m) => {
+                      const tienePosicion = m.lat !== null && m.lng !== null;
+                      const pt: LatLng = tienePosicion ? { lat: m.lat!, lng: m.lng! } : { lat: 0, lng: 0 };
+                      const dentroDelLote = tienePosicion && polygon.length >= 3 ? esPuntoEnPoligono(pt, polygon) : false;
+                      const auditoria = tienePosicion && lineas.length > 0 ? calcularDesvioPasada(pt, lineas) : null;
+
+                      return (
+                        <div
+                          key={m.device_id || m.maquina_id || m.nombre}
+                          className="bg-slate-950/70 border border-slate-800 hover:border-slate-700 rounded-lg p-3.5 space-y-2.5 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm text-white">{m.nombre}</span>
+                                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${m.encendido ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                                  {m.encendido ? "🟢 En marcha" : "⚪ Detenido"}
+                                </Badge>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">
+                                {m.tipo || "Maquinaria"} {m.velocidad_kmh !== null ? `· ${(m.velocidad_kmh || 0).toFixed(1)} km/h` : ""}
+                              </p>
+                            </div>
+
+                            {tienePosicion && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setMaquinaEnFoco(pt);
+                                  setActiveTab("mapa");
+                                  toast.info(`Centrando mapa en ${m.nombre}`);
+                                }}
+                                className="h-7 text-xs border-slate-700 bg-slate-900 hover:bg-slate-800 text-amber-400 gap-1 px-2.5"
+                                title="Ver en el mapa interactivo"
+                              >
+                                <Crosshair className="h-3 w-3" /> Ver en Mapa
+                              </Button>
+                            )}
+                          </div>
+
+                          {tienePosicion ? (
+                            <div className="bg-slate-900/60 p-2.5 rounded border border-slate-800/60 text-xs space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-slate-400">Ubicación respecto al lote:</span>
+                                {polygon.length >= 3 ? (
+                                  dentroDelLote ? (
+                                    <span className="font-bold text-emerald-400 flex items-center gap-1">
+                                      <Check className="h-3 w-3" /> Dentro del Perímetro
+                                    </span>
+                                  ) : (
+                                    <span className="font-bold text-amber-400 flex items-center gap-1">
+                                      <AlertTriangle className="h-3 w-3" /> Fuera del Lote
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="text-muted-foreground">Lote sin delimitar</span>
+                                )}
+                              </div>
+
+                              {auditoria && auditoria.lineaCercana && (
+                                <>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-slate-400">Pasada más próxima:</span>
+                                    <span className="font-mono font-bold text-white">{auditoria.lineaCercana.nombre} ({auditoria.lineaCercana.headingName})</span>
+                                  </div>
+
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-slate-400">Desvío de pasada (Cross-track):</span>
+                                    <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] ${
+                                      auditoria.calidad === "excelente"
+                                        ? "bg-emerald-950/60 text-emerald-400 border border-emerald-500/30"
+                                        : auditoria.calidad === "buena"
+                                        ? "bg-amber-950/60 text-amber-400 border border-amber-500/30"
+                                        : "bg-red-950/60 text-red-400 border border-red-500/30"
+                                    }`}>
+                                      {auditoria.desvioMeters} m ({auditoria.calidad === "excelente" ? "✓ Alineado" : auditoria.calidad === "buena" ? "Desvío leve" : "⚠️ Desalineado"})
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+
+                              <div className="text-[10px] text-slate-400 font-mono pt-0.5">
+                                Coordenadas GPS: {m.lat?.toFixed(6)}, {m.lng?.toFixed(6)}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-amber-500/80 bg-amber-950/20 p-2 rounded border border-amber-500/20">
+                              Sin señal GPS en este momento
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

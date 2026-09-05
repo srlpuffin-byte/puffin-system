@@ -13,7 +13,9 @@ import {
   auditarRectitudLote,
   enderezarPoligonoCuadrado,
   suavizarBordesCurvos,
-  calcularEjesLote
+  calcularEjesLote,
+  esPuntoEnPoligono,
+  calcularDesvioPasada
 } from "@/lib/gis/surface-planner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +35,8 @@ import {
   Route, 
   Magnet, 
   Square,
-  Sparkles
+  Sparkles,
+  Tractor
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -73,6 +76,21 @@ export type MapInteractionMode =
   | "draw_manual_line" 
   | "measure";
 
+export interface MaquinaGpsPunto {
+  maquina_id: number | null;
+  device_id: number | null;
+  nombre: string;
+  tipo: string;
+  estado_satcom: string;
+  lat: number | null;
+  lng: number | null;
+  velocidad_kmh: number | null;
+  encendido: boolean;
+  is_unlinked?: boolean;
+  imagen_url?: string | null;
+  proyecto_lugar?: string | null;
+}
+
 interface TrazadorMapaProps {
   polygon: LatLng[];
   onPolygonChange: (poly: LatLng[]) => void;
@@ -93,6 +111,11 @@ interface TrazadorMapaProps {
   initialCenter?: LatLng;
   anchoCalle?: number;
   onAnchoCalleChange?: (ancho: number) => void;
+  maquinas?: MaquinaGpsPunto[];
+  mostrarMaquinas?: boolean;
+  onToggleMostrarMaquinas?: () => void;
+  trackHistorico?: LatLng[];
+  maquinaEnFoco?: LatLng | null;
 }
 
 export function TrazadorMapa({
@@ -115,6 +138,11 @@ export function TrazadorMapa({
   initialCenter = { lat: -32.8908, lng: -64.3496 },
   anchoCalle = 5,
   onAnchoCalleChange,
+  maquinas = [],
+  mostrarMaquinas = true,
+  onToggleMostrarMaquinas,
+  trackHistorico = [],
+  maquinaEnFoco = null,
 }: TrazadorMapaProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -130,6 +158,8 @@ export function TrazadorMapa({
   const abMarkersRef = useRef<any[]>([]);
   const edgeLabelsGroupRef = useRef<any>(null);
   const cornerBadgesGroupRef = useRef<any>(null);
+  const maquinasGroupRef = useRef<any>(null);
+  const trackGroupRef = useRef<any>(null);
   const baseLayersRef = useRef<{ [key: string]: any }>({});
   
   const [activeLayer, setActiveLayer] = useState<"hybrid" | "satellite" | "streets">("hybrid");
@@ -187,6 +217,8 @@ export function TrazadorMapa({
       rubberbandLayerRef.current = L.layerGroup().addTo(map);
       edgeLabelsGroupRef.current = L.layerGroup().addTo(map);
       cornerBadgesGroupRef.current = L.layerGroup().addTo(map);
+      maquinasGroupRef.current = L.layerGroup().addTo(map);
+      trackGroupRef.current = L.layerGroup().addTo(map);
 
       // Movimiento del cursor con Autoayuda / Snapping Inteligente
       map.on("mousemove", (e: any) => {
@@ -918,17 +950,156 @@ export function TrazadorMapa({
 
     if (interactionMode === "draw_ab" && abPoints.length === 1) {
       const pA = abPoints[0];
-      const markerA = L.marker([pA.lat, pA.lng], {
-        icon: L.divIcon({
-          html: `<div style="background:#22c55e;color:white;font-weight:bold;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 0 10px rgba(0,0,0,0.8)">A</div>`,
-          iconSize: [26, 26],
-          iconAnchor: [13, 13],
-        }),
+      const marker = L.circleMarker([pA.lat, pA.lng], {
+        radius: 7,
+        fillColor: "#22c55e",
+        color: "#ffffff",
+        weight: 2,
+        fillOpacity: 1,
       }).addTo(map);
-      markerA.bindTooltip("Punto A fijado. Clic en Punto B para rumbo", { permanent: true, direction: "top" });
-      abMarkersRef.current.push(markerA);
+      abMarkersRef.current.push(marker);
     }
   }, [interactionMode, abPoints]);
+
+  // Enfocar mapa en máquina seleccionada
+  useEffect(() => {
+    if (!mapRef.current || !maquinaEnFoco) return;
+    mapRef.current.flyTo([maquinaEnFoco.lat, maquinaEnFoco.lng], 16, { animate: true, duration: 1 });
+  }, [maquinaEnFoco]);
+
+  // Renderizar Máquinas con Telemetría GPS Xpert Satcom
+  useEffect(() => {
+    if (!maquinasGroupRef.current || !window.L) return;
+    const L = window.L;
+    const group = maquinasGroupRef.current;
+    group.clearLayers();
+
+    if (!mostrarMaquinas || !maquinas || maquinas.length === 0) return;
+
+    maquinas.forEach((m) => {
+      if (m.lat === null || m.lng === null) return;
+      const pt: LatLng = { lat: m.lat, lng: m.lng };
+      const dentroDelLote = esPuntoEnPoligono(pt, polygon);
+      const auditoria = calcularDesvioPasada(pt, lineas);
+
+      const statusColor = m.encendido ? "#22c55e" : "#94a3b8";
+      const iconHtml = `
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%); cursor: pointer;">
+          <div style="
+            background: rgba(15, 23, 42, 0.95);
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid ${statusColor};
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+            margin-bottom: 2px;
+          ">
+            🚜 ${m.nombre}
+          </div>
+          <div style="
+            width: 32px;
+            height: 32px;
+            background: #0f172a;
+            border: 2.5px solid ${statusColor};
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 10px ${m.encendido ? 'rgba(34, 197, 94, 0.7)' : 'rgba(0,0,0,0.4)'};
+            font-size: 15px;
+          ">
+            🚜
+          </div>
+          <div style="
+            background: ${dentroDelLote ? (auditoria.estaAlineado ? "#15803d" : "#b45309") : "#b91c1c"};
+            color: #ffffff;
+            font-size: 9px;
+            font-weight: 800;
+            font-family: monospace;
+            padding: 1px 4px;
+            border-radius: 3px;
+            margin-top: 2px;
+            white-space: nowrap;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+          ">
+            ${m.velocidad_kmh ? `${m.velocidad_kmh.toFixed(0)} km/h` : "0 km/h"} · ${dentroDelLote ? (auditoria.desvioMeters ? `±${auditoria.desvioMeters}m` : "En Eje") : "Fuera de Lote"}
+          </div>
+        </div>
+      `;
+
+      const divIcon = L.divIcon({
+        className: "custom-machine-marker",
+        html: iconHtml,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      });
+
+      const marker = L.marker([m.lat, m.lng], { icon: divIcon });
+
+      const popupContent = `
+        <div style="font-family: sans-serif; font-size: 12px; min-width: 220px; padding: 4px; color: #1e293b;">
+          <div style="font-weight: 900; font-size: 14px; border-bottom: 2px solid ${statusColor}; padding-bottom: 4px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+            <span>🚜 ${m.nombre}</span>
+            <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${m.encendido ? '#dcfce7; color: #166534;' : '#f1f5f9; color: #475569;'}">
+              ${m.encendido ? '🟢 En Marcha' : '⚪ Detenido'}
+            </span>
+          </div>
+          <div style="display: grid; gap: 4px; font-size: 11px;">
+            <div><b>Velocidad:</b> ${m.velocidad_kmh ? `${m.velocidad_kmh.toFixed(1)} km/h` : '0.0 km/h'}</div>
+            <div><b>Posición:</b> ${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}</div>
+            <div style="border-top: 1px solid #e2e8f0; margin-top: 4px; padding-top: 4px;">
+              <b>Auditoría en Lote:</b>
+              <div style="margin-top: 2px;">
+                ${dentroDelLote ? `
+                  <span style="color: #166534; font-weight: bold;">📍 Dentro del perímetro delimitado</span><br/>
+                  ${auditoria.lineaCercana ? `
+                    <b>Pasada más cercana:</b> ${auditoria.lineaCercana.nombre}<br/>
+                    <b>Desvío del eje:</b> <span style="color: ${auditoria.calidad === 'excelente' ? '#166534' : auditoria.calidad === 'buena' ? '#ca8a04' : '#dc2626'}; font-weight: bold;">
+                      ${auditoria.desvioMeters} m (${auditoria.calidad === 'excelente' ? '✓ Excelente / Centrado' : auditoria.calidad === 'buena' ? 'Aceptable' : '⚠️ Desalineado'})
+                    </span>
+                  ` : ''}
+                ` : `
+                  <span style="color: #dc2626; font-weight: bold;">⚠️ Fuera del lote delimitado</span>
+                `}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      marker.bindPopup(popupContent);
+      group.addLayer(marker);
+    });
+  }, [maquinas, mostrarMaquinas, polygon, lineas]);
+
+  // Renderizar Track Histórico de la Máquina (recorrido real)
+  useEffect(() => {
+    if (!trackGroupRef.current || !window.L) return;
+    const L = window.L;
+    const group = trackGroupRef.current;
+    group.clearLayers();
+
+    if (!trackHistorico || trackHistorico.length < 2) return;
+
+    const latLngs = trackHistorico.map((p) => [p.lat, p.lng]);
+    const trackLine = L.polyline(latLngs, {
+      color: "#06b6d4",
+      weight: 3.5,
+      opacity: 0.9,
+      dashArray: "3, 6",
+    });
+
+    trackLine.bindPopup(`
+      <div style="font-family: sans-serif; font-size: 11px;">
+        <b>Traza Real Registrada:</b> ${trackHistorico.length} puntos de GPS.
+      </div>
+    `);
+
+    group.addLayer(trackLine);
+  }, [trackHistorico]);
 
   const handleLocalizarGPS = () => {
     if (!navigator.geolocation) {
@@ -1152,6 +1323,20 @@ export function TrazadorMapa({
             <span className="text-[10px] text-muted-foreground font-mono">m</span>
           </div>
         </div>
+
+        {/* Botón para ver u ocultar máquinas Xpert Satcom en tiempo real */}
+        {maquinas && maquinas.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onToggleMostrarMaquinas}
+            className={`text-xs h-7 gap-1 ${mostrarMaquinas ? "bg-emerald-500 text-slate-950 font-black shadow" : "bg-slate-800/90 border-slate-600 text-slate-200 hover:bg-slate-700"}`}
+            title="Mostrar u ocultar la posición en tiempo real de las máquinas Xpert Satcom"
+          >
+            <Tractor className="h-3.5 w-3.5" />
+            {mostrarMaquinas ? `🛰️ Satcom (${maquinas.filter(m => m.lat !== null).length})` : "🛰️ Ver Máquinas"}
+          </Button>
+        )}
 
         {/* Botón para limpiar calles externas si hay alguna */}
         {callesManuales.length > 0 && (
