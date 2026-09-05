@@ -131,6 +131,18 @@ export function formatearTiempoReporte(isoString?: string | null): string {
   return `hace ${diffDias}d (${dia}/${mes})`;
 }
 
+export function formatearFechaHora(isoString?: string | null): string {
+  if (!isoString) return "Sin fecha";
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return "Sin fecha";
+  const dia = String(d.getDate()).padStart(2, "0");
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const horas = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${dia}/${mes} ${horas}:${min} hs`;
+}
+
+
 interface TrazadorMapaProps {
   polygon: LatLng[];
   onPolygonChange: (poly: LatLng[]) => void;
@@ -1746,7 +1758,7 @@ export function TrazadorMapa({
     return () => {};
   }, [mapReady, maquinaAuditadaId, seguirVehiculoActivo]);
 
-  // Renderizar Traza Satelital Histórica
+  // Renderizar Traza Satelital Histórica con Marcadores de Inicio, Fin y Flechas Direccionales
   useEffect(() => {
     if (!mapRef.current || !trackGroupRef.current || !window.L) return undefined;
     if (!isAdmin || !mostrarAuditoriaAdmin || !trackHistorico || trackHistorico.length < 2) {
@@ -1758,13 +1770,113 @@ export function TrazadorMapa({
     const group = trackGroupRef.current;
     group.clearLayers();
 
-    const latLngs = trackHistorico
-      .map((p) => [Number(p.lat), Number(p.lng)])
-      .filter(([lat, lng]) => !isNaN(lat) && !isNaN(lng));
-    if (latLngs.length < 2) return undefined;
+    const validPoints = trackHistorico.filter(
+      (p) => !isNaN(Number(p.lat)) && !isNaN(Number(p.lng))
+    );
+    if (validPoints.length < 2) return undefined;
 
-    const trackLine = L.polyline(latLngs, { color: "#06b6d4", weight: 3.5, opacity: 0.95 });
+    const latLngs: [number, number][] = validPoints.map((p) => [Number(p.lat), Number(p.lng)]);
+
+    // 1. Polilínea de la traza histórica en cian
+    const trackLine = L.polyline(latLngs, { color: "#06b6d4", weight: 4, opacity: 0.95 });
     group.addLayer(trackLine);
+
+    // 2. Flechas direccionales a lo largo del camino
+    const step = Math.max(6, Math.floor(latLngs.length / 18));
+    for (let i = step; i < latLngs.length - 1; i += step) {
+      const p1 = latLngs[i];
+      const p2 = latLngs[i + 1];
+      const dLat = p2[0] - p1[0];
+      const dLng = p2[1] - p1[1];
+      if (Math.abs(dLat) < 0.00002 && Math.abs(dLng) < 0.00002) continue;
+      const angle = (Math.atan2(dLng, dLat) * 180) / Math.PI;
+      const arrowIcon = L.divIcon({
+        className: "audit-track-arrow",
+        html: `<div style="transform: rotate(${angle}deg); color: #22d3ee; text-shadow: 0 1px 3px rgba(0,0,0,0.9); font-size: 13px; font-weight: 900; line-height: 1; display: flex; align-items: center; justify-content: center; user-select: none;">▲</div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      });
+      const arrowMarker = L.marker([p1[0], p1[1]], { icon: arrowIcon, interactive: false, zIndexOffset: 400 });
+      group.addLayer(arrowMarker);
+    }
+
+    // 3. Marcador de INICIO (Punto de Partida)
+    const puntoInicio = validPoints[0];
+    const horaInicio = formatearFechaHora(puntoInicio.fixTime);
+    const startIcon = L.divIcon({
+      className: "audit-start-pin",
+      html: `
+        <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer;">
+          <div style="background: #10b981; color: #ffffff; border: 2.5px solid #ffffff; box-shadow: 0 3px 12px rgba(16,185,129,0.8); border-radius: 9999px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px; position: relative;">
+            <span style="position: absolute; width: 100%; height: 100%; border-radius: 9999px; background: #34d399; opacity: 0.45; animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
+            <span style="z-index: 1;">▶</span>
+          </div>
+          <div style="background: rgba(15,23,42,0.95); border: 1px solid #10b981; color: #6ee7b7; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; margin-top: 3px; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.7); letter-spacing: 0.5px;">
+            🟢 INICIO
+          </div>
+        </div>
+      `,
+      iconSize: [64, 58],
+      iconAnchor: [32, 20],
+    });
+    const startMarker = L.marker([Number(puntoInicio.lat), Number(puntoInicio.lng)], {
+      icon: startIcon,
+      zIndexOffset: 2500,
+    });
+    startMarker.bindPopup(`
+      <div style="font-family: sans-serif; min-width: 200px; color: #0f172a; padding: 4px;">
+        <div style="display: flex; align-items: center; gap: 6px; border-bottom: 2px solid #10b981; padding-bottom: 4px; margin-bottom: 6px;">
+          <span style="background: #10b981; color: white; border-radius: 4px; padding: 2px 6px; font-weight: 900; font-size: 11px;">▶</span>
+          <span style="font-weight: 800; color: #047857; font-size: 13px;">Punto de Partida (Inicio)</span>
+        </div>
+        <div style="font-size: 12px; line-height: 1.6; color: #334155;">
+          <div>📅 <strong>Fecha/Hora:</strong> ${horaInicio}</div>
+          <div>⚡ <strong>Velocidad inicial:</strong> ${puntoInicio.speed_kmh || 0} km/h</div>
+          <div>🧭 <strong>Rumbo:</strong> ${puntoInicio.rumbo || 0}°</div>
+          <div>🔑 <strong>Motor:</strong> ${puntoInicio.encendido ? "Encendido" : "Apagado"}</div>
+        </div>
+      </div>
+    `);
+    group.addLayer(startMarker);
+
+    // 4. Marcador de FIN (Punto de Llegada / Último Reporte)
+    const puntoFin = validPoints[validPoints.length - 1];
+    const horaFin = formatearFechaHora(puntoFin.fixTime);
+    const endIcon = L.divIcon({
+      className: "audit-end-pin",
+      html: `
+        <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer;">
+          <div style="background: #e11d48; color: #ffffff; border: 2.5px solid #ffffff; box-shadow: 0 3px 12px rgba(225,29,72,0.8); border-radius: 9999px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 14px; position: relative;">
+            <span style="position: absolute; width: 100%; height: 100%; border-radius: 9999px; background: #fb7185; opacity: 0.45; animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
+            <span style="z-index: 1;">🏁</span>
+          </div>
+          <div style="background: rgba(15,23,42,0.95); border: 1px solid #e11d48; color: #fda4af; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; margin-top: 3px; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.7); letter-spacing: 0.5px;">
+            🏁 FIN
+          </div>
+        </div>
+      `,
+      iconSize: [64, 58],
+      iconAnchor: [32, 20],
+    });
+    const endMarker = L.marker([Number(puntoFin.lat), Number(puntoFin.lng)], {
+      icon: endIcon,
+      zIndexOffset: 2500,
+    });
+    endMarker.bindPopup(`
+      <div style="font-family: sans-serif; min-width: 200px; color: #0f172a; padding: 4px;">
+        <div style="display: flex; align-items: center; gap: 6px; border-bottom: 2px solid #e11d48; padding-bottom: 4px; margin-bottom: 6px;">
+          <span style="background: #e11d48; color: white; border-radius: 4px; padding: 2px 6px; font-weight: 900; font-size: 11px;">🏁</span>
+          <span style="font-weight: 800; color: #be123c; font-size: 13px;">Punto Final (Llegada)</span>
+        </div>
+        <div style="font-size: 12px; line-height: 1.6; color: #334155;">
+          <div>📅 <strong>Fecha/Hora:</strong> ${horaFin}</div>
+          <div>⚡ <strong>Velocidad final:</strong> ${puntoFin.speed_kmh || 0} km/h</div>
+          <div>🧭 <strong>Rumbo:</strong> ${puntoFin.rumbo || 0}°</div>
+          <div>🔑 <strong>Motor:</strong> ${puntoFin.encendido ? "Encendido" : "Apagado"}</div>
+        </div>
+      </div>
+    `);
+    group.addLayer(endMarker);
 
     // Solo hacer fitBounds si NO hay un enfoque directo reciente sobre la máquina
     const isMaquinaEnFocoActiva = maquinaEnFoco && (Date.now() - (maquinaEnFoco.timestamp || 0)) < 4000;
@@ -2659,6 +2771,61 @@ export function TrazadorMapa({
                 </span>
               </div>
             </div>
+
+            {/* Resumen de Recorrido Auditado (Inicio y Fin) */}
+            {trackHistorico && trackHistorico.length >= 2 && (() => {
+              const inicio = trackHistorico[0];
+              const fin = trackHistorico[trackHistorico.length - 1];
+              return (
+                <div className="bg-slate-900/90 border border-cyan-500/30 rounded-lg p-2 space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px] text-cyan-300 font-bold uppercase tracking-wider">
+                    <span className="flex items-center gap-1">
+                      <Route className="h-3 w-3 text-cyan-400" />
+                      Trayecto Auditado
+                    </span>
+                    <span className="font-mono text-slate-400 font-normal">{trackHistorico.length} puntos GPS</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        if (mapRef.current && inicio.lat !== null && inicio.lng !== null && !isNaN(Number(inicio.lat)) && !isNaN(Number(inicio.lng))) {
+                          mapRef.current.flyTo([Number(inicio.lat), Number(inicio.lng)], 17, { animate: true });
+                          toast.info(`Centrado en Punto de Inicio (${formatearFechaHora(inicio.fixTime)})`);
+                        }
+                      }}
+                      className="text-left flex items-start gap-1.5 bg-slate-950/70 p-1.5 rounded border border-emerald-500/40 hover:border-emerald-400 cursor-pointer transition-colors"
+                      title="Haga clic para enfocar el punto de partida en el mapa"
+                    >
+                      <span className="text-emerald-400 font-extrabold text-xs shrink-0 mt-0.5">🟢</span>
+                      <div className="min-w-0">
+                        <div className="text-[9px] text-emerald-400 font-bold uppercase">Inicio (Partida)</div>
+                        <div className="text-slate-100 font-mono font-bold truncate">{formatearFechaHora(inicio.fixTime)}</div>
+                        <div className="text-[10px] text-slate-400">{inicio.speed_kmh || 0} km/h</div>
+                      </div>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        if (mapRef.current && fin.lat !== null && fin.lng !== null && !isNaN(Number(fin.lat)) && !isNaN(Number(fin.lng))) {
+                          mapRef.current.flyTo([Number(fin.lat), Number(fin.lng)], 17, { animate: true });
+                          toast.info(`Centrado en Punto de Llegada (${formatearFechaHora(fin.fixTime)})`);
+                        }
+                      }}
+                      className="text-left flex items-start gap-1.5 bg-slate-950/70 p-1.5 rounded border border-rose-500/40 hover:border-rose-400 cursor-pointer transition-colors"
+                      title="Haga clic para enfocar el punto de llegada en el mapa"
+                    >
+                      <span className="text-rose-400 font-extrabold text-xs shrink-0 mt-0.5">🏁</span>
+                      <div className="min-w-0">
+                        <div className="text-[9px] text-rose-400 font-bold uppercase">Fin (Llegada)</div>
+                        <div className="text-slate-100 font-mono font-bold truncate">{formatearFechaHora(fin.fixTime)}</div>
+                        <div className="text-[10px] text-slate-400">{fin.speed_kmh || 0} km/h</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Acciones de Auditoría */}
             <div className="flex items-center gap-2 pt-1">
