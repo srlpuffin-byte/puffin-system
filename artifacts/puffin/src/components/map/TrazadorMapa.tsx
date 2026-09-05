@@ -19,6 +19,14 @@ import {
 } from "@/lib/gis/surface-planner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
 import { 
   Layers, 
   Crosshair, 
@@ -36,7 +44,12 @@ import {
   Magnet, 
   Square,
   Sparkles,
-  Tractor
+  Tractor,
+  Sliders,
+  Check,
+  RotateCcw,
+  X,
+  Smartphone
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -137,6 +150,16 @@ interface TrazadorMapaProps {
   onToggleMostrarMaquinas?: () => void;
   trackHistorico?: LatLng[];
   maquinaEnFoco?: LatLng | null;
+  // Nuevas props para Guiado de Cabina & Secuencia de Labor
+  pasadaActivaId?: string | null;
+  proximaPasadaId?: string | null;
+  pasadasCompletadasIds?: string[];
+  ordenSecuencia?: "descendente" | "ascendente";
+  onSiguientePasada?: () => void;
+  onAnteriorPasada?: () => void;
+  onCompletarPasada?: (id: string) => void;
+  onToggleOrdenSecuencia?: () => void;
+  onCentrarEnPasada?: (line: LineSegment) => void;
 }
 
 export function TrazadorMapa({
@@ -164,6 +187,15 @@ export function TrazadorMapa({
   onToggleMostrarMaquinas,
   trackHistorico = [],
   maquinaEnFoco = null,
+  pasadaActivaId = null,
+  proximaPasadaId = null,
+  pasadasCompletadasIds = [],
+  ordenSecuencia = "descendente",
+  onSiguientePasada,
+  onAnteriorPasada,
+  onCompletarPasada,
+  onToggleOrdenSecuencia,
+  onCentrarEnPasada,
 }: TrazadorMapaProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -193,8 +225,24 @@ export function TrazadorMapa({
   const [manualLinePoints, setManualLinePoints] = useState<LatLng[]>([]);
   const [measurePoints, setMeasurePoints] = useState<LatLng[]>([]);
   const [measureResult, setMeasureResult] = useState<{ dist: number; bearing: number } | null>(null);
-  const [isLocating, setIsLocating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLocating, setIsLocating] = useState(false);
+  const [mobileRumboModal, setMobileRumboModal] = useState(false);
+  const [mobilePasoModal, setMobilePasoModal] = useState(false);
+  const [mobileMenuModal, setMobileMenuModal] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+
+  const handleCentrarEnPasadaActiva = (line?: LineSegment | null) => {
+    const target = line || lineas.find(l => l.id === pasadaActivaId) || lineas[0];
+    if (target && mapRef.current && window.L) {
+      const bounds = window.L.latLngBounds([
+        [target.start.lat, target.start.lng],
+        [target.end.lat, target.end.lng]
+      ]);
+      mapRef.current.fitBounds(bounds, { padding: [80, 80], maxZoom: 17 });
+      toast.info(`Centrando en ${target.nombre}`);
+    }
+  };
 
   const auditoria = useMemo(() => auditarRectitudLote(polygon), [polygon]);
   const ejes = useMemo(() => calcularEjesLote(polygon), [polygon]);
@@ -741,7 +789,7 @@ export function TrazadorMapa({
     }
   }, [polygon, interactionMode, onPolygonChange]);
 
-  // Renderizar Pasadas Automáticas
+  // Renderizar Pasadas Automáticas con Guiado de Cabina
   useEffect(() => {
     if (!linesLayerGroupRef.current || !window.L) return;
     const L = window.L;
@@ -749,44 +797,168 @@ export function TrazadorMapa({
     group.clearLayers();
 
     lineas.forEach((line) => {
-      const isSelected = selectedLineId === line.id;
+      const isActiva = pasadaActivaId ? pasadaActivaId === line.id : selectedLineId === line.id;
+      const isProxima = proximaPasadaId === line.id;
+      const isCompletada = pasadasCompletadasIds?.includes(line.id);
+
       const latLngs = [
         [line.start.lat, line.start.lng],
         [line.end.lat, line.end.lng],
       ];
 
+      let outlineWeight = 5;
+      let strokeColor = "#f59e0b"; // Naranja ámbar estándar
+      let strokeWeight = 3.5;
+      let opacity = 0.9;
+      let dashArray: string | undefined = undefined;
+
+      if (isActiva) {
+        strokeColor = "#00ff66"; // Verde neón activo
+        strokeWeight = 6.5;
+        outlineWeight = 11;
+        opacity = 1;
+      } else if (isProxima) {
+        strokeColor = "#38bdf8"; // Cian próxima
+        strokeWeight = 4.5;
+        outlineWeight = 7.5;
+        opacity = 1;
+      } else if (isCompletada) {
+        strokeColor = "#15803d"; // Verde tenue completada
+        strokeWeight = 2.5;
+        outlineWeight = 4;
+        dashArray = "6, 6";
+        opacity = 0.7;
+      }
+
       const outline = L.polyline(latLngs, {
         color: "#000000",
-        weight: isSelected ? 7 : 5,
-        opacity: 0.7,
+        weight: outlineWeight,
+        opacity: 0.8,
       });
 
       const polyline = L.polyline(latLngs, {
-        color: isSelected ? "#06b6d4" : "#f59e0b",
-        weight: isSelected ? 4 : 3,
-        opacity: 1,
+        color: strokeColor,
+        weight: strokeWeight,
+        opacity,
+        dashArray,
       });
 
       const markerA = L.circleMarker([line.start.lat, line.start.lng], {
-        radius: isSelected ? 5 : 3.5,
+        radius: isActiva ? 6 : 3.5,
         fillColor: "#22c55e",
         color: "#ffffff",
-        weight: 1.5,
+        weight: isActiva ? 2.5 : 1.5,
         fillOpacity: 1,
       });
 
       const markerB = L.circleMarker([line.end.lat, line.end.lng], {
-        radius: isSelected ? 5 : 3.5,
+        radius: isActiva ? 6 : 3.5,
         fillColor: "#ef4444",
         color: "#ffffff",
-        weight: 1.5,
+        weight: isActiva ? 2.5 : 1.5,
         fillOpacity: 1,
       });
 
+      // Cartel flotante en el centro de la pasada activa o próxima
+      const midLat = (line.start.lat + line.end.lat) / 2;
+      const midLng = (line.start.lng + line.end.lng) / 2;
+
+      if (isActiva) {
+        const activeHtml = `
+          <div style="
+            background: #0f172a;
+            border: 2px solid #22c55e;
+            color: #ffffff;
+            box-shadow: 0 0 16px #22c55e, 0 4px 12px rgba(0,0,0,0.8);
+            border-radius: 6px;
+            padding: 2.5px 8px;
+            font-size: 11px;
+            font-weight: 900;
+            font-family: ui-monospace, monospace;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+          ">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 6px #22c55e;"></span>
+            <span style="color:#4ade80;">🎯 ${line.nombre}</span>
+            <span style="color:#94a3b8;font-size:9.5px;">${line.lengthMeters}m · ${line.bearing}° ${line.headingName}</span>
+          </div>
+        `;
+        const activeIcon = L.divIcon({
+          className: "custom-active-line-badge",
+          html: activeHtml,
+          iconSize: [0, 0],
+          iconAnchor: [0, 0],
+        });
+        const badgeMarker = L.marker([midLat, midLng], { icon: activeIcon, interactive: false, zIndexOffset: 2500 });
+        group.addLayer(badgeMarker);
+      } else if (isProxima) {
+        const proxHtml = `
+          <div style="
+            background: #0f172a;
+            border: 1.5px solid #38bdf8;
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(56,189,248,0.7);
+            border-radius: 5px;
+            padding: 1.5px 6px;
+            font-size: 10px;
+            font-weight: 800;
+            font-family: ui-monospace, monospace;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+          ">
+            <span style="color:#38bdf8;">➡️ Próxima: ${line.nombre}</span>
+          </div>
+        `;
+        const proxIcon = L.divIcon({
+          className: "custom-prox-line-badge",
+          html: proxHtml,
+          iconSize: [0, 0],
+          iconAnchor: [0, 0],
+        });
+        const proxMarker = L.marker([midLat, midLng], { icon: proxIcon, interactive: false, zIndexOffset: 1500 });
+        group.addLayer(proxMarker);
+      } else if (isCompletada) {
+        const compHtml = `
+          <div style="
+            background: rgba(21, 128, 61, 0.9);
+            color: #ffffff;
+            border-radius: 4px;
+            padding: 1px 5px;
+            font-size: 9px;
+            font-weight: 800;
+            font-family: ui-monospace, monospace;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+          ">
+            <span>✓ ${line.nombre}</span>
+          </div>
+        `;
+        const compIcon = L.divIcon({
+          className: "custom-comp-line-badge",
+          html: compHtml,
+          iconSize: [0, 0],
+          iconAnchor: [0, 0],
+        });
+        const compMarker = L.marker([midLat, midLng], { icon: compIcon, interactive: false, zIndexOffset: 1000 });
+        group.addLayer(compMarker);
+      }
+
       const popupContent = `
-        <div style="font-family: sans-serif; font-size: 12px; min-width: 200px; padding: 4px;">
-          <div style="font-weight: bold; font-size: 14px; color: #1e293b; border-bottom: 2px solid #f59e0b; padding-bottom: 4px; margin-bottom: 6px;">
-            🚜 ${line.nombre}
+        <div style="font-family: sans-serif; font-size: 12px; min-width: 220px; padding: 4px;">
+          <div style="font-weight: bold; font-size: 14px; color: #1e293b; border-bottom: 2px solid ${isActiva ? '#22c55e' : '#f59e0b'}; padding-bottom: 4px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+            <span>🚜 ${line.nombre}</span>
+            <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${isActiva ? '#dcfce7; color: #166534;' : isCompletada ? '#f1f5f9; color: #475569;' : '#fef3c7; color: #92400e;'}">
+              ${isActiva ? '🎯 Pasada Actual' : isCompletada ? '✓ Completada' : 'Pendiente'}
+            </span>
           </div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 8px;">
             <div><span style="color: #64748b;">Longitud:</span> <b>${line.lengthMeters.toLocaleString("es-AR")} m</b></div>
@@ -809,7 +981,7 @@ export function TrazadorMapa({
       group.addLayer(markerA);
       group.addLayer(markerB);
     });
-  }, [lineas, selectedLineId, onSelectLine]);
+  }, [lineas, selectedLineId, pasadaActivaId, proximaPasadaId, pasadasCompletadasIds, onSelectLine]);
 
   // Renderizar Calles Manuales con acciones de borrado y generación de pasadas paralelas
   useEffect(() => {
@@ -1219,11 +1391,84 @@ export function TrazadorMapa({
   }, [polygon]);
 
   return (
-    <div className={`relative overflow-hidden rounded-xl border border-slate-700 bg-slate-950 shadow-2xl ${isFullscreen ? "fixed inset-0 z-50 rounded-none border-none" : ""}`} style={{ height: isFullscreen ? "100vh" : height }}>
+    <div 
+      className={`relative overflow-hidden rounded-xl border border-slate-700 bg-slate-950 shadow-2xl transition-all ${
+        isFullscreen ? "fixed inset-0 z-50 rounded-none border-none h-screen" : "h-[calc(100dvh-130px)] min-h-[500px] md:h-[640px]"
+      }`} 
+      style={{ height: isFullscreen ? "100dvh" : undefined }}
+    >
       <div ref={containerRef} className="w-full h-full" />
 
-      {/* Buscador de Coordenadas Flotante */}
-      <div className="absolute top-3 left-3 z-[1000] flex items-center gap-2 max-w-[340px] w-full">
+      {/* 1. BARRA SUPERIOR PARA CELULAR (Compacta, ultra-limpia, no tapa el mapa) */}
+      <div className="flex md:hidden absolute top-2 left-2 right-2 z-[1000] flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-1 bg-slate-900/95 backdrop-blur-md p-1 rounded-lg border border-slate-700/80 shadow-lg text-white">
+          {/* Selector de Capas */}
+          <div className="flex items-center bg-slate-800 rounded p-0.5 text-[10px]">
+            <button
+              onClick={() => handleLayerChange("hybrid")}
+              className={`px-1.5 py-0.5 font-bold rounded ${activeLayer === "hybrid" ? "bg-amber-500 text-slate-950" : "text-slate-300"}`}
+            >
+              Híb
+            </button>
+            <button
+              onClick={() => handleLayerChange("satellite")}
+              className={`px-1.5 py-0.5 font-bold rounded ${activeLayer === "satellite" ? "bg-amber-500 text-slate-950" : "text-slate-300"}`}
+            >
+              Sat
+            </button>
+          </div>
+
+          {/* Chip de Rumbo Móvil */}
+          <button
+            onClick={() => setMobileRumboModal(true)}
+            className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded text-[11px] font-bold text-amber-400 border border-slate-700"
+          >
+            <Compass className="h-3 w-3" />
+            <span>{rumboGrados}°</span>
+          </button>
+
+          {/* Chip de Separación Móvil */}
+          <button
+            onClick={() => setMobilePasoModal(true)}
+            className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded text-[11px] font-bold text-white border border-slate-700"
+          >
+            <span className="text-amber-400 font-mono text-[10px]">Paso:</span>
+            <span>{anchoCalle}m</span>
+          </button>
+
+          {/* Chip de Secuencia Invertir (ej. 20➔1) */}
+          {onToggleOrdenSecuencia && (
+            <button
+              onClick={onToggleOrdenSecuencia}
+              className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded text-[11px] font-bold text-cyan-300 border border-slate-700"
+              title="Cambiar orden de pasadas"
+            >
+              <span>🔄 {ordenSecuencia === "descendente" ? "20➔1" : "1➔20"}</span>
+            </button>
+          )}
+
+          {/* Herramientas Rápidas Modal */}
+          <button
+            onClick={() => setMobileMenuModal(true)}
+            className="bg-slate-800 hover:bg-slate-700 p-1 rounded text-slate-200 border border-slate-700"
+            title="Herramientas de Lote"
+          >
+            <Sliders className="h-3.5 w-3.5 text-amber-400" />
+          </button>
+
+          {/* Pantalla Completa Cabina */}
+          <button
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="bg-slate-800 hover:bg-slate-700 p-1 rounded text-slate-200 border border-slate-700"
+            title="Pantalla Completa Cabina"
+          >
+            {isFullscreen ? <Minimize2 className="h-3.5 w-3.5 text-amber-400" /> : <Maximize2 className="h-3.5 w-3.5 text-amber-400" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Buscador de Coordenadas Flotante (Desktop) */}
+      <div className="hidden md:flex absolute top-3 left-3 z-[1000] items-center gap-2 max-w-[340px] w-full">
         <div className="relative w-full flex items-center shadow-lg">
           <Input
             value={searchQuery}
@@ -1242,8 +1487,8 @@ export function TrazadorMapa({
         </div>
       </div>
 
-      {/* Barra de Herramientas Principal Flotante */}
-      <div className="absolute top-14 left-3 z-[1000] flex flex-wrap items-center gap-1.5 bg-slate-900/90 backdrop-blur-md px-2.5 py-1.5 rounded-lg border border-slate-700/80 shadow-lg text-white max-w-[95%]">
+      {/* Barra de Herramientas Principal Flotante (Desktop) */}
+      <div className="hidden md:flex absolute top-14 left-3 z-[1000] flex-wrap items-center gap-1.5 bg-slate-900/90 backdrop-blur-md px-2.5 py-1.5 rounded-lg border border-slate-700/80 shadow-lg text-white max-w-[95%]">
         {/* Selector de Capas */}
         <div className="flex items-center bg-slate-800 rounded p-0.5 border border-slate-700 text-[11px]">
           <button
@@ -1670,8 +1915,282 @@ export function TrazadorMapa({
         </div>
       )}
 
-      {/* HUD Geodésico Inferior */}
-      <div className="absolute bottom-2 left-3 z-[1000] bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-md px-3 py-1.5 text-[11px] font-mono text-slate-300 flex items-center gap-3 shadow-lg pointer-events-none">
+      {/* HUD de Cabina & Banderillero Digital Flotante (Optimizado para Celular en Parabrisas) */}
+      {lineas && lineas.length > 0 && (
+        <div className="absolute bottom-2 left-2 right-2 md:bottom-3 md:left-1/2 md:-translate-x-1/2 md:max-w-xl z-[1000] bg-slate-950/95 backdrop-blur-md border-2 border-emerald-500/80 rounded-xl p-2.5 sm:p-3 shadow-2xl text-white">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+              <span className="bg-emerald-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded font-mono uppercase tracking-wider shadow">
+                🎯 PASADA ACTUAL
+              </span>
+              <span className="font-mono font-black text-sm sm:text-base text-emerald-400 truncate">
+                {lineas.find(l => l.id === pasadaActivaId)?.nombre || lineas[0]?.nombre}
+              </span>
+              {(() => {
+                const activa = lineas.find(l => l.id === pasadaActivaId) || lineas[0];
+                return activa ? (
+                  <span className="text-[11px] text-slate-300 font-mono">
+                    ({activa.lengthMeters}m · {activa.bearing}° {activa.headingName})
+                  </span>
+                ) : null;
+              })()}
+            </div>
+
+            {(() => {
+              const proxima = lineas.find(l => l.id === proximaPasadaId);
+              return proxima ? (
+                <div className="text-[11px] text-cyan-300 font-mono hidden sm:flex items-center gap-1 shrink-0">
+                  <span className="text-slate-400">➡️ Sig:</span>
+                  <b className="text-cyan-300">{proxima.nombre}</b>
+                </div>
+              ) : null;
+            })()}
+          </div>
+
+          <div className="flex items-center justify-between gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onAnteriorPasada}
+              className="h-9 px-3 text-xs font-bold border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 shrink-0"
+              title="Pasada anterior en la secuencia"
+            >
+              ⬅️ Ant.
+            </Button>
+
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const activa = lineas.find(l => l.id === pasadaActivaId) || lineas[0];
+                  if (activa) handleCentrarEnPasadaActiva(activa);
+                }}
+                className="h-9 px-2.5 text-xs font-bold border-slate-700 bg-slate-900 text-amber-400 hover:bg-slate-800"
+                title="Centrar mapa en la pasada actual"
+              >
+                🎯 Centrar
+              </Button>
+
+              {onToggleOrdenSecuencia && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onToggleOrdenSecuencia}
+                  className="h-9 px-2 text-[11px] font-bold border-slate-700 bg-slate-900 text-cyan-300 hover:bg-slate-800 hidden sm:flex items-center gap-1"
+                  title="Invertir secuencia de recorrido"
+                >
+                  🔄 {ordenSecuencia === "descendente" ? "20 ➔ 1" : "1 ➔ 20"}
+                </Button>
+              )}
+            </div>
+
+            <Button
+              size="sm"
+              onClick={() => {
+                const activa = lineas.find(l => l.id === pasadaActivaId) || lineas[0];
+                if (activa && onCompletarPasada) onCompletarPasada(activa.id);
+              }}
+              className="h-9 px-3 text-xs font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg gap-1.5 shrink-0"
+              title="Marcar pasada completada y avanzar a la siguiente"
+            >
+              <Check className="h-4 w-4 stroke-[3]" />
+              <span>✓ Lista ➔ Sig.</span>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Móvil: Selector de Rumbo */}
+      <Dialog open={mobileRumboModal} onOpenChange={setMobileRumboModal}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base flex items-center gap-2 text-amber-400">
+              <Compass className="h-4 w-4" /> Orientación de Pasadas (Rumbo)
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-400">
+              Elija el sentido en el que la maquinaria recorrerá el lote:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-2 py-2">
+            {polygon.length >= 3 && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    onRumboChange?.(ejes.rumboLargo);
+                    setMobileRumboModal(false);
+                    toast.success(`Alineado A LO LARGO (${Math.round(ejes.rumboLargo)}°)`);
+                  }}
+                  className="justify-start h-10 border-slate-700 bg-slate-800 hover:bg-slate-700 text-white gap-2 text-xs"
+                >
+                  📏 A lo Largo del Lote ({Math.round(ejes.rumboLargo)}° - Alambrado)
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    onRumboChange?.(ejes.rumboAncho);
+                    setMobileRumboModal(false);
+                    toast.success(`Alineado A LO ANCHO (${Math.round(ejes.rumboAncho)}°)`);
+                  }}
+                  className="justify-start h-10 border-slate-700 bg-slate-800 hover:bg-slate-700 text-white gap-2 text-xs"
+                >
+                  📐 A lo Ancho Transversal ({Math.round(ejes.rumboAncho)}°)
+                </Button>
+              </>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => {
+                onRumboChange?.(90);
+                setMobileRumboModal(false);
+                toast.success("Orientado Horizontal (90° Este-Oeste)");
+              }}
+              className="justify-start h-10 border-slate-700 bg-slate-800 hover:bg-slate-700 text-white gap-2 text-xs"
+            >
+              ➡️ Horizontal (Este-Oeste / 90°)
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                onRumboChange?.(0);
+                setMobileRumboModal(false);
+                toast.success("Orientado Vertical (0° Norte-Sur)");
+              }}
+              className="justify-start h-10 border-slate-700 bg-slate-800 hover:bg-slate-700 text-white gap-2 text-xs"
+            >
+              ⬆️ Vertical (Norte-Sur / 0°)
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Móvil: Selector de Paso */}
+      <Dialog open={mobilePasoModal} onOpenChange={setMobilePasoModal}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base flex items-center gap-2 text-amber-400">
+              <Ruler className="h-4 w-4" /> Separación entre Calles
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-400">
+              Distancia en metros entre los ejes de las pasadas:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-4 gap-2 py-2">
+            {[3, 5, 8, 10, 15, 20, 50, 100].map((d) => (
+              <Button
+                key={d}
+                variant={anchoCalle === d ? "default" : "outline"}
+                onClick={() => {
+                  onAnchoCalleChange?.(d);
+                  setMobilePasoModal(false);
+                }}
+                className={`h-10 text-xs font-bold ${anchoCalle === d ? "bg-amber-500 text-slate-950 font-black shadow" : "border-slate-700 bg-slate-800 text-white"}`}
+              >
+                {d}m
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Móvil: Menú de Herramientas de Campo */}
+      <Dialog open={mobileMenuModal} onOpenChange={setMobileMenuModal}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base flex items-center gap-2 text-white">
+              <Sliders className="h-4 w-4 text-amber-400" /> Herramientas de Campo
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-400">
+              Opciones de trazado, topografía y corrección:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-2 py-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setInteractionMode(interactionMode === "draw_polygon" ? "none" : "draw_polygon");
+                setMobileMenuModal(false);
+              }}
+              className="justify-start h-10 border-slate-700 bg-slate-800 text-white gap-2 text-xs"
+            >
+              <MapPin className="h-4 w-4 text-green-400" />
+              {polygon.length === 0 ? "Delimitar Terreno" : "Editar Vértices del Lote"}
+            </Button>
+            {polygon.length === 4 && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const enderezado = enderezarPoligonoCuadrado(polygon);
+                  onPolygonChange(enderezado);
+                  setMobileMenuModal(false);
+                  toast.success("¡Lote enderezado a escuadra perfecta de 90°!");
+                }}
+                className="justify-start h-10 border-slate-700 bg-slate-800 text-cyan-300 gap-2 text-xs"
+              >
+                <Square className="h-4 w-4 text-cyan-400" />
+                Cuadrar y Enderezar a 90°
+              </Button>
+            )}
+            {polygon.length >= 3 && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const suavizado = suavizarBordesCurvos(polygon, 1);
+                  onPolygonChange(suavizado);
+                  setMobileMenuModal(false);
+                  toast.success("Curvas geodésicas aplicadas");
+                }}
+                className="justify-start h-10 border-slate-700 bg-slate-800 text-cyan-300 gap-2 text-xs"
+              >
+                <Sparkles className="h-4 w-4 text-cyan-400" />
+                Suavizar Curvas del Alambrado
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setInteractionMode(interactionMode === "measure" ? "none" : "measure");
+                setMeasurePoints([]);
+                setMeasureResult(null);
+                setMobileMenuModal(false);
+              }}
+              className="justify-start h-10 border-slate-700 bg-slate-800 text-white gap-2 text-xs"
+            >
+              <Ruler className="h-4 w-4 text-cyan-400" />
+              Medir Distancia en el Terreno
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setInteractionMode(interactionMode === "add_waypoint" ? "none" : "add_waypoint");
+                setMobileMenuModal(false);
+              }}
+              className="justify-start h-10 border-slate-700 bg-slate-800 text-white gap-2 text-xs"
+            >
+              <AlertTriangle className="h-4 w-4 text-blue-400" />
+              + Agregar Mojón u Obstáculo
+            </Button>
+            {callesManuales.length > 0 && (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  onCallesManualesChange?.([]);
+                  setMobileMenuModal(false);
+                  toast.success("Calles externas eliminadas");
+                }}
+                className="justify-start h-10 gap-2 text-xs"
+              >
+                <Trash2 className="h-4 w-4" />
+                Limpiar Calles Externas ({callesManuales.length})
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* HUD Geodésico Inferior (Oculto en móvil si está el HUD de Cabina para no superponer) */}
+      <div className={`absolute ${lineas && lineas.length > 0 ? "bottom-20 md:bottom-2" : "bottom-2"} left-3 z-[900] bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-md px-3 py-1.5 text-[11px] font-mono text-slate-300 hidden sm:flex items-center gap-3 shadow-lg pointer-events-none`}>
         <span className="flex items-center gap-1">
           <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
           WGS84
@@ -1682,7 +2201,7 @@ export function TrazadorMapa({
             <b className="text-white">{cursorCoords.lng.toFixed(6)}</b>
           </span>
         )}
-        <span className="hidden sm:inline border-l border-slate-700 pl-2 text-amber-400">
+        <span className="border-l border-slate-700 pl-2 text-amber-400">
           Rumbo: {rumboGrados}° ({obtenerNombreRumbo(rumboGrados)})
         </span>
       </div>

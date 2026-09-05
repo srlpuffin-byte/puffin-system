@@ -65,7 +65,11 @@ import {
   Upload,
   RefreshCw,
   Crosshair,
-  FileCheck
+  FileCheck,
+  ArrowRight,
+  ArrowLeft,
+  RotateCcw,
+  CheckCircle2
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -85,6 +89,11 @@ export function Americangis() {
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("mapa");
   
+  // Secuencia de laboreo y guiado en cabina (ej: empezar en Calle 20 hacia Calle 1)
+  const [ordenSecuencia, setOrdenSecuencia] = useState<"descendente" | "ascendente">("descendente");
+  const [pasadaActivaId, setPasadaActivaId] = useState<string | null>(null);
+  const [pasadasCompletadasIds, setPasadasCompletadasIds] = useState<string[]>([]);
+
   // Elementos avanzados de campo
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [callesManuales, setCallesManuales] = useState<LineSegment[]>([]);
@@ -175,12 +184,42 @@ export function Americangis() {
     return generarLineasGuia(polygon, anchoCalle, rumboGrados, alternarSentido);
   }, [polygon, anchoCalle, rumboGrados, alternarSentido]);
 
+  // Secuencia de laboreo ordenada (Descendente: Calle 20 -> Calle 19... o Ascendente: Calle 01 -> 02...)
+  const lineasOrdenadas: LineSegment[] = useMemo(() => {
+    if (lineas.length === 0) return [];
+    if (ordenSecuencia === "descendente") {
+      return [...lineas].reverse();
+    }
+    return [...lineas];
+  }, [lineas, ordenSecuencia]);
+
+  // Sincronizar pasada activa inicial al recalcular lote o cambiar orden
+  useEffect(() => {
+    if (lineasOrdenadas.length > 0) {
+      if (!pasadaActivaId || !lineasOrdenadas.some((l) => l.id === pasadaActivaId)) {
+        setPasadaActivaId(lineasOrdenadas[0].id);
+      }
+    } else {
+      setPasadaActivaId(null);
+    }
+  }, [lineasOrdenadas, pasadaActivaId]);
+
+  // Próxima pasada en la secuencia
+  const proximaPasadaId = useMemo(() => {
+    if (!pasadaActivaId || lineasOrdenadas.length === 0) return null;
+    const idx = lineasOrdenadas.findIndex((l) => l.id === pasadaActivaId);
+    if (idx >= 0 && idx + 1 < lineasOrdenadas.length) {
+      return lineasOrdenadas[idx + 1].id;
+    }
+    return null;
+  }, [lineasOrdenadas, pasadaActivaId]);
+
   // Distancia total acumulada
   const distanciaTotalMeters = useMemo(() => {
-    const distAuto = lineas.reduce((acc, l) => acc + l.lengthMeters, 0);
+    const distAuto = lineasOrdenadas.reduce((acc, l) => acc + l.lengthMeters, 0);
     const distManual = callesManuales.reduce((acc, l) => acc + l.lengthMeters, 0);
     return distAuto + distManual;
-  }, [lineas, callesManuales]);
+  }, [lineasOrdenadas, callesManuales]);
 
   // Estimación de horas de máquina (7.5 km/h promedio)
   const horasEstimadas = useMemo(() => {
@@ -189,7 +228,7 @@ export function Americangis() {
     return Math.round((km / 7.5) * 10) / 10;
   }, [distanciaTotalMeters]);
 
-  // Objeto Plan completo
+  // Objeto Plan completo (utiliza lineasOrdenadas para que KML, CSV y GeoJSON exporten en la secuencia elegida)
   const planActual: LotePlan = useMemo(() => {
     return {
       id: `lote-${Date.now()}`,
@@ -203,7 +242,7 @@ export function Americangis() {
       anchoCalleMeters: anchoCalle,
       rumboGrados,
       alternarSentido,
-      lineas,
+      lineas: lineasOrdenadas,
       callesManuales,
       waypoints,
       distanciaTotalMeters,
@@ -216,7 +255,7 @@ export function Americangis() {
     anchoCalle,
     rumboGrados,
     alternarSentido,
-    lineas,
+    lineasOrdenadas,
     callesManuales,
     waypoints,
     distanciaTotalMeters,
@@ -426,6 +465,67 @@ export function Americangis() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  // Controles de Navegación de Pasadas para Cabina
+  const handleSiguientePasada = () => {
+    if (!pasadaActivaId || lineasOrdenadas.length === 0) return;
+    const idx = lineasOrdenadas.findIndex((l) => l.id === pasadaActivaId);
+    if (idx >= 0 && idx + 1 < lineasOrdenadas.length) {
+      const sig = lineasOrdenadas[idx + 1];
+      setPasadaActivaId(sig.id);
+      setSelectedLineId(sig.id);
+      toast.info(`Avanzando a pasada: ${sig.nombre}`);
+    } else {
+      toast.success("¡Llegó a la última pasada de la secuencia!");
+    }
+  };
+
+  const handleAnteriorPasada = () => {
+    if (!pasadaActivaId || lineasOrdenadas.length === 0) return;
+    const idx = lineasOrdenadas.findIndex((l) => l.id === pasadaActivaId);
+    if (idx > 0) {
+      const ant = lineasOrdenadas[idx - 1];
+      setPasadaActivaId(ant.id);
+      setSelectedLineId(ant.id);
+      toast.info(`Retrocediendo a pasada: ${ant.nombre}`);
+    }
+  };
+
+  const handleCompletarPasada = (id: string) => {
+    if (!pasadasCompletadasIds.includes(id)) {
+      setPasadasCompletadasIds((prev) => [...prev, id]);
+    }
+    const idx = lineasOrdenadas.findIndex((l) => l.id === id);
+    if (idx >= 0 && idx + 1 < lineasOrdenadas.length) {
+      const sig = lineasOrdenadas[idx + 1];
+      setPasadaActivaId(sig.id);
+      setSelectedLineId(sig.id);
+      toast.success(`✓ Pasada completada. Rumbo a: ${sig.nombre}`);
+    } else {
+      toast.success("🎉 ¡Todas las pasadas del lote han sido completadas!");
+    }
+  };
+
+  const handleToggleOrdenSecuencia = () => {
+    setOrdenSecuencia((prev) => {
+      const nuevo = prev === "descendente" ? "ascendente" : "descendente";
+      toast.info(
+        nuevo === "descendente"
+          ? "Secuencia invertida: De mayor a menor (Calle 20 ➔ Calle 01)"
+          : "Secuencia directa: De menor a mayor (Calle 01 ➔ Calle 20)"
+      );
+      return nuevo;
+    });
+  };
+
+  const handleReiniciarProgresoPasadas = () => {
+    setPasadasCompletadasIds([]);
+    if (lineasOrdenadas.length > 0) {
+      setPasadaActivaId(lineasOrdenadas[0].id);
+      setSelectedLineId(lineasOrdenadas[0].id);
+    }
+    toast.info("Progreso de pasadas reiniciado al inicio");
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* Encabezado Profesional */}
@@ -527,7 +627,7 @@ export function Americangis() {
               <Compass className="h-4 w-4 text-amber-400" />
             </div>
             <div className="text-2xl font-black tracking-tight text-amber-400">
-              {lineas.length} {lineas.length === 1 ? "recta" : "rectas"}
+              {lineasOrdenadas.length} {lineasOrdenadas.length === 1 ? "recta" : "rectas"}
               {callesManuales.length > 0 && <span className="text-xs text-fuchsia-400 ml-1">+{callesManuales.length} man.</span>}
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -863,11 +963,11 @@ export function Americangis() {
                     toast.error("Delimite primero el terreno para duplicar las pasadas");
                     return;
                   }
-                  toast.success(`¡Tiradas ${lineas.length} líneas rectas cada ${anchoCalle}m hasta el final del lote!`);
+                  toast.success(`¡Tiradas ${lineasOrdenadas.length} líneas rectas cada ${anchoCalle}m hasta el final del lote!`);
                 }}
                 className="h-8 text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 font-black gap-1.5 shadow px-3.5"
               >
-                🚜 Duplicar Pasadas cada {anchoCalle}m ({lineas.length} rectas de borde a borde)
+                🚜 Duplicar Pasadas cada {anchoCalle}m ({lineasOrdenadas.length} rectas de borde a borde)
               </Button>
             </div>
           </div>
@@ -876,23 +976,26 @@ export function Americangis() {
 
       {/* Pestañas de Trabajo */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="bg-slate-900 border border-slate-800 p-1 flex-wrap h-auto">
-          <TabsTrigger value="mapa" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold">
+        <TabsList className="bg-slate-900 border border-slate-800 p-1 flex overflow-x-auto whitespace-nowrap scrollbar-none max-w-full h-auto">
+          <TabsTrigger value="mapa" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold shrink-0">
             <Layers className="h-3.5 w-3.5" /> Visor Cartográfico y Trazador
           </TabsTrigger>
-          <TabsTrigger value="telemetria" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold">
+          <TabsTrigger value="cabina" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold shrink-0">
+            <Compass className="h-3.5 w-3.5 text-amber-400 data-[state=active]:text-slate-950" /> 📱 Cabina Móvil & Secuencia ({lineasOrdenadas.length})
+          </TabsTrigger>
+          <TabsTrigger value="telemetria" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold shrink-0">
             <Tractor className="h-3.5 w-3.5" /> Auditoría Xpert Satcom ({maquinasGps.filter(m => m.lat !== null).length})
           </TabsTrigger>
-          <TabsTrigger value="coordenadas" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold">
-            <FileSpreadsheet className="h-3.5 w-3.5" /> Calles A-B ({lineas.length + callesManuales.length})
+          <TabsTrigger value="coordenadas" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold shrink-0">
+            <FileSpreadsheet className="h-3.5 w-3.5" /> Calles A-B ({lineasOrdenadas.length + callesManuales.length})
           </TabsTrigger>
-          <TabsTrigger value="waypoints" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold">
+          <TabsTrigger value="waypoints" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold shrink-0">
             <AlertTriangle className="h-3.5 w-3.5" /> Waypoints & Obstáculos ({waypoints.length})
           </TabsTrigger>
-          <TabsTrigger value="vertices" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold">
+          <TabsTrigger value="vertices" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold shrink-0">
             <MapPin className="h-3.5 w-3.5" /> Vértices del Lote ({polygon.length})
           </TabsTrigger>
-          <TabsTrigger value="avenza" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold">
+          <TabsTrigger value="avenza" className="gap-1.5 text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 font-bold shrink-0">
             <Smartphone className="h-3.5 w-3.5" /> Guía Avenza Maps & Celular
           </TabsTrigger>
         </TabsList>
@@ -924,7 +1027,7 @@ export function Americangis() {
           <TrazadorMapa
             polygon={polygon}
             onPolygonChange={setPolygon}
-            lineas={lineas}
+            lineas={lineasOrdenadas}
             callesManuales={callesManuales}
             onCallesManualesChange={setCallesManuales}
             onDeleteCalleManual={handleBorrarCalleManual}
@@ -936,7 +1039,10 @@ export function Americangis() {
             interactionMode={interactionMode}
             setInteractionMode={setInteractionMode}
             selectedLineId={selectedLineId}
-            onSelectLine={setSelectedLineId}
+            onSelectLine={(id) => {
+              setSelectedLineId(id);
+              if (id) setPasadaActivaId(id);
+            }}
             height="620px"
             anchoCalle={anchoCalle}
             onAnchoCalleChange={setAnchoCalle}
@@ -945,6 +1051,14 @@ export function Americangis() {
             onToggleMostrarMaquinas={() => setMostrarMaquinasGps(!mostrarMaquinasGps)}
             trackHistorico={trackAuditoria}
             maquinaEnFoco={maquinaEnFoco}
+            pasadaActivaId={pasadaActivaId}
+            proximaPasadaId={proximaPasadaId}
+            pasadasCompletadasIds={pasadasCompletadasIds}
+            ordenSecuencia={ordenSecuencia}
+            onSiguientePasada={handleSiguientePasada}
+            onAnteriorPasada={handleAnteriorPasada}
+            onCompletarPasada={handleCompletarPasada}
+            onToggleOrdenSecuencia={handleToggleOrdenSecuencia}
           />
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground bg-slate-900/60 border border-slate-800/80 rounded-lg p-3">
@@ -1172,6 +1286,309 @@ export function Americangis() {
           </Card>
         </TabsContent>
 
+        {/* PESTAÑA: CABINA MÓVIL & SECUENCIA DE LABOR (BANDERILLERO DIGITAL) */}
+        <TabsContent value="cabina" className="space-y-4 m-0">
+          {(() => {
+            const pasadaActiva = lineasOrdenadas.find((l) => l.id === pasadaActivaId) || lineasOrdenadas[0];
+            const proximaPasada = lineasOrdenadas.find((l) => l.id === proximaPasadaId);
+            const porcentajeCompletado = lineasOrdenadas.length > 0 
+              ? Math.round((pasadasCompletadasIds.length / lineasOrdenadas.length) * 100) 
+              : 0;
+            const metrosCompletados = lineasOrdenadas
+              .filter((l) => pasadasCompletadasIds.includes(l.id))
+              .reduce((acc, l) => acc + l.lengthMeters, 0);
+
+            return (
+              <div className="space-y-4">
+                {/* Control Maestro Superior de Cabina */}
+                <div className="bg-slate-900/90 border-2 border-slate-700 rounded-xl p-4 shadow-xl">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="h-5 w-5 text-amber-400" />
+                        <h2 className="text-lg font-black text-white tracking-tight">
+                          Consola de Guiado en Cabina & Secuencia de Labor
+                        </h2>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Diseñado para soporte de celular/tablet en el parabrisas del tractor o cosechadora.
+                      </p>
+                    </div>
+
+                    {/* Selector de Orden / Invertir Secuencia */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        size="sm"
+                        onClick={handleToggleOrdenSecuencia}
+                        className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs h-9 px-3 gap-1.5 shadow"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        <span>Secuencia: <b>{ordenSecuencia === "descendente" ? "Calle 20 ➔ 01" : "Calle 01 ➔ 20"}</b></span>
+                      </Button>
+
+                      {pasadasCompletadasIds.length > 0 && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleReiniciarProgresoPasadas}
+                          className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs h-9 px-2.5 gap-1"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Reiniciar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Barra de Progreso General */}
+                  <div className="pt-3 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-300 font-medium">
+                        Progreso del Lote: <b className="text-emerald-400">{pasadasCompletadasIds.length}</b> de <b className="text-white">{lineasOrdenadas.length}</b> pasadas
+                      </span>
+                      <span className="font-mono text-emerald-400 font-bold">
+                        {porcentajeCompletado}% ({Math.round(metrosCompletados)}m trabajados)
+                      </span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                      <div
+                        className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-300 rounded-full"
+                        style={{ width: `${porcentajeCompletado}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {lineasOrdenadas.length === 0 ? (
+                  <Card className="border-slate-800 bg-slate-900/60 p-8 text-center">
+                    <Compass className="h-10 w-10 text-slate-600 mx-auto mb-3" />
+                    <p className="text-slate-300 font-bold text-sm">No hay pasadas generadas aún</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Delimite el lote con al menos 3 vértices en la pestaña "Visor Cartográfico" para trazar las pasadas paralelas rectas.
+                    </p>
+                  </Card>
+                ) : (
+                  <>
+                    {/* Tarjeta de Gran Impacto: PASADA ACTUAL (Alto Contraste para Luz Solar) */}
+                    <div className="bg-slate-950 border-2 border-emerald-500 rounded-xl p-4 sm:p-6 shadow-2xl space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="inline-flex items-center gap-2 bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider">
+                            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                            🎯 PASADA EN CURSO
+                          </div>
+                          <div className="text-3xl sm:text-4xl font-black text-white tracking-tight flex items-center gap-3">
+                            <span>{pasadaActiva?.nombre}</span>
+                            <Badge className="bg-emerald-500 text-slate-950 font-black text-sm px-2.5 py-1">
+                              {pasadaActiva?.lengthMeters} m
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {proximaPasada && (
+                          <div className="bg-slate-900 border border-cyan-500/40 rounded-lg p-2.5 sm:text-right">
+                            <div className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5 sm:justify-end">
+                              <span>➡️ SIGUIENTE PASADA</span>
+                            </div>
+                            <div className="text-lg font-black text-white font-mono mt-0.5">
+                              {proximaPasada.nombre}
+                            </div>
+                            <div className="text-xs text-slate-400 font-mono">
+                              {proximaPasada.lengthMeters}m · {proximaPasada.bearing}° {proximaPasada.headingName}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Datos Técnicos de la Pasada */}
+                      {pasadaActiva && (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
+                          <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                            <span className="text-[10px] text-slate-400 uppercase block font-semibold">Rumbo Geodésico</span>
+                            <span className="text-sm sm:text-base font-mono font-black text-amber-400">
+                              {pasadaActiva.bearing}° ({pasadaActiva.headingName})
+                            </span>
+                          </div>
+                          <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                            <span className="text-[10px] text-slate-400 uppercase block font-semibold">Distancia Total</span>
+                            <span className="text-sm sm:text-base font-mono font-black text-white">
+                              {pasadaActiva.lengthMeters} metros
+                            </span>
+                          </div>
+                          <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                            <span className="text-[10px] text-slate-400 uppercase block font-semibold">Separación Lateral</span>
+                            <span className="text-sm sm:text-base font-mono font-black text-cyan-400">
+                              {anchoCalle} m entre ejes
+                            </span>
+                          </div>
+                          <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                            <span className="text-[10px] text-slate-400 uppercase block font-semibold">Sentido de Trabajo</span>
+                            <span className="text-sm sm:text-base font-mono font-black text-slate-200">
+                              Punto A ➔ Punto B
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Coordenadas A y B de la Pasada */}
+                      {pasadaActiva && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-slate-900/90 p-3 rounded-lg border border-slate-800 font-mono">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500" /> Cabecera A (Inicio):
+                            </span>
+                            <span className="text-slate-300">
+                              {pasadaActiva.start.lat.toFixed(6)}, {pasadaActiva.start.lng.toFixed(6)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-1.5 text-red-400 font-bold">
+                              <span className="h-2 w-2 rounded-full bg-red-500" /> Cabecera B (Fin):
+                            </span>
+                            <span className="text-slate-300">
+                              {pasadaActiva.end.lat.toFixed(6)}, {pasadaActiva.end.lng.toFixed(6)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Botones Grandes de Control Táctil (Touch Friendly) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          onClick={handleAnteriorPasada}
+                          className="h-12 text-sm font-bold border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 gap-2"
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                          <span>Pasada Anterior</span>
+                        </Button>
+
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedLineId(pasadaActiva.id);
+                            setActiveTab("mapa");
+                          }}
+                          className="h-12 text-sm font-bold border-amber-500/50 bg-amber-950/30 text-amber-300 hover:bg-amber-950/60 gap-2"
+                        >
+                          <Target className="h-4 w-4 text-amber-400" />
+                          <span>Ver en el Mapa</span>
+                        </Button>
+
+                        <Button
+                          size="lg"
+                          onClick={() => handleCompletarPasada(pasadaActiva.id)}
+                          className="h-12 text-sm font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg gap-2"
+                        >
+                          <CheckCircle2 className="h-5 w-5" />
+                          <span>✓ Lista ➔ Siguiente Pasada</span>
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Grilla / Listado de Pasadas en Orden de Labor */}
+                    <Card className="border-slate-800 bg-slate-900/70 shadow-lg">
+                      <CardHeader className="pb-3 border-b border-slate-800">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-base text-white flex items-center gap-2">
+                              <span>Orden de Pasadas ({lineasOrdenadas.length})</span>
+                              <Badge variant="outline" className="text-xs text-amber-400 border-amber-400/40">
+                                {ordenSecuencia === "descendente" ? "20 ➔ 1" : "1 ➔ 20"}
+                              </Badge>
+                            </CardTitle>
+                            <CardDescription className="text-xs">
+                              Toque cualquier pasada para seleccionarla inmediatamente como activa.
+                            </CardDescription>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleDescargarKML}
+                              className="text-xs border-slate-700 bg-slate-800 text-amber-300 hover:bg-slate-700 h-8 gap-1"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              KML Avenza
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 max-h-[420px] overflow-y-auto pr-1">
+                          {lineasOrdenadas.map((line, idx) => {
+                            const esActiva = line.id === pasadaActiva?.id;
+                            const esCompletada = pasadasCompletadasIds.includes(line.id);
+                            const esProxima = line.id === proximaPasadaId;
+
+                            return (
+                              <button
+                                key={line.id}
+                                onClick={() => {
+                                  setPasadaActivaId(line.id);
+                                  setSelectedLineId(line.id);
+                                }}
+                                className={`p-3 rounded-lg border text-left transition-all flex items-center justify-between gap-2 ${
+                                  esActiva
+                                    ? "bg-emerald-950/80 border-emerald-500 shadow-lg ring-2 ring-emerald-500/50"
+                                    : esCompletada
+                                    ? "bg-slate-950/40 border-emerald-900/40 opacity-70"
+                                    : esProxima
+                                    ? "bg-cyan-950/40 border-cyan-500/60 shadow"
+                                    : "bg-slate-950/70 border-slate-800 hover:border-slate-700 hover:bg-slate-800/60"
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[11px] font-mono text-slate-400">
+                                      #{idx + 1}
+                                    </span>
+                                    <span className={`font-mono font-bold text-sm truncate ${
+                                      esActiva ? "text-emerald-400" : esCompletada ? "text-slate-400 line-through" : "text-white"
+                                    }`}>
+                                      {line.nombre}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                                    {line.lengthMeters}m · {line.bearing}°
+                                  </div>
+                                </div>
+
+                                <div className="shrink-0">
+                                  {esActiva ? (
+                                    <Badge className="bg-emerald-500 text-slate-950 font-black text-[10px] px-1.5 py-0.5">
+                                      EN CURSO
+                                    </Badge>
+                                  ) : esCompletada ? (
+                                    <span className="text-emerald-400 text-xs font-bold flex items-center gap-1">
+                                      <Check className="h-3.5 w-3.5 stroke-[3]" /> Hecha
+                                    </span>
+                                  ) : esProxima ? (
+                                    <Badge variant="outline" className="border-cyan-400 text-cyan-300 text-[10px] px-1.5 py-0.5">
+                                      SIGUIENTE
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-500 font-mono">
+                                      Pendiente
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+        </TabsContent>
+
         {/* PESTAÑA 2: PLANILLA DE COORDENADAS A-B */}
         <TabsContent value="coordenadas" className="space-y-4 m-0">
           <Card className="border-slate-800 bg-slate-900/60">
@@ -1276,7 +1693,7 @@ export function Americangis() {
                       ))}
 
                       {/* Pasadas Automáticas */}
-                      {lineas.map((line) => (
+                      {lineasOrdenadas.map((line) => (
                         <tr
                           key={line.id}
                           onClick={() => setSelectedLineId(line.id)}
