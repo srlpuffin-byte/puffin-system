@@ -263,12 +263,12 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "registrar_gasto",
-      description: "Registra un gasto/egreso en el sistema de forma RÁPIDA, DIRECTA E INTELIGENTE. REGLAS CRÍTICAS: 1) Fecha: por defecto usa SIEMPRE la fecha de hoy, NUNCA preguntes por la fecha. 2) Categoría: dedúcela automáticamente según el concepto (ej: relays/repuestos/filtros -> Mantenimiento, combustible/nafta/gasoil -> Combustible, cemento/caños -> Materiales, etc.), NUNCA preguntes por la categoría. 3) Centro de costos: si se menciona un proyecto/obra (ej: 'Lipsa', 'Broglia'), imputalo automáticamente. 4) Observaciones: si se menciona una máquina o equipo (ej: 'liugong', 'cargadora liugong', 'pala', 'camión'), anótalo en observaciones (ej: 'Cargadora LiuGong'). 5) REGISTRO INMEDIATO: Si tienes concepto y monto (del mensaje de texto, foto o factura PDF), REGISTRA EL GASTO INMEDIATAMENTE sin pedir confirmaciones previas ('¿confirmás?', 'decime OK'). Luego responde con el resumen prolijo de lo que quedó guardado.",
+      description: "Registra un gasto/egreso en el sistema de forma RÁPIDA, DIRECTA E INTELIGENTE. REGLAS CRÍTICAS: 1) Fecha: por defecto usa SIEMPRE la fecha de hoy, NUNCA preguntes por la fecha. 2) Categoría: dedúcela automáticamente según el concepto (ej: relays/repuestos/filtros/líquido de freno/cubiertas -> Repuestos, combustible/nafta/gasoil -> Combustible, reparaciones/service/taller -> Mantenimiento, cemento/caños -> Materiales, etc.), NUNCA preguntes por la categoría. 3) Centro de costos: si se menciona un proyecto/obra (ej: 'Lipsa', 'Broglia'), imputalo automáticamente. 4) Observaciones: si se menciona una máquina o equipo (ej: 'liugong', 'cargadora liugong', 'pala', 'camión'), anótalo en observaciones (ej: 'Cargadora LiuGong'). 5) REGISTRO INMEDIATO: Si tienes concepto y monto (del mensaje de texto, foto o factura PDF), REGISTRA EL GASTO INMEDIATAMENTE sin pedir confirmaciones previas ('¿confirmás?', 'decime OK'). Luego responde con el resumen prolijo de lo que quedó guardado.",
       parameters: {
         type: "object",
         properties: {
           fecha: { type: "string", description: "Fecha del gasto en formato YYYY-MM-DD (opcional, si no se especifica usa hoy)" },
-          categoria: { type: "string", description: "Categoría del gasto (ej: Mantenimiento, Combustible, Materiales, Servicios, Herramientas, Personal, Alquiler, Otro). Inferir automáticamente." },
+          categoria: { type: "string", description: "Categoría del gasto (ej: Repuestos, Mantenimiento, Combustible, Materiales, Servicios, Sueldos, Alquiler, Otros). Inferir automáticamente." },
           concepto: { type: "string", description: "Descripción o detalle del gasto" },
           monto: { type: "number", description: "Monto TOTAL en pesos. Si el usuario indica cantidad y precio unitario (ej: 47 litros a $2290), multiplícalos." },
           proveedor: { type: "string", description: "Nombre del proveedor o empresa si figura (opcional)" },
@@ -782,13 +782,15 @@ Para el registro de EGRESOS/GASTOS, el dueño de la empresa necesita MÁXIMA VEL
 INTERPRETACIÓN INTELIGENTE DE DATOS:
 1. FECHA: Por defecto es SIEMPRE la fecha del día de hoy (${todayISO}). NUNCA preguntes la fecha. Solo usá otra fecha si el usuario la indica explícitamente o si figura en el comprobante/factura.
 2. CATEGORÍA: Deducila automáticamente a partir del concepto/proveedor. NUNCA preguntes por la categoría:
-   - Relays, filtros, aceite, correas, orugas, cubiertas, repuestos, reparaciones, mecánica, electricidad -> "Mantenimiento"
+   - Relays, filtros, líquido de freno, jeringas, cubiertas, ponchos, orugas, correas, baterías, repuestos, piezas, partes de máquinas -> "Repuestos"
+   - Service, mano de obra mecánica, reparaciones de taller, tornería, arreglos -> "Mantenimiento"
    - Gasoil, diesel, nafta, combustible, YPF, Axion, Shell -> "Combustible"
    - Cemento, arena, ripio, caños, hierro, chapas, insumos -> "Materiales"
    - Amoladoras, discos, pinzas, palas, herramientas -> "Herramientas"
-   - Viáticos, comida, almuerzos, fletes, servicios -> "Servicios" o "Personal"
+   - Viáticos, comida, almuerzos, fletes, servicios -> "Servicios"
+   - Sueldos, jornales, adelantos -> "Sueldos"
    - Alquileres -> "Alquiler" (imputar a "RMG e hijas")
-   - Si dudas -> usá "Materiales" o "Mantenimiento". ¡JAMÁS preguntes la categoría!
+   - Si dudas -> usá "Repuestos". ¡JAMÁS preguntes la categoría!
 3. PROYECTO / CENTRO DE COSTOS Y MÁQUINA:
    - Si el usuario menciona una obra (ej: "Lipsa", "Broglia", "Campo"), imputalo como centro_costos.
    - Si menciona una máquina (ej: "liugong", "cargadora liugong", "pala", "camión", "excavadora"), anotala en observaciones (ej: "Cargadora LiuGong").
@@ -801,7 +803,7 @@ INTERPRETACIÓN INTELIGENTE DE DATOS:
      -> Concepto: "4 MICRO RELAY DE 24V 15A"
      -> Monto: 48000
      -> Fecha: "${todayISO}"
-     -> Categoría: "Mantenimiento"
+     -> Categoría: "Repuestos"
      -> Centro de costos: "Lipsa"
      -> Observaciones: "Cargadora LiuGong"
      Y REGISTRARLO DIRECTAMENTE con 'registrar_gasto'.
@@ -869,7 +871,7 @@ REGLAS DE OPERACIÓN:
 - Cuando no encontrés algo, decilo claramente.
 - Respondé siempre de forma concisa y profesional.
 
-CATEGORÍAS DE GASTO: Combustible, Materiales, Servicios, Mantenimiento, Herramientas, Administrativo, Personal, Alquiler, Otro.`
+CATEGORÍAS DE GASTO: Repuestos, Mantenimiento, Combustible, Materiales, Servicios, Sueldos, Herramientas, Alquiler, Otros.`
     : `Sos el Asistente de PUFFIN SRL.
 Hablás en español rioplatense, de forma profesional.
 Rol: *OPERARIO* — acceso solo lectura.
@@ -1847,18 +1849,22 @@ async function executeRegistrarGasto(args: {
     let categoriaFinal = args.categoria;
     if (!categoriaFinal) {
       const c = `${args.concepto || ""} ${args.observaciones || ""} ${args.centro_costos || ""}`.toLowerCase();
-      if (/relay|filtro|aceite|repuesto|mecanic|cubierta|oruga|correa|bateria|freno|service|reparac/i.test(c)) {
+      if (/repuesto|relay|filtro|freno|liquido|cubierta|poncho|oruga|correa|bateria|jeringa|pieza|buje|tornillo|chapa/i.test(c)) {
+        categoriaFinal = "Repuestos";
+      } else if (/mecanic|service|reparac|taller|torner|mano de obra/i.test(c)) {
         categoriaFinal = "Mantenimiento";
       } else if (/gasoil|combustible|nafta|ypf|axion|shell|litro/i.test(c)) {
         categoriaFinal = "Combustible";
-      } else if (/cemento|caño|arena|ripio|hierro|chapa|alambre|tornillo|disco/i.test(c)) {
+      } else if (/cemento|caño|arena|ripio|hierro|alambre/i.test(c)) {
         categoriaFinal = "Materiales";
+      } else if (/sueldo|jornal|quincena|adelanto/i.test(c)) {
+        categoriaFinal = "Sueldos";
       } else if (/alquiler|rmg/i.test(c)) {
         categoriaFinal = "Alquiler";
       } else if (/viatico|almuerzo|comida|flete/i.test(c)) {
         categoriaFinal = "Servicios";
       } else {
-        categoriaFinal = "Materiales";
+        categoriaFinal = "Repuestos";
       }
     }
 
