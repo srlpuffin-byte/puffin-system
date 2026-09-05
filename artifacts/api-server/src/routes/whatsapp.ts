@@ -1,10 +1,104 @@
 import { Router } from "express";
+import zlib from "node:zlib";
 import { handleWhatsAppMessage } from "../services/assistant.js";
 import { downloadWhatsAppMedia } from "../services/whatsapp.js";
 
 export const whatsappRouter = Router();
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || "puffin_secret_token";
+
+/**
+ * Extractor ultra-robusto de texto para facturas y documentos PDF.
+ * 1. Intenta con pdf-parse (v2 clase PDFParse o v1 función).
+ * 2. Si falla o devuelve vacío, aplica un fallback directo descompimiendo los streams FlateDecode con zlib.
+ */
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  if (!buffer || buffer.length < 10) return "";
+
+  // 1. Intento con pdf-parse
+  try {
+    const pdfModule = await import("pdf-parse");
+    if ((pdfModule as any).PDFParse) {
+      const parser = new (pdfModule as any).PDFParse({ data: buffer });
+      const parsedResult = await parser.getText();
+      const text = parsedResult?.text || parsedResult?.pages?.map((p: any) => p.text).join("\n") || "";
+      if (text && text.trim().length > 15) {
+        const cleaned = text
+          .split("\n")
+          .map((l: string) => l.trim())
+          .filter(Boolean)
+          .join("\n");
+        console.log(`[PDF] Texto extraído exitosamente con PDFParse v2 (${cleaned.length} caracteres)`);
+        return cleaned;
+      }
+    } else if (typeof (pdfModule as any).default === "function") {
+      const parsedResult = await (pdfModule as any).default(buffer);
+      if (parsedResult?.text?.trim()?.length > 15) {
+        const cleaned = parsedResult.text
+          .split("\n")
+          .map((l: string) => l.trim())
+          .filter(Boolean)
+          .join("\n");
+        console.log(`[PDF] Texto extraído con pdf-parse v1 (${cleaned.length} caracteres)`);
+        return cleaned;
+      }
+    }
+  } catch (pdfErr) {
+    console.warn("[PDF] Advertencia con pdf-parse:", pdfErr);
+  }
+
+  // 2. Fallback robusto: extracción de streams descomprimidos de PDF
+  // Las facturas electrónicas de AFIP guardan conceptos y montos en bloques de texto FlateDecode
+  try {
+    const binaryStr = buffer.toString("binary");
+    const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+    let match;
+    const extractedWords: string[] = [];
+
+    while ((match = streamRegex.exec(binaryStr)) !== null) {
+      const rawData = Buffer.from(match[1], "binary");
+      let decompressed = "";
+      try {
+        decompressed = zlib.inflateSync(rawData).toString("latin1");
+      } catch {
+        try {
+          decompressed = zlib.inflateRawSync(rawData).toString("latin1");
+        } catch {
+          decompressed = rawData.toString("latin1");
+        }
+      }
+
+      // Buscar operadores Tj: (texto) Tj
+      const tjMatches = decompressed.match(/\([^)]+\)\s*Tj/g) || [];
+      for (const m of tjMatches) {
+        const t = m.slice(1, m.lastIndexOf(")")).trim();
+        if (t && t.length > 0 && !/^[\x00-\x1F\x7F]+$/.test(t)) {
+          extractedWords.push(t);
+        }
+      }
+
+      // Buscar operadores TJ: [(texto) -12 (otro)] TJ
+      const arrMatches = decompressed.match(/\[[^\]]+\]\s*TJ/g) || [];
+      for (const m of arrMatches) {
+        const innerMatches = m.match(/\([^)]+\)/g) || [];
+        const combined = innerMatches.map(s => s.slice(1, -1)).join("");
+        if (combined.trim().length > 0 && !/^[\x00-\x1F\x7F]+$/.test(combined)) {
+          extractedWords.push(combined.trim());
+        }
+      }
+    }
+
+    if (extractedWords.length > 5) {
+      const fallbackText = extractedWords.join(" ");
+      console.log(`[PDF] Fallback de streams zlib extrajo ${extractedWords.length} palabras (${fallbackText.length} caracteres)`);
+      return fallbackText;
+    }
+  } catch (streamErr) {
+    console.warn("[PDF] Falló extracción de streams crudos:", streamErr);
+  }
+
+  return "";
+}
 
 // Cola / Buffer para agrupar mensajes continuos que llegan con segundos de diferencia
 // (ej: primero la foto/PDF del comprobante y a continuación "Lipsa cargadora Liugong", o al revés)
@@ -164,26 +258,18 @@ whatsappRouter.post("/", async (req, res) => {
               batch.mediaBase64 = base64;
               // Si es un PDF, extraer el texto para que la IA lo interprete directamente
               if (message.document.mime_type?.includes("pdf") || docName.toLowerCase().endsWith(".pdf")) {
-                try {
-                  const { PDFParse } = await import("pdf-parse");
-                  const base64Data = base64.includes(";base64,") ? base64.split(";base64,")[1] : base64;
-                  const buffer = Buffer.from(base64Data, "base64");
-                  const parser = new PDFParse({ data: buffer });
-                  const parsedResult = await parser.getText();
-                  if (parsedResult && parsedResult.text && parsedResult.text.trim()) {
-                    // Preservar saltos de línea para conservar estructura de tablas y conceptos
-                    const cleanedLines = parsedResult.text
-                      .split("\n")
-                      .map((l: string) => l.trim())
-                      .filter(Boolean)
-                      .join("\n");
-                    docHeader += `\n\n--- CONTENIDO EXTRAÍDO DE LA FACTURA/PDF (${docName}) ---\n${cleanedLines.slice(0, 4000)}`;
-                    console.log(`[Webhook] Texto extraído exitosamente de PDF ${docName} (${cleanedLines.length} caracteres)`);
-                  }
-                } catch (pdfErr) {
-                  console.warn(`[Webhook] No se pudo extraer texto del PDF ${docName}:`, pdfErr);
+                const base64Data = base64.includes(";base64,") ? base64.split(";base64,")[1] : base64;
+                const buffer = Buffer.from(base64Data.trim(), "base64");
+                const extractedText = await extractPdfText(buffer);
+                if (extractedText && extractedText.trim()) {
+                  docHeader += `\n\n--- CONTENIDO EXTRAÍDO DE LA FACTURA/PDF (${docName}) ---\n${extractedText.slice(0, 4000)}`;
+                  console.log(`[Webhook] ✅ Texto extraído exitosamente de PDF ${docName} (${extractedText.length} caracteres)`);
+                } else {
+                  console.warn(`[Webhook] ⚠️ No se pudo extraer texto del PDF ${docName}`);
                 }
               }
+            } else {
+              console.error(`[Webhook] ❌ downloadWhatsAppMedia devolvió null para el documento ${mediaId}`);
             }
           } catch (err) {
             console.error(`[Webhook] Error descargando documento ${mediaId}:`, err);

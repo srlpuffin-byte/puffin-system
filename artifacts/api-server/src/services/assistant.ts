@@ -811,7 +811,11 @@ PASO 1 - INTERPRETAR Y ARMAR LA ESTRUCTURA (SIN REGISTRAR TODAVÍA):
 Cuando el usuario te envíe un mensaje con un gasto (texto, foto o comprobante PDF):
 - NO llames a 'registrar_gasto' inmediatamente.
 - Deducí e interpretá de forma inteligente todos los datos posibles:
-  1. FECHA: Por defecto es SIEMPRE la fecha del día de hoy (${todayISO}). NUNCA preguntes la fecha a menos que el usuario o el comprobante indiquen otra fecha explícita.
+  0. CONCEPTO Y MONTO DESDE LA FACTURA/PDF:
+     - Si el mensaje incluye contenido extraído de una factura o comprobante PDF: EXTRAÉ OBLIGATORIAMENTE el concepto/repuesto (ej: "Filtro de gasoil", "Micro relay") y el monto total en pesos (ej: 8000, 48000).
+     - El Concepto del egreso es el ítem, repuesto o servicio adquirido (ej: "Filtro de gasoil"). NUNCA uses el nombre de la máquina ("Cargadora LiuGong") como concepto si en la factura figura el ítem.
+     - El monto es el total de la factura. NUNCA pongas "(no fue especificado)" si en el texto del comprobante aparece el precio o total.
+  1. FECHA: Por defecto es la fecha de emisión de la factura si figura (ej: 01/09/2026), o la fecha de hoy (${todayISO}).
   2. CATEGORÍA: Deducila automáticamente a partir del concepto/proveedor (¡NUNCA preguntes por la categoría!):
      - Relays, filtros, líquido de freno, jeringas, cubiertas, ponchos, orugas, correas, baterías, repuestos, piezas, partes de máquinas -> "Repuestos"
      - Service, mano de obra mecánica, reparaciones de taller, tornería, arreglos -> "Mantenimiento"

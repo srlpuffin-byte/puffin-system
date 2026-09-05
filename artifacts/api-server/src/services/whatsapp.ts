@@ -268,38 +268,51 @@ export async function downloadWhatsAppMedia(mediaId: string): Promise<string | n
   }
 
   try {
-    // 1. Obtener la URL del medio
+    // 1. Obtener la URL del medio desde Meta Graph API
     const url = `${WHATSAPP_API_URL}/${mediaId}`;
     const urlRes = await fetch(url, {
-      headers: { "Authorization": `Bearer ${WHATSAPP_ACCESS_TOKEN}` }
+      headers: {
+        Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+        "User-Agent": "curl/7.64.1",
+        Accept: "*/*",
+      },
     });
 
     if (!urlRes.ok) {
-      console.error(`[WhatsApp] Error obteniendo URL del media ${mediaId}:`, await urlRes.text());
+      console.error(`[WhatsApp] Error obteniendo URL del media ${mediaId}: status=${urlRes.status} body=${await urlRes.text()}`);
       return null;
     }
 
-    const mediaData = await urlRes.json() as any;
+    const mediaData = (await urlRes.json()) as any;
     const mediaUrl = mediaData.url;
 
-    if (!mediaUrl) return null;
+    if (!mediaUrl) {
+      console.error(`[WhatsApp] Meta no devolvió URL para el mediaId ${mediaId}:`, mediaData);
+      return null;
+    }
 
-    // 2. Descargar el binario del medio
+    // 2. Descargar el binario del medio desde lookaside.fbsbx.com
+    // IMPORTANTE: Meta lookaside CDN requiere User-Agent estándar (ej: curl) para no bloquear la petición
     const mediaRes = await fetch(mediaUrl, {
-      headers: { "Authorization": `Bearer ${WHATSAPP_ACCESS_TOKEN}` }
+      headers: {
+        Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+        "User-Agent": "curl/7.64.1",
+        Accept: "*/*",
+      },
     });
 
     if (!mediaRes.ok) {
-      console.error(`[WhatsApp] Error descargando binario del media ${mediaId}:`, await mediaRes.text());
+      console.error(`[WhatsApp] Error descargando binario del media ${mediaId} (${mediaUrl}): status=${mediaRes.status} body=${await mediaRes.text()}`);
       return null;
     }
 
     const arrayBuffer = await mediaRes.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString('base64');
-    
-    // Suponemos que es jpeg para WhatsApp, aunque podría ser otro
-    const mimeType = mediaData.mime_type || "image/jpeg";
-    
+    const buf = Buffer.from(arrayBuffer);
+    const mimeType = mediaData.mime_type || "application/octet-stream";
+
+    console.log(`[WhatsApp] Media ${mediaId} descargado exitosamente: ${buf.length} bytes, MIME=${mimeType}`);
+
+    const base64 = buf.toString("base64");
     return `data:${mimeType};base64,${base64}`;
   } catch (error) {
     console.error(`[WhatsApp] Excepción al descargar media ${mediaId}:`, error);
