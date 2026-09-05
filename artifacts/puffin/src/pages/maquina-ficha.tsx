@@ -97,7 +97,7 @@ export function MaquinaFicha() {
         return null;
       }
     },
-    enabled: !!maquinaId && !!maquina?.satcom_id,
+    enabled: !!maquinaId && !!(maquina as any)?.satcom_id,
     refetchInterval: 30000 // Actualiza cada 30 segundos en vivo
   });
 

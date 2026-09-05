@@ -72,7 +72,7 @@ export function Egresos() {
     query: {
       refetchOnMount: true,
       staleTime: 0,
-    }
+    } as any
   });
   const egresos = egresosResp?.data;
   const paginationMeta = egresosResp?.meta;
@@ -447,7 +447,7 @@ export function Egresos() {
                         </TableCell>
                         <TableCell>
                           {eg.comprobante ? (
-                            <Badge variant="default" className="bg-green-600 hover:bg-green-700 cursor-pointer" onClick={() => handleVerFoto(eg.id)}>Ver Foto</Badge>
+                            <Badge variant="default" className="bg-green-600 hover:bg-green-700 cursor-pointer" onClick={() => handleVerFoto(eg.id)}>Ver Comprobante</Badge>
                           ) : (
                             <Badge variant="secondary">NO</Badge>
                           )}
@@ -487,7 +487,7 @@ export function Egresos() {
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-muted-foreground">Comprobante:</span>
                         {eg.comprobante ? (
-                          <Badge variant="default" className="bg-green-600 hover:bg-green-700 cursor-pointer text-[10px] px-1 py-0" onClick={() => handleVerFoto(eg.id)}>Ver Foto</Badge>
+                          <Badge variant="default" className="bg-green-600 hover:bg-green-700 cursor-pointer text-[10px] px-1.5 py-0.5" onClick={() => handleVerFoto(eg.id)}>Ver Comprobante</Badge>
                         ) : (
                           <Badge variant="secondary" className="text-[10px] px-1 py-0">NO</Badge>
                         )}
@@ -674,16 +674,28 @@ export function Egresos() {
           </div>
         </div>
       )}
-      {/* Dialog para Ver Foto */}
+      {/* Dialog para Ver Foto / Comprobante */}
       <Dialog open={openFotoDialog} onOpenChange={setOpenFotoDialog}>
-        <DialogContent className="sm:max-w-[600px] bg-white p-1">
-          <div className="relative bg-slate-950 flex items-center justify-center min-h-[300px] rounded-md overflow-hidden">
+        <DialogContent className="sm:max-w-[750px] bg-white p-2">
+          <div className="relative bg-slate-950 flex items-center justify-center min-h-[350px] rounded-md overflow-hidden">
             {fotoUrlToView ? (
-              <img src={fotoUrlToView} alt="Comprobante" className="max-w-full max-h-[80vh] object-contain" />
+              fotoUrlToView.includes("application/pdf") || fotoUrlToView.toLowerCase().endsWith(".pdf") ? (
+                <div className="w-full h-[75vh] flex flex-col bg-white">
+                  <div className="p-2 bg-slate-100 border-b flex justify-between items-center text-xs text-slate-600">
+                    <span className="font-semibold">Factura / Comprobante PDF</span>
+                    <a href={fotoUrlToView} target="_blank" rel="noreferrer" className="text-blue-600 font-medium underline flex items-center gap-1">
+                      Abrir en pestaña nueva ↗
+                    </a>
+                  </div>
+                  <iframe src={fotoUrlToView} title="Comprobante PDF" className="w-full flex-1 border-0" />
+                </div>
+              ) : (
+                <img src={fotoUrlToView} alt="Comprobante" className="max-w-full max-h-[80vh] object-contain" />
+              )
             ) : (
               <div className="text-slate-400">Cargando...</div>
             )}
-            <Button variant="ghost" className="absolute top-2 right-2 text-white bg-black/50 hover:bg-black/80" onClick={() => setOpenFotoDialog(false)}>
+            <Button variant="ghost" className="absolute top-2 right-2 text-white bg-black/50 hover:bg-black/80 z-10" onClick={() => setOpenFotoDialog(false)}>
               ✕ Cerrar
             </Button>
           </div>
