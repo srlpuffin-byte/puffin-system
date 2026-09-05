@@ -306,12 +306,17 @@ export function TrazadorMapa({
       }
       const devId = (target as any).device_id;
       const maqId = (target as any).maquina_id;
-      if (devId || maqId) {
+      const nom = (target as any).nombre;
+      if (devId || maqId || nom) {
         for (const [, veh] of animatedVehiclesRef.current.entries()) {
-          if (
-            (devId && String(veh.data.device_id) === String(devId)) ||
-            (maqId && String(veh.data.maquina_id) === String(maqId))
-          ) {
+          const matchDev = devId && String(veh.data.device_id) === String(devId);
+          const matchMaq = maqId && String(veh.data.maquina_id) === String(maqId);
+          const matchNom = nom && veh.data.nombre && (
+            veh.data.nombre.toLowerCase().trim() === nom.toLowerCase().trim() ||
+            veh.data.nombre.toLowerCase().includes(nom.toLowerCase()) ||
+            nom.toLowerCase().includes(veh.data.nombre.toLowerCase())
+          );
+          if (matchDev || matchMaq || matchNom) {
             pt = { lat: veh.currentLat || pt.lat, lng: veh.currentLng || pt.lng };
             targetMarker = veh.marker;
             break;
@@ -319,7 +324,13 @@ export function TrazadorMapa({
         }
       }
     } else {
-      const validas = maquinas.filter((m) => m.lat !== null && m.lng !== null);
+      const validas = maquinas.filter((m) => m.lat !== null && m.lng !== null && !isNaN(Number(m.lat)) && !isNaN(Number(m.lng)));
+      if (validas.length > 1) {
+        const bounds = window.L.latLngBounds(validas.map(m => [Number(m.lat), Number(m.lng)]));
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+        toast.success(`Mostrando toda la flota (${validas.length} vehículos) en el mapa`);
+        return;
+      }
       const onlineOne = validas.find((m) => m.estado_satcom === "online");
       const chosen = onlineOne || validas[0];
       if (chosen && chosen.lat !== null && chosen.lng !== null) {
@@ -347,6 +358,7 @@ export function TrazadorMapa({
       onToggleMostrarMaquinas();
     }
 
+    map.setView([pt.lat, pt.lng], 17);
     map.flyTo([pt.lat, pt.lng], 17, { animate: true, duration: 0.8 });
 
     const openMarkerPopup = () => {
@@ -372,8 +384,9 @@ export function TrazadorMapa({
     };
 
     openMarkerPopup();
-    setTimeout(openMarkerPopup, 150);
-    setTimeout(openMarkerPopup, 450);
+    setTimeout(openMarkerPopup, 100);
+    setTimeout(openMarkerPopup, 300);
+    setTimeout(openMarkerPopup, 650);
 
     toast.success(`Centrando mapa en ${nombre}`);
   };
@@ -389,9 +402,15 @@ export function TrazadorMapa({
       const L = window.L;
       if (!containerRef.current || mapRef.current) return;
 
+      const hasFoco = maquinaEnFoco && !isNaN(Number(maquinaEnFoco.lat)) && !isNaN(Number(maquinaEnFoco.lng));
+      const centerToUse: [number, number] = hasFoco
+        ? [Number(maquinaEnFoco.lat), Number(maquinaEnFoco.lng)]
+        : [initialCenter.lat, initialCenter.lng];
+      const zoomToUse = hasFoco ? 17 : 14;
+
       const map = L.map(containerRef.current, {
-        center: [initialCenter.lat, initialCenter.lng],
-        zoom: 14,
+        center: centerToUse,
+        zoom: zoomToUse,
         zoomControl: false,
         attributionControl: false,
       });
@@ -454,7 +473,9 @@ export function TrazadorMapa({
       mapRef.current = map;
       setMapReady(true);
 
-      if (polygon.length >= 3) {
+      if (hasFoco) {
+        map.setView([Number(maquinaEnFoco.lat), Number(maquinaEnFoco.lng)], 17);
+      } else if (polygon.length >= 3) {
         const bounds = L.latLngBounds(polygon.map((p) => [p.lat, p.lng]));
         map.fitBounds(bounds, { padding: [50, 50] });
       }
@@ -1326,12 +1347,17 @@ export function TrazadorMapa({
 
       let targetMarker: any = null;
 
-      // 1. Buscar en animatedVehiclesRef por device_id o maquina_id
-      if (maquinaEnFoco.device_id || maquinaEnFoco.maquina_id) {
+      // 1. Buscar en animatedVehiclesRef por device_id, maquina_id o nombre
+      if (maquinaEnFoco.device_id || maquinaEnFoco.maquina_id || maquinaEnFoco.nombre) {
         for (const [, veh] of animatedVehiclesRef.current.entries()) {
           const matchDev = maquinaEnFoco.device_id && String(veh.data.device_id) === String(maquinaEnFoco.device_id);
           const matchMaq = maquinaEnFoco.maquina_id && String(veh.data.maquina_id) === String(maquinaEnFoco.maquina_id);
-          if (matchDev || matchMaq) {
+          const matchNom = maquinaEnFoco.nombre && veh.data.nombre && (
+            veh.data.nombre.toLowerCase().trim() === maquinaEnFoco.nombre.toLowerCase().trim() ||
+            veh.data.nombre.toLowerCase().includes(maquinaEnFoco.nombre.toLowerCase()) ||
+            maquinaEnFoco.nombre.toLowerCase().includes(veh.data.nombre.toLowerCase())
+          );
+          if (matchDev || matchMaq || matchNom) {
             lat = veh.currentLat || lat;
             lng = veh.currentLng || lng;
             targetMarker = veh.marker;
@@ -1357,6 +1383,7 @@ export function TrazadorMapa({
         });
       }
 
+      map.setView([lat, lng], 17);
       map.flyTo([lat, lng], 17, { animate: true, duration: 0.8 });
 
       if (targetMarker) {
@@ -1364,29 +1391,31 @@ export function TrazadorMapa({
       }
     };
 
-    // Reintentos automáticos para sincronizar con transiciones de pestañas
+    // Reintentos automáticos para sincronizar con transiciones de pestañas y montaje
     ejecutarEnfoque();
-    const t1 = setTimeout(ejecutarEnfoque, 100);
-    const t2 = setTimeout(ejecutarEnfoque, 300);
-    const t3 = setTimeout(ejecutarEnfoque, 650);
+    const t1 = setTimeout(ejecutarEnfoque, 60);
+    const t2 = setTimeout(ejecutarEnfoque, 180);
+    const t3 = setTimeout(ejecutarEnfoque, 400);
+    const t4 = setTimeout(ejecutarEnfoque, 850);
 
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
+      clearTimeout(t4);
     };
-  }, [maquinaEnFoco, activeTab]);
+  }, [maquinaEnFoco, activeTab, mapReady]);
 
   // Invalidar tamaño cuando la pestaña activa pasa a ser 'mapa'
   useEffect(() => {
     if (activeTab === "mapa" && mapRef.current) {
       const map = mapRef.current;
       map.invalidateSize();
-      const t = setTimeout(() => {
-        map.invalidateSize();
-      }, 150);
+      const t1 = setTimeout(() => map.invalidateSize(), 80);
+      const t2 = setTimeout(() => map.invalidateSize(), 250);
       return () => {
-        clearTimeout(t);
+        clearTimeout(t1);
+        clearTimeout(t2);
       };
     }
     return undefined;
@@ -1407,11 +1436,13 @@ export function TrazadorMapa({
     const currentKeys = new Set<string>();
 
     maquinas.forEach((m) => {
-      if (m.lat === null || m.lng === null) return;
+      const lat = m.lat !== null && m.lat !== undefined ? Number(m.lat) : NaN;
+      const lng = m.lng !== null && m.lng !== undefined ? Number(m.lng) : NaN;
+      if (isNaN(lat) || isNaN(lng)) return;
       const key = String(m.device_id ? `dev-${m.device_id}` : `maq-${m.maquina_id || m.nombre}`);
       currentKeys.add(key);
 
-      const pt: LatLng = { lat: m.lat, lng: m.lng };
+      const pt: LatLng = { lat, lng };
       const tieneLote = polygon.length >= 3;
       const dentroDelLote = tieneLote ? esPuntoEnPoligono(pt, polygon) : false;
       const auditoria = lineas.length > 0 ? calcularDesvioPasada(pt, lineas) : { lineaCercana: null, desvioMeters: 0, estaAlineado: true, calidad: "excelente" as const };
@@ -1542,7 +1573,7 @@ export function TrazadorMapa({
             <div><b>Velocidad Actual:</b> <b>${velDisplay.toFixed(1)} km/h</b> (Rumbo: ${rumbo}°)</div>
             ${m.horometro_horas ? `<div><b>Horómetro Satcom:</b> <b>${m.horometro_horas.toLocaleString("es-AR")} hrs</b></div>` : ''}
             <div><b>Último Reporte:</b> <span style="font-weight: bold; color: ${isOffline ? '#dc2626' : '#166534'};">${tiempoReporte}</span></div>
-            <div><b>Coordenadas:</b> ${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}</div>
+            <div><b>Coordenadas:</b> ${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
           </div>
           ${isAdmin ? `
           <div style="margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 6px; display: flex; gap: 4px;">
@@ -1564,7 +1595,7 @@ export function TrazadorMapa({
           iconAnchor: [22, 30],
         });
 
-        const marker = L.marker([m.lat, m.lng], { icon: divIcon, zIndexOffset: 1000 });
+        const marker = L.marker([lat, lng], { icon: divIcon, zIndexOffset: 1000 });
         marker.bindPopup(popupContent);
 
         marker.on("click", () => {
@@ -1592,18 +1623,24 @@ export function TrazadorMapa({
         const newAnimated = {
           id: key,
           data: m,
-          currentLat: m.lat,
-          currentLng: m.lng,
+          currentLat: lat,
+          currentLng: lng,
           marker,
         };
 
         animatedVehiclesRef.current.set(key, newAnimated);
       } else {
         animated.data = m;
-        animated.currentLat = m.lat;
-        animated.currentLng = m.lng;
-        animated.marker.setLatLng([m.lat, m.lng]);
+        animated.currentLat = lat;
+        animated.currentLng = lng;
+        animated.marker.setLatLng([lat, lng]);
         animated.marker.setPopupContent(popupContent);
+        animated.marker.setIcon(L.divIcon({
+          className: "custom-machine-pin",
+          html: buildIconHtml(velDisplay, rumbo),
+          iconSize: [44, 60],
+          iconAnchor: [22, 30],
+        }));
         
         const iconEl = animated.marker.getElement();
         if (iconEl) {
@@ -1645,13 +1682,24 @@ export function TrazadorMapa({
     const group = trackGroupRef.current;
     group.clearLayers();
 
-    const latLngs = trackHistorico.map((p) => [p.lat, p.lng]);
-    const trackLine = L.polyline(latLngs, { color: "#06b6d4", weight: 3, opacity: 0.95 });
+    const latLngs = trackHistorico
+      .map((p) => [Number(p.lat), Number(p.lng)])
+      .filter(([lat, lng]) => !isNaN(lat) && !isNaN(lng));
+    if (latLngs.length < 2) return undefined;
+
+    const trackLine = L.polyline(latLngs, { color: "#06b6d4", weight: 3.5, opacity: 0.95 });
     group.addLayer(trackLine);
-    try { map.fitBounds(trackLine.getBounds(), { padding: [60, 60] }); } catch (e) {}
+
+    // Solo hacer fitBounds si NO hay un enfoque directo reciente sobre la máquina
+    const isMaquinaEnFocoActiva = maquinaEnFoco && (Date.now() - (maquinaEnFoco.timestamp || 0)) < 4000;
+    if (!isMaquinaEnFocoActiva) {
+      try { 
+        map.fitBounds(trackLine.getBounds(), { padding: [60, 60], maxZoom: 17 }); 
+      } catch (e) {}
+    }
 
     return undefined;
-  }, [trackHistorico, isAdmin, mostrarAuditoriaAdmin]);
+  }, [trackHistorico, isAdmin, mostrarAuditoriaAdmin, maquinaEnFoco]);
 
   const handleLocalizarGPS = () => {
     if (!navigator.geolocation) {

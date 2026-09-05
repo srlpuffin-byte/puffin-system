@@ -152,27 +152,45 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
 
     const devices = await SatcomClient.getDevices();
 
-    // Identificar dispositivos vinculados
-    const linkedDeviceIds = new Set(maquinas.map(m => m.satcom_id));
+    // Identificar dispositivos vinculados (normalizando IDs a número)
+    const linkedDeviceIds = new Set(
+      maquinas
+        .map(m => Number(m.satcom_id))
+        .filter((id): id is number => !isNaN(id) && id > 0)
+    );
     
     // Dispositivos sin vincular
-    const unlinkedDevices = devices.filter(d => !linkedDeviceIds.has(d.id));
+    const unlinkedDevices = devices.filter(d => !linkedDeviceIds.has(Number(d.id)));
 
-    // Obtener posiciones para todos (vinculados y no vinculados)
-    const positionIdsToFetch = [
-      ...maquinas.map(m => devices.find(d => d.id === m.satcom_id)?.positionId),
-      ...unlinkedDevices.map(d => d.positionId)
-    ].filter((id): id is number => !!id);
+    // Obtener posiciones para todos los dispositivos conocidos
+    const positionIdsToFetch = Array.from(new Set([
+      ...maquinas.map(m => devices.find(d => Number(d.id) === Number(m.satcom_id))?.positionId),
+      ...devices.map(d => d.positionId)
+    ])).filter((id): id is number => typeof id === "number" && id > 0);
 
     const positions = await SatcomClient.getPositionsBulk(positionIdsToFetch);
     const positionsMap = new Map(positions.map(p => [p.id, p]));
+
+    // Fallback individual si alguna posición de un dispositivo no vino en el bulk
+    for (const d of devices) {
+      if (d.positionId && !positionsMap.has(d.positionId)) {
+        try {
+          const fallbackPos = await SatcomClient.getPosition(d.positionId);
+          if (fallbackPos) {
+            positionsMap.set(fallbackPos.id, fallbackPos);
+          }
+        } catch {
+          // Continuar con los demás
+        }
+      }
+    }
 
     const result = [];
 
     // 1. Agregar máquinas vinculadas
     for (const m of maquinas) {
-      const device = devices.find(d => d.id === m.satcom_id);
-      const position = device ? positionsMap.get(device.positionId) : null;
+      const device = devices.find(d => Number(d.id) === Number(m.satcom_id));
+      const position = device && device.positionId ? positionsMap.get(device.positionId) : null;
       const estadoSatcom = device?.status || "unknown";
       const fixTime = position?.fixTime || position?.deviceTime || device?.lastUpdate || null;
       const isDeviceOffline = estadoSatcom === "offline";
@@ -180,14 +198,19 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
       const rawSpeedKmh = position && typeof position.speed === "number" ? Math.round(position.speed * 1.852) : null;
       const velocidadActual = (isDeviceOffline || isStale) ? 0 : rawSpeedKmh;
 
+      const rawLat = position?.latitude !== undefined && position?.latitude !== null ? Number(position.latitude) : null;
+      const rawLng = position?.longitude !== undefined && position?.longitude !== null ? Number(position.longitude) : null;
+      const validLat = rawLat !== null && !isNaN(rawLat) ? rawLat : null;
+      const validLng = rawLng !== null && !isNaN(rawLng) ? rawLng : null;
+
       result.push({
         maquina_id: m.id,
         device_id: device?.id || null,
         nombre: m.nombre,
         tipo: m.tipo,
         estado_satcom: estadoSatcom,
-        lat: position?.latitude || null,
-        lng: position?.longitude || null,
+        lat: validLat,
+        lng: validLng,
         velocidad_kmh: velocidadActual,
         ultima_velocidad_reportada: rawSpeedKmh,
         rumbo: position && typeof position.course === "number" ? Math.round(position.course) : null,
@@ -203,9 +226,9 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
       });
     }
 
-    // 2. Agregar dispositivos sin vincular
+    // 2. Agregar dispositivos sin vincular (asegura que ningún vehículo de Satcom falte)
     for (const d of unlinkedDevices) {
-      const position = positionsMap.get(d.positionId);
+      const position = d.positionId ? positionsMap.get(d.positionId) : null;
       const estadoSatcom = d.status || "unknown";
       const fixTime = position?.fixTime || position?.deviceTime || d.lastUpdate || null;
       const isDeviceOffline = estadoSatcom === "offline";
@@ -213,14 +236,19 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
       const rawSpeedKmh = position && typeof position.speed === "number" ? Math.round(position.speed * 1.852) : null;
       const velocidadActual = (isDeviceOffline || isStale) ? 0 : rawSpeedKmh;
 
+      const rawLat = position?.latitude !== undefined && position?.latitude !== null ? Number(position.latitude) : null;
+      const rawLng = position?.longitude !== undefined && position?.longitude !== null ? Number(position.longitude) : null;
+      const validLat = rawLat !== null && !isNaN(rawLat) ? rawLat : null;
+      const validLng = rawLng !== null && !isNaN(rawLng) ? rawLng : null;
+
       result.push({
         maquina_id: null,
         device_id: d.id,
         nombre: d.name,
-        tipo: "GPS sin asignar",
+        tipo: "GPS Satelital",
         estado_satcom: estadoSatcom,
-        lat: position?.latitude || null,
-        lng: position?.longitude || null,
+        lat: validLat,
+        lng: validLng,
         velocidad_kmh: velocidadActual,
         ultima_velocidad_reportada: rawSpeedKmh,
         rumbo: position && typeof position.course === "number" ? Math.round(position.course) : null,

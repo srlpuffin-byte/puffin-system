@@ -78,7 +78,10 @@ const ANCHOS_PRESET = [3, 5, 8, 10, 15, 20, 30, 50, 100];
 
 export function Americangis() {
   const { data: user } = useGetMe();
-  const isAdmin = user?.rol?.toLowerCase() === "admin" || user?.rol?.toLowerCase() === "administrador";
+  const isAdmin = user?.rol?.toLowerCase() === "admin" || 
+    user?.rol?.toLowerCase() === "administrador" ||
+    (user as any)?.role?.toLowerCase() === "admin" ||
+    (user as any)?.role?.toLowerCase() === "administrador";
   const { data: proyectos } = useGetProyectos();
 
   // Estados principales del trazado
@@ -122,14 +125,18 @@ export function Americangis() {
   const [nombreTrackCargado, setNombreTrackCargado] = useState<string | null>(null);
 
   const handleCentrarMaquinaEnMapa = (m: MaquinaGpsPunto) => {
-    if (m.lat === null || m.lng === null) {
+    const lat = m.lat !== null && m.lat !== undefined ? Number(m.lat) : NaN;
+    const lng = m.lng !== null && m.lng !== undefined ? Number(m.lng) : NaN;
+    if (isNaN(lat) || isNaN(lng)) {
       toast.info(`La máquina ${m.nombre} no posee coordenadas GPS en este momento.`);
       return;
     }
     setMostrarMaquinasGps(true);
+    setMaquinaAuditada(m);
+    setMostrarAuditoriaAdmin(true);
     setMaquinaEnFoco({
-      lat: Number(m.lat),
-      lng: Number(m.lng),
+      lat,
+      lng,
       device_id: m.device_id,
       maquina_id: m.maquina_id,
       nombre: m.nombre,
@@ -1080,7 +1087,7 @@ export function Americangis() {
         </TabsList>
 
         {/* PESTAÑA 1: VISOR SATELITAL */}
-        <TabsContent value="mapa" className="space-y-3 m-0">
+        <TabsContent value="mapa" forceMount className={activeTab === "mapa" ? "space-y-3 m-0" : "hidden"}>
           {/* Alerta si hay calles manuales fuera del perímetro */}
           {callesManuales.length > 0 && (
             <div className="bg-amber-950/40 border border-amber-500/50 rounded-lg p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-lg">
