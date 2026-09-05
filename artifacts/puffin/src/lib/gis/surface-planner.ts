@@ -969,3 +969,65 @@ export function generarLotePorMedidas(
   });
 }
 
+/**
+ * Genera pasadas paralelas libres espaciadas en metros (ej. cada 5 metros) a partir de una sola línea recta A-B,
+ * tirando las líneas rectas hacia los lados "hasta el final" sin necesidad obligatoria de cerrar un polígono.
+ */
+export function generarPasadasDesdeLineaBase(
+  lineaBase: { start: LatLng; end: LatLng },
+  anchoMeters: number = 5,
+  cantidadPasadas: number = 20,
+  lado: "ambos" | "derecha" | "izquierda" = "derecha"
+): LineSegment[] {
+  const origin = calcularCentroide([lineaBase.start, lineaBase.end]);
+  const mStart = proyectarLocal(lineaBase.start, origin);
+  const mEnd = proyectarLocal(lineaBase.end, origin);
+
+  const dx = mEnd.x - mStart.x;
+  const dy = mEnd.y - mStart.y;
+  const lengthMeters = Math.hypot(dx, dy);
+  if (lengthMeters <= 0) return [];
+
+  const bearing = calcularRumboGrados(lineaBase.start, lineaBase.end);
+  const headingName = obtenerNombreRumbo(bearing);
+
+  // Vector unitario normal (perpendicular a la derecha)
+  const nx = dy / lengthMeters;
+  const ny = -dx / lengthMeters;
+
+  const offsets: number[] = [0]; // Incluye la línea base
+  if (lado === "derecha" || lado === "ambos") {
+    for (let i = 1; i <= cantidadPasadas; i++) offsets.push(i * anchoMeters);
+  }
+  if (lado === "izquierda" || lado === "ambos") {
+    for (let i = 1; i <= cantidadPasadas; i++) offsets.push(-i * anchoMeters);
+  }
+
+  offsets.sort((a, b) => a - b);
+
+  return offsets.map((offset, idx) => {
+    const sX = mStart.x + offset * nx;
+    const sY = mStart.y + offset * ny;
+    const eX = mEnd.x + offset * nx;
+    const eY = mEnd.y + offset * ny;
+
+    const start = desproyectarLocal({ x: sX, y: sY }, origin);
+    const end = desproyectarLocal({ x: eX, y: eY }, origin);
+
+    const labelOffset = offset === 0 ? "Eje Base" : offset > 0 ? `+${offset}m` : `${offset}m`;
+
+    return {
+      id: `pasada-ab-${idx + 1}`,
+      index: idx + 1,
+      nombre: `Línea ${String(idx + 1).padStart(2, "0")} (${labelOffset})`,
+      start,
+      end,
+      lengthMeters: Math.round(lengthMeters * 10) / 10,
+      bearing: Math.round(bearing * 10) / 10,
+      headingName,
+      tipo: "pasada_auto",
+    };
+  });
+}
+
+

@@ -74,6 +74,8 @@ interface TrazadorMapaProps {
   lineas: LineSegment[];
   callesManuales?: LineSegment[];
   onCallesManualesChange?: (calles: LineSegment[]) => void;
+  onDeleteCalleManual?: (id: string) => void;
+  onGenerarPasadasDesdeRecta?: (line: LineSegment) => void;
   waypoints?: Waypoint[];
   onWaypointsChange?: (wps: Waypoint[]) => void;
   rumboGrados: number;
@@ -92,6 +94,8 @@ export function TrazadorMapa({
   lineas,
   callesManuales = [],
   onCallesManualesChange,
+  onDeleteCalleManual,
+  onGenerarPasadasDesdeRecta,
   waypoints = [],
   onWaypointsChange,
   rumboGrados,
@@ -623,10 +627,11 @@ export function TrazadorMapa({
     });
   }, [lineas, selectedLineId, onSelectLine]);
 
-  // Renderizar Calles Manuales
+  // Renderizar Calles Manuales con acciones de borrado y generación de pasadas paralelas
   useEffect(() => {
-    if (!manualLinesGroupRef.current || !window.L) return;
+    if (!manualLinesGroupRef.current || !window.L || !mapRef.current) return;
     const L = window.L;
+    const map = mapRef.current;
     const group = manualLinesGroupRef.current;
     group.clearLayers();
 
@@ -638,21 +643,51 @@ export function TrazadorMapa({
 
       const polyline = L.polyline(latLngs, {
         color: "#d946ef",
-        weight: 5,
+        weight: 5.5,
         opacity: 0.95,
       });
 
-      polyline.bindPopup(`
-        <div style="font-size:12px;padding:4px;">
-          <b style="color:#d946ef;font-size:14px;">🛣️ ${line.nombre}</b><br/>
-          <b>Longitud:</b> ${line.lengthMeters} m<br/>
-          <b>Rumbo:</b> ${line.bearing}° (${line.headingName})
+      const popupDiv = document.createElement("div");
+      popupDiv.style.fontSize = "12px";
+      popupDiv.style.minWidth = "220px";
+      popupDiv.style.padding = "4px";
+      popupDiv.innerHTML = `
+        <div style="font-weight:bold;font-size:14px;color:#d946ef;margin-bottom:4px;">🛣️ ${line.nombre}</div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-family:sans-serif;">
+          <span>Longitud: <b>${line.lengthMeters} m</b></span>
+          <span>Rumbo: <b>${line.bearing}° (${line.headingName})</b></span>
         </div>
-      `);
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <button id="gen-grid-${line.id}" style="background:#f59e0b;color:#0f172a;border:none;padding:6px 8px;border-radius:4px;font-weight:bold;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
+            🚀 Tirar líneas rectas cada 5m desde esta calle
+          </button>
+          <button id="del-man-${line.id}" style="background:#ef4444;color:white;border:none;padding:5px 8px;border-radius:4px;font-weight:bold;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
+            🗑️ Eliminar esta Calle
+          </button>
+        </div>
+      `;
+
+      polyline.bindPopup(popupDiv);
+      polyline.on("popupopen", () => {
+        const btnDel = document.getElementById(`del-man-${line.id}`);
+        if (btnDel) {
+          btnDel.onclick = () => {
+            if (onDeleteCalleManual) onDeleteCalleManual(line.id);
+            map.closePopup();
+          };
+        }
+        const btnGen = document.getElementById(`gen-grid-${line.id}`);
+        if (btnGen) {
+          btnGen.onclick = () => {
+            if (onGenerarPasadasDesdeRecta) onGenerarPasadasDesdeRecta(line);
+            map.closePopup();
+          };
+        }
+      });
 
       group.addLayer(polyline);
     });
-  }, [callesManuales]);
+  }, [callesManuales, onDeleteCalleManual, onGenerarPasadasDesdeRecta]);
 
   // Renderizar Waypoints con Radios de Seguridad
   useEffect(() => {
@@ -955,6 +990,24 @@ export function TrazadorMapa({
           {interactionMode === "measure" ? "Midiendo..." : "Medir"}
         </Button>
 
+        {/* Borrar Calles Manuales si hay alguna */}
+        {callesManuales.length > 0 && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              if (confirm(`¿Desea borrar las ${callesManuales.length} calles manuales?`)) {
+                if (onCallesManualesChange) onCallesManualesChange([]);
+                toast.success("Calles manuales borradas");
+              }
+            }}
+            className="text-xs h-7 text-fuchsia-400 hover:text-fuchsia-300 hover:bg-fuchsia-950/40 px-2 gap-1"
+            title="Borrar calles manuales"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Borrar Calle ({callesManuales.length})
+          </Button>
+        )}
+
         {polygon.length > 0 && (
           <Button
             size="sm"
@@ -968,7 +1021,7 @@ export function TrazadorMapa({
             className="text-xs h-7 text-red-400 hover:text-red-300 hover:bg-red-950/40 px-1.5"
             title="Borrar polígono"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-3.5 w-3.5" /> Borrar Lote
           </Button>
         )}
       </div>

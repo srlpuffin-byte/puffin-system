@@ -15,7 +15,8 @@ import {
   generarGeoJSON, 
   descargarArchivo,
   generarLotePorMedidas,
-  calcularCentroide 
+  calcularCentroide,
+  generarPasadasDesdeLineaBase 
 } from "@/lib/gis/surface-planner";
 import { TrazadorMapa, MapInteractionMode } from "@/components/map/TrazadorMapa";
 import { useGetProyectos } from "@/hooks/use-proyectos";
@@ -52,7 +53,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-const ANCHOS_PRESET = [3, 4.5, 6, 9, 12, 15, 20, 30, 50];
+const ANCHOS_PRESET = [3, 5, 6, 8, 10, 12, 15, 20, 25, 30];
 
 export function Americangis() {
   const { data: proyectos } = useGetProyectos();
@@ -61,7 +62,7 @@ export function Americangis() {
   const [nombreLote, setNombreLote] = useState("Lote 01 - Trazado Recto");
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<string>("");
   const [polygon, setPolygon] = useState<LatLng[]>([]);
-  const [anchoCalle, setAnchoCalle] = useState<number>(12);
+  const [anchoCalle, setAnchoCalle] = useState<number>(5); // 5 metros por defecto como solicitó el usuario
   const [rumboGrados, setRumboGrados] = useState<number>(90);
   const [alternarSentido, setAlternarSentido] = useState<boolean>(true);
   const [interactionMode, setInteractionMode] = useState<MapInteractionMode>("none");
@@ -241,6 +242,25 @@ export function Americangis() {
     if (!isNaN(rumbo)) setRumboGrados(rumbo);
     setDialogMedidasOpen(false);
     toast.success(`Lote de ${ancho}m x ${largo}m generado (${((ancho * largo) / 10000).toFixed(2)} Ha)`);
+  };
+
+  // Borrar calle manual individual
+  const handleBorrarCalleManual = (id: string) => {
+    setCallesManuales(callesManuales.filter((c) => c.id !== id));
+    toast.info("Calle manual eliminada");
+  };
+
+  // Generar pasadas paralelas a partir de una recta manual (cada 5m hasta el final)
+  const handleGenerarPasadasDesdeRecta = (line: LineSegment) => {
+    const paso = anchoCalle || 5;
+    const pasadas = generarPasadasDesdeLineaBase(
+      { start: line.start, end: line.end },
+      paso,
+      25,
+      "ambos"
+    );
+    setCallesManuales(pasadas);
+    toast.success(`¡Tiradas ${pasadas.length} líneas rectas cada ${paso}m a partir de la calle!`);
   };
 
   // Crear nuevo waypoint desde diálogo
@@ -620,12 +640,44 @@ export function Americangis() {
 
         {/* PESTAÑA 1: VISOR SATELITAL */}
         <TabsContent value="mapa" className="space-y-3 m-0">
+          {/* Guía Rápida: Cómo generar líneas rectas cada 5 metros hasta el final */}
+          <div className="bg-gradient-to-r from-amber-500/15 via-slate-900/90 to-slate-900 border border-amber-500/40 rounded-lg p-3.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs shadow-lg">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">
+                  Guía de Trabajo
+                </span>
+                <b className="text-white text-sm">¿Cómo tirar líneas rectas cada 5 metros hasta el final?</b>
+              </div>
+              <p className="text-slate-300 leading-relaxed">
+                <b>Método 1 (Recomendado):</b> Haz clic en <b className="text-green-400">"Delimitar Terreno"</b> y marca las esquinas de tu campo en el mapa (o presiona <b className="text-amber-400">"Crear por Medidas"</b> arriba). El sistema <b>tirará automáticamente líneas rectas cada {anchoCalle} metros de borde a borde hasta el final del lote</b>.
+              </p>
+              {callesManuales.length > 0 && (
+                <p className="text-fuchsia-300 font-medium">
+                  <b>Método 2:</b> Haz clic en la calle violeta del mapa y presiona <b>"🚀 Tirar líneas rectas cada 5m desde esta calle"</b> para proyectar el enrejado paralelo hacia los lados.
+                </p>
+              )}
+            </div>
+
+            {callesManuales.length > 0 && (
+              <Button
+                size="sm"
+                onClick={() => handleGenerarPasadasDesdeRecta(callesManuales[0])}
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs h-8 whitespace-nowrap shadow border-none shrink-0"
+              >
+                🚀 Tirar pasadas cada {anchoCalle}m ahora
+              </Button>
+            )}
+          </div>
+
           <TrazadorMapa
             polygon={polygon}
             onPolygonChange={setPolygon}
             lineas={lineas}
             callesManuales={callesManuales}
             onCallesManualesChange={setCallesManuales}
+            onDeleteCalleManual={handleBorrarCalleManual}
+            onGenerarPasadasDesdeRecta={handleGenerarPasadasDesdeRecta}
             waypoints={waypoints}
             onWaypointsChange={setWaypoints}
             rumboGrados={rumboGrados}
@@ -732,14 +784,33 @@ export function Americangis() {
                           <td className="py-2 px-3 text-red-400">
                             {line.end.lat.toFixed(6)}, {line.end.lng.toFixed(6)}
                           </td>
-                          <td className="py-2 px-3 text-right">
+                          <td className="py-2 px-3 text-right flex items-center justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleGenerarPasadasDesdeRecta(line)}
+                              className="h-6 px-2 text-[10px] bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-slate-950 font-bold"
+                              title="Tirar pasadas paralelas cada 5m desde esta recta"
+                            >
+                              🚀 Pasadas
+                            </Button>
                             <Button
                               size="sm"
                               variant="ghost"
                               onClick={() => handleCopiarCoords(`${line.start.lat.toFixed(6)}, ${line.start.lng.toFixed(6)}`, line.id)}
-                              className="h-6 px-2 text-[11px]"
+                              className="h-6 px-1.5 text-[11px] text-slate-400 hover:text-white"
+                              title="Copiar coordenadas"
                             >
                               {copiedId === line.id ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleBorrarCalleManual(line.id)}
+                              className="h-6 px-1.5 text-[11px] text-red-400 hover:text-red-300 hover:bg-red-950/40"
+                              title="Borrar calle manual"
+                            >
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </td>
                         </tr>
