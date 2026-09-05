@@ -277,6 +277,66 @@ export function TrazadorMapa({
   const [mobileMenuModal, setMobileMenuModal] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
+  // Exponer manejador global y captura de clics para el botón de auditoría del popup
+  useEffect(() => {
+    (window as any).__puffinAuditarMaquina = (k: string) => {
+      let targetMaquina: MaquinaGpsPunto | null = null;
+      for (const [, veh] of animatedVehiclesRef.current.entries()) {
+        if (veh.id === k) {
+          targetMaquina = veh.data;
+          break;
+        }
+      }
+      if (!targetMaquina) {
+        targetMaquina = maquinas.find(m => {
+          const itemKey = String(m.device_id ? `dev-${m.device_id}` : `maq-${m.maquina_id || m.nombre}`);
+          return itemKey === k;
+        }) || null;
+      }
+
+      if (targetMaquina) {
+        if (onSelectMaquina) {
+          onSelectMaquina(targetMaquina);
+        }
+        if (!mostrarAuditoriaAdmin && onToggleMostrarAuditoriaAdmin) {
+          onToggleMostrarAuditoriaAdmin();
+        }
+        setPanelAuditoriaAbierto(true);
+        if (mapRef.current) {
+          mapRef.current.closePopup();
+        }
+        toast.success(`Auditoría de trayectoria y horas activada para ${targetMaquina.nombre}`);
+      }
+    };
+
+    return () => {
+      delete (window as any).__puffinAuditarMaquina;
+    };
+  }, [maquinas, onSelectMaquina, mostrarAuditoriaAdmin, onToggleMostrarAuditoriaAdmin]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleContainerClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const btn = target?.closest("[data-audit-key]") as HTMLElement;
+      if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const k = btn.getAttribute("data-audit-key");
+        if (k && (window as any).__puffinAuditarMaquina) {
+          (window as any).__puffinAuditarMaquina(k);
+        }
+      }
+    };
+
+    container.addEventListener("click", handleContainerClick, true);
+    return () => {
+      container.removeEventListener("click", handleContainerClick, true);
+    };
+  }, []);
+
   const handleCentrarEnPasadaActiva = (line?: LineSegment | null) => {
     const target = line || lineas.find(l => l.id === pasadaActivaId) || lineas[0];
     if (target && mapRef.current && window.L) {
@@ -1577,7 +1637,12 @@ export function TrazadorMapa({
           </div>
           ${isAdmin ? `
           <div style="margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 6px; display: flex; gap: 4px;">
-            <button id="btn-audit-${key}" style="flex: 1; background: #06b6d4; color: #ffffff; border: none; border-radius: 4px; padding: 5px 8px; font-weight: bold; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+            <button 
+              id="btn-audit-${key}" 
+              data-audit-key="${key}"
+              onclick="if(window.__puffinAuditarMaquina){window.__puffinAuditarMaquina('${key}');}"
+              style="flex: 1; background: #06b6d4; color: #ffffff; border: none; border-radius: 4px; padding: 6px 10px; font-weight: bold; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;"
+            >
               📊 Auditar Trayectoria y Horas
             </button>
           </div>
@@ -1586,6 +1651,20 @@ export function TrazadorMapa({
       `;
 
       const animated = animatedVehiclesRef.current.get(key);
+
+      const attachPopupListeners = () => {
+        if (!isAdmin) return;
+        const btn = document.getElementById(`btn-audit-${key}`);
+        if (btn) {
+          btn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if ((window as any).__puffinAuditarMaquina) {
+              (window as any).__puffinAuditarMaquina(key);
+            }
+          };
+        }
+      };
 
       if (!animated) {
         const divIcon = L.divIcon({
@@ -1606,16 +1685,9 @@ export function TrazadorMapa({
         });
 
         marker.on("popupopen", () => {
-          if (isAdmin) {
-            const btn = document.getElementById(`btn-audit-${key}`);
-            if (btn) {
-              btn.onclick = () => {
-                if (onSelectMaquina) onSelectMaquina(m);
-                setPanelAuditoriaAbierto(true);
-                marker.closePopup();
-              };
-            }
-          }
+          attachPopupListeners();
+          setTimeout(attachPopupListeners, 50);
+          setTimeout(attachPopupListeners, 200);
         });
 
         group.addLayer(marker);
@@ -1635,6 +1707,10 @@ export function TrazadorMapa({
         animated.currentLng = lng;
         animated.marker.setLatLng([lat, lng]);
         animated.marker.setPopupContent(popupContent);
+        if (animated.marker.isPopupOpen && animated.marker.isPopupOpen()) {
+          attachPopupListeners();
+          setTimeout(attachPopupListeners, 50);
+        }
         animated.marker.setIcon(L.divIcon({
           className: "custom-machine-pin",
           html: buildIconHtml(velDisplay, rumbo),
@@ -2427,9 +2503,21 @@ export function TrazadorMapa({
       {(() => {
         if (!isAdmin || !mostrarAuditoriaAdmin) return null;
 
-        const maquinaAuditada = maquinas.find(m => 
-          (maquinaAuditadaId && (String(m.device_id) === String(maquinaAuditadaId) || String(m.maquina_id) === String(maquinaAuditadaId)))
+        let maquinaAuditada = maquinas.find(m => 
+          maquinaAuditadaId && (String(m.device_id) === String(maquinaAuditadaId) || String(m.maquina_id) === String(maquinaAuditadaId))
         ) || null;
+
+        if (!maquinaAuditada && maquinaAuditadaId) {
+          for (const [, veh] of animatedVehiclesRef.current.entries()) {
+            if (
+              String(veh.data.device_id) === String(maquinaAuditadaId) ||
+              String(veh.data.maquina_id) === String(maquinaAuditadaId)
+            ) {
+              maquinaAuditada = veh.data;
+              break;
+            }
+          }
+        }
 
         if (!maquinaAuditada || !panelAuditoriaAbierto) return null;
 

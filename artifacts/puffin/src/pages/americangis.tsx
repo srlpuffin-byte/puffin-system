@@ -175,14 +175,19 @@ export function Americangis() {
 
   // Cuando se cargan puntos de la traza de Satcom
   useEffect(() => {
-    if (trackData && trackData.puntos && trackData.puntos.length > 0) {
+    if (trackData && trackData.puntos) {
       setTrackAuditoria(trackData.puntos);
-      setNombreTrackCargado(`${trackData.nombre} - Traza Satcom (${trackData.puntos.length} pts)`);
+      if (trackData.puntos.length > 0) {
+        setNombreTrackCargado(`${trackData.nombre} - Traza Satcom (${trackData.puntos.length} pts)`);
+      } else {
+        setNombreTrackCargado(`${trackData.nombre} - Sin puntos`);
+      }
     }
   }, [trackData]);
 
   const handleSelectMaquinaAuditoria = (m: MaquinaGpsPunto | null) => {
     setMaquinaAuditada(m);
+    setMostrarAuditoriaAdmin(true);
     if (m && m.lat !== null && m.lng !== null) {
       setMostrarMaquinasGps(true);
       setMaquinaEnFoco({

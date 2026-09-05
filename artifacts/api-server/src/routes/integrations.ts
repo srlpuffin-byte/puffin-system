@@ -278,9 +278,11 @@ integrationsRouter.get("/xpert/track", requireAuth, async (req, res) => {
     let nombreEquipo = "Equipo Xpert Satcom";
     let tipoEquipo = "Maquinaria";
 
+    let dev: any = null;
+
     if (device_id) {
       targetDeviceId = parseInt(device_id as string, 10);
-      const dev = (await SatcomClient.getDevices()).find(d => d.id === targetDeviceId);
+      dev = (await SatcomClient.getDevices()).find(d => Number(d.id) === targetDeviceId);
       if (dev) nombreEquipo = dev.name;
     } else if (maquina_id) {
       const maquina = await db
@@ -289,7 +291,8 @@ integrationsRouter.get("/xpert/track", requireAuth, async (req, res) => {
         .where(eq(maquinasTable.id, parseInt(maquina_id as string, 10)))
         .limit(1);
       if (maquina.length && maquina[0].satcom_id) {
-        targetDeviceId = maquina[0].satcom_id;
+        targetDeviceId = Number(maquina[0].satcom_id);
+        dev = (await SatcomClient.getDevices()).find(d => Number(d.id) === targetDeviceId);
         nombreEquipo = maquina[0].nombre;
         tipoEquipo = maquina[0].tipo || "Maquinaria";
       }
@@ -300,11 +303,28 @@ integrationsRouter.get("/xpert/track", requireAuth, async (req, res) => {
       return;
     }
 
-    const horasNum = Math.min(Math.max(parseFloat(horas as string) || 12, 1), 48);
+    const horasNum = Math.min(Math.max(parseFloat(horas as string) || 24, 1), 72);
     const toDate = new Date().toISOString();
     const fromDate = new Date(Date.now() - horasNum * 3600 * 1000).toISOString();
 
-    const positions = await SatcomClient.getDeviceTrack(targetDeviceId, fromDate, toDate);
+    let positions = await SatcomClient.getDeviceTrack(targetDeviceId, fromDate, toDate);
+    let periodoActividad = `Últimas ${horasNum} horas`;
+
+    // Si no hubo posiciones en las últimas horas (ej. máquina inactiva o fuera de línea),
+    // consultar automáticamente la última jornada con reporte según lastUpdate del hardware
+    if ((!positions || positions.length === 0) && dev?.lastUpdate) {
+      const lastUpdateTime = new Date(dev.lastUpdate).getTime();
+      if (!isNaN(lastUpdateTime)) {
+        const toLast = new Date(lastUpdateTime + 10 * 60 * 1000).toISOString();
+        const fromLast = new Date(lastUpdateTime - horasNum * 3600 * 1000).toISOString();
+        const pastPositions = await SatcomClient.getDeviceTrack(targetDeviceId, fromLast, toLast);
+        if (pastPositions && pastPositions.length > 0) {
+          positions = pastPositions;
+          const fechaStr = new Date(lastUpdateTime).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+          periodoActividad = `Última jornada reportada (${fechaStr})`;
+        }
+      }
+    }
 
     if (!positions || positions.length === 0) {
       res.json({
