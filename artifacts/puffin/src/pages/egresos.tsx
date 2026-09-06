@@ -390,7 +390,16 @@ export function Egresos() {
                         <TableCell>
                           <Badge variant="outline">{eg.categoria}</Badge>
                         </TableCell>
-                        <TableCell>{eg.concepto}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-0.5 max-w-sm">
+                            <span className="font-medium text-slate-900">{eg.concepto}</span>
+                            {eg.observaciones && (
+                              <span className="text-xs text-slate-500 whitespace-pre-wrap line-clamp-2 hover:line-clamp-none transition-all">
+                                {eg.observaciones}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           {eg.centro_costos ? (
                             (() => {
@@ -484,6 +493,12 @@ export function Egresos() {
 
                     <div className="flex flex-col gap-1">
                       <span className="font-medium text-sm leading-snug">{eg.concepto}</span>
+                      {eg.observaciones && (
+                        <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded p-1.5 my-1 whitespace-pre-wrap">
+                          <span className="font-semibold text-slate-700">Nota / Desglose: </span>
+                          {eg.observaciones}
+                        </div>
+                      )}
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-muted-foreground">Comprobante:</span>
                         {eg.comprobante ? (
@@ -548,11 +563,17 @@ export function Egresos() {
                 <Switch checked={form.comprobante} onCheckedChange={c => set("comprobante", c)} />
               </div>
               <div className="flex items-center gap-3">
-                <input type="file" accept="image/*" onChange={handleFotoChange} className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                <input type="file" accept="image/*,application/pdf" onChange={handleFotoChange} className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
               </div>
               {fotoBase64 && (
-                <div className="mt-2 h-32 relative rounded-md overflow-hidden border">
-                  <img src={fotoBase64} alt="Vista previa" className="object-contain w-full h-full bg-slate-50" />
+                <div className="mt-2 h-32 relative rounded-md overflow-hidden border bg-slate-50 flex items-center justify-center p-2">
+                  {fotoFile?.type === "application/pdf" || fotoBase64.includes("application/pdf") ? (
+                    <div className="flex items-center gap-2 text-slate-700 text-sm font-medium">
+                      <span>📄 Documento PDF seleccionado: {fotoFile?.name || "comprobante.pdf"}</span>
+                    </div>
+                  ) : (
+                    <img src={fotoBase64} alt="Vista previa" className="object-contain w-full h-full" />
+                  )}
                 </div>
               )}
             </div>
@@ -679,10 +700,10 @@ export function Egresos() {
         <DialogContent className="sm:max-w-[750px] bg-white p-2">
           <div className="relative bg-slate-950 flex items-center justify-center min-h-[350px] rounded-md overflow-hidden">
             {fotoUrlToView ? (
-              fotoUrlToView.includes("application/pdf") || fotoUrlToView.toLowerCase().endsWith(".pdf") ? (
+              fotoUrlToView.includes("application/pdf") || fotoUrlToView.toLowerCase().endsWith(".pdf") || fotoUrlToView.toLowerCase().includes(".pdf?") || fotoUrlToView.startsWith("data:application/pdf") ? (
                 <div className="w-full h-[75vh] flex flex-col bg-white">
                   <div className="p-2 bg-slate-100 border-b flex justify-between items-center text-xs text-slate-600">
-                    <span className="font-semibold">Factura / Comprobante PDF</span>
+                    <span className="font-semibold flex items-center gap-1.5">📄 Factura / Comprobante PDF</span>
                     <a href={fotoUrlToView} target="_blank" rel="noreferrer" className="text-blue-600 font-medium underline flex items-center gap-1">
                       Abrir en pestaña nueva ↗
                     </a>

@@ -246,11 +246,12 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "adjuntar_comprobante",
-      description: "Adjunta la foto/imagen que se acaba de enviar a un egreso/gasto YA EXISTENTE en la base de datos. Usar cuando el usuario envía una imagen y pide agregarla a un egreso ya creado. Busca el egreso por concepto, proyecto, monto o fecha.",
+      description: "Adjunta la foto o comprobante PDF a un egreso/gasto YA EXISTENTE Y GUARDADO en la base de datos (preferentemente indicando su ID, ej: 'adjuntá el comprobante al gasto #15'). PROHIBIDO ABSOLUTAMENTE invocar esta función si estás en proceso de registrar un gasto nuevo o si el gasto está pendiente de confirmación. Para gastos nuevos, el comprobante se adjunta automáticamente al invocar 'registrar_gasto'.",
       parameters: {
         type: "object",
         properties: {
-          concepto: { type: "string", description: "Concepto o descripción parcial del egreso al que adjuntar la foto (opcional)" },
+          id: { type: "number", description: "ID numérico del egreso existente al que adjuntar el comprobante (ej: 237)" },
+          concepto: { type: "string", description: "Concepto o descripción del egreso existente al que adjuntar la foto (opcional)" },
           monto: { type: "number", description: "Monto del egreso al que adjuntar la foto (opcional)" },
           fecha: { type: "string", description: "Fecha del egreso en formato YYYY-MM-DD (opcional)" },
           centro_costos: { type: "string", description: "Proyecto/obra del egreso (opcional)" },
@@ -263,19 +264,19 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "registrar_gasto",
-      description: "Registra definitivamente un gasto/egreso en la base de datos del sistema. REGLA FUNDAMENTAL: NO llames a esta función en el primer mensaje de datos de un gasto. Primero debés armar e interpretar toda la estructura del egreso, presentársela al usuario y pedir confirmación expresa (consultando si fue por transferencia o efectivo, si fue facturado o si desea modificar algo). Únicamente cuando el usuario confirme ('sí', 'confirmá', 'dale', 'guardalo', o responda indicando cómo guardarlo), ejecutá esta función.",
+      description: "Registra definitivamente un gasto/egreso en la base de datos del sistema. REGLA FUNDAMENTAL: NO llames a esta función en el primer mensaje de datos de un gasto. Primero debés armar e interpretar toda la estructura del egreso, presentársela al usuario y pedir confirmación expresa (consultando si fue por transferencia o efectivo, si fue facturado o si desea modificar algo). Únicamente cuando el usuario confirme ('sí', 'confirmá', 'dale', 'guardalo', 'adjunta el comprobante y confirmo', etc.), ejecutá esta función.",
       parameters: {
         type: "object",
         properties: {
           fecha: { type: "string", description: "Fecha del gasto en formato YYYY-MM-DD (opcional, si no se especifica usa hoy)" },
           categoria: { type: "string", description: "Categoría del gasto (ej: Repuestos, Mantenimiento, Combustible, Materiales, Servicios, Sueldos, Alquiler, Otros). Inferir automáticamente." },
-          concepto: { type: "string", description: "Descripción o detalle del gasto" },
-          monto: { type: "number", description: "Monto TOTAL en pesos. Si el usuario indica cantidad y precio unitario (ej: 47 litros a $2290), multiplícalos." },
+          concepto: { type: "string", description: "Descripción o detalle resumido del gasto (ej: 'Ronco gastos (Viaje grillo + 2 cubiertas)')" },
+          monto: { type: "number", description: "Monto TOTAL en pesos. Si el usuario indica varios conceptos o items, sumalos exactamente." },
           proveedor: { type: "string", description: "Nombre del proveedor o empresa si figura (opcional)" },
           metodo_pago: { type: "string", description: "Método de pago si se especificó, ej: 'Transferencia', 'Efectivo', 'Tarjeta' (opcional)" },
           facturado: { type: "boolean", description: "true si fue facturado (con factura), false si sin factura (opcional)" },
           centro_costos: { type: "string", description: "Proyecto u obra al que se imputa el gasto, ej: 'Lipsa' (opcional)" },
-          observaciones: { type: "string", description: "Observaciones adicionales, ej: máquina asociada como 'Cargadora LiuGong' (opcional)" },
+          observaciones: { type: "string", description: "Observaciones adicionales. CRÍTICO: Si el egreso contiene varios ítems o gastos sumados (ej: viaje grillo $67.400 + cubiertas $26.000 y $60.000), DEBES guardar obligatoriamente el desglose completo en este campo (ej: 'Desglose: Viaje grillo $67.400 | Cubierta 1 $26.000 | Cubierta 2 $60.000'). También incluye la máquina asociada si aplica." },
         },
         required: ["concepto", "monto"],
       },
@@ -824,6 +825,10 @@ Cuando el usuario te envíe un mensaje con un gasto (texto, foto, comprobante PD
 
   1. CONCEPTO Y MONTO (FACTURAS, COMPROBANTES Y AUDIOS):
      - COMPROBANTES BANCARIOS CON "VARIOS": En comprobantes de transferencia bancaria suele figurar por defecto "Concepto: Varios". Si el usuario en el audio o texto especifica el repuesto o servicio (ej: "alternador de motocompresor"), el ítem real ("Alternador de motocompresor" o "Alternador") DEBE REEMPLAZAR OBLIGATORIAMENTE a "Varios".
+     - GASTOS MÚLTIPLES O DESGLOSE: Si el usuario pasa varios conceptos, compras o viajes para sumar (ej: "viaje de grillo $67.400, 2 cubiertas $26.000 y $60.000"):
+       * Sumá los montos matemáticamente con precisión exacta ($153.400).
+       * EN OBSERVACIONES: GUARDA OBLIGATORIAMENTE EL DESGLOSE COMPLETO de los ítems (ej: "Desglose: Viaje grillo $67.400 | Cubierta 1 $26.000 | Cubierta 2 $60.000"). ¡Esto es fundamental para que el desglose quede registrado en la base de datos y aparezca en la web!
+       * EN CONCEPTO: Colocá un resumen descriptivo que mencione los conceptos principales (ej: "Ronco gastos (Viaje grillo + 2 cubiertas)").
      - Si el mensaje incluye contenido extraído de una factura o comprobante PDF:
        * BUSCÁ EL ARTÍCULO/REPUESTO/SERVICIO que figura en el comprobante (ej: "Filtro de gasoil", "4 MICRO RELAY 24V", "Aceite 15w40") y asignalo OBLIGATORIAMENTE al Concepto.
        * NUNCA uses el nombre de la máquina ("Cargadora LiuGong", "Motocompresor") ni del proyecto ("Lipsa") como Concepto cuando haya un repuesto específico. La máquina va en Máquina/Observaciones y el proyecto en Proyecto.
@@ -851,7 +856,12 @@ Cuando el usuario te envíe un mensaje con un gasto (texto, foto, comprobante PD
 
   6. FACTURACIÓN: Si viene con factura PDF adjunta o mencionó factura, indicar "Facturado (comprobante adjunto)". Si es un comprobante de transferencia bancaria, indicar "Transferencia (comprobante adjunto)". Si no, marcar como pendiente a definir.
 
-  7. MENSAJES SUCESIVOS / COMPLETAR ESTRUCTURA PENDIENTE:
+  7. MENSAJES SUCESIVOS / COMPLETAR ESTRUCTURA PENDIENTE / ADJUNTAR COMPROBANTES:
+     - PROHIBIDO ABSOLUTAMENTE invocar 'adjuntar_comprobante' mientras estás estructurando o confirmando un gasto nuevo.
+     - Si el usuario dice "Adjunta el comprobante", "adjuntalo", o envía una imagen o comprobante PDF cuando confirma o estructura un gasto nuevo:
+       -> El comprobante se adjunta AUTOMÁTICAMENTE cuando llames a 'registrar_gasto' (el sistema ya tiene guardado el archivo en la sesión).
+       -> NO llames a 'adjuntar_comprobante' (esa herramienta es SOLO para egresos viejos ya guardados en la BD).
+       -> Si el usuario dice "Adjunta el comprobante" y "Confirmo" (o similar), ejecutá DIRECTAMENTE 'registrar_gasto'.
      - Si en el turno anterior presentaste una estructura con datos incompletos (ej: "Proyecto: Pendiente a definir", "Máquina: Pendiente a definir", o "Concepto: Varios") y el usuario te responde con un audio o texto aportando esos datos (ej: "alternador de motocompresor, lipsa..."):
        -> NO crees un gasto nuevo separado.
        -> ACTUALIZÁ LA ESTRUCTURA PENDIENTE con los nuevos datos (Concepto: Alternador, Máquina: Motocompresor, Proyecto: Lipsa, Categoría: Repuestos) manteniendo la fecha, monto y comprobante del comprobante previo.
@@ -1062,7 +1072,7 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
         } else if (functionName === "adjuntar_comprobante") {
           const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
           toolResult = await executeAdjuntarComprobante(functionArgs, imgUrl);
-          if (imgUrl && sesion.datos_pendientes) {
+          if (toolResult.includes("✅") && imgUrl && sesion.datos_pendientes) {
             (sesion.datos_pendientes as any).ultima_imagen_url = null;
           }
         } else if (functionName === "actualizar_fotografia") {
@@ -1759,6 +1769,7 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
 // ADJUNTAR COMPROBANTE A EGRESO EXISTENTE
 // ==========================================
 async function executeAdjuntarComprobante(args: {
+  id?: number;
   concepto?: string;
   monto?: number;
   fecha?: string;
@@ -1766,16 +1777,26 @@ async function executeAdjuntarComprobante(args: {
 }, imgUrl?: string | null) {
   try {
     if (!imgUrl) {
-      return `❌ No tengo ninguna imagen disponible para adjuntar. Por favor, enviame primero la foto del comprobante junto con el pedido de adjuntarla.`;
+      return `❌ No tengo ningún comprobante (foto o PDF) disponible para adjuntar. Por favor, enviame primero el archivo junto con el pedido de adjuntarlo.`;
     }
 
-    const { ilike, and, eq, desc, sql, gte: gteOp } = await import("drizzle-orm");
+    const { ilike, and, eq, desc, sql } = await import("drizzle-orm");
 
-    // ── Búsqueda en cascada (de más específica a más tolerante) ──────────────
+    // ── Búsqueda de egreso objetivo ──────────────
     let resultados: (typeof egresosTable.$inferSelect)[] = [];
 
+    // 0️⃣ Si especificó ID directo (lo más seguro y preciso)
+    if (args.id) {
+      const [egresoPorId] = await db.select().from(egresosTable)
+        .where(eq(egresosTable.id, args.id))
+        .limit(1);
+      if (egresoPorId) {
+        resultados = [egresoPorId];
+      }
+    }
+
     // 1️⃣ Intento con TODOS los filtros disponibles (AND estricto)
-    {
+    if (!resultados.length) {
       const conditions: any[] = [];
       if (args.concepto) conditions.push(ilike(egresosTable.concepto, `%${args.concepto}%`));
       if (args.centro_costos) conditions.push(ilike(egresosTable.centro_costos, `%${args.centro_costos}%`));
@@ -1789,7 +1810,7 @@ async function executeAdjuntarComprobante(args: {
       }
     }
 
-    // 2️⃣ Fallback: solo por concepto (ignora monto/fecha que pueden estar mal formateados)
+    // 2️⃣ Fallback: solo por concepto
     if (!resultados.length && args.concepto) {
       resultados = await db.select().from(egresosTable)
         .where(ilike(egresosTable.concepto, `%${args.concepto}%`))
@@ -1810,29 +1831,33 @@ async function executeAdjuntarComprobante(args: {
       }
     }
 
-    // 4️⃣ Último recurso: egreso más reciente (últimos 10 minutos)
     if (!resultados.length) {
-      const hace10min = new Date(Date.now() - 10 * 60 * 1000);
-      resultados = await db.select().from(egresosTable)
-        .where(gteOp(egresosTable.createdAt, hace10min))
-        .orderBy(desc(egresosTable.id))
-        .limit(1);
+      return `❌ No encontré ningún egreso registrado que coincida con esos datos (concepto/monto/ID). Si estás por registrar un gasto nuevo, confirmámelo y el comprobante se adjuntará automáticamente a ese egreso.`;
     }
 
-    if (!resultados.length) {
-      return `❌ No encontré ningún egreso con los datos que me pasaste. ¿Podés darme más datos? (Concepto, monto, fecha, proyecto)`;
-    }
-
-    // Tomar el más reciente entre los encontrados
+    // Tomar el egreso encontrado
     const egreso = resultados[0];
+
+    // Procesar archivo (PDF o Imagen) mediante storage
+    let finalComprobanteUrl = imgUrl;
+    const isPdf = imgUrl.includes("application/pdf") || 
+                  imgUrl.startsWith("JVBERi") || 
+                  (imgUrl.includes(";base64,") && imgUrl.split(";base64,")[1].trim().startsWith("JVBERi"));
+    try {
+      const { uploadImage } = await import("./storage.js");
+      const ext = isPdf ? "pdf" : "jpg";
+      finalComprobanteUrl = await uploadImage(`comprobante_${egreso.id}_${Date.now()}.${ext}`, imgUrl);
+    } catch (e) {
+      console.warn("[Bot] No se pudo subir comprobante a Cloudinary, guardando directo:", e);
+    }
 
     // Insertar fotografía
     await db.insert(fotografiasTable).values({
       empresa_id: 1,
       entidad_tipo: "egreso",
       entidad_id: egreso.id,
-      url: imgUrl,
-      descripcion: "Comprobante adjuntado por WhatsApp",
+      url: finalComprobanteUrl,
+      descripcion: isPdf ? "Comprobante PDF adjuntado por WhatsApp" : "Comprobante adjuntado por WhatsApp",
     });
 
     // Marcar comprobante en el egreso
@@ -1840,7 +1865,7 @@ async function executeAdjuntarComprobante(args: {
 
     await auditarBot("Actualizar", "Egreso", egreso.id, { comprobante: true });
 
-    return `✅ ¡Comprobante adjuntado correctamente al egreso #${egreso.id} "${egreso.concepto}" por $${Number(egreso.monto).toLocaleString("es-AR")}! Ya podés verlo en la web apretando el botón verde "Ver Foto" en la tabla de Gastos.`;
+    return `✅ ¡Comprobante adjuntado correctamente al egreso #${egreso.id} "${egreso.concepto}" por $${Number(egreso.monto).toLocaleString("es-AR")}! Ya podés verlo en la web apretando el botón verde "Ver Comprobante" en Gastos.`;
   } catch (error: any) {
     console.error("Error adjuntando comprobante:", error);
     return `❌ Error al adjuntar el comprobante: ${error.message}`;
@@ -2048,9 +2073,11 @@ async function executeRegistrarGasto(args: {
 
     if (imgUrl && egreso && egreso.id) {
       let finalComprobanteUrl = imgUrl;
+      const isPdf = imgUrl.includes("application/pdf") || 
+                    imgUrl.startsWith("JVBERi") || 
+                    (imgUrl.includes(";base64,") && imgUrl.split(";base64,")[1].trim().startsWith("JVBERi"));
       try {
         const { uploadImage } = await import("./storage.js");
-        const isPdf = imgUrl.includes("application/pdf") || imgUrl.startsWith("JVBERi");
         const ext = isPdf ? "pdf" : "jpg";
         finalComprobanteUrl = await uploadImage(`comprobante_${egreso.id}_${Date.now()}.${ext}`, imgUrl);
       } catch (e) {
@@ -2061,7 +2088,7 @@ async function executeRegistrarGasto(args: {
         entidad_tipo: "egreso",
         entidad_id: egreso.id,
         url: finalComprobanteUrl,
-        descripcion: "Comprobante cargado por WhatsApp",
+        descripcion: isPdf ? "Comprobante PDF cargado por WhatsApp" : "Comprobante cargado por WhatsApp",
       });
     }
 
@@ -2128,8 +2155,9 @@ async function executeActualizarGasto(args: {
           if (pMatch) {
             centroCostosResuelto = pMatch.lugar;
             const resto = palabras.filter(x => x !== p).join(" ");
-            if (resto && !obsExtra) {
-              obsExtra = resto.includes("liugong") ? "Cargadora LiuGong" : resto;
+            if (resto) {
+              const maq = resto.includes("liugong") ? "Cargadora LiuGong" : resto;
+              obsExtra = obsExtra ? `${obsExtra} | ${maq}` : maq;
             }
             break;
           }
@@ -2165,9 +2193,11 @@ async function executeActualizarGasto(args: {
 
     if (imgUrl) {
       let finalComprobanteUrl = imgUrl;
+      const isPdf = imgUrl.includes("application/pdf") || 
+                    imgUrl.startsWith("JVBERi") || 
+                    (imgUrl.includes(";base64,") && imgUrl.split(";base64,")[1].trim().startsWith("JVBERi"));
       try {
         const { uploadImage } = await import("./storage.js");
-        const isPdf = imgUrl.includes("application/pdf") || imgUrl.startsWith("JVBERi");
         const ext = isPdf ? "pdf" : "jpg";
         finalComprobanteUrl = await uploadImage(`comprobante_${egreso.id}_${Date.now()}.${ext}`, imgUrl);
       } catch (e) {
@@ -2178,7 +2208,7 @@ async function executeActualizarGasto(args: {
         entidad_tipo: "egreso",
         entidad_id: egreso.id,
         url: finalComprobanteUrl,
-        descripcion: "Comprobante cargado por WhatsApp",
+        descripcion: isPdf ? "Comprobante PDF cargado por WhatsApp" : "Comprobante cargado por WhatsApp",
       });
     }
 

@@ -66,6 +66,82 @@ router.get("/debug-fotos", async (req, res) => {
   }
 });
 
+router.get("/fix-comprobante-ronco", async (req, res) => {
+  try {
+    const result = await fixComprobanteRonco();
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+export async function fixComprobanteRonco() {
+  const { egresosTable, fotografiasTable } = await import("@workspace/db/schema");
+  const { eq, ilike, and, desc } = await import("drizzle-orm");
+
+  // 1. Buscar egreso #237 (Ronco)
+  const [ronco] = await db.select().from(egresosTable).where(eq(egresosTable.id, 237)).limit(1);
+  if (!ronco) {
+    return { success: false, error: "No se encontró el egreso #237" };
+  }
+
+  // 2. Buscar egreso Gelso
+  const [gelso] = await db.select().from(egresosTable)
+    .where(ilike(egresosTable.concepto, "%Gelso%"))
+    .orderBy(desc(egresosTable.id))
+    .limit(1);
+
+  const desgloseTexto = "Desglose: Viaje grillo $67.400 | Cubierta 1 $26.000 | Cubierta 2 $60.000";
+  let nuevaObs = ronco.observaciones || "";
+  if (!nuevaObs.includes("Desglose:")) {
+    nuevaObs = nuevaObs ? `${desgloseTexto} | ${nuevaObs}` : desgloseTexto;
+  }
+
+  // 3. Actualizar Ronco #237 con el desglose y marcar comprobante = true
+  await db.update(egresosTable).set({
+    observaciones: nuevaObs,
+    comprobante: true
+  }).where(eq(egresosTable.id, 237));
+
+  let fotoMovida = false;
+  if (gelso) {
+    // Buscar fotos asociadas a Gelso
+    const fotosGelso = await db.select().from(fotografiasTable)
+      .where(and(eq(fotografiasTable.entidad_tipo, "egreso"), eq(fotografiasTable.entidad_id, gelso.id)));
+    
+    if (fotosGelso.length > 0) {
+      // Mover la foto más reciente de Gelso a Ronco #237
+      const ultimaFoto = fotosGelso[fotosGelso.length - 1];
+      await db.update(fotografiasTable).set({
+        entidad_id: 237,
+        descripcion: "Comprobante reasignado a Ronco gastos"
+      }).where(eq(fotografiasTable.id, ultimaFoto.id));
+      fotoMovida = true;
+    }
+
+    // Marcar comprobante = false en Gelso (o según le queden fotos reales)
+    const fotosRestantesGelso = await db.select().from(fotografiasTable)
+      .where(and(eq(fotografiasTable.entidad_tipo, "egreso"), eq(fotografiasTable.entidad_id, gelso.id)));
+    await db.update(egresosTable).set({
+      comprobante: fotosRestantesGelso.length > 0
+    }).where(eq(egresosTable.id, gelso.id));
+  }
+
+  // Sincronizar Google Sheets
+  try {
+    const { syncAllSheets } = await import("../services/sync-sheets.js");
+    await syncAllSheets();
+  } catch (_) {}
+
+  return {
+    success: true,
+    message: "Egreso #237 corregido exitosamente con desglose y comprobante.",
+    ronco: { id: 237, observaciones: nuevaObs, comprobante: true },
+    gelsoId: gelso?.id,
+    fotoMovida
+  };
+}
+
 // DEBUG TEMPORAL - REMOVER DESPUÉS
 router.get("/debug-proyectos-map", async (req, res) => {
   try {

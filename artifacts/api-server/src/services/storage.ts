@@ -22,33 +22,49 @@ cloudinary.config({
 export async function uploadImage(filename: string, base64Data: string): Promise<string> {
   const safeFilename = `${Date.now()}_${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
   
+  // Detectar si es un documento PDF
+  const isPdf = filename.toLowerCase().endsWith('.pdf') || 
+                base64Data.includes('application/pdf') || 
+                base64Data.startsWith('JVBERi') ||
+                (base64Data.includes(';base64,') && base64Data.split(';base64,')[1].trim().startsWith('JVBERi'));
+
+  const dataUri = base64Data.includes(';base64,') 
+    ? base64Data 
+    : (isPdf ? `data:application/pdf;base64,${base64Data}` : `data:image/jpeg;base64,${base64Data}`);
+
   // Usar Cloudinary si la URL está configurada
   if (process.env.CLOUDINARY_URL) {
     try {
-      // Cloudinary necesita el formato data URI (data:image/xxx;base64,...)
-      const dataUri = base64Data.includes(';base64,') 
-        ? base64Data 
-        : `data:image/jpeg;base64,${base64Data}`;
+      const baseName = safeFilename.split('.')[0];
+      const uploadOptions: any = {
+        folder: 'puffin-system',
+      };
 
-      const uploadResult = await cloudinary.uploader.upload(dataUri, {
-        public_id: safeFilename.split('.')[0], // Usar nombre de archivo base sin extensión
-        folder: 'puffin-system', // Carpeta dentro de Cloudinary
-        resource_type: 'auto', // Soporta imágenes, PDFs y otros documentos
-      });
+      if (isPdf) {
+        // En Cloudinary, los PDFs se manejan como 'raw' o 'auto' con formato y extensión explícita
+        uploadOptions.resource_type = 'raw';
+        uploadOptions.public_id = `${baseName}.pdf`;
+      } else {
+        uploadOptions.resource_type = 'auto';
+        uploadOptions.public_id = baseName;
+      }
+
+      const uploadResult = await cloudinary.uploader.upload(dataUri, uploadOptions);
       
-      return uploadResult.secure_url;
+      let finalUrl = uploadResult.secure_url || uploadResult.url;
+      // Asegurar que las URLs de PDF terminen con .pdf para correcta detección en el visor
+      if (isPdf && finalUrl && !finalUrl.toLowerCase().endsWith('.pdf')) {
+        finalUrl = `${finalUrl}.pdf`;
+      }
+      return finalUrl;
     } catch (error) {
-      console.error('Error al subir imagen a Cloudinary:', error);
-      throw new Error('Error al subir la imagen a Cloudinary');
+      console.error('Error al subir imagen a Cloudinary, usando fallback Data URI:', error);
+      // Fallback: si falla Cloudinary, no perder el comprobante y guardarlo directo como Data URI
+      return dataUri;
     }
   }
 
   // Fallback: Guardar directamente como Base64 (Data URI) en la base de datos
-  // Esto evita problemas de archivos perdidos en entornos serverless/efímeros (como Vercel/Railway)
-  // sin depender del file system local.
-  const dataUri = base64Data.includes(';base64,') 
-    ? base64Data 
-    : `data:image/jpeg;base64,${base64Data}`;
-    
+  // Esto evita problemas de archivos perdidos en entornos serverless/efímeros
   return dataUri;
 }

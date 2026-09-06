@@ -29,4 +29,15 @@ app.listen(port, (err) => {
   logger.info({ port }, "Server listening");
   startSpeedMonitor();
   startSatcomMonitor();
+
+  // Ejecución puntual para reparar comprobante y desglose de Ronco #237
+  import("./routes/index.js").then(({ fixComprobanteRonco }) => {
+    if (fixComprobanteRonco) {
+      fixComprobanteRonco().then(res => {
+        logger.info({ res }, "[Auto-Fix] Resultado corrección egreso #237 Ronco/Gelso");
+      }).catch(err => {
+        logger.error({ err }, "[Auto-Fix] Error en corrección automática de egreso #237");
+      });
+    }
+  }).catch(() => {});
 });

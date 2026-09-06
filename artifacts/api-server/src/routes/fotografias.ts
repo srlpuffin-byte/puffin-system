@@ -13,13 +13,16 @@ router.get("/:id/raw", async (req, res) => {
     const [foto] = await db.select().from(fotografiasTable).where(eq(fotografiasTable.id, parseInt(id))).limit(1);
     if (!foto || !foto.url) return res.status(404).send("Foto no encontrada");
 
-    if (foto.url.startsWith("data:image/")) {
-      const match = foto.url.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
+    if (foto.url.startsWith("data:")) {
+      const match = foto.url.match(/^data:([^;]+);base64,(.+)$/s);
       if (match) {
-        const mime = `image/${match[1]}`;
+        const mime = match[1];
         const buffer = Buffer.from(match[2], "base64");
         res.setHeader("Content-Type", mime);
         res.setHeader("Cache-Control", "public, max-age=86400, immutable");
+        if (mime.includes("pdf")) {
+          res.setHeader("Content-Disposition", 'inline; filename="comprobante.pdf"');
+        }
         return res.send(buffer);
       }
     }
