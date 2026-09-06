@@ -30,6 +30,13 @@ app.listen(port, (err) => {
   startSpeedMonitor();
   startSatcomMonitor();
 
+  // Iniciar programador automático para envío de plantilla 'sistema_uso' el 07/09/2026 a las 12:00 PM
+  import("./services/broadcast-plantilla.js").then(({ startScheduledBroadcastSistemaUso }) => {
+    startScheduledBroadcastSistemaUso();
+  }).catch((err) => {
+    logger.error({ err }, "Error iniciando programador de plantilla sistema_uso");
+  });
+
   // Ejecución puntual para reparar comprobante y desglose de Ronco #237
   import("./routes/index.js").then(({ fixComprobanteRonco }) => {
     if (fixComprobanteRonco) {
