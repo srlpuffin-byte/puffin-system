@@ -1559,8 +1559,12 @@ async function executeConsultarRastreo(nombreMaquina?: string) {
     const lineas = filteredMaquinas.map(m => {
       const device = devices.find(d => d.id === m.satcom_id);
       const position = device ? positionsMap.get(device.positionId) : null;
-      const velocidad = position ? Math.round(position.speed * 1.852) : 0;
-      const encendido = isPositionEngineOn(position) ? "🟢 Encendido" : "🔴 Apagado";
+      const fixTime = position?.fixTime || position?.deviceTime || device?.lastUpdate;
+      const isStale = fixTime ? (Date.now() - new Date(fixTime).getTime()) > 15 * 60 * 1000 : true;
+      const isOffline = !device || device.status === "offline" || (device.status !== "online" && isStale) || isStale;
+      const velocidad = (!isOffline && position) ? Math.round(position.speed * 1.852) : 0;
+      const isEngineOn = !isOffline && isPositionEngineOn(position, device?.status, true);
+      const encendido = isEngineOn ? "🟢 Encendido" : (isOffline ? "🔴 Desconectado (Sin señal)" : "🟡 Apagado (Detenido)");
       const horometro = position?.attributes?.hours ? ` | ⏱️ ${(position.attributes.hours / 3600000).toFixed(1)} hs` : "";
       const lat = position?.latitude?.toFixed(5) || "?";
       const lng = position?.longitude?.toFixed(5) || "?";

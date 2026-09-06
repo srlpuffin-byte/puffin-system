@@ -406,7 +406,10 @@ cronRouter.get("/sync-satcom", async (req, res) => {
       if (!position) continue;
 
       const { isPositionEngineOn } = await import("../services/satcom.js");
-      const currentIgnition = isPositionEngineOn(position);
+      const fixTime = position.fixTime || position.deviceTime || device.lastUpdate;
+      const isStale = fixTime ? (Date.now() - new Date(fixTime).getTime()) > 15 * 60 * 1000 : true;
+      const isOffline = device.status === "offline" || (device.status !== "online" && isStale) || isStale;
+      const currentIgnition = !isOffline && isPositionEngineOn(position, device.status, true);
       const satcomHorometroRaw = position.attributes?.hours ? (position.attributes.hours / 3600000) : 0;
 
       // Obtener el último evento registrado en historial_uso
@@ -432,12 +435,14 @@ cronRouter.get("/sync-satcom", async (req, res) => {
         const nuevoEstado = currentIgnition ? "encendido" : "apagado";
         
         let newHorometro = lastHorometro;
-        if (lastIgnition === true && !currentIgnition && ultimoEvento?.fecha_hora) {
+        if (satcomHorometroRaw > lastHorometro) {
+          newHorometro = Number(satcomHorometroRaw.toFixed(1));
+        } else if (lastIgnition === true && !currentIgnition && ultimoEvento?.fecha_hora) {
           const diffMs = Math.max(0, Date.now() - new Date(ultimoEvento.fecha_hora).getTime());
           const diffHours = diffMs / (1000 * 60 * 60);
-          newHorometro = Number((lastHorometro + diffHours).toFixed(1));
-        } else if (satcomHorometroRaw > lastHorometro) {
-          newHorometro = Number(satcomHorometroRaw.toFixed(1));
+          if (diffHours > 0 && diffHours <= 8) {
+            newHorometro = Number((lastHorometro + diffHours).toFixed(1));
+          }
         }
 
         const newHorometroStr = newHorometro.toFixed(1);

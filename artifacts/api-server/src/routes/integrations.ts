@@ -191,12 +191,13 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
     for (const m of maquinas) {
       const device = devices.find(d => Number(d.id) === Number(m.satcom_id));
       const position = device && device.positionId ? positionsMap.get(device.positionId) : null;
-      const estadoSatcom = device?.status || "unknown";
+      const rawEstadoSatcom = device?.status || "unknown";
       const fixTime = position?.fixTime || position?.deviceTime || device?.lastUpdate || null;
-      const isDeviceOffline = estadoSatcom === "offline";
-      const isStale = fixTime ? (Date.now() - new Date(fixTime).getTime()) > 15 * 60 * 1000 : false;
+      const isStale = fixTime ? (Date.now() - new Date(fixTime).getTime()) > 15 * 60 * 1000 : true;
+      const isDeviceOffline = rawEstadoSatcom === "offline" || (rawEstadoSatcom !== "online" && isStale) || isStale;
+      const estadoSatcom = isDeviceOffline ? "offline" : (rawEstadoSatcom === "online" ? "online" : "unknown");
       const rawSpeedKmh = position && typeof position.speed === "number" ? Math.round(position.speed * 1.852) : null;
-      const velocidadActual = (isDeviceOffline || isStale) ? 0 : rawSpeedKmh;
+      const velocidadActual = isDeviceOffline ? 0 : rawSpeedKmh;
 
       const rawLat = position?.latitude !== undefined && position?.latitude !== null ? Number(position.latitude) : null;
       const rawLng = position?.longitude !== undefined && position?.longitude !== null ? Number(position.longitude) : null;
@@ -216,8 +217,8 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
         rumbo: position && typeof position.course === "number" ? Math.round(position.course) : null,
         horometro_horas: position?.attributes?.hours ? Math.round((position.attributes.hours / 3600000) * 10) / 10 : null,
         odometro_km: position?.attributes?.totalDistance ? Math.round((position.attributes.totalDistance / 1000) * 10) / 10 : null,
-        motion: position?.attributes?.motion ?? (velocidadActual !== null && velocidadActual > 1),
-        encendido: isPositionEngineOn(position, estadoSatcom),
+        motion: isDeviceOffline ? false : (position?.attributes?.motion ?? (velocidadActual !== null && velocidadActual > 1)),
+        encendido: isDeviceOffline ? false : isPositionEngineOn(position, estadoSatcom, true),
         is_unlinked: false,
         imagen_url: fotografiasMap.get(m.id) || null,
         proyecto_lugar: maquinasProyectoMap.get(m.id) || null,
@@ -229,12 +230,13 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
     // 2. Agregar dispositivos sin vincular (asegura que ningún vehículo de Satcom falte)
     for (const d of unlinkedDevices) {
       const position = d.positionId ? positionsMap.get(d.positionId) : null;
-      const estadoSatcom = d.status || "unknown";
+      const rawEstadoSatcom = d.status || "unknown";
       const fixTime = position?.fixTime || position?.deviceTime || d.lastUpdate || null;
-      const isDeviceOffline = estadoSatcom === "offline";
-      const isStale = fixTime ? (Date.now() - new Date(fixTime).getTime()) > 15 * 60 * 1000 : false;
+      const isStale = fixTime ? (Date.now() - new Date(fixTime).getTime()) > 15 * 60 * 1000 : true;
+      const isDeviceOffline = rawEstadoSatcom === "offline" || (rawEstadoSatcom !== "online" && isStale) || isStale;
+      const estadoSatcom = isDeviceOffline ? "offline" : (rawEstadoSatcom === "online" ? "online" : "unknown");
       const rawSpeedKmh = position && typeof position.speed === "number" ? Math.round(position.speed * 1.852) : null;
-      const velocidadActual = (isDeviceOffline || isStale) ? 0 : rawSpeedKmh;
+      const velocidadActual = isDeviceOffline ? 0 : rawSpeedKmh;
 
       const rawLat = position?.latitude !== undefined && position?.latitude !== null ? Number(position.latitude) : null;
       const rawLng = position?.longitude !== undefined && position?.longitude !== null ? Number(position.longitude) : null;
@@ -254,8 +256,8 @@ integrationsRouter.get("/xpert/mapa", requireAuth, async (req, res) => {
         rumbo: position && typeof position.course === "number" ? Math.round(position.course) : null,
         horometro_horas: position?.attributes?.hours ? Math.round((position.attributes.hours / 3600000) * 10) / 10 : null,
         odometro_km: position?.attributes?.totalDistance ? Math.round((position.attributes.totalDistance / 1000) * 10) / 10 : null,
-        motion: position?.attributes?.motion ?? (velocidadActual !== null && velocidadActual > 1),
-        encendido: isPositionEngineOn(position, estadoSatcom),
+        motion: isDeviceOffline ? false : (position?.attributes?.motion ?? (velocidadActual !== null && velocidadActual > 1)),
+        encendido: isDeviceOffline ? false : isPositionEngineOn(position, estadoSatcom, true),
         is_unlinked: true,
         proyecto_lugar: null,
         fix_time: fixTime,
@@ -567,7 +569,7 @@ integrationsRouter.get("/xpert/telemetria", requireAuth, async (req, res) => {
       posicion: { lat: position.latitude, lng: position.longitude },
       velocidad_kmh: position.speed * 1.852,
       rumbo: typeof position.course === "number" ? Math.round(position.course) : 0,
-      estado: isPositionEngineOn(position) ? "encendido" : "apagado",
+      estado: isPositionEngineOn(position, device.status, true) ? "encendido" : "apagado",
       horas_motor_acumuladas: position.attributes?.hours ? position.attributes.hours / 3600000 : 0,
       kilometraje_acumulado: position.attributes?.distance ? position.attributes.distance / 1000 : 0,
       ultima_actualizacion: new Date().toISOString()

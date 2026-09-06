@@ -4,28 +4,13 @@ import { apiFetch } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, RefreshCw, Wifi, WifiOff, Zap, ZapOff, Plus, Pencil, Check, X, Link as LinkIcon, Unlink, Settings2, Search, Tractor } from "lucide-react";
-import { SatcomMap } from "@/components/map/SatcomMap";
+import { SatcomMap, MapPoint } from "@/components/map/SatcomMap";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useGetMaquinas, getGetMaquinasQueryKey } from "@workspace/api-client-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-
-interface MapPoint {
-  maquina_id: number | null;
-  device_id: number | null;
-  nombre: string;
-  tipo: string;
-  estado_satcom: string;
-  lat: number | null;
-  lng: number | null;
-  velocidad_kmh: number | null;
-  encendido: boolean;
-  is_unlinked?: boolean;
-  imagen_url?: string | null;
-  proyecto_lugar?: string | null;
-}
 
 interface SatcomDevice {
   id: number;
@@ -309,8 +294,16 @@ export function Gps() {
                         )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
-                        {p.encendido ? <Zap className="h-3 w-3 text-green-600" /> : <ZapOff className="h-3 w-3 text-slate-400" />}
-                        {hasGps ? <Wifi className="h-3 w-3 text-blue-500" /> : <WifiOff className="h-3 w-3 text-slate-300" />}
+                        {p.estado_satcom === "online" && p.encendido ? (
+                          <span title="Motor encendido"><Zap className="h-3 w-3 text-green-600" /></span>
+                        ) : (
+                          <span title="Motor apagado"><ZapOff className="h-3 w-3 text-slate-400" /></span>
+                        )}
+                        {hasGps && p.estado_satcom === "online" ? (
+                          <span title="En línea"><Wifi className="h-3 w-3 text-blue-500" /></span>
+                        ) : (
+                          <span title="Sin señal"><WifiOff className="h-3 w-3 text-slate-300" /></span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3 mt-1 ml-4 flex-wrap">
@@ -394,8 +387,8 @@ export function Gps() {
                           <span className="text-sm font-medium truncate">{p.nombre}</span>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          {p.encendido ? <Zap className="h-3 w-3 text-green-600" /> : <ZapOff className="h-3 w-3 text-slate-400" />}
-                          {hasGps ? <Wifi className="h-3 w-3 text-amber-500" /> : <WifiOff className="h-3 w-3 text-slate-300" />}
+                          {p.estado_satcom === "online" && p.encendido ? <Zap className="h-3 w-3 text-green-600" /> : <ZapOff className="h-3 w-3 text-slate-400" />}
+                          {hasGps && p.estado_satcom === "online" ? <Wifi className="h-3 w-3 text-amber-500" /> : <WifiOff className="h-3 w-3 text-slate-300" />}
                         </div>
                       </div>
                       <div className="mt-1.5 flex items-center justify-between gap-2">
@@ -442,8 +435,9 @@ export function Gps() {
           <SatcomMap points={mapPoints} activePointId={selectedId} height="100%" />
           <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-3 border text-xs space-y-1.5 z-[1000]">
             <p className="font-semibold text-slate-700 mb-2">Leyenda</p>
-            <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-green-500 inline-block" /> Encendida / En línea</div>
-            <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-red-400 inline-block" /> Apagada / Sin señal</div>
+            <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-green-500 inline-block" /> En línea (Motor encendido)</div>
+            <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-500 inline-block" /> En línea (Motor detenido)</div>
+            <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-red-500 inline-block" /> Desconectada / Sin señal</div>
             <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-slate-300 inline-block" /> Estado desconocido</div>
           </div>
           <button

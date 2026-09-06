@@ -30,15 +30,14 @@ export interface SatcomPosition {
 
 export function isPositionEngineOn(position: any, deviceStatus?: string, checkRealtimeLiveness: boolean = false): boolean {
   if (!position) return false;
-  if (checkRealtimeLiveness && deviceStatus === "offline") return false;
 
   // Si se solicita verificar si está en marcha en vivo en este preciso instante
   if (checkRealtimeLiveness) {
+    if (deviceStatus && deviceStatus !== "online") return false;
     const timestamp = position.fixTime || position.deviceTime;
-    if (timestamp) {
-      const ageMinutes = (Date.now() - new Date(timestamp).getTime()) / (1000 * 60);
-      if (ageMinutes > 15) return false;
-    }
+    if (!timestamp) return false;
+    const ageMinutes = (Date.now() - new Date(timestamp).getTime()) / (1000 * 60);
+    if (isNaN(ageMinutes) || ageMinutes > 15) return false;
   }
 
   if (position.attributes?.ignition === true) return true;

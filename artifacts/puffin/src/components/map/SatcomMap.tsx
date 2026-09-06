@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
+import { formatearTiempoReporte } from "@/components/map/TrazadorMapa";
 
-interface MapPoint {
+export interface MapPoint {
   maquina_id: number | null;
   device_id: number | null;
   nombre: string;
@@ -13,6 +14,8 @@ interface MapPoint {
   is_unlinked?: boolean;
   imagen_url?: string | null;
   proyecto_lugar?: string | null;
+  fix_time?: string | null;
+  last_update?: string | null;
 }
 
 interface SatcomMapProps {
@@ -48,7 +51,10 @@ function loadLeaflet(): Promise<void> {
 }
 
 function createMarkerIcon(L: any, encendido: boolean, status: string) {
-  const color = encendido ? "#22c55e" : status === "offline" ? "#ef4444" : "#94a3b8";
+  const isOnline = status === "online";
+  const color = !isOnline 
+    ? (status === "offline" ? "#ef4444" : "#94a3b8") 
+    : (encendido ? "#22c55e" : "#f59e0b");
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 48" width="36" height="48">
       <path d="M18 0C8.059 0 0 8.059 0 18c0 13.5 18 30 18 30s18-16.5 18-30C36 8.059 27.941 0 18 0z" fill="${color}" stroke="white" stroke-width="2"/>
@@ -122,20 +128,23 @@ export function SatcomMap({ points, height = "420px", activePointId }: SatcomMap
     const validPoints = points.filter(p => p.lat !== null && p.lng !== null);
 
     validPoints.forEach(p => {
+      const isOnline = p.estado_satcom === "online";
+      const tiempoReporte = formatearTiempoReporte(p.fix_time || p.last_update);
       const icon = createMarkerIcon(L, p.encendido, p.estado_satcom);
       const marker = L.marker([p.lat!, p.lng!], { icon })
         .bindPopup(`
-          <div style="font-family:system-ui;min-width:180px;max-width:220px">
+          <div style="font-family:system-ui;min-width:190px;max-width:240px">
             ${p.imagen_url ? `<img src="${p.imagen_url}" style="width:100%;height:100px;object-fit:cover;border-radius:6px;margin-bottom:8px" alt="${p.nombre}" />` : ''}
             <strong style="font-size:14px">${p.nombre}</strong><br/>
             <span style="color:#64748b;font-size:12px">${p.tipo}</span>
             ${p.proyecto_lugar ? `<br/><span style="display:inline-block;margin-top:4px;padding:2px 6px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:12px;font-size:10px;font-weight:600;">En: ${p.proyecto_lugar}</span>` : ''}
             <hr style="margin:6px 0;border-color:#e2e8f0"/>
-            <div style="display:flex;gap:6px;flex-direction:column;font-size:12px">
-              <span>${p.encendido ? "🟢" : "🔴"} <b>${p.encendido ? "Encendido" : "Apagado"}</b></span>
-              <span>🛰 GPS: <b>${p.estado_satcom === "online" ? "En línea" : p.estado_satcom === "offline" ? "Sin señal" : "Desconocido"}</b></span>
-              ${p.velocidad_kmh !== null ? `<span>⚡ <b>${p.velocidad_kmh} km/h</b></span>` : ""}
-              <span style="color:#94a3b8;font-size:11px">📍 ${p.lat?.toFixed(5)}, ${p.lng?.toFixed(5)}</span>
+            <div style="display:flex;gap:5px;flex-direction:column;font-size:12px">
+              <div><b>Conexión:</b> ${isOnline ? '<span style="color:#166534;font-weight:bold">🟢 En línea</span>' : '<span style="color:#dc2626;font-weight:bold">🔴 Desconectado</span>'}</div>
+              <div><b>Motor:</b> ${isOnline ? (p.encendido ? '<span style="color:#166534;font-weight:bold">🟢 Encendido</span>' : '<span style="color:#b45309;font-weight:bold">🟡 Detenido</span>') : '<span style="color:#64748b;font-weight:bold">🔴 Apagado / Sin señal</span>'}</div>
+              <div style="font-size:11px;color:${isOnline ? '#166534' : '#dc2626'}"><b>Último Reporte:</b> ${tiempoReporte}</div>
+              ${p.velocidad_kmh !== null ? `<div>⚡ Velocidad: <b>${p.velocidad_kmh} km/h</b></div>` : ""}
+              <div style="color:#94a3b8;font-size:11px">📍 ${p.lat?.toFixed(5)}, ${p.lng?.toFixed(5)}</div>
             </div>
           </div>
         `)
