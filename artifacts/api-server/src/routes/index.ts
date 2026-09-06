@@ -59,7 +59,14 @@ router.get("/clear-history", async (req, res) => {
 router.get("/debug-fotos", async (req, res) => {
   try {
     const { fotografiasTable } = await import("@workspace/db/schema");
-    const fotosList = await db.select().from(fotografiasTable).limit(50);
+    const { desc } = await import("drizzle-orm");
+    const fotosList = await db.select({
+      id: fotografiasTable.id,
+      entidad_tipo: fotografiasTable.entidad_tipo,
+      entidad_id: fotografiasTable.entidad_id,
+      descripcion: fotografiasTable.descripcion,
+      createdAt: fotografiasTable.createdAt
+    }).from(fotografiasTable).orderBy(desc(fotografiasTable.id)).limit(15);
     return res.json(fotosList);
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -77,7 +84,7 @@ router.get("/fix-comprobante-ronco", async (req, res) => {
 
 export async function fixComprobanteRonco() {
   const { egresosTable, fotografiasTable } = await import("@workspace/db/schema");
-  const { eq, ilike, and, desc } = await import("drizzle-orm");
+  const { eq, ilike, and, desc, or, inArray } = await import("drizzle-orm");
 
   // 1. Buscar egreso #237 (Ronco)
   const [ronco] = await db.select().from(egresosTable).where(eq(egresosTable.id, 237)).limit(1);
@@ -104,27 +111,68 @@ export async function fixComprobanteRonco() {
   }).where(eq(egresosTable.id, 237));
 
   let fotoMovida = false;
+  let fotoIdReasignada: number | null = null;
+
+  // Buscar si la foto está asociada a Gelso o fue la última foto creada
   if (gelso) {
-    // Buscar fotos asociadas a Gelso
     const fotosGelso = await db.select().from(fotografiasTable)
-      .where(and(eq(fotografiasTable.entidad_tipo, "egreso"), eq(fotografiasTable.entidad_id, gelso.id)));
+      .where(and(
+        inArray(fotografiasTable.entidad_tipo, ["egreso", "egresos"]),
+        eq(fotografiasTable.entidad_id, gelso.id)
+      ))
+      .orderBy(desc(fotografiasTable.id));
     
     if (fotosGelso.length > 0) {
-      // Mover la foto más reciente de Gelso a Ronco #237
-      const ultimaFoto = fotosGelso[fotosGelso.length - 1];
+      const targetFoto = fotosGelso[0];
       await db.update(fotografiasTable).set({
+        entidad_tipo: "egreso",
         entidad_id: 237,
-        descripcion: "Comprobante reasignado a Ronco gastos"
-      }).where(eq(fotografiasTable.id, ultimaFoto.id));
+        descripcion: "Comprobante de Ronco gastos reasignado"
+      }).where(eq(fotografiasTable.id, targetFoto.id));
       fotoMovida = true;
+      fotoIdReasignada = targetFoto.id;
     }
 
-    // Marcar comprobante = false en Gelso (o según le queden fotos reales)
-    const fotosRestantesGelso = await db.select().from(fotografiasTable)
-      .where(and(eq(fotografiasTable.entidad_tipo, "egreso"), eq(fotografiasTable.entidad_id, gelso.id)));
+    // Actualizar comprobante de Gelso
+    const fotosRestantes = await db.select().from(fotografiasTable)
+      .where(and(
+        inArray(fotografiasTable.entidad_tipo, ["egreso", "egresos"]),
+        eq(fotografiasTable.entidad_id, gelso.id)
+      ));
     await db.update(egresosTable).set({
-      comprobante: fotosRestantesGelso.length > 0
+      comprobante: fotosRestantes.length > 0
     }).where(eq(egresosTable.id, gelso.id));
+  }
+
+  // Si aún no se encontró la foto pero hay fotos recientes huérfanas o en otro egreso
+  if (!fotoMovida) {
+    const [fotoRoncoExistente] = await db.select().from(fotografiasTable)
+      .where(and(
+        inArray(fotografiasTable.entidad_tipo, ["egreso", "egresos"]),
+        eq(fotografiasTable.entidad_id, 237)
+      ))
+      .limit(1);
+
+    if (fotoRoncoExistente) {
+      fotoMovida = true;
+      fotoIdReasignada = fotoRoncoExistente.id;
+    } else {
+      // Tomar la última foto subida en fotografiasTable de tipo egreso si fue en las últimas 24h
+      const ultimasFotos = await db.select().from(fotografiasTable)
+        .where(inArray(fotografiasTable.entidad_tipo, ["egreso", "egresos"]))
+        .orderBy(desc(fotografiasTable.id))
+        .limit(1);
+      if (ultimasFotos.length > 0) {
+        const uFoto = ultimasFotos[0];
+        await db.update(fotografiasTable).set({
+          entidad_tipo: "egreso",
+          entidad_id: 237,
+          descripcion: "Comprobante de Ronco gastos reasignado"
+        }).where(eq(fotografiasTable.id, uFoto.id));
+        fotoMovida = true;
+        fotoIdReasignada = uFoto.id;
+      }
+    }
   }
 
   // Sincronizar Google Sheets
@@ -138,7 +186,8 @@ export async function fixComprobanteRonco() {
     message: "Egreso #237 corregido exitosamente con desglose y comprobante.",
     ronco: { id: 237, observaciones: nuevaObs, comprobante: true },
     gelsoId: gelso?.id,
-    fotoMovida
+    fotoMovida,
+    fotoIdReasignada
   };
 }
 
