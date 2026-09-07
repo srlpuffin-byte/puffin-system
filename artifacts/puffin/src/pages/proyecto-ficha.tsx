@@ -12,6 +12,18 @@ import { ChevronLeft, MapPin, Activity, DollarSign, Users, Tractor, ExternalLink
 import { format } from "date-fns";
 import { toast } from "sonner";
 
+function formatDateSafe(dateStr: any) {
+  if (!dateStr) return "-";
+  try {
+    const str = typeof dateStr === "string" ? dateStr.replace(" ", "T") : dateStr;
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return "-";
+    return format(d, "dd/MM/yyyy");
+  } catch {
+    return "-";
+  }
+}
+
 export function ProyectoFicha({ params: propParams }: { params?: { id?: string } } = {}) {
   const hookParams = useParams<{ id?: string }>();
   const [, matchParams] = useRoute("/proyectos/:id");
@@ -88,7 +100,7 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
   const egresosProyecto = todosLosEgresos?.data?.filter((eg: any) => {
     const cc = (eg.centro_costos || "").trim().toLowerCase();
     if (!cc) return false;
-    const lugar = proyecto.lugar.toLowerCase();
+    const lugar = (proyecto.lugar || "").toLowerCase();
     return cc.includes(lugar) || lugar.includes(cc);
   }) || [];
 
@@ -102,9 +114,10 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
   const porcentajeGastado = gananciaARS > 0 ? (totalGastosARS / gananciaARS) * 100 : 0;
 
   const estadoBadge = (estado: string) => {
-    if (estado === "activo") return <Badge className="bg-green-600 hover:bg-green-700">ACTIVO</Badge>;
-    if (estado === "finalizado") return <Badge variant="secondary">FINALIZADO</Badge>;
-    return <Badge variant="outline">{estado.toUpperCase()}</Badge>;
+    const est = (estado || "activo").toLowerCase();
+    if (est === "activo") return <Badge className="bg-green-600 hover:bg-green-700">ACTIVO</Badge>;
+    if (est === "finalizado") return <Badge variant="secondary">FINALIZADO</Badge>;
+    return <Badge variant="outline">{est.toUpperCase()}</Badge>;
   };
 
   return (
@@ -116,11 +129,11 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
         </Link>
         <div className="min-w-0">
           <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-primary flex flex-wrap items-center gap-2">
-            {proyecto.lugar}
+            {proyecto.lugar || "Sin nombre"}
             {estadoBadge(proyecto.estado)}
           </h1>
           <p className="text-muted-foreground flex items-center gap-1 mt-1 text-xs sm:text-sm">
-            <MapPin className="h-3 w-3 flex-shrink-0" /> Proyecto ID: {proyecto.id} • Creado el {format(new Date(proyecto.createdAt), "dd/MM/yyyy")}
+            <MapPin className="h-3 w-3 flex-shrink-0" /> Proyecto ID: {proyecto.id} • Creado el {formatDateSafe(proyecto.createdAt)}
           </p>
         </div>
       </div>
@@ -358,7 +371,7 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
                           return (
                             <TableRow key={eg.id}>
                               <TableCell className="text-sm">
-                                {eg.fecha ? format(new Date(eg.fecha), "dd/MM/yyyy") : "-"}
+                                {formatDateSafe(eg.fecha)}
                               </TableCell>
                               <TableCell>
                                 <Badge variant="outline" className="text-xs">{eg.categoria}</Badge>
@@ -405,7 +418,7 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
                           </div>
                           
                           <div className="flex items-center text-xs text-muted-foreground gap-1.5">
-                            <span>{eg.fecha ? format(new Date(eg.fecha), "dd/MM/yyyy") : "-"}</span>
+                            <span>{formatDateSafe(eg.fecha)}</span>
                             <span>•</span>
                             <span>USD ${(monto / tc).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</span>
                           </div>
@@ -479,7 +492,7 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
                           {pagos.map((pago: any, idx: number) => (
                             <TableRow key={idx}>
                               <TableCell className="text-sm">
-                                {pago.fecha ? format(new Date(pago.fecha), "dd/MM/yyyy") : "-"}
+                                {formatDateSafe(pago.fecha)}
                               </TableCell>
                               <TableCell>
                                 <Badge variant="outline" className="capitalize bg-slate-50">

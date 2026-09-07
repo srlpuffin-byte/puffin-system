@@ -15,12 +15,24 @@ import { RegistrarPagoDialog } from "@/components/forms/registrar-pago-dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
+function formatDateSafe(dateStr: any) {
+  if (!dateStr) return "-";
+  try {
+    const str = typeof dateStr === "string" ? dateStr.replace(" ", "T") : dateStr;
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return "-";
+    return format(d, "dd/MM/yyyy");
+  } catch {
+    return "-";
+  }
+}
+
 export function Proyectos() {
   const [search, setSearch] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [editProyecto, setEditProyecto] = useState<Proyecto | null>(null);
   const [pagoProyecto, setPagoProyecto] = useState<Proyecto | null>(null);
-  const { data: proyectos, isLoading } = useGetProyectos();
+  const { data: proyectos, isLoading, isError, refetch } = useGetProyectos();
   const deleteMut = useDeleteProyecto();
   const { data: empleados } = useGetEmpleados();
   const { data: maquinas } = useGetMaquinas();
@@ -57,7 +69,7 @@ export function Proyectos() {
     }).join(", ");
   };
 
-  const filteredProyectos = proyectos?.filter(p => 
+  const projectList = (proyectos || []).filter(p => 
     (p.lugar || "").toLowerCase().includes(search.toLowerCase()) ||
     (p.estado || "").toLowerCase().includes(search.toLowerCase())
   );
@@ -172,18 +184,27 @@ export function Proyectos() {
                 <TableBody>
                   {isLoading ? (
                     <TableSkeleton cols={5} rows={5} />
-                  ) : filteredProyectos?.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No se encontraron resultados.</TableCell></TableRow>
+                  ) : isError ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 space-y-2">
+                        <p className="text-red-500 font-medium">Error al cargar proyectos.</p>
+                        <Button size="sm" variant="outline" onClick={() => refetch()}>
+                          <RefreshCw className="h-4 w-4 mr-1" /> Reintentar
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ) : projectList.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No se encontraron proyectos.</TableCell></TableRow>
                   ) : (
-                    filteredProyectos?.map((p) => (
+                    projectList.map((p) => (
                       <TableRow key={p.id}>
                         <TableCell>
                           <div className="font-medium text-base flex items-center gap-1">
                             <MapPin className="h-4 w-4 text-muted-foreground" />
-                            {p.lugar}
+                            {p.lugar || "Sin nombre"}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            Creado: {format(new Date(p.createdAt), "dd/MM/yyyy")}
+                            Creado: {formatDateSafe(p.createdAt)}
                           </div>
                         </TableCell>
                         {!isEmpleado && (
@@ -292,24 +313,33 @@ export function Proyectos() {
             <div className="md:hidden divide-y">
               {isLoading ? (
                 <CardSkeleton rows={4} />
-              ) : filteredProyectos?.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">No se encontraron resultados.</div>
+              ) : isError ? (
+                <div className="text-center py-8 space-y-2 p-4">
+                  <p className="text-red-500 font-medium text-sm">Error al cargar los proyectos.</p>
+                  <Button size="sm" variant="outline" onClick={() => refetch()}>
+                    <RefreshCw className="h-4 w-4 mr-1" /> Reintentar
+                  </Button>
+                </div>
+              ) : projectList.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No se encontraron proyectos.</div>
               ) : (
-                filteredProyectos?.map((p) => (
+                projectList.map((p) => {
+                  const estado = (p.estado || "activo").toLowerCase();
+                  return (
                   <div key={p.id} className="p-4 bg-card flex flex-col gap-4 hover:bg-slate-50 transition-colors">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <h4 className="font-semibold text-base flex items-center gap-1 text-primary">
                           <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                          {p.lugar}
+                          {p.lugar || "Sin nombre"}
                         </h4>
                         <div className="text-xs text-muted-foreground mt-1">
-                          Creado: {format(new Date(p.createdAt), "dd/MM/yyyy")}
+                          Creado: {formatDateSafe(p.createdAt)}
                         </div>
                       </div>
-                      <Badge variant={p.estado === "activo" ? "default" : p.estado === "finalizado" ? "secondary" : "outline"}
-                             className={p.estado === "activo" ? "bg-green-600" : ""}>
-                        {p.estado.toUpperCase()}
+                      <Badge variant={estado === "activo" ? "default" : estado === "finalizado" ? "secondary" : "outline"}
+                             className={estado === "activo" ? "bg-green-600" : ""}>
+                        {estado.toUpperCase()}
                       </Badge>
                     </div>
 
@@ -317,11 +347,11 @@ export function Proyectos() {
                       <div className="grid grid-cols-2 gap-2 text-sm bg-slate-50 p-2 rounded border">
                         <div className="flex flex-col">
                           <span className="text-xs text-muted-foreground">Dimensiones</span>
-                          <span className="font-medium">{parseFloat(p.hectareas).toLocaleString('es-AR')} Has.</span>
+                          <span className="font-medium">{parseFloat(p.hectareas || "0").toLocaleString('es-AR')} Has.</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-xs text-muted-foreground">Precio/Ha</span>
-                          <span className="font-medium">${parseFloat(p.precio_hectarea).toLocaleString('es-AR')}</span>
+                          <span className="font-medium">${parseFloat(p.precio_hectarea || "0").toLocaleString('es-AR')}</span>
                         </div>
                         <div className="col-span-2 flex justify-between border-t pt-2 mt-1">
                           <span className="text-xs text-muted-foreground">Ganancia Est.</span>
@@ -363,8 +393,9 @@ export function Proyectos() {
                       )}
                     </div>
                   </div>
-                ))
-              )}
+                );
+              })
+            )}
             </div>
           </div>
         </CardContent>
