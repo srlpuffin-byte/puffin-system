@@ -1,5 +1,8 @@
 import { Router } from "express";
 import zlib from "node:zlib";
+import { db } from "@workspace/db";
+import { whatsappSesionesTable } from "@workspace/db/schema";
+import { eq } from "drizzle-orm";
 import { handleWhatsAppMessage } from "../services/assistant.js";
 import { downloadWhatsAppMedia } from "../services/whatsapp.js";
 import { transcribeAudio } from "../services/transcription.js";
@@ -223,10 +226,69 @@ whatsappRouter.post("/", async (req, res) => {
       // Si Meta envía actualizaciones de estado de entrega (sent, delivered, read, failed)
       if (change.statuses) {
         for (const s of change.statuses) {
-          if (s.status === "failed") {
-            console.error(`[Webhook WhatsApp] ❌ Mensaje ${s.id} falló al entregarse a ${s.recipient_id}:`, JSON.stringify(s.errors || []));
+          const wamid = s.id;
+          const recipientId = s.recipient_id;
+          const status = s.status; // "sent", "delivered", "read", "failed"
+          const isFailed = status === "failed";
+          let errorDescription = "";
+
+          if (isFailed) {
+            const errObj = s.errors?.[0];
+            if (errObj?.code === 131047) {
+              errorDescription = "Ventana de 24 hs cerrada por Meta. El contacto debe responder primero o recibir una plantilla aprobada.";
+            } else if (errObj?.title || errObj?.message) {
+              errorDescription = `${errObj.title || ""}: ${errObj.message || ""}`.trim();
+            } else {
+              errorDescription = "No entregado en WhatsApp por Meta.";
+            }
+            console.error(`[Webhook WhatsApp] ❌ Mensaje ${wamid} falló al entregarse a ${recipientId}:`, errorDescription, JSON.stringify(s.errors || []));
           } else {
-            console.log(`[Webhook WhatsApp] Estado de mensaje ${s.id} (${s.recipient_id}): ${s.status}`);
+            console.log(`[Webhook WhatsApp] Estado de mensaje ${wamid} (${recipientId}): ${status}`);
+          }
+
+          // Actualizar en base de datos la sesión del destinatario
+          try {
+            const recipientClean = recipientId ? recipientId.replace(/\D/g, "") : "";
+            if (recipientClean) {
+              const last10 = recipientClean.slice(-10);
+              const sesiones = await db.select().from(whatsappSesionesTable);
+              const sesion = sesiones.find(ses => ses.phone.replace(/\D/g, "").slice(-10) === last10);
+              if (sesion && Array.isArray(sesion.messages)) {
+                let updated = false;
+                const newMessages = (sesion.messages as any[]).map((msg: any) => {
+                  if (msg.id === wamid) {
+                    updated = true;
+                    return {
+                      ...msg,
+                      delivery_status: status,
+                      delivery_error: isFailed ? errorDescription : null,
+                    };
+                  }
+                  return msg;
+                });
+
+                // Si no coincide por wamid pero falló la entrega del último mensaje del asistente
+                if (!updated && isFailed) {
+                  for (let i = newMessages.length - 1; i >= 0; i--) {
+                    if (newMessages[i].role === "assistant") {
+                      newMessages[i].delivery_status = "failed";
+                      newMessages[i].delivery_error = errorDescription;
+                      updated = true;
+                      break;
+                    }
+                  }
+                }
+
+                if (updated) {
+                  await db
+                    .update(whatsappSesionesTable)
+                    .set({ messages: newMessages, updated_at: new Date() })
+                    .where(eq(whatsappSesionesTable.phone, sesion.phone));
+                }
+              }
+            }
+          } catch (statusDbErr) {
+            console.warn("[Webhook WhatsApp] Error al actualizar estado de entrega en BD:", statusDbErr);
           }
         }
         return;

@@ -36,6 +36,10 @@ import {
   Calendar,
   MoreVertical,
   ArrowLeft,
+  AlertTriangle,
+  Check,
+  HelpCircle,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -52,6 +56,10 @@ interface ChatItem {
   botPausedUntil?: string | null;
   botPauseRemainingMinutes?: number | null;
   esAdmin: boolean;
+  window24hActive?: boolean;
+  window24hExpiresAt?: string | null;
+  window24hRemainingMinutes?: number | null;
+  hasEverReplied?: boolean;
 }
 
 interface ChatDetail {
@@ -66,6 +74,10 @@ interface ChatDetail {
   botPauseRemainingMinutes?: number | null;
   esAdmin: boolean;
   updated_at: string;
+  window24hActive?: boolean;
+  window24hExpiresAt?: string | null;
+  window24hRemainingMinutes?: number | null;
+  hasEverReplied?: boolean;
 }
 
 interface ContactoDisponible {
@@ -251,6 +263,31 @@ export function WhatsAppChats() {
     },
     onError: (err: any) => {
       toast.error(`Error al enviar mensaje: ${err?.message || "Revisar conexión con WhatsApp API"}`);
+    },
+  });
+
+  // Mutación: Enviar plantilla oficial aprobada por Meta
+  const sendTemplateMutation = useMutation({
+    mutationFn: ({ phone, templateName }: { phone: string; templateName?: string }) =>
+      apiFetch<{ success: boolean }>(`/whatsapp-chats/${encodeURIComponent(phone)}/send-template`, {
+        method: "POST",
+        body: JSON.stringify({ templateName: templateName || "comunicado_accesos_bot" }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-chat-detail", selectedPhone] });
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-chats"] });
+      toast.success("Plantilla oficial enviada por WhatsApp");
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTo({
+            top: chatContainerRef.current.scrollHeight,
+            behavior: "smooth",
+          });
+        }
+      }, 100);
+    },
+    onError: (err: any) => {
+      toast.error(`Error al enviar plantilla oficial: ${err?.message || "Revisar API de Meta"}`);
     },
   });
 
@@ -512,6 +549,17 @@ export function WhatsAppChats() {
                             Manual
                           </Badge>
                         )}
+                        {c.window24hActive ? (
+                          <span className="inline-flex items-center gap-1 text-[9px] text-emerald-600 dark:text-emerald-400 font-medium whitespace-nowrap" title="Ventana 24 hs activa: se pueden enviar mensajes libres">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            24h activa
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[9px] text-amber-600/80 dark:text-amber-400/80 font-normal whitespace-nowrap" title="Ventana 24 hs inactiva: Meta requiere plantilla o mensaje del contacto">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400/80"></span>
+                            24h cerrada
+                          </span>
+                        )}
                       </div>
 
                       <p className="text-xs text-muted-foreground/90 truncate flex items-center gap-1">
@@ -694,6 +742,15 @@ export function WhatsAppChats() {
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
+                        onClick={() => sendTemplateMutation.mutate({ phone: selectedPhone! })}
+                        disabled={sendTemplateMutation.isPending}
+                        className="cursor-pointer gap-2 py-2 text-blue-600 dark:text-blue-400"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        <span>Enviar Plantilla Oficial (Abrir 24h)</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
                         onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 0 })}
                         className="cursor-pointer gap-2 py-2 text-rose-600 dark:text-rose-400"
                       >
@@ -737,6 +794,41 @@ export function WhatsAppChats() {
                     >
                       <Zap className="h-3 w-3 fill-current" />
                       Reactivar
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Banner informativo de Ventana de 24 hs de Meta WhatsApp */}
+              {!chatActivo.window24hActive && (
+                <div className="bg-gradient-to-r from-blue-500/15 via-indigo-500/10 to-blue-500/5 border-b border-blue-500/25 px-3 py-2 text-xs text-blue-950 dark:text-blue-200 flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-6 w-6 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300 flex items-center justify-center flex-shrink-0">
+                      <HelpCircle className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground text-[11px] sm:text-xs flex items-center gap-1.5">
+                        Ventana de 24 hs Inactiva en Meta
+                        <Badge variant="outline" className="text-[9px] border-blue-500/40 bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 py-0 font-normal">
+                          Regla de Meta API
+                        </Badge>
+                      </p>
+                      <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate sm:whitespace-normal">
+                        {chatActivo.hasEverReplied
+                          ? "Pasaron más de 24 hs del último mensaje del usuario. Los mensajes libres no llegan hasta que el contacto escriba o reciba una plantilla."
+                          : "Contacto nuevo: Meta exige que el contacto escriba primero al WhatsApp de Puffin o enviar una plantilla oficial para abrir el chat."}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      onClick={() => sendTemplateMutation.mutate({ phone: selectedPhone! })}
+                      disabled={sendTemplateMutation.isPending}
+                      className="h-7 px-2.5 sm:px-3 text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-xs"
+                    >
+                      <FileText className="h-3 w-3" />
+                      {sendTemplateMutation.isPending ? "Enviando..." : "Enviar Plantilla Oficial"}
                     </Button>
                   </div>
                 </div>
@@ -854,10 +946,10 @@ export function WhatsAppChats() {
                               {/* Contenido del texto */}
                               <p className="whitespace-pre-wrap select-text font-normal">{textContent}</p>
 
-                              {/* Fecha precisa, Hora y Tilde de entrega */}
+                              {/* Fecha precisa, Hora y Tilde de entrega / error */}
                               <div
-                                className="flex items-center justify-end gap-1 mt-1 text-[10px] opacity-70 select-none"
-                                title={full}
+                                className="flex items-center justify-end gap-1.5 mt-1 text-[10px] opacity-80 select-none"
+                                title={m.delivery_error ? `${full} — Error: ${m.delivery_error}` : full}
                               >
                                 {showDateBadge && (
                                   <span className="font-mono text-[9px] bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded-xs">
@@ -866,7 +958,21 @@ export function WhatsAppChats() {
                                 )}
                                 <span className="font-mono">{time}</span>
                                 {!isUser && (
-                                  <CheckCheck className={`h-3.5 w-3.5 inline ${m.manual ? "text-emerald-200" : "text-slate-400"}`} />
+                                  m.delivery_status === "failed" ? (
+                                    <span
+                                      className="inline-flex items-center gap-1 text-rose-300 font-bold bg-rose-950/70 border border-rose-500/40 px-1.5 py-0.5 rounded-xs cursor-help"
+                                      title={m.delivery_error || "No entregado en WhatsApp por Meta (Ventana 24h inactiva)"}
+                                    >
+                                      <AlertTriangle className="h-3 w-3 text-rose-300 animate-pulse" />
+                                      <span className="text-[9px]">No entregado</span>
+                                    </span>
+                                  ) : m.delivery_status === "read" ? (
+                                    <CheckCheck className="h-3.5 w-3.5 inline text-sky-300" title="Leído por el contacto" />
+                                  ) : m.delivery_status === "delivered" ? (
+                                    <CheckCheck className={`h-3.5 w-3.5 inline ${m.manual ? "text-emerald-200" : "text-slate-300"}`} title="Entregado al teléfono" />
+                                  ) : (
+                                    <CheckCheck className={`h-3.5 w-3.5 inline ${m.manual ? "text-emerald-200" : "text-slate-400"}`} title="Enviado a Meta WhatsApp" />
+                                  )
                                 )}
                               </div>
                             </div>

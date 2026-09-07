@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { whatsappSesionesTable, empleadosTable, fotografiasTable } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { sendWhatsAppMessage } from "../services/whatsapp.js";
+import { sendWhatsAppMessage, sendWhatsAppTemplate, formatArgentinaPhone } from "../services/whatsapp.js";
 import { isAuthorizedAdmin, ADMIN_PHONES } from "../services/assistant.js";
 
 const router = Router();
@@ -90,6 +90,23 @@ router.get("/", async (req, res) => {
       }
       const esAdmin = ADMIN_PHONES.some((a) => last10 === getLast10(a)) || (emp?.cargo || "").toLowerCase().includes("admin");
 
+      // Calcular ventana de 24 horas de Meta (válida solo si el usuario escribió en las últimas 24h)
+      const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
+      let window24hActive = false;
+      let window24hExpiresAt: string | null = null;
+      let window24hRemainingMinutes: number | null = null;
+
+      if (lastUserMsg && lastUserMsg.created_at) {
+        const lastUserTime = new Date(lastUserMsg.created_at).getTime();
+        const expiresMs = lastUserTime + 24 * 60 * 60 * 1000;
+        const msLeft = expiresMs - Date.now();
+        if (msLeft > 0) {
+          window24hActive = true;
+          window24hExpiresAt = new Date(expiresMs).toISOString();
+          window24hRemainingMinutes = Math.ceil(msLeft / 60000);
+        }
+      }
+
       return {
         phone: s.phone,
         nombre: emp ? `${emp.nombre} ${emp.apellido}`.trim() : (s.phone.length > 10 ? `+${s.phone}` : s.phone),
@@ -103,6 +120,10 @@ router.get("/", async (req, res) => {
         botPausedUntil: pausedUntil,
         botPauseRemainingMinutes: remainingMinutes,
         esAdmin,
+        window24hActive,
+        window24hExpiresAt,
+        window24hRemainingMinutes,
+        hasEverReplied: Boolean(lastUserMsg),
       };
     });
 
@@ -150,13 +171,13 @@ router.get("/contactos-disponibles", async (req, res) => {
 router.get("/:phone", async (req, res) => {
   try {
     const rawPhone = req.params.phone;
-    const phoneClean = rawPhone.replace(/[^0-9]/g, "");
+    const phoneClean = formatArgentinaPhone(rawPhone);
     const last10 = getLast10(phoneClean);
 
     // Buscar sesión por exact match o por terminación
     const sesiones = await db.select().from(whatsappSesionesTable);
     const sesion = sesiones.find(
-      (s) => s.phone === rawPhone || s.phone.replace(/[^0-9]/g, "") === phoneClean || getLast10(s.phone) === last10
+      (s) => s.phone === phoneClean || s.phone === rawPhone || getLast10(s.phone) === last10
     );
 
     // Buscar datos del empleado
@@ -204,9 +225,26 @@ router.get("/:phone", async (req, res) => {
       created_at: m.created_at || sesion?.updated_at || new Date().toISOString(),
     }));
 
+    // Calcular estado de la ventana de 24 horas de Meta
+    const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
+    let window24hActive = false;
+    let window24hExpiresAt: string | null = null;
+    let window24hRemainingMinutes: number | null = null;
+
+    if (lastUserMsg && lastUserMsg.created_at) {
+      const lastUserTime = new Date(lastUserMsg.created_at).getTime();
+      const expiresMs = lastUserTime + 24 * 60 * 60 * 1000;
+      const msLeft = expiresMs - Date.now();
+      if (msLeft > 0) {
+        window24hActive = true;
+        window24hExpiresAt = new Date(expiresMs).toISOString();
+        window24hRemainingMinutes = Math.ceil(msLeft / 60000);
+      }
+    }
+
     return res.json({
-      phone: sesion?.phone || rawPhone,
-      nombre: emp ? `${emp.nombre} ${emp.apellido}`.trim() : rawPhone,
+      phone: sesion?.phone || phoneClean,
+      nombre: emp ? `${emp.nombre} ${emp.apellido}`.trim() : (phoneClean.length > 10 ? `+${phoneClean}` : phoneClean),
       cargo: emp?.cargo || (esAdmin ? "Administrador" : "Contacto externo"),
       empleado_id: emp?.id || null,
       foto_perfil: fotoPerfil,
@@ -215,6 +253,10 @@ router.get("/:phone", async (req, res) => {
       botPausedUntil: pausedUntil,
       botPauseRemainingMinutes: remainingMinutes,
       esAdmin,
+      window24hActive,
+      window24hExpiresAt,
+      window24hRemainingMinutes,
+      hasEverReplied: Boolean(lastUserMsg),
       updated_at: sesion?.updated_at || new Date(),
     });
   } catch (err: any) {
@@ -232,20 +274,19 @@ router.post("/:phone/send", async (req, res) => {
       return res.status(400).json({ error: "El mensaje no puede estar vacío" });
     }
 
-    const cleanPhone = rawPhone.replace(/[^0-9]/g, "");
+    const cleanPhone = formatArgentinaPhone(rawPhone);
     if (cleanPhone.length < 8) {
       return res.status(400).json({ error: "Número de teléfono no válido" });
     }
 
-    // 1. Enviar mensaje por WhatsApp
-    await sendWhatsAppMessage(cleanPhone, text.trim());
+    // 1. Enviar mensaje por WhatsApp a Meta
+    const metaRes = await sendWhatsAppMessage(cleanPhone, text.trim());
+    const wamid = (metaRes as any)?.messages?.[0]?.id || null;
 
     // 2. Obtener o crear sesión para registrar el mensaje en el historial
-    let [sesion] = await db
-      .select()
-      .from(whatsappSesionesTable)
-      .where(eq(whatsappSesionesTable.phone, cleanPhone))
-      .limit(1);
+    const last10 = getLast10(cleanPhone);
+    const sesiones = await db.select().from(whatsappSesionesTable);
+    let sesion = sesiones.find((s) => s.phone === cleanPhone || getLast10(s.phone) === last10);
 
     if (!sesion) {
       const [nueva] = await db
@@ -262,11 +303,13 @@ router.post("/:phone/send", async (req, res) => {
 
     const historial = (sesion.messages as any[]) || [];
     const nuevoMsg = {
+      id: wamid,
       role: "assistant",
       content: text.trim(),
       created_at: new Date().toISOString(),
       manual: true,
       admin_user: req.user?.rol || "admin",
+      delivery_status: "sent",
     };
     historial.push(nuevoMsg);
 
@@ -298,17 +341,73 @@ router.post("/:phone/send", async (req, res) => {
   }
 });
 
-// 5. Conmutar pausa del bot para un chat específico (Modo Manual vs Modo Automático)
+// 5. Enviar una plantilla oficial aprobada por Meta para abrir/re-enganchar la conversación
+router.post("/:phone/send-template", async (req, res) => {
+  try {
+    const rawPhone = req.params.phone;
+    const cleanPhone = formatArgentinaPhone(rawPhone);
+    const templateName = req.body?.templateName || "comunicado_accesos_bot";
+
+    const last10 = getLast10(cleanPhone);
+    const sesiones = await db.select().from(whatsappSesionesTable);
+    let sesion = sesiones.find((s) => s.phone === cleanPhone || getLast10(s.phone) === last10);
+
+    if (!sesion) {
+      const [nueva] = await db
+        .insert(whatsappSesionesTable)
+        .values({
+          phone: cleanPhone,
+          messages: [],
+          estado: "idle",
+          datos_pendientes: {},
+        })
+        .returning();
+      sesion = nueva;
+    }
+
+    const metaRes = await sendWhatsAppTemplate(cleanPhone, templateName, "es_AR");
+    const wamid = (metaRes as any)?.messages?.[0]?.id || null;
+
+    const historial = (sesion.messages as any[]) || [];
+    const nuevoMsg = {
+      id: wamid,
+      role: "assistant",
+      content: `📢 [Plantilla Oficial Meta Enviada] Se envió la plantilla oficial "${templateName}" para abrir la ventana de conversación. Una vez que el contacto responda, se podrán enviar mensajes libres.`,
+      created_at: new Date().toISOString(),
+      manual: true,
+      admin_user: req.user?.rol || "admin",
+      delivery_status: "sent",
+      is_template: true,
+    };
+    historial.push(nuevoMsg);
+
+    await db
+      .update(whatsappSesionesTable)
+      .set({
+        messages: historial,
+        updated_at: new Date(),
+      })
+      .where(eq(whatsappSesionesTable.phone, sesion.phone));
+
+    return res.json({
+      success: true,
+      message: nuevoMsg,
+    });
+  } catch (err: any) {
+    req.log?.error?.(err);
+    return res.status(500).json({ error: "Error enviando plantilla oficial", details: err.message });
+  }
+});
+
+// 6. Conmutar pausa del bot para un chat específico (Modo Manual vs Modo Automático)
 router.post("/:phone/toggle-bot", async (req, res) => {
   try {
     const rawPhone = req.params.phone;
-    const cleanPhone = rawPhone.replace(/[^0-9]/g, "");
+    const cleanPhone = formatArgentinaPhone(rawPhone);
+    const last10 = getLast10(cleanPhone);
 
-    let [sesion] = await db
-      .select()
-      .from(whatsappSesionesTable)
-      .where(eq(whatsappSesionesTable.phone, cleanPhone))
-      .limit(1);
+    const sesiones = await db.select().from(whatsappSesionesTable);
+    let sesion = sesiones.find((s) => s.phone === cleanPhone || getLast10(s.phone) === last10);
 
     if (!sesion) {
       const [nueva] = await db

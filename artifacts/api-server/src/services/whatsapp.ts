@@ -5,7 +5,7 @@ const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || "TODO_ACCESS_
 
 // Formatea números argentinos al formato internacional requerido por WhatsApp
 // Ej: "3472629600" → "5493472629600"
-function formatArgentinaPhone(number: string): string {
+export function formatArgentinaPhone(number: string): string {
   const digits = number.replace(/[^0-9]/g, "");
   if (digits.startsWith("549")) return digits;           // Ya tiene 549
   if (digits.startsWith("54")) return `549${digits.slice(2)}`; // Tiene 54 pero falta el 9
@@ -14,7 +14,7 @@ function formatArgentinaPhone(number: string): string {
   return digits; // Formato desconocido, enviar tal cual
 }
 
-export async function sendWhatsAppMessage(to: string, text: string): Promise<{ status: string; error?: string }> {
+export async function sendWhatsAppMessage(to: string, text: string): Promise<any> {
   const toFormatted = formatArgentinaPhone(to);
 
   if (!WHATSAPP_ACCESS_TOKEN || WHATSAPP_ACCESS_TOKEN === "TODO_ACCESS_TOKEN") {
