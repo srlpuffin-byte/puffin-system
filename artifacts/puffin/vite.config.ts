@@ -45,6 +45,7 @@ export default defineConfig({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
+        importScripts: ['/push-worker.js'],
         maximumFileSizeToCacheInBytes: 5000000,
         // Solo cachear assets con hash (JS, CSS, imágenes) — NO el index.html
         globPatterns: ['**/*.{js,css,ico,png,svg,jpg,jpeg,webp}'],

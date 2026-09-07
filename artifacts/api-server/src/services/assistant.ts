@@ -723,7 +723,7 @@ async function obtenerSesion(phone: string) {
     const ahora = Date.now();
     const ultimaActividad = sesion.updated_at ? new Date(sesion.updated_at).getTime() : 0;
     if (ahora - ultimaActividad > SESSION_TIMEOUT_MS) {
-      const datos = typeof sesion.datos_pendientes === "object" && sesion.datos_pendientes ? { ...sesion.datos_pendientes } : {};
+      const datos: any = typeof sesion.datos_pendientes === "object" && sesion.datos_pendientes ? { ...sesion.datos_pendientes } : {};
       if (datos.bot_paused_until && new Date(datos.bot_paused_until).getTime() <= ahora) {
         datos.bot_paused = false;
         datos.bot_paused_until = null;

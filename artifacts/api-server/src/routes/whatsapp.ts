@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { handleWhatsAppMessage } from "../services/assistant.js";
 import { downloadWhatsAppMedia } from "../services/whatsapp.js";
 import { transcribeAudio } from "../services/transcription.js";
+import { sendPushNotificationToAll } from "../services/push-notifications.js";
 
 export const whatsappRouter = Router();
 
@@ -308,6 +309,26 @@ whatsappRouter.post("/", async (req, res) => {
         console.log(`[Webhook] Ignorando mensaje del propio bot (${from})`);
         return;
       }
+
+      const contactProfileName = change.contacts?.[0]?.profile?.name || "";
+      let notifPreview = "Nuevo mensaje de WhatsApp";
+      if (msgType === "text" && message.text?.body) {
+        notifPreview = message.text.body.trim();
+      } else if (msgType === "image") {
+        notifPreview = message.image?.caption ? `📷 Foto: ${message.image.caption}` : "📷 Foto adjunta";
+      } else if (msgType === "document") {
+        notifPreview = `📄 Documento: ${message.document?.filename || "Archivo"}`;
+      } else if (msgType === "audio" || msgType === "voice") {
+        notifPreview = "🎙️ Nota de voz recibida";
+      }
+
+      sendPushNotificationToAll({
+        title: `💬 WhatsApp: ${contactProfileName || fromClean}`,
+        body: notifPreview,
+        url: `/whatsapp`,
+        tag: `wa-${fromClean}`,
+        data: { phone: fromClean, sender: contactProfileName || fromClean },
+      }).catch((err) => console.warn("[Webhook] Error enviando push notification:", err));
 
       const batch = getOrCreateBatch(from);
 

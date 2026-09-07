@@ -31,6 +31,8 @@ router.put("/:id", async (req, res) => {
   return res.json({ ...alerta, fecha: alerta.fecha?.toISOString() || new Date().toISOString() });
 });
 
+import { sendPushNotificationToAll } from "../services/push-notifications.js";
+
 router.post("/", async (req, res) => {
   const { tipo, prioridad, descripcion, entidad_tipo, entidad_id, entidad_nombre } = req.body;
   if (!tipo || !descripcion) {
@@ -50,6 +52,13 @@ router.post("/", async (req, res) => {
       fecha: new Date(),
     })
     .returning();
+
+  sendPushNotificationToAll({
+    title: `⚠️ Alerta: ${tipo.toUpperCase()}`,
+    body: `${entidad_nombre ? entidad_nombre + ': ' : ''}${descripcion}`,
+    url: "/alertas",
+    tag: `alerta-${alerta.id}`,
+  }).catch((err) => console.warn("[Alertas] Error enviando push notification:", err));
 
   return res.status(201).json({
     ...alerta,

@@ -276,4 +276,7 @@ router.use("/alquileres", requireAuth, adminAuditMiddleware, alquileresRouter);
 import whatsappChatsRouter from "./whatsapp-chats";
 router.use("/whatsapp-chats", requireAuth, adminAuditMiddleware, whatsappChatsRouter);
 
+import pushNotificationsRouter from "./push-notifications";
+router.use("/push-notifications", pushNotificationsRouter);
+
 export default router;

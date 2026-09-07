@@ -30,6 +30,14 @@ app.listen(port, (err) => {
   startSpeedMonitor();
   startSatcomMonitor();
 
+  // Inicializar notificaciones Web Push y asegurar tabla en BD
+  import("./services/push-notifications.js").then(({ configureWebPush, ensurePushSubscriptionsTable }) => {
+    configureWebPush();
+    ensurePushSubscriptionsTable();
+  }).catch((err) => {
+    logger.error({ err }, "[Push Notifications] Error inicializando en startup");
+  });
+
   // Envío masivo de plantilla 'sistema_uso' deshabilitado a pedido del administrador
   // import("./services/broadcast-plantilla.js").then(({ startScheduledBroadcastSistemaUso }) => startScheduledBroadcastSistemaUso());
 

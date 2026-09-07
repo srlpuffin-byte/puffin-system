@@ -41,12 +41,16 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePWAUpdate } from "@/hooks/use-pwa-update";
+import { NotificationBell } from "@/components/ui/notification-bell";
+import { PushNotificationBanner } from "@/components/ui/push-notification-banner";
+import { useGlobalNotifications } from "@/hooks/use-global-notifications";
 
 interface NavItem {
   icon: React.ElementType;
   label: string;
   href: string;
   badge?: boolean;
+  badgeCount?: number;
 }
 
 interface NavGroup {
@@ -152,9 +156,13 @@ function NavGroupComponent({ group, location, onNavigate }: { group: NavGroup; l
                     <item.icon className="h-5 w-5 flex-shrink-0" />
                     {item.label}
                   </div>
-                  {item.badge && (
+                  {item.badgeCount !== undefined && item.badgeCount > 0 ? (
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-bold text-white shadow-sm">
+                      {item.badgeCount}
+                    </span>
+                  ) : item.badge ? (
                     <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" title="Falta información"></div>
-                  )}
+                  ) : null}
                 </Link>
               </li>
             );
@@ -171,6 +179,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { data: user } = useGetMe();
   const logoutMut = useLogout();
+  const { unreadWhatsAppCount } = useGlobalNotifications();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
@@ -246,9 +255,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <img src={logoUrl} alt="PUFFIN SRL" className="h-7 w-auto mr-2 object-contain" />
           <span className="tracking-wide">PUFFIN SRL</span>
         </div>
-        <Button variant="ghost" size="icon" className="h-8 w-8 ml-2 text-muted-foreground" onClick={() => setSearchOpen(true)} title="Buscar (Ctrl+K)">
-          <Search className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <NotificationBell />
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setSearchOpen(true)} title="Buscar (Ctrl+K)">
+            <Search className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
       <nav className="flex-1 overflow-y-auto py-3 px-2">
         {NAV_GROUPS.filter(group => {
@@ -302,6 +314,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       badge = !isFaltante.dni || isFaltante.dni === "COMPLETAR" || !isFaltante.telefono || !isFaltante.contacto_familiar_telefono;
                     }
                     return { ...item, badge };
+                  }
+
+                  if (item.href === "/whatsapp") {
+                    return { ...item, badgeCount: unreadWhatsAppCount };
                   }
 
                   return item;
@@ -365,18 +381,22 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       )}
 
       <main className="flex-1 bg-background flex flex-col min-w-0" style={{overflowY: 'auto', WebkitOverflowScrolling: 'touch'}}>
-        <div className="lg:hidden h-14 bg-card border-b border-border flex items-center justify-between px-4 flex-shrink-0">
+        <div className="lg:hidden h-14 bg-card border-b border-border flex items-center justify-between px-3 sm:px-4 flex-shrink-0">
           <div className="flex items-center">
-            <Button variant="ghost" size="sm" onClick={() => setMobileOpen(true)} className="mr-2">
+            <Button variant="ghost" size="sm" onClick={() => setMobileOpen(true)} className="mr-1 sm:mr-2">
               <Menu className="h-5 w-5" />
             </Button>
             <img src={logoUrl} alt="PUFFIN SRL" className="h-7 w-auto mx-1 object-contain" />
             <span className="font-bold text-primary ml-1">PUFFIN</span>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setSearchOpen(true)}>
-            <Search className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setSearchOpen(true)}>
+              <Search className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
+        <PushNotificationBanner />
         <div className="flex-1 p-2 md:p-4 lg:p-8">
           {children}
         </div>
