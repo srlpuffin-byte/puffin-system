@@ -497,4 +497,26 @@ router.post("/:phone/toggle-bot", async (req, res) => {
   }
 });
 
+// 7. Eliminar una conversación / contacto del sistema
+router.delete("/:phone", async (req, res) => {
+  try {
+    const rawPhone = req.params.phone;
+    const cleanPhone = formatArgentinaPhone(rawPhone);
+    const last10 = getLast10(cleanPhone);
+
+    const sesiones = await db.select().from(whatsappSesionesTable);
+    const sesion = sesiones.find((s) => s.phone === cleanPhone || s.phone === rawPhone || getLast10(s.phone) === last10);
+
+    if (sesion) {
+      await db.delete(whatsappSesionesTable).where(eq(whatsappSesionesTable.phone, sesion.phone));
+      console.log(`[WhatsApp Chats] ✅ Conversación eliminada para ${sesion.phone}`);
+    }
+
+    return res.json({ success: true, message: "Conversación eliminada correctamente", phone: cleanPhone });
+  } catch (err: any) {
+    req.log?.error?.(err);
+    return res.status(500).json({ error: "Error al eliminar conversación", details: err.message });
+  }
+});
+
 export default router;

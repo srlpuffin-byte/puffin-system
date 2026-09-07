@@ -40,6 +40,7 @@ import {
   Check,
   HelpCircle,
   FileText,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -189,6 +190,8 @@ export function WhatsAppChats() {
   const [modalNuevoChat, setModalNuevoChat] = useState(false);
   const [nuevoChatTelefono, setNuevoChatTelefono] = useState("");
   const [nuevoChatMensaje, setNuevoChatMensaje] = useState("");
+  const [modalEliminarChat, setModalEliminarChat] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState<{ phone: string; nombre: string } | null>(null);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const prevMsgCountRef = useRef(0);
@@ -316,6 +319,27 @@ export function WhatsAppChats() {
     },
     onError: (err: any) => {
       toast.error(`Error cambiando modo: ${err?.message}`);
+    },
+  });
+
+  // Mutación: Eliminar conversación / contacto
+  const deleteChatMutation = useMutation({
+    mutationFn: (phone: string) =>
+      apiFetch<{ success: boolean }>(`/whatsapp-chats/${encodeURIComponent(phone)}`, {
+        method: "DELETE",
+      }),
+    onSuccess: (_, deletedPhone) => {
+      toast.success("Conversación eliminada");
+      if (selectedPhone === deletedPhone) {
+        setSelectedPhone(null);
+      }
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-chats"] });
+      queryClient.removeQueries({ queryKey: ["whatsapp-chat-detail", deletedPhone] });
+      setModalEliminarChat(false);
+      setChatToDelete(null);
+    },
+    onError: (err: any) => {
+      toast.error(`Error al eliminar conversación: ${err?.message || "Revisar conexión"}`);
     },
   });
 
@@ -478,7 +502,7 @@ export function WhatsAppChats() {
                   <div
                     key={c.phone}
                     onClick={() => setSelectedPhone(c.phone)}
-                    className={`p-3 cursor-pointer transition-all flex items-start gap-3 select-none active:bg-muted/70 ${
+                    className={`p-3 cursor-pointer transition-all flex items-start gap-3 select-none active:bg-muted/70 group relative ${
                       isSelected
                         ? "bg-emerald-50 dark:bg-emerald-950/30 border-l-4 border-l-emerald-600"
                         : "hover:bg-slate-100/70 dark:hover:bg-slate-800/40"
@@ -524,9 +548,24 @@ export function WhatsAppChats() {
                         <span className="font-semibold text-sm truncate text-foreground">
                           {c.nombre}
                         </span>
-                        <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">
-                          {formattedDate}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">
+                            {formattedDate}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setChatToDelete({ phone: c.phone, nombre: c.nombre });
+                              setModalEliminarChat(true);
+                            }}
+                            title="Eliminar conversación"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-1.5 mb-1">
@@ -756,6 +795,17 @@ export function WhatsAppChats() {
                       >
                         <Pause className="h-3.5 w-3.5" />
                         <span>Pausa permanente (manual)</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setChatToDelete({ phone: chatActivo.phone, nombre: chatActivo.nombre });
+                          setModalEliminarChat(true);
+                        }}
+                        className="cursor-pointer gap-2 py-2 text-rose-600 dark:text-rose-400 font-medium"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Eliminar conversación</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -1173,6 +1223,46 @@ export function WhatsAppChats() {
               className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
             >
               Abrir Chat
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de confirmación para eliminar conversación */}
+      <Dialog open={modalEliminarChat} onOpenChange={setModalEliminarChat}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+              <Trash2 className="h-5 w-5" />
+              ¿Eliminar conversación?
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm text-muted-foreground pt-2">
+              Estás a punto de eliminar la conversación con{" "}
+              <strong className="text-foreground">{chatToDelete?.nombre || chatToDelete?.phone}</strong> (
+              {chatToDelete?.phone}). Se borrará el historial de este chat del panel. Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row justify-end gap-2 pt-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setModalEliminarChat(false)}
+              disabled={deleteChatMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                if (chatToDelete?.phone) {
+                  deleteChatMutation.mutate(chatToDelete.phone);
+                }
+              }}
+              disabled={deleteChatMutation.isPending}
+              className="gap-1.5 font-medium"
+            >
+              {deleteChatMutation.isPending ? "Eliminando..." : "Eliminar Conversación"}
             </Button>
           </DialogFooter>
         </DialogContent>

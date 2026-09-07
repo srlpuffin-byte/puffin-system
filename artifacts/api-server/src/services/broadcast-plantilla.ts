@@ -116,22 +116,5 @@ export async function enviarPlantillaSistemaUsoAEmpleados(): Promise<{
  * Equivalente a 2026-09-07T15:00:00.000Z.
  */
 export function startScheduledBroadcastSistemaUso() {
-  // 12:00:00 Hora Argentina (UTC-3) del 7 de Septiembre de 2026
-  const TARGET_TIME_MS = new Date("2026-09-07T15:00:00.000Z").getTime();
-
-  console.log(`[Programador] Programador de plantilla 'sistema_uso' iniciado. Objetivo: 07/09/2026 12:00 (Arg) / ${new Date(TARGET_TIME_MS).toISOString()}`);
-
-  const intervalId = setInterval(async () => {
-    const now = Date.now();
-    if (now >= TARGET_TIME_MS && !hasExecuted) {
-      hasExecuted = true;
-      clearInterval(intervalId);
-      console.log(`[Programador] ⏰ Llegó la hora programada (12:00 PM). Disparando envío masivo de la plantilla 'sistema_uso'...`);
-      try {
-        await enviarPlantillaSistemaUsoAEmpleados();
-      } catch (err) {
-        console.error("[Programador] Error al ejecutar el envío programado:", err);
-      }
-    }
-  }, 30_000); // Chequea cada 30 segundos
+  console.log("[Programador] 🚫 Envío programado de plantilla 'sistema_uso' DESHABILITADO por configuración.");
 }

@@ -369,15 +369,13 @@ cronRouter.post("/comunicado-accesos", async (req, res) => {
   });
 });
 
-// Endpoint manual o programado para disparar el comunicado 'sistema_uso' a todos los empleados
+// Endpoint deshabilitado a pedido del administrador
 cronRouter.all(["/broadcast-sistema-uso", "/enviar-plantilla-sistema"], async (req, res) => {
-  try {
-    const { enviarPlantillaSistemaUsoAEmpleados } = await import("../services/broadcast-plantilla.js");
-    const resultado = await enviarPlantillaSistemaUsoAEmpleados();
-    return res.json(resultado);
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
+  return res.json({
+    success: false,
+    disabled: true,
+    message: "El envío masivo de la plantilla 'sistema_uso' ha sido deshabilitado permanentemente.",
+  });
 });
 
 // ========================================================================================
