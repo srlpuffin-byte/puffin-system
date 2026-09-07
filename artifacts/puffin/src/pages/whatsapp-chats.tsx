@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { useGetMe } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -14,17 +13,14 @@ import {
   Search,
   Bot,
   User,
-  Phone,
   Pause,
   Play,
   RefreshCw,
   Plus,
   ExternalLink,
   Shield,
-  Clock,
   Sparkles,
   CheckCheck,
-  FileText,
   ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -34,6 +30,7 @@ interface ChatItem {
   nombre: string;
   cargo?: string;
   empleado_id?: number | null;
+  foto_perfil?: string | null;
   ultimoMensaje: string;
   ultimaFecha: string;
   totalMensajes: number;
@@ -46,6 +43,7 @@ interface ChatDetail {
   nombre: string;
   cargo?: string;
   empleado_id?: number | null;
+  foto_perfil?: string | null;
   messages: any[];
   botPausado: boolean;
   esAdmin: boolean;
@@ -79,13 +77,14 @@ export function WhatsAppChats() {
   const [nuevoChatTelefono, setNuevoChatTelefono] = useState("");
   const [nuevoChatMensaje, setNuevoChatMensaje] = useState("");
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const prevMsgCountRef = useRef(0);
 
   // 1. Query: Lista de chats
   const { data: chats = [], isLoading: loadingChats, refetch: refetchChats } = useQuery<ChatItem[]>({
     queryKey: ["whatsapp-chats"],
     queryFn: () => apiFetch<ChatItem[]>("/whatsapp-chats"),
-    refetchInterval: 5000, // Actualización automática cada 5 segundos
+    refetchInterval: 5000,
   });
 
   // 2. Query: Detalle del chat seleccionado
@@ -93,7 +92,7 @@ export function WhatsAppChats() {
     queryKey: ["whatsapp-chat-detail", selectedPhone],
     queryFn: () => apiFetch<ChatDetail>(`/whatsapp-chats/${encodeURIComponent(selectedPhone!)}`),
     enabled: !!selectedPhone,
-    refetchInterval: 3000, // Actualización automática de la conversación
+    refetchInterval: 3000,
   });
 
   // 3. Query: Contactos para nuevo chat
@@ -102,10 +101,29 @@ export function WhatsAppChats() {
     queryFn: () => apiFetch<ContactoDisponible[]>("/whatsapp-chats/contactos-disponibles"),
   });
 
-  // Scroll al final al recibir mensajes nuevos
+  // Auto-scroll al fondo al cambiar de chat
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatActivo?.messages]);
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+    prevMsgCountRef.current = chatActivo?.messages?.length || 0;
+  }, [selectedPhone]);
+
+  // Scroll suave al fondo al llegar mensajes nuevos (solo si está cerca del fondo para no interrumpir lectura arriba)
+  useEffect(() => {
+    const count = chatActivo?.messages?.length || 0;
+    if (count > prevMsgCountRef.current && chatContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 250;
+      if (isNearBottom || prevMsgCountRef.current === 0) {
+        chatContainerRef.current.scrollTo({
+          top: chatContainerRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }
+    }
+    prevMsgCountRef.current = count;
+  }, [chatActivo?.messages?.length]);
 
   // Mutación: Enviar mensaje manual
   const sendMutation = useMutation({
@@ -119,6 +137,15 @@ export function WhatsAppChats() {
       queryClient.invalidateQueries({ queryKey: ["whatsapp-chat-detail", selectedPhone] });
       queryClient.invalidateQueries({ queryKey: ["whatsapp-chats"] });
       toast.success("Mensaje enviado por WhatsApp");
+      // Scroll al fondo tras enviar mensaje propio
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTo({
+            top: chatContainerRef.current.scrollHeight,
+            behavior: "smooth",
+          });
+        }
+      }, 100);
     },
     onError: (err: any) => {
       toast.error(`Error al enviar mensaje: ${err?.message || "Revisar conexión con WhatsApp API"}`);
@@ -191,21 +218,21 @@ export function WhatsAppChats() {
   });
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] max-w-7xl mx-auto space-y-3">
+    <div className="flex flex-col h-[calc(100vh-5.5rem)] max-w-7xl mx-auto space-y-2 overflow-hidden">
       {/* Barra superior de título y acciones */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1 flex-shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="h-9 w-9 rounded-xl bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-sm">
             <MessageSquare className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
               Centro de WhatsApp
-              <Badge variant="outline" className="border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+              <Badge variant="outline" className="border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium py-0">
                 En vivo
               </Badge>
             </h1>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground">
               Monitoreo en tiempo real, auditoría de mensajes y respuestas manuales desde el servidor
             </p>
           </div>
@@ -219,7 +246,7 @@ export function WhatsAppChats() {
               refetchChats();
               if (selectedPhone) refetchDetalle();
             }}
-            className="h-9 gap-1.5 text-xs"
+            className="h-8 gap-1.5 text-xs"
             title="Refrescar lista y mensajes"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -229,7 +256,7 @@ export function WhatsAppChats() {
           <Button
             size="sm"
             onClick={() => setModalNuevoChat(true)}
-            className="h-9 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
+            className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
           >
             <Plus className="h-3.5 w-3.5" />
             Nuevo Chat
@@ -237,24 +264,24 @@ export function WhatsAppChats() {
         </div>
       </div>
 
-      {/* Contenedor principal estilo WhatsApp Web */}
-      <Card className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-hidden border shadow-sm rounded-xl">
-        {/* COLUMNA IZQUIERDA: Lista de conversaciones (4 cols en desktop) */}
-        <div className="md:col-span-4 lg:col-span-4 border-r flex flex-col h-full bg-slate-50/50 dark:bg-slate-900/30">
+      {/* Contenedor principal estilo WhatsApp Web: flex-1 + min-h-0 para garantizar scroll vertical sin saltos */}
+      <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden border shadow-sm rounded-xl bg-card">
+        {/* COLUMNA IZQUIERDA: Lista de conversaciones */}
+        <div className="w-full md:w-80 lg:w-96 flex flex-col min-h-0 border-r bg-slate-50/50 dark:bg-slate-900/30 flex-shrink-0">
           {/* Buscador */}
-          <div className="p-3 border-b space-y-2">
+          <div className="p-2.5 border-b space-y-2 flex-shrink-0">
             <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nombre, teléfono o mensaje..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 h-9 text-xs bg-background"
+                className="pl-8 h-8 text-xs bg-background"
               />
             </div>
 
             {/* Filtros rápidos */}
-            <div className="flex gap-1 overflow-x-auto pb-1 text-xs">
+            <div className="flex gap-1 overflow-x-auto pb-0.5 text-xs">
               {(
                 [
                   { id: "todos", label: "Todos" },
@@ -266,7 +293,7 @@ export function WhatsAppChats() {
                 <button
                   key={f.id}
                   onClick={() => setFiltroTipo(f.id)}
-                  className={`px-2.5 py-1 rounded-full font-medium transition-colors text-[11px] whitespace-nowrap ${
+                  className={`px-2 py-0.5 rounded-full font-medium transition-colors text-[11px] whitespace-nowrap ${
                     filtroTipo === f.id
                       ? "bg-emerald-600 text-white"
                       : "bg-background text-muted-foreground hover:bg-muted"
@@ -279,7 +306,7 @@ export function WhatsAppChats() {
           </div>
 
           {/* Lista scrolleable de chats */}
-          <div className="flex-1 overflow-y-auto divide-y divide-border/40">
+          <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-border/40">
             {loadingChats ? (
               <div className="p-8 text-center text-xs text-muted-foreground space-y-2">
                 <RefreshCw className="h-5 w-5 animate-spin mx-auto text-muted-foreground/60" />
@@ -309,22 +336,30 @@ export function WhatsAppChats() {
                         : "hover:bg-slate-100/70 dark:hover:bg-slate-800/40"
                     }`}
                   >
-                    {/* Avatar con iniciales o ícono */}
+                    {/* Avatar con foto de perfil o iniciales */}
                     <div className="relative flex-shrink-0">
-                      <div
-                        className={`h-11 w-11 rounded-full flex items-center justify-center font-bold text-sm text-white shadow-sm ${
-                          c.esAdmin
-                            ? "bg-gradient-to-br from-indigo-500 to-purple-600"
-                            : "bg-gradient-to-br from-emerald-500 to-teal-600"
-                        }`}
-                      >
-                        {c.nombre
-                          .split(" ")
-                          .map((n) => n[0])
-                          .slice(0, 2)
-                          .join("")
-                          .toUpperCase() || <User className="h-5 w-5" />}
-                      </div>
+                      {c.foto_perfil ? (
+                        <img
+                          src={c.foto_perfil}
+                          alt={c.nombre}
+                          className="h-11 w-11 rounded-full object-cover shadow-sm border border-border/80"
+                        />
+                      ) : (
+                        <div
+                          className={`h-11 w-11 rounded-full flex items-center justify-center font-bold text-sm text-white shadow-sm ${
+                            c.esAdmin
+                              ? "bg-gradient-to-br from-indigo-500 to-purple-600"
+                              : "bg-gradient-to-br from-emerald-500 to-teal-600"
+                          }`}
+                        >
+                          {c.nombre
+                            .split(" ")
+                            .map((n) => n[0])
+                            .slice(0, 2)
+                            .join("")
+                            .toUpperCase() || <User className="h-5 w-5" />}
+                        </div>
+                      )}
                       {c.botPausado && (
                         <div
                           className="absolute -bottom-1 -right-1 h-4 w-4 bg-amber-500 rounded-full border-2 border-background flex items-center justify-center"
@@ -371,45 +406,54 @@ export function WhatsAppChats() {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: Conversación activa (8 cols en desktop) */}
-        <div className="md:col-span-8 lg:col-span-8 flex flex-col h-full bg-background">
+        {/* COLUMNA DERECHA: Conversación activa */}
+        <div className="flex-1 flex flex-col min-h-0 bg-background overflow-hidden">
           {selectedPhone && chatActivo ? (
             <>
-              {/* Cabecera del chat seleccionado */}
-              <div className="p-3.5 border-b flex items-center justify-between gap-3 bg-slate-50/70 dark:bg-slate-900/40">
+              {/* Cabecera del chat seleccionado (fija arriba) */}
+              <div className="p-3 border-b flex items-center justify-between gap-3 bg-slate-50/70 dark:bg-slate-900/40 flex-shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0 ${
-                      chatActivo.esAdmin
-                        ? "bg-gradient-to-br from-indigo-500 to-purple-600"
-                        : "bg-gradient-to-br from-emerald-500 to-teal-600"
-                    }`}
-                  >
-                    {chatActivo.nombre
-                      .split(" ")
-                      .map((n) => n[0])
-                      .slice(0, 2)
-                      .join("")
-                      .toUpperCase() || <User className="h-5 w-5" />}
-                  </div>
+                  {/* Foto de perfil o iniciales */}
+                  {chatActivo.foto_perfil ? (
+                    <img
+                      src={chatActivo.foto_perfil}
+                      alt={chatActivo.nombre}
+                      className="h-10 w-10 rounded-full object-cover shadow-sm border border-border/80 flex-shrink-0"
+                    />
+                  ) : (
+                    <div
+                      className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0 ${
+                        chatActivo.esAdmin
+                          ? "bg-gradient-to-br from-indigo-500 to-purple-600"
+                          : "bg-gradient-to-br from-emerald-500 to-teal-600"
+                      }`}
+                    >
+                      {chatActivo.nombre
+                        .split(" ")
+                        .map((n) => n[0])
+                        .slice(0, 2)
+                        .join("")
+                        .toUpperCase() || <User className="h-5 w-5" />}
+                    </div>
+                  )}
 
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h2 className="font-bold text-base text-foreground truncate">
+                      <h2 className="font-bold text-sm text-foreground truncate">
                         {chatActivo.nombre}
                       </h2>
                       {chatActivo.esAdmin ? (
-                        <Badge variant="outline" className="text-[10px] border-indigo-500/40 text-indigo-600 dark:text-indigo-400">
-                          <Shield className="h-3 w-3 mr-1" />
-                          Administrador
+                        <Badge variant="outline" className="text-[10px] border-indigo-500/40 text-indigo-600 dark:text-indigo-400 py-0">
+                          <Shield className="h-2.5 w-2.5 mr-1" />
+                          Admin
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="text-[10px]">
+                        <Badge variant="secondary" className="text-[10px] py-0">
                           {chatActivo.cargo || "Operario"}
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                       <span>{chatActivo.phone.startsWith("54") ? `+${chatActivo.phone}` : chatActivo.phone}</span>
                       <span>•</span>
                       <a
@@ -425,7 +469,7 @@ export function WhatsAppChats() {
                 </div>
 
                 {/* Control de Modo Manual / Bot Automático */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <Button
                     variant={chatActivo.botPausado ? "default" : "outline"}
                     size="sm"
@@ -459,7 +503,7 @@ export function WhatsAppChats() {
 
               {/* Banner informativo si el bot está pausado */}
               {chatActivo.botPausado && (
-                <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
+                <div className="bg-amber-500/10 border-b border-amber-500/20 px-3.5 py-1.5 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between flex-shrink-0">
                   <span className="flex items-center gap-1.5">
                     <Pause className="h-3.5 w-3.5 text-amber-500" />
                     <strong>Modo Manual Activo:</strong> El asistente de IA no responderá automáticamente en este chat.
@@ -468,8 +512,11 @@ export function WhatsAppChats() {
                 </div>
               )}
 
-              {/* Flujo de mensajes */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-100/40 dark:bg-slate-950/40">
+              {/* Flujo de mensajes con scroll vertical garantizado */}
+              <div
+                ref={chatContainerRef}
+                className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-slate-100/40 dark:bg-slate-950/40"
+              >
                 {loadingDetalle ? (
                   <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
                     <RefreshCw className="h-5 w-5 animate-spin mr-2" /> Cargando mensajes...
@@ -508,13 +555,21 @@ export function WhatsAppChats() {
                         className={`flex ${isUser ? "justify-start" : "justify-end"} items-end gap-1.5`}
                       >
                         {isUser && (
-                          <div className="h-6 w-6 rounded-full bg-slate-300 dark:bg-slate-700 flex items-center justify-center text-[10px] text-foreground flex-shrink-0 mb-1">
-                            <User className="h-3 w-3" />
-                          </div>
+                          chatActivo.foto_perfil ? (
+                            <img
+                              src={chatActivo.foto_perfil}
+                              alt={chatActivo.nombre}
+                              className="h-6 w-6 rounded-full object-cover mb-1 border border-border/60 flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="h-6 w-6 rounded-full bg-slate-300 dark:bg-slate-700 flex items-center justify-center text-[10px] text-foreground flex-shrink-0 mb-1">
+                              <User className="h-3 w-3" />
+                            </div>
+                          )
                         )}
 
                         <div
-                          className={`max-w-[80%] md:max-w-[70%] rounded-2xl p-3 text-xs leading-relaxed shadow-sm ${
+                          className={`max-w-[85%] md:max-w-[75%] rounded-2xl p-3 text-xs leading-relaxed shadow-sm ${
                             isUser
                               ? "bg-white dark:bg-slate-800 text-foreground border rounded-bl-sm"
                               : m.manual
@@ -563,11 +618,10 @@ export function WhatsAppChats() {
                     );
                   })
                 )}
-                <div ref={messagesEndRef} />
               </div>
 
-              {/* Barra inferior para redactar y enviar */}
-              <form onSubmit={handleEnviar} className="p-3 border-t bg-background flex items-end gap-2">
+              {/* Barra inferior para redactar y enviar (fija abajo) */}
+              <form onSubmit={handleEnviar} className="p-2.5 border-t bg-background flex items-end gap-2 flex-shrink-0">
                 <div className="flex-1 relative">
                   <textarea
                     rows={2}
@@ -580,14 +634,14 @@ export function WhatsAppChats() {
                         handleEnviar();
                       }
                     }}
-                    className="w-full resize-none p-2.5 text-xs rounded-lg border bg-slate-50/50 dark:bg-slate-900/50 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    className="w-full resize-none p-2 text-xs rounded-lg border bg-slate-50/50 dark:bg-slate-900/50 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
                 </div>
 
                 <Button
                   type="submit"
                   disabled={!mensajeTexto.trim() || sendMutation.isPending}
-                  className="h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs font-semibold shadow-sm"
+                  className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs font-semibold shadow-sm flex-shrink-0"
                 >
                   <Send className="h-3.5 w-3.5" />
                   {sendMutation.isPending ? "Enviando..." : "Enviar"}
@@ -616,7 +670,7 @@ export function WhatsAppChats() {
             </div>
           )}
         </div>
-      </Card>
+      </div>
 
       {/* Modal: Iniciar Nuevo Chat */}
       <Dialog open={modalNuevoChat} onOpenChange={setModalNuevoChat}>

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { whatsappSesionesTable, empleadosTable } from "@workspace/db/schema";
+import { whatsappSesionesTable, empleadosTable, fotografiasTable } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { sendWhatsAppMessage } from "../services/whatsapp.js";
 import { isAuthorizedAdmin, ADMIN_PHONES } from "../services/assistant.js";
@@ -32,6 +32,26 @@ router.get("/", async (req, res) => {
         estado: empleadosTable.estado,
       })
       .from(empleadosTable);
+
+    const fotos = await db
+      .select({
+        id: fotografiasTable.id,
+        entidad_tipo: fotografiasTable.entidad_tipo,
+        entidad_id: fotografiasTable.entidad_id,
+        url: fotografiasTable.url,
+        descripcion: fotografiasTable.descripcion,
+      })
+      .from(fotografiasTable)
+      .where(eq(fotografiasTable.entidad_tipo, "empleado"));
+
+    const getFotoPerfil = (empId?: number | null): string | null => {
+      if (!empId) return null;
+      const empFotos = fotos.filter((f) => f.entidad_id === empId);
+      if (empFotos.length === 0) return null;
+      const foto = empFotos.find((f) => f.descripcion?.toLowerCase().includes("perfil")) || empFotos[0];
+      if (!foto?.url) return null;
+      return foto.url.startsWith("data:") ? `/api/fotografias/${foto.id}/raw` : foto.url;
+    };
 
     const chats = sesiones.map((s) => {
       const phoneClean = s.phone.replace(/[^0-9]/g, "");
@@ -65,6 +85,7 @@ router.get("/", async (req, res) => {
         nombre: emp ? `${emp.nombre} ${emp.apellido}`.trim() : (s.phone.length > 10 ? `+${s.phone}` : s.phone),
         cargo: emp?.cargo || (esAdmin ? "Administrador" : "Contacto externo"),
         empleado_id: emp?.id || null,
+        foto_perfil: getFotoPerfil(emp?.id),
         ultimoMensaje: lastMsgText || "Sin mensajes",
         ultimaFecha: s.updated_at || new Date(),
         totalMensajes: messages.length,
@@ -134,15 +155,29 @@ router.get("/:phone", async (req, res) => {
       return (t1 && t1 === last10) || (t2 && t2 === last10);
     });
 
-    const esAdmin = ADMIN_PHONES.some((a) => last10 === getLast10(a)) || (emp?.cargo || "").toLowerCase().includes("admin");
-    const datosPendientes = sesion?.datos_pendientes && typeof sesion.datos_pendientes === "object" ? sesion.datos_pendientes : {};
-    const botPaused = Boolean((datosPendientes as any).bot_paused);
+    let fotoPerfil: string | null = null;
+    if (emp?.id) {
+      const empFotos = await db
+        .select({
+          id: fotografiasTable.id,
+          url: fotografiasTable.url,
+          descripcion: fotografiasTable.descripcion,
+        })
+        .from(fotografiasTable)
+        .where(eq(fotografiasTable.entidad_tipo, "empleado"));
+
+      const foto = empFotos.find((f) => f.descripcion?.toLowerCase().includes("perfil")) || empFotos[0];
+      if (foto?.url) {
+        fotoPerfil = foto.url.startsWith("data:") ? `/api/fotografias/${foto.id}/raw` : foto.url;
+      }
+    }
 
     return res.json({
       phone: sesion?.phone || rawPhone,
       nombre: emp ? `${emp.nombre} ${emp.apellido}`.trim() : rawPhone,
       cargo: emp?.cargo || (esAdmin ? "Administrador" : "Contacto externo"),
       empleado_id: emp?.id || null,
+      foto_perfil: fotoPerfil,
       messages: (sesion?.messages as any[]) || [],
       botPausado: botPaused,
       esAdmin,
