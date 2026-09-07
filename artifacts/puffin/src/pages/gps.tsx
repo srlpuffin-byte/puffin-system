@@ -1,9 +1,10 @@
 import React, { useState } from "react";
+import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, RefreshCw, Wifi, WifiOff, Zap, ZapOff, Plus, Pencil, Check, X, Link as LinkIcon, Unlink, Settings2, Search, Tractor } from "lucide-react";
+import { MapPin, RefreshCw, Wifi, WifiOff, Zap, ZapOff, Plus, Pencil, Check, X, Link as LinkIcon, Unlink, Settings2, Search, Tractor, ArrowLeft } from "lucide-react";
 import { SatcomMap, MapPoint } from "@/components/map/SatcomMap";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -176,10 +177,15 @@ export function Gps() {
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] gap-0 -m-6">
+    <div className="flex flex-col h-[calc(100vh-80px)] gap-0 -m-2 md:-m-4 lg:-m-8">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-background shrink-0">
+      <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b bg-background shrink-0">
         <div className="flex items-center gap-2 min-w-0">
+          <Link href="/xpert">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0" title="Volver a Xpert Satcom">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
           <MapPin className="h-5 w-5 text-primary shrink-0" />
           <h1 className="text-base sm:text-xl font-bold tracking-tight text-primary truncate">GPS y Rastreo</h1>
           <Badge variant="secondary" className="text-xs shrink-0 hidden sm:inline-flex">

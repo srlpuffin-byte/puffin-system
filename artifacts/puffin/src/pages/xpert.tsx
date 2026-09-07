@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +49,7 @@ const TELEMETRY_FIELDS = [
 ];
 
 export function Xpert() {
+  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [linkingMaquina, setLinkingMaquina] = useState<number | null>(null);
 
@@ -116,19 +118,22 @@ export function Xpert() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="rounded-full bg-blue-600 p-2">
-          <Satellite className="h-6 w-6 text-white" />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="rounded-full bg-blue-600 p-2.5 shrink-0 shadow-sm">
+            <Satellite className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">Xpert Satcom</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">Telemetría satelital y rastreo GPS de maquinaria</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-primary">Xpert Satcom</h1>
-          <p className="text-sm text-muted-foreground">Telemetría satelital y rastreo GPS de maquinaria</p>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           {isConfigured && linkedCount < validMaquinas.length && (
             <Button
               variant="outline"
               size="sm"
+              className="flex-1 sm:flex-none whitespace-nowrap"
               onClick={() => autoLinkMutation.mutate()}
               disabled={autoLinkMutation.isPending}
             >
@@ -136,7 +141,12 @@ export function Xpert() {
               {autoLinkMutation.isPending ? "Vinculando..." : "Auto-vincular GPS"}
             </Button>
           )}
-          <Button variant="default" size="sm" onClick={() => window.location.href = '/gps'}>
+          <Button
+            variant="default"
+            size="sm"
+            className="flex-1 sm:flex-none whitespace-nowrap bg-primary hover:bg-primary/90 text-white shadow-sm"
+            onClick={() => setLocation('/gps')}
+          >
             <MapPin className="h-4 w-4 mr-2" />
             Ver mapa de flota
           </Button>
@@ -156,17 +166,25 @@ export function Xpert() {
 
       {/* Stats row */}
       {isConfigured && (
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="text-center p-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+          <Card className="text-center p-3 sm:p-4">
             <p className="text-2xl font-bold text-primary">{devices.length}</p>
             <p className="text-xs text-muted-foreground mt-1">Dispositivos GPS</p>
           </Card>
-          <Card className="text-center p-4">
+          <Card className="text-center p-3 sm:p-4">
             <p className="text-2xl font-bold text-blue-600">{linkedCount}</p>
             <p className="text-xs text-muted-foreground mt-1">Máquinas vinculadas</p>
           </Card>
+          <Card className="text-center p-3 sm:p-4 col-span-2 sm:col-span-1">
+            <p className="text-2xl font-bold text-slate-700">
+              {Math.max(0, validMaquinas.length - linkedCount)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Pendientes de vincular</p>
+          </Card>
         </div>
-      )}      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Telemetría disponible */}
         <Card>
           <CardHeader>

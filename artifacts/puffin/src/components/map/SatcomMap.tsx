@@ -46,6 +46,7 @@ function loadLeaflet(): Promise<void> {
     const script = document.createElement("script");
     script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
     script.onload = () => resolve();
+    script.onerror = () => resolve();
     document.head.appendChild(script);
   });
 }
@@ -81,9 +82,19 @@ export function SatcomMap({ points, height = "420px", activePointId }: SatcomMap
     if (!containerRef.current || initializedRef.current) return;
     initializedRef.current = true;
 
+    const resizeObserver = new ResizeObserver(() => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+      }
+    });
+
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
     loadLeaflet().then(() => {
       const L = window.L;
-      if (!containerRef.current || mapRef.current) return;
+      if (!containerRef.current || mapRef.current || !L) return;
 
       mapRef.current = L.map(containerRef.current, {
         center: [-32.5, -64.5],
@@ -97,6 +108,13 @@ export function SatcomMap({ points, height = "420px", activePointId }: SatcomMap
         maxZoom: 20,
       }).addTo(mapRef.current);
 
+      // Trigger invalidateSize after initial tiles attach
+      setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize();
+        }
+      }, 250);
+
       // Fix para líneas blancas/huecos entre tiles en algunos navegadores
       const style = document.createElement('style');
       style.innerHTML = `
@@ -109,6 +127,7 @@ export function SatcomMap({ points, height = "420px", activePointId }: SatcomMap
     });
 
     return () => {
+      resizeObserver.disconnect();
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -121,6 +140,8 @@ export function SatcomMap({ points, height = "420px", activePointId }: SatcomMap
   useEffect(() => {
     const L = window.L;
     if (!mapRef.current || !L) return;
+
+    mapRef.current.invalidateSize();
 
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
