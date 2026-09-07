@@ -54,6 +54,7 @@ export interface PushNotificationPayload {
   body: string;
   icon?: string;
   badge?: string;
+  badgeCount?: number;
   tag?: string;
   url?: string;
   data?: Record<string, any>;
@@ -192,14 +193,17 @@ export async function sendPushNotificationToAll(payload: PushNotificationPayload
       return { total: 0, sent: 0, failed: 0 };
     }
 
+    const numericBadge = payload.badgeCount && payload.badgeCount > 0 ? payload.badgeCount : 1;
     const jsonPayload = JSON.stringify({
       title: payload.title,
       body: payload.body,
       icon: payload.icon || "/favicon.png",
       badge: payload.badge || "/favicon.png",
+      badgeCount: numericBadge,
       tag: payload.tag || "puffin-alert",
       data: {
         url: payload.url || "/panel",
+        badgeCount: numericBadge,
         ...(payload.data || {}),
       },
     });
@@ -308,14 +312,17 @@ export async function sendPushNotificationToUser(
       return { total: 0, sent: 0, failed: 0 };
     }
 
+    const numericBadge = payload.badgeCount && payload.badgeCount > 0 ? payload.badgeCount : 1;
     const jsonPayload = JSON.stringify({
       title: payload.title,
       body: payload.body,
       icon: payload.icon || "/favicon.png",
       badge: payload.badge || "/favicon.png",
+      badgeCount: numericBadge,
       tag: payload.tag || "puffin-user-alert",
       data: {
         url: payload.url || "/jornadas",
+        badgeCount: numericBadge,
         ...(payload.data || {}),
       },
     });

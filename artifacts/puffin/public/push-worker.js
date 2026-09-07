@@ -1,11 +1,20 @@
 /* eslint-disable no-restricted-globals */
 // PUFFIN SRL - Push Notification Worker (Compatible con iOS PWA Standalone, Android y Desktop)
 
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('push', (event) => {
   let payload = {
     title: 'PUFFIN SRL',
     body: 'Nuevo mensaje recibido en el sistema.',
     url: '/whatsapp',
+    badgeCount: 1,
   };
 
   if (event.data) {
@@ -23,7 +32,7 @@ self.addEventListener('push', (event) => {
   const body = payload.body || 'Tenés una nueva notificación.';
   const targetUrl = payload.data?.url || payload.url || '/whatsapp';
 
-  // Opciones ultra-compatibles con iOS Safari
+  // Opciones compatibles con iOS Safari y Android
   const options = {
     body: body,
     tag: payload.tag || 'puffin-' + Date.now(),
@@ -33,7 +42,6 @@ self.addEventListener('push', (event) => {
     },
   };
 
-  // En Android y Chrome de escritorio podemos adjuntar iconos y vibración
   const isApple = /iPhone|iPad|iPod/.test(navigator.userAgent || '');
   if (!isApple) {
     options.icon = '/pwa-192x192.png';
@@ -41,28 +49,24 @@ self.addEventListener('push', (event) => {
     options.vibrate = [200, 100, 200];
   }
 
-  // Actualizar el numerito de badge en el icono de la app en la pantalla del celular (iOS 16.4+ PWA y Android)
-  if ('setAppBadge' in self.navigator) {
-    try {
-      const badgeVal = payload.badgeCount ?? payload.data?.badgeCount ?? payload.badge;
-      const num = typeof badgeVal === 'number' ? badgeVal : parseInt(badgeVal, 10);
-      if (!isNaN(num) && num > 0) {
-        self.navigator.setAppBadge(num).catch(() => {});
-      } else {
-        self.navigator.setAppBadge().catch(() => {});
-      }
-    } catch {}
-  }
+  // Actualizar el número de badge en el icono de la aplicación en el celular (iOS PWA / Android)
+  const badgeVal = payload.badgeCount ?? payload.data?.badgeCount ?? 1;
+  const num = typeof badgeVal === 'number' ? badgeVal : parseInt(badgeVal, 10);
+  const targetBadge = !isNaN(num) && num > 0 ? num : 1;
 
-  event.waitUntil(
-    self.registration.showNotification(title, options).catch((err) => {
-      console.warn('[SW Push] Fallback a notificación mínima:', err);
-      return self.registration.showNotification(title, {
-        body: body,
-        data: { url: targetUrl },
-      });
-    })
-  );
+  const badgePromise = ('setAppBadge' in self.navigator)
+    ? self.navigator.setAppBadge(targetBadge).catch((err) => console.warn('[SW] setAppBadge error:', err))
+    : Promise.resolve();
+
+  const notifPromise = self.registration.showNotification(title, options).catch((err) => {
+    console.warn('[SW Push] Fallback a notificación mínima:', err);
+    return self.registration.showNotification(title, {
+      body: body,
+      data: { url: targetUrl },
+    });
+  });
+
+  event.waitUntil(Promise.all([notifPromise, badgePromise]));
 });
 
 self.addEventListener('notificationclick', (event) => {

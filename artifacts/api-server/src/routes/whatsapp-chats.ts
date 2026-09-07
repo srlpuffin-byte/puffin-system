@@ -107,6 +107,16 @@ router.get("/", async (req, res) => {
         }
       }
 
+      // Calcular mensajes no leídos: cuántos mensajes seguidos desde el final son del usuario
+      let unreadCount = 0;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === "user") {
+          unreadCount++;
+        } else {
+          break;
+        }
+      }
+
       return {
         phone: s.phone,
         nombre: emp ? `${emp.nombre} ${emp.apellido}`.trim() : (s.phone.length > 10 ? `+${s.phone}` : s.phone),
@@ -114,6 +124,8 @@ router.get("/", async (req, res) => {
         empleado_id: emp?.id || null,
         foto_perfil: getFotoPerfil(emp?.id),
         ultimoMensaje: lastMsgText || "Sin mensajes",
+        last_message: lastMsgObj,
+        unread_count: unreadCount,
         ultimaFecha: s.updated_at || new Date(),
         totalMensajes: messages.length,
         botPausado: botPaused,

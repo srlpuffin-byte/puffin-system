@@ -373,7 +373,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex bg-background" style={{height: '100dvh', overflow: 'hidden'}}>
+    <div
+      className="flex bg-background w-full max-w-[100vw] overflow-hidden"
+      style={{ height: '100dvh', maxHeight: '100dvh', overflow: 'hidden', maxWidth: '100vw', width: '100%' }}
+    >
       <div className="hidden lg:flex flex-shrink-0">
         <Sidebar />
       </div>
@@ -387,8 +390,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <main className="flex-1 bg-background flex flex-col min-w-0" style={{overflowY: 'auto', WebkitOverflowScrolling: 'touch'}}>
-        <div className="lg:hidden h-14 bg-card border-b border-border flex items-center justify-between px-3 sm:px-4 flex-shrink-0">
+      <main
+        className="flex-1 bg-background flex flex-col min-w-0 w-full max-w-full overflow-x-hidden"
+        style={{ overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', maxWidth: '100vw', width: '100%' }}
+      >
+        <div className="lg:hidden h-14 bg-card border-b border-border flex items-center justify-between px-3 sm:px-4 flex-shrink-0 w-full max-w-full">
           <div className="flex items-center">
             <Button variant="ghost" size="sm" onClick={() => setMobileOpen(true)} className="relative mr-1 sm:mr-2">
               <Menu className="h-5 w-5" />
@@ -408,7 +414,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
         <PushNotificationBanner />
         <JornadaAlertaBanner />
-        <div className="flex-1 p-2 md:p-4 lg:p-8">
+        <div className="flex-1 p-2 md:p-4 lg:p-8 w-full max-w-full min-w-0 overflow-x-hidden">
           {children}
         </div>
       </main>

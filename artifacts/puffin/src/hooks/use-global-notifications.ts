@@ -67,15 +67,17 @@ export function useGlobalNotifications() {
         const chatsRes = await fetch("/api/whatsapp-chats", { headers });
         if (chatsRes.ok) {
           const chatsData = await chatsRes.json();
-          const sessions = chatsData.sessions || [];
+          const sessions: any[] = Array.isArray(chatsData) ? chatsData : (chatsData.sessions || []);
 
           let totalUnread = 0;
           let newestIncomingTime = lastSeenMsgTimestampRef.current;
           let latestNewMessage: { sender: string; text: string; phone: string } | null = null;
 
           for (const s of sessions) {
-            if (s.unread_count && s.unread_count > 0) {
+            if (typeof s.unread_count === "number" && s.unread_count > 0) {
               totalUnread += s.unread_count;
+            } else if (s.last_message?.role === "user") {
+              totalUnread += 1;
             }
 
             // Verificar si el último mensaje es de un usuario y es más reciente que nuestra marca de tiempo
@@ -84,7 +86,7 @@ export function useGlobalNotifications() {
               if (msgTime > lastSeenMsgTimestampRef.current) {
                 newestIncomingTime = Math.max(newestIncomingTime, msgTime);
                 latestNewMessage = {
-                  sender: s.contact_name || s.phone,
+                  sender: s.nombre || s.contact_name || s.phone,
                   text: s.last_message.content || (s.last_message.has_media ? "📷 Archivo adjunto" : "Nuevo mensaje"),
                   phone: s.phone,
                 };
@@ -143,9 +145,19 @@ export function useGlobalNotifications() {
     checkNotifications();
     const interval = setInterval(checkNotifications, 5000);
 
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkNotifications();
+      }
+    };
+    window.addEventListener("focus", checkNotifications);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
       isMounted = false;
       clearInterval(interval);
+      window.removeEventListener("focus", checkNotifications);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [location, setLocation]);
 

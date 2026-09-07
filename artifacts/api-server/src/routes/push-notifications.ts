@@ -1,5 +1,8 @@
 import { Router, Request } from "express";
 import jwt from "jsonwebtoken";
+import { db } from "@workspace/db";
+import { alertasTable } from "@workspace/db/schema";
+import { eq, desc } from "drizzle-orm";
 import {
   VAPID_PUBLIC_KEY,
   savePushSubscription,
@@ -119,28 +122,71 @@ router.post("/test", async (req: any, res) => {
   }
 });
 
-// Consultar notificaciones recientes para la campana y panel web
-router.get("/recent", (req, res) => {
-  const notifs = getRecentNotifications();
-  return res.json({ notifications: notifs });
+// Consultar notificaciones recientes para la campana y panel web (combinando memoria y alertas activas)
+router.get("/recent", async (req, res) => {
+  try {
+    const memNotifs = getRecentNotifications();
+    const dbAlertas = await db
+      .select()
+      .from(alertasTable)
+      .where(eq(alertasTable.estado, "activa"))
+      .orderBy(desc(alertasTable.fecha))
+      .limit(20);
+
+    const dbItems = dbAlertas.map((a) => ({
+      id: `alerta-${a.id}`,
+      tipo: "alerta" as const,
+      titulo: `Alerta: ${a.tipo?.toUpperCase() || "SISTEMA"}`,
+      mensaje: a.descripcion,
+      url: "/alertas",
+      fecha: a.fecha ? a.fecha.toISOString() : new Date().toISOString(),
+      leido: false,
+    }));
+
+    const combined = [...memNotifs];
+    for (const item of dbItems) {
+      if (!combined.some((c) => c.id === item.id)) {
+        combined.push(item);
+      }
+    }
+
+    return res.json({ notifications: combined });
+  } catch (err: any) {
+    const memNotifs = getRecentNotifications();
+    return res.json({ notifications: memNotifs });
+  }
 });
 
 // Eliminar una notificación individual
-router.delete("/recent/:id", (req, res) => {
+router.delete("/recent/:id", async (req, res) => {
   const { id } = req.params;
-  const deleted = deleteRecentNotification(id);
-  return res.json({ success: deleted });
+  deleteRecentNotification(id);
+  if (id.startsWith("alerta-")) {
+    const aId = parseInt(id.replace("alerta-", ""), 10);
+    if (!isNaN(aId)) {
+      try {
+        await db.update(alertasTable).set({ estado: "resuelta" }).where(eq(alertasTable.id, aId));
+      } catch {}
+    }
+  }
+  return res.json({ success: true });
 });
 
 // Vaciar todas las notificaciones
-router.delete("/recent", (req, res) => {
+router.delete("/recent", async (req, res) => {
   clearRecentNotifications();
+  try {
+    await db.update(alertasTable).set({ estado: "resuelta" }).where(eq(alertasTable.estado, "activa"));
+  } catch {}
   return res.json({ success: true });
 });
 
 // Marcar todas las notificaciones como leídas
-router.post("/recent/read-all", (req, res) => {
+router.post("/recent/read-all", async (req, res) => {
   markAllNotificationsAsRead();
+  try {
+    await db.update(alertasTable).set({ estado: "resuelta" }).where(eq(alertasTable.estado, "activa"));
+  } catch {}
   return res.json({ success: true });
 });
 
