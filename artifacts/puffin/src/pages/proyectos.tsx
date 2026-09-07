@@ -247,7 +247,7 @@ export function Proyectos() {
                                 <DollarSign className="w-4 h-4" />
                               </Button>
                             )}
-                            <Link href={`/proyectos/${p.id}`}>
+                            <Link href={`/proyectos/${p.id}`} asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -346,8 +346,8 @@ export function Proyectos() {
                     </div>
 
                     <div className="flex items-center gap-2 mt-2 pt-3 border-t">
-                      <Link href={`/proyectos/${p.id}`} className="flex-1">
-                        <Button variant="outline" className="w-full h-9 text-slate-700">
+                      <Link href={`/proyectos/${p.id}`} asChild>
+                        <Button variant="outline" className="flex-1 w-full h-9 text-slate-700">
                           <Eye className="w-4 h-4 mr-2" /> Ver detalles
                         </Button>
                       </Link>

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, useRoute, useLocation, Link } from "wouter";
 import { useGetProyecto, useDeletePago } from "@/hooks/use-proyectos";
 import { useGetEmpleados, useGetMaquinas, useGetEgresos, useGetMe } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,15 +8,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronLeft, MapPin, Activity, DollarSign, Users, Tractor, ExternalLink, TrendingDown, TrendingUp, Minus, Receipt, Package, Trash2 } from "lucide-react";
+import { ChevronLeft, MapPin, Activity, DollarSign, Users, Tractor, ExternalLink, TrendingDown, TrendingUp, Minus, Receipt, Package, Trash2, RefreshCw, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
-export function ProyectoFicha() {
-  const { id } = useParams();
-  const proyectoId = parseInt(id || "0", 10);
+export function ProyectoFicha({ params: propParams }: { params?: { id?: string } } = {}) {
+  const hookParams = useParams<{ id?: string }>();
+  const [, matchParams] = useRoute("/proyectos/:id");
+  const [loc] = useLocation();
 
-  const { data: proyecto, isLoading } = useGetProyecto(proyectoId);
+  // Múltiples fuentes de respaldo para resolver el ID del proyecto
+  const urlMatch = loc.match(/\/proyectos\/([^\/\?#]+)/) || 
+    (typeof window !== "undefined" ? window.location.pathname.match(/\/proyectos\/([^\/\?#]+)/) : null);
+
+  const rawId = propParams?.id || hookParams?.id || matchParams?.id || (urlMatch ? urlMatch[1] : undefined);
+  const proyectoId = parseInt(rawId || "0", 10);
+
+  const { data: proyecto, isLoading, isError, refetch } = useGetProyecto(proyectoId);
   const { data: empleados } = useGetEmpleados();
   const { data: maquinas } = useGetMaquinas();
   const { data: todosLosEgresos } = useGetEgresos();
@@ -37,8 +45,40 @@ export function ProyectoFicha() {
   // Tipo de cambio editable (usuario lo puede ajustar)
   const [tipoCambio, setTipoCambio] = useState("1200");
 
-  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Cargando proyecto...</div>;
-  if (!proyecto) return <div className="p-8 text-center text-red-500">Proyecto no encontrado</div>;
+  if (isLoading) {
+    return (
+      <div className="p-12 text-center flex flex-col items-center justify-center gap-3">
+        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        <p className="text-muted-foreground text-sm font-medium">Cargando datos del proyecto...</p>
+      </div>
+    );
+  }
+
+  if (!proyecto) {
+    return (
+      <div className="p-6 max-w-md mx-auto my-12 text-center space-y-4">
+        <div className="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto">
+          <AlertCircle className="w-6 h-6" />
+        </div>
+        <div className="space-y-1">
+          <h3 className="font-semibold text-lg text-slate-800">Proyecto no encontrado</h3>
+          <p className="text-sm text-muted-foreground">
+            No se pudo cargar la información del proyecto solicitado (ID: {rawId || "no especificado"}).
+          </p>
+        </div>
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <Link href="/proyectos">
+            <Button variant="outline" size="sm">
+              <ChevronLeft className="w-4 h-4 mr-1" /> Volver a Proyectos
+            </Button>
+          </Link>
+          <Button variant="default" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="w-4 h-4 mr-1" /> Reintentar
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const assignedEmpleados = empleados?.filter(e => proyecto.empleados_asignados?.includes(e.id)) || [];
   const assignedMaquinas = maquinas?.filter(m => proyecto.maquinas_asignadas?.includes(m.id) && m.categoria !== "inventario") || [];

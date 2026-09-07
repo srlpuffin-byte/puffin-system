@@ -29,11 +29,17 @@ export function useGetProyectos() {
 }
 
 export function useGetProyecto(id: number) {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: [`/api/proyectos/${id}`],
     queryFn: async () => {
       const res = await apiFetch(`/proyectos/${id}`);
       return res as Proyecto;
+    },
+    initialData: () => {
+      if (!id) return undefined;
+      const proyectos = queryClient.getQueryData<Proyecto[]>(["/api/proyectos"]);
+      return proyectos?.find((p) => p.id === id);
     },
     enabled: !!id,
   });

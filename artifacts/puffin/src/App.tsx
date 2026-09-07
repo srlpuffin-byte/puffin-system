@@ -55,7 +55,7 @@ const queryClient = new QueryClient({
 import { useGetMe } from "@workspace/api-client-react";
 import { useGetEmpleadosMe } from "@/hooks/use-get-empleados-me";
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType<any> }) {
+function ProtectedRoute({ component: Component, params }: { component: React.ComponentType<any>; params?: any }) {
   const [location, setLocation] = useLocation();
   const token = getAuthToken();
   const { data: user, isLoading: userLoading } = useGetMe();
@@ -84,7 +84,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
   return (
     <AppLayout>
-      <Component />
+      <Component params={params} />
     </AppLayout>
   );
 }
@@ -127,9 +127,9 @@ function Router() {
         <Route path="/panel"><ProtectedRoute component={Panel} /></Route>
         <Route path="/mis-datos"><ProtectedRoute component={MisDatos} /></Route>
         <Route path="/maquinas"><ProtectedRoute component={Maquinas} /></Route>
-        <Route path="/maquinas/:id"><ProtectedRoute component={MaquinaFicha} /></Route>
+        <Route path="/maquinas/:id">{(params) => <ProtectedRoute component={MaquinaFicha} params={params} />}</Route>
         <Route path="/operarios"><ProtectedRoute component={Operarios} /></Route>
-        <Route path="/operarios/:id"><ProtectedRoute component={OperarioFicha} /></Route>
+        <Route path="/operarios/:id">{(params) => <ProtectedRoute component={OperarioFicha} params={params} />}</Route>
         <Route path="/jornadas"><ProtectedRoute component={Jornadas} /></Route>
         <Route path="/combustible"><ProtectedRoute component={Combustible} /></Route>
         <Route path="/mantenimientos"><ProtectedRoute component={Mantenimientos} /></Route>
@@ -150,7 +150,7 @@ function Router() {
         <Route path="/americangis"><ProtectedRoute component={Americangis} /></Route>
         <Route path="/xpert"><ProtectedRoute component={Xpert} /></Route>
         <Route path="/proyectos"><ProtectedRoute component={Proyectos} /></Route>
-        <Route path="/proyectos/:id"><ProtectedRoute component={ProyectoFicha} /></Route>
+        <Route path="/proyectos/:id">{(params) => <ProtectedRoute component={ProyectoFicha} params={params} />}</Route>
         <Route component={NotFound} />
       </Switch>
     </ErrorBoundary>

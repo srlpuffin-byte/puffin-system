@@ -125,6 +125,7 @@ router.post("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "ID de proyecto inválido" });
     let [proyecto] = await db.select().from(proyectosTable).where(eq(proyectosTable.id, id)).limit(1);
     if (!proyecto) return res.status(404).json({ error: "Proyecto no encontrado" });
 
