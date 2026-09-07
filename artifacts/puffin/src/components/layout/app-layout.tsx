@@ -18,6 +18,7 @@ import {
   TrendingUp,
   Bot,
   Satellite,
+  MessageSquare,
   Map,
   Compass,
   UserCog,
@@ -107,6 +108,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { icon: Satellite, label: "Xpert Satcom", href: "/xpert" },
       { icon: Bot, label: "Puffin AI", href: "/ia" },
+      { icon: MessageSquare, label: "WhatsApp Chats", href: "/whatsapp" },
     ],
   },
   {

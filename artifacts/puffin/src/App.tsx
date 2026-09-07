@@ -25,6 +25,7 @@ import { Usuarios } from "@/pages/usuarios";
 import { Gps } from "@/pages/gps";
 import { Productividad } from "@/pages/productividad";
 import { Ia } from "@/pages/ia";
+import { WhatsAppChats } from "@/pages/whatsapp-chats";
 import { Americangis } from "@/pages/americangis";
 import { Egresos } from "@/pages/egresos";
 import { Xpert } from "@/pages/xpert";
@@ -143,6 +144,7 @@ function Router() {
         <Route path="/gps"><ProtectedRoute component={Gps} /></Route>
         <Route path="/productividad"><ProtectedRoute component={Productividad} /></Route>
         <Route path="/ia"><ProtectedRoute component={Ia} /></Route>
+        <Route path="/whatsapp"><ProtectedRoute component={WhatsAppChats} /></Route>
         <Route path="/americangis"><ProtectedRoute component={Americangis} /></Route>
         <Route path="/xpert"><ProtectedRoute component={Xpert} /></Route>
         <Route path="/proyectos"><ProtectedRoute component={Proyectos} /></Route>

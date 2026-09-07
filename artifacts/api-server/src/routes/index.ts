@@ -271,7 +271,9 @@ router.use("/fotografias", fotografiasRouter);
 router.use("/egresos", requireAuth, adminAuditMiddleware, egresosRouter);
 router.use("/search", requireAuth, adminAuditMiddleware, searchRouter);
 router.use("/cierres", requireAuth, adminAuditMiddleware, cierresRouter);
-router.use("/proyectos", requireAuth, adminAuditMiddleware, proyectosRouter);
 router.use("/alquileres", requireAuth, adminAuditMiddleware, alquileresRouter);
+
+import whatsappChatsRouter from "./whatsapp-chats";
+router.use("/whatsapp-chats", requireAuth, adminAuditMiddleware, whatsappChatsRouter);
 
 export default router;

@@ -755,31 +755,61 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
   const senderPhone = from.replace(/[^0-9]/g, "");
 
   const isAdmin = await isAuthorizedAdmin(senderPhone);
+  const sesion = await obtenerSesion(senderPhone);
 
   // CRÍTICO: Si NO es administrador, bloquear el acceso al asistente inmediatamente.
   // No procesar con IA, no consultar base de datos ni exponer información sensible de la empresa.
+  // Guardamos el mensaje en el historial de sesión para que la administración pueda auditarlo desde la Web.
   if (!isAdmin) {
     console.log(`[WhatsApp Asistente] Acceso denegado: el número ${senderPhone} no es administrador.`);
     try {
-      const sesion = await obtenerSesion(senderPhone);
       const ahora = Date.now();
       const ultimoAviso = (sesion.datos_pendientes as any)?.ultimo_aviso_no_admin || 0;
+      const historialNoAdmin = (sesion.messages as any[]) || [];
+
+      // Guardar el mensaje entrante del operario/contacto en el historial para auditoría web
+      historialNoAdmin.push({
+        role: "user",
+        content: text,
+        created_at: new Date().toISOString(),
+        has_media: !!imageBase64,
+      });
 
       // Responder con aviso formal solo si pasaron al menos 15 minutos (anti-spam / anti-loop)
       if (ahora - ultimoAviso > 15 * 60 * 1000) {
-        await sendWhatsAppMessage(
-          from,
-          "Hola. Este canal es de uso exclusivo para administración interna de PUFFIN SRL. Las consultas e interacciones con el asistente inteligente están reservadas únicamente para personal administrativo autorizado."
-        );
+        const textoAviso = "Hola. Este canal es de uso exclusivo para administración interna de PUFFIN SRL. Las consultas e interacciones con el asistente inteligente están reservadas únicamente para personal administrativo autorizado.";
+        await sendWhatsAppMessage(from, textoAviso);
+        historialNoAdmin.push({
+          role: "assistant",
+          content: textoAviso,
+          created_at: new Date().toISOString(),
+          is_warning: true,
+        });
+
         sesion.datos_pendientes = {
           ...(typeof sesion.datos_pendientes === "object" ? sesion.datos_pendientes : {}),
           ultimo_aviso_no_admin: ahora,
         };
-        await guardarSesion(senderPhone, [], "idle", sesion.datos_pendientes);
       }
+
+      await guardarSesion(senderPhone, historialNoAdmin, "idle", sesion.datos_pendientes);
     } catch (e) {
       console.warn("[WhatsApp Asistente] Error gestionando aviso no-admin:", (e as any)?.message);
     }
+    return;
+  }
+
+  // Si el bot fue pausado manualmente desde la web por un administrador para este chat:
+  if ((sesion.datos_pendientes as any)?.bot_paused) {
+    console.log(`[WhatsApp Asistente] Chat con ${senderPhone} en MODO MANUAL (bot pausado). Guardando mensaje sin respuesta de IA.`);
+    const historialManual = (sesion.messages as any[]) || [];
+    historialManual.push({
+      role: "user",
+      content: text,
+      created_at: new Date().toISOString(),
+      has_media: !!imageBase64,
+    });
+    await guardarSesion(senderPhone, historialManual, "manual", sesion.datos_pendientes);
     return;
   }
 
@@ -796,9 +826,6 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
     return;
   }
 
-  // Obtener historial de conversación
-  const sesion = await obtenerSesion(senderPhone);
-  
   // Reconstruir historial preservando pares tool_call/tool_result completos.
   // Un tool_call sin su tool_result correspondiente rompe la API de OpenAI/Groq,
   // por eso se filtran los pares incompletos pero se mantienen los completos.
