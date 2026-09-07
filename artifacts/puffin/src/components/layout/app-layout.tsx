@@ -22,6 +22,7 @@ import {
   Map,
   Compass,
   UserCog,
+  BellRing,
   ChevronDown,
   ChevronRight,
   Menu,
@@ -120,6 +121,7 @@ const NAV_GROUPS: NavGroup[] = [
     defaultOpen: false,
     items: [
       { icon: UserCog, label: "Usuarios", href: "/usuarios" },
+      { icon: BellRing, label: "Notificaciones", href: "/admin-notificaciones" },
     ],
   },
 ];

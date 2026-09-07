@@ -38,6 +38,17 @@ app.listen(port, (err) => {
     logger.error({ err }, "[Push Notifications] Error inicializando en startup");
   });
 
+  // Inicializar configuración de notificaciones y monitor automático de jornadas (+12h)
+  import("./services/notificaciones-config.js").then(({ ensureNotificacionesConfigTable }) => {
+    return ensureNotificacionesConfigTable();
+  }).then(() => {
+    return import("./services/jornadas-monitor.js");
+  }).then(({ startJornadasMonitor }) => {
+    startJornadasMonitor();
+  }).catch((err) => {
+    logger.error({ err }, "[Jornadas Monitor] Error inicializando monitor de jornadas");
+  });
+
   // Envío masivo de plantilla 'sistema_uso' deshabilitado a pedido del administrador
   // import("./services/broadcast-plantilla.js").then(({ startScheduledBroadcastSistemaUso }) => startScheduledBroadcastSistemaUso());
 

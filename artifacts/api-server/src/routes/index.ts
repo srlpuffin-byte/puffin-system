@@ -279,4 +279,7 @@ router.use("/whatsapp-chats", requireAuth, adminAuditMiddleware, whatsappChatsRo
 import pushNotificationsRouter from "./push-notifications";
 router.use("/push-notifications", pushNotificationsRouter);
 
+import notificacionesConfigRouter from "./notificaciones-config";
+router.use("/notificaciones-config", requireAuth, adminAuditMiddleware, notificacionesConfigRouter);
+
 export default router;

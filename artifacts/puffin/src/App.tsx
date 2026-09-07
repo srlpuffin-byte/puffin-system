@@ -22,6 +22,7 @@ import { Reportes } from "@/pages/reportes";
 import { Incidentes } from "@/pages/incidentes";
 import { Actividad } from "@/pages/actividad";
 import { Usuarios } from "@/pages/usuarios";
+import { AdminNotificaciones } from "@/pages/admin-notificaciones";
 import { Gps } from "@/pages/gps";
 import { Productividad } from "@/pages/productividad";
 import { Ia } from "@/pages/ia";
@@ -141,6 +142,7 @@ function Router() {
         <Route path="/incidentes"><ProtectedRoute component={Incidentes} /></Route>
         <Route path="/actividad"><ProtectedRoute component={Actividad} /></Route>
         <Route path="/usuarios"><ProtectedRoute component={Usuarios} /></Route>
+        <Route path="/admin-notificaciones"><ProtectedRoute component={AdminNotificaciones} /></Route>
         <Route path="/gps"><ProtectedRoute component={Gps} /></Route>
         <Route path="/productividad"><ProtectedRoute component={Productividad} /></Route>
         <Route path="/ia"><ProtectedRoute component={Ia} /></Route>

@@ -3,6 +3,7 @@ import { maquinasTable } from "@workspace/db";
 import { isNotNull } from "drizzle-orm";
 import { SatcomClient } from "./satcom.js";
 import { sendWhatsAppMessage } from "./whatsapp.js";
+import { isNotificationEnabled } from "./notificaciones-config.js";
 
 const SPEED_LIMIT_KMH = 125;
 const CHECK_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
@@ -14,6 +15,8 @@ const lastAlertMap = new Map<number, number>();
 
 async function checkSpeeds() {
   try {
+    const isSatcomEnabled = await isNotificationEnabled("satcom_velocidad");
+    if (!isSatcomEnabled) return;
     const maquinas = await db
       .select()
       .from(maquinasTable)

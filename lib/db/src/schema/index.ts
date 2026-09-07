@@ -18,3 +18,4 @@ export * from "./whatsapp-sesiones";
 export * from "./historial_uso";
 export * from "./alquileres";
 export * from "./push-subscriptions";
+export * from "./notificaciones-config";

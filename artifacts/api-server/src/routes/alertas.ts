@@ -32,6 +32,7 @@ router.put("/:id", async (req, res) => {
 });
 
 import { sendPushNotificationToAll } from "../services/push-notifications.js";
+import { isNotificationEnabled } from "../services/notificaciones-config.js";
 
 router.post("/", async (req, res) => {
   const { tipo, prioridad, descripcion, entidad_tipo, entidad_id, entidad_nombre } = req.body;
@@ -53,12 +54,24 @@ router.post("/", async (req, res) => {
     })
     .returning();
 
-  sendPushNotificationToAll({
-    title: `⚠️ Alerta: ${tipo.toUpperCase()}`,
-    body: `${entidad_nombre ? entidad_nombre + ': ' : ''}${descripcion}`,
-    url: "/alertas",
-    tag: `alerta-${alerta.id}`,
-  }).catch((err) => console.warn("[Alertas] Error enviando push notification:", err));
+  // Verificar si la categoría de notificación está habilitada
+  const tipoLower = String(tipo || "").toLowerCase();
+  let enabledKey: "satcom_velocidad" | "combustible_mantenimiento" | "documentacion" | "incidentes" | null = null;
+  if (tipoLower.includes("velocidad") || tipoLower.includes("satcom")) enabledKey = "satcom_velocidad";
+  else if (tipoLower.includes("combustible") || tipoLower.includes("mantenimiento")) enabledKey = "combustible_mantenimiento";
+  else if (tipoLower.includes("document") || tipoLower.includes("carnet") || tipoLower.includes("vto")) enabledKey = "documentacion";
+  else if (tipoLower.includes("incidente") || tipoLower.includes("averia") || tipoLower.includes("accidente")) enabledKey = "incidentes";
+
+  const shouldSendPush = enabledKey ? await isNotificationEnabled(enabledKey) : true;
+
+  if (shouldSendPush) {
+    sendPushNotificationToAll({
+      title: `⚠️ Alerta: ${tipo.toUpperCase()}`,
+      body: `${entidad_nombre ? entidad_nombre + ': ' : ''}${descripcion}`,
+      url: "/alertas",
+      tag: `alerta-${alerta.id}`,
+    }).catch((err) => console.warn("[Alertas] Error enviando push notification:", err));
+  }
 
   return res.status(201).json({
     ...alerta,
