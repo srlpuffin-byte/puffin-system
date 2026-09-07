@@ -13,6 +13,26 @@ export interface GlobalNotificationItem {
   fecha: string;
 }
 
+function syncAppBadge(count: number) {
+  if (typeof navigator !== "undefined" && "setAppBadge" in navigator) {
+    try {
+      if (count > 0) {
+        navigator.setAppBadge(count);
+      } else {
+        navigator.clearAppBadge();
+      }
+    } catch {}
+  }
+  try {
+    const baseTitle = "PUFFIN SRL";
+    if (count > 0) {
+      document.title = `(${count}) ${baseTitle}`;
+    } else if (document.title.includes(baseTitle)) {
+      document.title = baseTitle;
+    }
+  } catch {}
+}
+
 export function useGlobalNotifications() {
   const [unreadWhatsAppCount, setUnreadWhatsAppCount] = useState(0);
   const [recentNotifications, setRecentNotifications] = useState<GlobalNotificationItem[]>([]);
@@ -20,6 +40,13 @@ export function useGlobalNotifications() {
 
   const lastSeenMsgTimestampRef = useRef<number>(Date.now());
   const isInitialLoadRef = useRef(true);
+
+  const totalBadges = unreadWhatsAppCount + recentNotifications.length;
+
+  // Sincronizar el badge nativo de la app del celular cada vez que cambia el total de notificaciones
+  useEffect(() => {
+    syncAppBadge(totalBadges);
+  }, [totalBadges]);
 
   // Polling cada 5 segundos para sincronizar notificaciones y mensajes en vivo
   useEffect(() => {
@@ -33,6 +60,9 @@ export function useGlobalNotifications() {
           headers["Authorization"] = `Bearer ${token}`;
         }
 
+        let currentUnread = unreadWhatsAppCount;
+        let currentNotifsCount = recentNotifications.length;
+
         // 1. Consultar chats de WhatsApp
         const chatsRes = await fetch("/api/whatsapp-chats", { headers });
         if (chatsRes.ok) {
@@ -43,7 +73,7 @@ export function useGlobalNotifications() {
           let newestIncomingTime = lastSeenMsgTimestampRef.current;
           let latestNewMessage: { sender: string; text: string; phone: string } | null = null;
 
-          sessions.forEach((s: any) => {
+          for (const s of sessions) {
             if (s.unread_count && s.unread_count > 0) {
               totalUnread += s.unread_count;
             }
@@ -60,17 +90,15 @@ export function useGlobalNotifications() {
                 };
               }
             }
-          });
+          }
 
           if (isMounted) {
+            currentUnread = totalUnread;
             setUnreadWhatsAppCount(totalUnread);
 
             // Si hay un mensaje nuevo que no estaba en el estado inicial
             if (!isInitialLoadRef.current && latestNewMessage) {
               lastSeenMsgTimestampRef.current = newestIncomingTime;
-
-              // Solo emitir sonido y toast si NO estamos ya dentro de la sección de whatsapp mirando ese chat
-              const isLookingAtChat = location === "/whatsapp" || location.startsWith("/whatsapp?");
 
               playNotificationSound("message");
               if ("vibrate" in navigator) {
@@ -86,19 +114,7 @@ export function useGlobalNotifications() {
                 },
               });
             } else if (isInitialLoadRef.current) {
-              // En la carga inicial solo marcamos el tiempo de corte
               lastSeenMsgTimestampRef.current = Date.now();
-            }
-
-            // Actualizar App Badge nativo (soporte en iPhone iOS 16.4+, Android y PWA Desktop)
-            if ("setAppBadge" in navigator) {
-              try {
-                if (totalUnread > 0) {
-                  navigator.setAppBadge(totalUnread);
-                } else {
-                  navigator.clearAppBadge();
-                }
-              } catch {}
             }
           }
         }
@@ -107,7 +123,13 @@ export function useGlobalNotifications() {
         const notifsRes = await fetch("/api/push-notifications/recent", { headers });
         if (notifsRes.ok && isMounted) {
           const notifsData = await notifsRes.json();
-          setRecentNotifications(notifsData.notifications || []);
+          const list: GlobalNotificationItem[] = notifsData.notifications || [];
+          currentNotifsCount = list.length;
+          setRecentNotifications(list);
+        }
+
+        if (isMounted) {
+          syncAppBadge(currentUnread + currentNotifsCount);
         }
 
         if (isInitialLoadRef.current) {
@@ -146,9 +168,6 @@ export function useGlobalNotifications() {
   const clearAllNotifications = async () => {
     // Limpieza optimista inmediata
     setRecentNotifications([]);
-    if ("clearAppBadge" in navigator) {
-      try { navigator.clearAppBadge(); } catch {}
-    }
     try {
       const token = getAuthToken();
       const headers: Record<string, string> = {};
@@ -171,15 +190,14 @@ export function useGlobalNotifications() {
         method: "POST",
         headers,
       });
-      if ("clearAppBadge" in navigator) {
-        try { navigator.clearAppBadge(); } catch {}
-      }
+      setRecentNotifications([]);
     } catch {}
   };
 
   return {
     unreadWhatsAppCount,
     recentNotifications,
+    totalBadges,
     deleteNotification,
     clearAllNotifications,
     markAllAsRead,

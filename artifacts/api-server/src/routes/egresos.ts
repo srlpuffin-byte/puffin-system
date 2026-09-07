@@ -16,7 +16,7 @@ router.get("/sync-sheet", async (req, res) => {
 });
 
 router.get("/", async (req, res) => {
-  const { categoria, centro_costos, proveedor, search, metodo_pago } = req.query as Record<string, string>;
+  const { categoria, centro_costos, proveedor, search, metodo_pago, orden } = req.query as Record<string, string>;
   const page  = Math.max(1, parseInt((req.query.page  as string) || "1"));
   const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || "50")));
   const offset = (page - 1) * limit;
@@ -57,8 +57,13 @@ router.get("/", async (req, res) => {
     .from(egresosTable)
     .where(whereClause);
 
+  // Orden: por defecto los más recientes cargados al sistema primero (ID descendente)
+  const orderClauses = orden === "fecha"
+    ? [desc(egresosTable.fecha), desc(egresosTable.id)]
+    : [desc(egresosTable.id)];
+
   const egresos = await baseQuery
-    .orderBy(desc(egresosTable.fecha), desc(egresosTable.id))
+    .orderBy(...orderClauses)
     .limit(limit)
     .offset(offset);
   

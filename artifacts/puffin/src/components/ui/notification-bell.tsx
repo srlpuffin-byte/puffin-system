@@ -28,6 +28,7 @@ export function NotificationBell() {
   const {
     unreadWhatsAppCount,
     recentNotifications,
+    totalBadges,
     deleteNotification,
     clearAllNotifications,
   } = useGlobalNotifications();
@@ -39,8 +40,6 @@ export function NotificationBell() {
     subscribeToPush,
     sendTestNotification,
   } = usePushNotifications();
-
-  const totalBadges = unreadWhatsAppCount;
 
   const handleItemClick = (item: GlobalNotificationItem) => {
     setOpen(false);
@@ -71,12 +70,12 @@ export function NotificationBell() {
           variant="ghost"
           size="icon"
           className="relative h-9 w-9 text-muted-foreground hover:text-foreground"
-          title="Notificaciones"
+          title={`Notificaciones (${totalBadges})`}
         >
           <Bell className="h-5 w-5" />
           {totalBadges > 0 && (
             <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-background animate-pulse">
-              {totalBadges > 9 ? "9+" : totalBadges}
+              {totalBadges > 99 ? "99+" : totalBadges}
             </span>
           )}
         </Button>
@@ -92,6 +91,11 @@ export function NotificationBell() {
           <div className="flex items-center gap-2">
             <Bell className="h-4 w-4 text-primary" />
             <h4 className="font-semibold text-sm">Centro de Notificaciones</h4>
+            {totalBadges > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white shadow-sm">
+                {totalBadges}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">

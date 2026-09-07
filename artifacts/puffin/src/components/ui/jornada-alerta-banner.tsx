@@ -40,7 +40,8 @@ export function JornadaAlertaBanner() {
   if (!jornadaExcedida) return null;
 
   let horas = 12;
-  let startTime = jornadaExcedida.createdAt ? new Date(jornadaExcedida.createdAt).getTime() : 0;
+  const jExAny = jornadaExcedida as any;
+  let startTime = (jExAny.createdAt || jExAny.created_at) ? new Date(jExAny.createdAt || jExAny.created_at).getTime() : 0;
   if (jornadaExcedida.fecha) {
     const fechaStr = String(jornadaExcedida.fecha).split("T")[0];
     const horaStr = jornadaExcedida.hora_inicio || "07:00";

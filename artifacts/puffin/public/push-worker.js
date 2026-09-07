@@ -41,6 +41,19 @@ self.addEventListener('push', (event) => {
     options.vibrate = [200, 100, 200];
   }
 
+  // Actualizar el numerito de badge en el icono de la app en la pantalla del celular (iOS 16.4+ PWA y Android)
+  if ('setAppBadge' in self.navigator) {
+    try {
+      const badgeVal = payload.badgeCount ?? payload.data?.badgeCount ?? payload.badge;
+      const num = typeof badgeVal === 'number' ? badgeVal : parseInt(badgeVal, 10);
+      if (!isNaN(num) && num > 0) {
+        self.navigator.setAppBadge(num).catch(() => {});
+      } else {
+        self.navigator.setAppBadge().catch(() => {});
+      }
+    } catch {}
+  }
+
   event.waitUntil(
     self.registration.showNotification(title, options).catch((err) => {
       console.warn('[SW Push] Fallback a notificación mínima:', err);
@@ -54,6 +67,12 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+
+  // Limpiar o decrementar badge al abrir la notificación
+  if ('clearAppBadge' in self.navigator) {
+    try { self.navigator.clearAppBadge().catch(() => {}); } catch {}
+  }
+
   const targetUrl = event.notification.data?.url || '/whatsapp';
 
   event.waitUntil(

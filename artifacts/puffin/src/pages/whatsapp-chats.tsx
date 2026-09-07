@@ -1016,11 +1016,17 @@ export function WhatsAppChats() {
                                       <span className="text-[9px]">No entregado</span>
                                     </span>
                                   ) : m.delivery_status === "read" ? (
-                                    <CheckCheck className="h-3.5 w-3.5 inline text-sky-300" title="Leído por el contacto" />
+                                    <span title="Leído por el contacto">
+                                      <CheckCheck className="h-3.5 w-3.5 inline text-sky-300" />
+                                    </span>
                                   ) : m.delivery_status === "delivered" ? (
-                                    <CheckCheck className={`h-3.5 w-3.5 inline ${m.manual ? "text-emerald-200" : "text-slate-300"}`} title="Entregado al teléfono" />
+                                    <span title="Entregado al teléfono">
+                                      <CheckCheck className={`h-3.5 w-3.5 inline ${m.manual ? "text-emerald-200" : "text-slate-300"}`} />
+                                    </span>
                                   ) : (
-                                    <CheckCheck className={`h-3.5 w-3.5 inline ${m.manual ? "text-emerald-200" : "text-slate-400"}`} title="Enviado a Meta WhatsApp" />
+                                    <span title="Enviado a Meta WhatsApp">
+                                      <CheckCheck className={`h-3.5 w-3.5 inline ${m.manual ? "text-emerald-200" : "text-slate-400"}`} />
+                                    </span>
                                   )
                                 )}
                               </div>

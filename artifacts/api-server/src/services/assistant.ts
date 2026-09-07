@@ -275,7 +275,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           proveedor: { type: "string", description: "Nombre del proveedor o empresa si figura (opcional)" },
           metodo_pago: { type: "string", description: "Método de pago si se especificó, ej: 'Transferencia', 'Efectivo', 'Tarjeta' (opcional)" },
           facturado: { type: "boolean", description: "true si fue facturado (con factura), false si sin factura (opcional)" },
-          centro_costos: { type: "string", description: "Proyecto u obra al que se imputa el gasto, ej: 'Lipsa' (opcional)" },
+          centro_costos: { type: "string", description: "Proyecto u obra al que se imputa el gasto, ej: 'Lipsa' (opcional). Si en la confirmación o comprobante es 'Ninguno', 'Sin asignar' o sin proyecto, DEBES omitir este campo o enviar null. Si el usuario confirma la estructura previa, NUNCA alteres ni agregues un proyecto que no estaba en la estructura aprobada." },
           observaciones: { type: "string", description: "Observaciones adicionales. CRÍTICO: Si el egreso contiene varios ítems o gastos sumados (ej: viaje grillo $67.400 + cubiertas $26.000 y $60.000), DEBES guardar obligatoriamente el desglose completo en este campo (ej: 'Desglose: Viaje grillo $67.400 | Cubierta 1 $26.000 | Cubierta 2 $60.000'). También incluye la máquina asociada si aplica." },
         },
         required: ["concepto", "monto"],
@@ -757,6 +757,67 @@ async function guardarSesion(phone: string, messages: any[], estado: string = "i
   }
 }
 
+// Helper para detectar valores que representen "Sin proyecto asignado" o "Ninguno"
+export function isNingunProyecto(val?: string | null): boolean {
+  if (!val) return true;
+  const v = val.trim().toLowerCase();
+  return /^(ningun[oa]|sin\s+asignar|no\s+asignad[ao]|sin\s+proyecto.*|sin\s+centro.*|a\s+definir|pendiente.*|n\/?a|none|null|-)$/i.test(v);
+}
+
+// Parser para detectar y extraer la estructura de egreso presentada al usuario
+export function parseEstructuraEgreso(text: string) {
+  if (!text) return null;
+  const isStructure = /estructura.*egreso|confirm[aá]s\s+que\s+lo\s+guarde/i.test(text);
+  if (!isStructure) return null;
+  
+  const extract = (regex: RegExp) => {
+    const m = text.match(regex);
+    return m ? m[1].replace(/[*_]/g, "").trim() : null;
+  };
+  
+  const fechaStr = extract(/(?:📅\s*)?\*?Fecha\*?:\s*([^\n\r]+)/i);
+  const montoStr = extract(/(?:💰\s*)?\*?Monto\*?:\s*([^\n\r]+)/i);
+  const concepto = extract(/(?:📝\s*)?\*?Concepto\*?:\s*([^\n\r]+)/i);
+  const categoria = extract(/(?:🏷️?\s*)?\*?Categor[ií]a\*?:\s*([^\n\r]+)/i);
+  const proyecto = extract(/(?:🏗️?\s*)?\*?Proyecto\*?:\s*([^\n\r]+)/i);
+  const maquina = extract(/(?:🚜\s*)?\*?M[aá]quina\*?:\s*([^\n\r]+)/i);
+  const metodoPago = extract(/(?:💳\s*)?\*?M[eé]todo de pago\*?:\s*([^\n\r]+)/i);
+  const facturadoStr = extract(/(?:🧾\s*)?\*?Facturado\*?:\s*([^\n\r]+)/i);
+
+  let montoNum: number | null = null;
+  if (montoStr) {
+    const cleanMonto = montoStr.replace(/[^0-9.,]/g, "");
+    if (cleanMonto.includes(",") && cleanMonto.includes(".")) {
+      montoNum = parseFloat(cleanMonto.replace(/\./g, "").replace(",", "."));
+    } else if (cleanMonto.includes(",")) {
+      montoNum = parseFloat(cleanMonto.replace(",", "."));
+    } else {
+      montoNum = parseFloat(cleanMonto);
+    }
+  }
+
+  let fechaNorm: string | null = null;
+  if (fechaStr) {
+    const mFecha = fechaStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (mFecha) {
+      fechaNorm = `${mFecha[3]}-${mFecha[2].padStart(2, "0")}-${mFecha[1].padStart(2, "0")}`;
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(fechaStr.trim())) {
+      fechaNorm = fechaStr.trim();
+    }
+  }
+
+  return {
+    fecha: fechaNorm || fechaStr,
+    monto: montoNum,
+    concepto,
+    categoria: isNingunProyecto(categoria) ? null : categoria,
+    centro_costos: isNingunProyecto(proyecto) ? null : proyecto,
+    maquina: isNingunProyecto(maquina) ? null : maquina,
+    metodo_pago: isNingunProyecto(metodoPago) ? null : metodoPago,
+    facturado: facturadoStr ? /^s[ií]/i.test(facturadoStr) : null,
+  };
+}
+
 export async function handleWhatsAppMessage(from: string, text: string, imageBase64?: string) {
   const senderPhone = from.replace(/[^0-9]/g, "");
 
@@ -1035,6 +1096,9 @@ Cuando el usuario te envíe un mensaje con un gasto (texto, foto, comprobante PD
   4. PROYECTO Y MÁQUINA:
      - Si menciona una obra (ej: "Lipsa", "Broglia", "Campo"), resolvé el centro_costos correspondiente (ej: "Lipsa Santiago del Estero - Nva Esperanza").
      - Si menciona una máquina o equipo (ej: "motocompresor", "liugong", "cargadora liugong", "pala", "camión", "pauny"), anotala como máquina en observaciones (ej: "Motocompresor", "Cargadora LiuGong").
+     - Si el usuario dice "sin proyecto", "sin proyecto asignado", "ninguno", o el comprobante no menciona obra ni se trata de alquiler de maquinaria:
+       * Indicá OBLIGATORIAMENTE en la estructura: "🏗️ *Proyecto:* Ninguno" (o "Sin asignar").
+       * NUNCA inventes ni pongas "RMG e hijas" por defecto para repuestos, insumos o compras generales.
 
   5. MÉTODO DE PAGO: Si el comprobante es una transferencia o lo dice, "Transferencia". Si dice efectivo, "Efectivo". Si no lo dijo, marcar como pendiente a definir.
 
@@ -1067,8 +1131,14 @@ Cuando el usuario te envíe un mensaje con un gasto (texto, foto, comprobante PD
   ¿Confirmás que lo guarde? ¿Querés indicar si fue por transferencia o efectivo, si es facturado o modificar algún dato?
 
 PASO 2 - CONFIRMACIÓN Y REGISTRO DEFINITIVO:
-- Cuando el usuario responda confirmando (ej: "Sí", "Confirmá", "Dale", "Guardalo", "Ok", o complete: "Por transferencia y facturado, guardalo", "con efectivo"):
-  -> Ejecutá DE INMEDIATO 'registrar_gasto' con todos los datos consolidados (concepto, monto, categoria, fecha, centro_costos, observaciones, metodo_pago, facturado).
+⚡⚡ REGLA SUPREMA: SI EL USUARIO CONFIRMA ALGO, NO LO EDITES.
+- Cuando el usuario responda confirmando (ej: "Confirmo", "Sí", "Confirmá", "Dale", "Guardalo", "Ok", o complete: "Por transferencia y facturado, guardalo", "con efectivo"):
+  -> Ejecutá DE INMEDIATO 'registrar_gasto' con los datos EXACTOS que presentaste en la estructura previa aprobada.
+  -> PROHIBIDO TERMINANTEMENTE MODIFICAR, REINTERPRETAR O AGREGAR CAMPOS AL CONFIRMAR:
+     * Si en la estructura aprobada decía "*Proyecto:* Ninguno" (o el usuario pidió "Sin proyecto asignado"), el parámetro 'centro_costos' DEBE SER null (u omitirse). NUNCA, BAJO NINGUNA CIRCUNSTANCIA, le asignes "RMG e Hijas" ni ningún otro proyecto.
+     * Si decía "Máquina: No asignada", no agregues una máquina inventada.
+     * Conservá exactamente el monto, fecha, concepto, método de pago y facturación aprobados.
+     * ÚNICAMENTE modificá un campo si el usuario en su mensaje de confirmación pide un cambio explícito (ej: "cambiá la fecha a ayer y guardalo").
   -> Respondé confirmando que quedó registrado con el ID generado:
      ✅ *Gasto registrado con éxito (ID #...)*
      📅 *Fecha:* ...
@@ -1120,7 +1190,8 @@ LO QUE PUEDO CONSULTAR (acceso total a la BD):
 REGLAS DE OPERACIÓN:
 - SIEMPRE usá las herramientas para buscar datos. Nunca inventés información.
 - CONTEXTO DE CONVERSACIÓN: Si el usuario hace una pregunta de seguimiento corta, inferí el tema del mensaje anterior.
-- REGLA CRÍTICA DE ALQUILERES: La empresa gestiona alquileres de máquinas. TODOS los gastos, costos o egresos de alquiler se agregan obligatoriamente al proyecto/centro de costos 'RMG e hijas' (salvo que el usuario especifique explícitamente otro).
+- REGLA DE ALQUILERES VS GASTOS GENERALES: La empresa gestiona alquileres de máquinas. Los egresos que sean ESPECÍFICAMENTE de alquiler de máquinas se agregan al proyecto/centro de costos 'RMG e hijas'. Si el gasto es de Repuestos, Mantenimiento, Materiales o Servicios generales, y el usuario dice "sin proyecto" o no especifica obra, el proyecto queda estrictamente en 'Ninguno' (sin asignar). NUNCA agregues "RMG e hijas" si el usuario no lo pidió o si se trata de repuestos o compras.
+- REGLA DE RESPETO A LA CONFIRMACIÓN: Una vez que el usuario confirma una estructura de gasto presentada ("Confirmo", "Sí", "Dale"), NO la edites ni alteres ningún dato. "Proyecto: Ninguno" debe registrarse estrictamente sin proyecto (centro_costos vacío).
 - Cuando no encontrés algo, decilo claramente.
 - Respondé siempre de forma concisa y profesional.
 
@@ -1220,7 +1291,7 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
           toolResult = await executeEnviarMensaje(functionArgs.mensaje, functionArgs.numero, functionArgs.nombre_empleado, functionArgs.todos);
         } else if (functionName === "registrar_gasto") {
           const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
-          toolResult = await executeRegistrarGasto(functionArgs, imgUrl, sesion);
+          toolResult = await executeRegistrarGasto(functionArgs, imgUrl, sesion, text);
           if (imgUrl && sesion.datos_pendientes) {
             (sesion.datos_pendientes as any).ultima_imagen_url = null;
           }
@@ -1309,10 +1380,24 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
       if (finalContent) {
         await sendWhatsAppMessage(from, finalContent);
         historialFiltrado.push({ role: "assistant", content: finalContent, created_at: new Date().toISOString() });
+        const parsedGasto = parseEstructuraEgreso(finalContent);
+        if (parsedGasto) {
+          if (!sesion.datos_pendientes || typeof sesion.datos_pendientes !== "object") {
+            sesion.datos_pendientes = {};
+          }
+          sesion.datos_pendientes.gasto_pendiente = parsedGasto;
+        }
       }
     } else if (responseMessage.content) {
       await sendWhatsAppMessage(from, responseMessage.content);
       historialFiltrado.push({ role: "assistant", content: responseMessage.content, created_at: new Date().toISOString() });
+      const parsedGasto = parseEstructuraEgreso(responseMessage.content);
+      if (parsedGasto) {
+        if (!sesion.datos_pendientes || typeof sesion.datos_pendientes !== "object") {
+          sesion.datos_pendientes = {};
+        }
+        sesion.datos_pendientes.gasto_pendiente = parsedGasto;
+      }
     }
 
     // Guardar historial actualizado manteniendo los datos pendientes
@@ -2152,8 +2237,21 @@ async function executeRegistrarGasto(args: {
   facturado?: boolean;
   centro_costos?: string;
   observaciones?: string;
-}, imgUrl?: string | null, sesion?: any) {
+}, imgUrl?: string | null, sesion?: any, mensajeUsuario?: string) {
   try {
+    const gastoPendiente = (sesion?.datos_pendientes as any)?.gasto_pendiente;
+
+    // Si existía una estructura previa armada y el usuario confirmó:
+    // Preservar los datos exactos que el usuario aprobó para que nada se altere arbitrariamente
+    if (gastoPendiente) {
+      if (!args.concepto && gastoPendiente.concepto) args.concepto = gastoPendiente.concepto;
+      if (!args.monto && gastoPendiente.monto) args.monto = gastoPendiente.monto;
+      if (!args.categoria && gastoPendiente.categoria) args.categoria = gastoPendiente.categoria;
+      if (!args.fecha && gastoPendiente.fecha) args.fecha = gastoPendiente.fecha;
+      if (args.facturado === undefined && gastoPendiente.facturado !== null) args.facturado = gastoPendiente.facturado;
+      if (!args.metodo_pago && gastoPendiente.metodo_pago) args.metodo_pago = gastoPendiente.metodo_pago;
+    }
+
     const fechaFinal = args.fecha || getArgentinaTodayISO();
 
     // Inferir categoría automáticamente si no se especificó
@@ -2204,8 +2302,34 @@ async function executeRegistrarGasto(args: {
     let centroCostosResuelto: string | null = args.centro_costos || null;
     let obsExtra: string | null = args.observaciones || null;
 
-    if (args.centro_costos) {
-      const ccLower = args.centro_costos.toLowerCase();
+    // Normalizar si viene "Ninguno", "Sin asignar", "Sin proyecto", etc.
+    if (isNingunProyecto(centroCostosResuelto)) {
+      centroCostosResuelto = null;
+    }
+
+    // PROTECCIÓN ESTRICTA DE CONFIRMACIÓN:
+    // Si la estructura previa presentada al usuario tenía Proyecto: Ninguno (centro_costos === null),
+    // y el usuario en su mensaje NO pidió expresamente un proyecto específico,
+    // SE RESPETARÁ ESTRICTAMENTE SIN PROYECTO (null). No se permite asignar "RMG e Hijas" ni otro.
+    if (gastoPendiente && gastoPendiente.centro_costos === null) {
+      const msgLower = (mensajeUsuario || "").toLowerCase();
+      const usuarioPidioProyectoExplicito = 
+        msgLower.includes("para lipsa") || 
+        msgLower.includes("para broglia") || 
+        msgLower.includes("para campo") || 
+        msgLower.includes("proyecto lipsa") || 
+        msgLower.includes("proyecto broglia") || 
+        msgLower.includes("asignar a") || 
+        msgLower.includes("imputar a");
+
+      if (!usuarioPidioProyectoExplicito) {
+        console.log(`[executeRegistrarGasto] Estructura aprobada era SIN PROYECTO. Forzando centroCostosResuelto = null.`);
+        centroCostosResuelto = null;
+      }
+    }
+
+    if (centroCostosResuelto) {
+      const ccLower = centroCostosResuelto.toLowerCase();
       const [proyecto] = await db.select({ lugar: proyectosTable.lugar })
         .from(proyectosTable)
         .where(ilike(proyectosTable.lugar, `%${ccLower}%`))
@@ -2233,8 +2357,9 @@ async function executeRegistrarGasto(args: {
         }
       }
     } else if (
-      (categoriaFinal && categoriaFinal.toLowerCase().includes("alquiler")) ||
-      (args.concepto && args.concepto.toLowerCase().includes("alquiler"))
+      !gastoPendiente && // Solo inferir automáticamente si NO proviene de una estructura previa ya aprobada
+      ((categoriaFinal && categoriaFinal.toLowerCase().includes("alquiler")) ||
+      (args.concepto && args.concepto.toLowerCase().includes("alquiler")))
     ) {
       centroCostosResuelto = "RMG e hijas";
     }
@@ -2261,6 +2386,7 @@ async function executeRegistrarGasto(args: {
         sesion.datos_pendientes = {};
       }
       sesion.datos_pendientes.ultimo_egreso_id = egreso.id;
+      delete (sesion.datos_pendientes as any).gasto_pendiente;
     }
 
     if (imgUrl && egreso && egreso.id) {
@@ -2293,7 +2419,7 @@ async function executeRegistrarGasto(args: {
       syncAllSheets().catch(console.error);
     } catch (_) {}
 
-    return `✅ Gasto registrado con éxito con ID #${egreso.id}.\n📅 Fecha: ${fechaFinal}\n💰 Monto: $${Number(args.monto).toLocaleString("es-AR")}\n📝 Concepto: ${args.concepto}\n🏷️ Categoría: ${categoriaFinal}\n🏗️ Proyecto: ${centroCostosResuelto || 'Sin asignar'}${obsExtra ? `\n🚜 Obs/Máquina: ${obsExtra}` : ''}${args.metodo_pago ? `\n💳 Método de pago: ${args.metodo_pago}` : ''}${args.facturado !== undefined ? `\n🧾 Facturado: ${args.facturado ? 'Sí' : 'No'}` : ''}${imgUrl ? '\n📎 Comprobante: Adjuntado' : ''}`;
+    return `✅ Gasto registrado con éxito con ID #${egreso.id}.\n📅 Fecha: ${fechaFinal}\n💰 Monto: $${Number(args.monto).toLocaleString("es-AR")}\n📝 Concepto: ${args.concepto}\n🏷️ Categoría: ${categoriaFinal}\n🏗️ Proyecto: ${centroCostosResuelto || 'Ninguno'}${obsExtra ? `\n🚜 Obs/Máquina: ${obsExtra}` : ''}${args.metodo_pago ? `\n💳 Método de pago: ${args.metodo_pago}` : ''}${args.facturado !== undefined ? `\n🧾 Facturado: ${args.facturado ? 'Sí' : 'No'}` : ''}${imgUrl ? '\n📎 Comprobante: Adjuntado' : ''}`;
   } catch (error: any) {
     console.error("Error registrando gasto:", error);
     return `❌ Error al registrar el gasto: ${error.message}`;
@@ -2327,31 +2453,35 @@ async function executeActualizarGasto(args: {
     let centroCostosResuelto = egreso.centro_costos;
     let obsExtra = args.observaciones || null;
 
-    if (args.centro_costos) {
-      const ccLower = args.centro_costos.toLowerCase();
-      const [proyecto] = await db.select({ lugar: proyectosTable.lugar })
-        .from(proyectosTable)
-        .where(ilike(proyectosTable.lugar, `%${ccLower}%`))
-        .limit(1);
-
-      if (proyecto) {
-        centroCostosResuelto = proyecto.lugar;
+    if (args.centro_costos !== undefined) {
+      if (isNingunProyecto(args.centro_costos)) {
+        centroCostosResuelto = null;
       } else {
-        const palabras = ccLower.split(/\s+/);
-        for (const p of palabras) {
-          if (p.length < 3) continue;
-          const [pMatch] = await db.select({ lugar: proyectosTable.lugar })
-            .from(proyectosTable)
-            .where(ilike(proyectosTable.lugar, `%${p}%`))
-            .limit(1);
-          if (pMatch) {
-            centroCostosResuelto = pMatch.lugar;
-            const resto = palabras.filter(x => x !== p).join(" ");
-            if (resto) {
-              const maq = resto.includes("liugong") ? "Cargadora LiuGong" : resto;
-              obsExtra = obsExtra ? `${obsExtra} | ${maq}` : maq;
+        const ccLower = args.centro_costos.toLowerCase();
+        const [proyecto] = await db.select({ lugar: proyectosTable.lugar })
+          .from(proyectosTable)
+          .where(ilike(proyectosTable.lugar, `%${ccLower}%`))
+          .limit(1);
+
+        if (proyecto) {
+          centroCostosResuelto = proyecto.lugar;
+        } else {
+          const palabras = ccLower.split(/\s+/);
+          for (const p of palabras) {
+            if (p.length < 3) continue;
+            const [pMatch] = await db.select({ lugar: proyectosTable.lugar })
+              .from(proyectosTable)
+              .where(ilike(proyectosTable.lugar, `%${p}%`))
+              .limit(1);
+            if (pMatch) {
+              centroCostosResuelto = pMatch.lugar;
+              const resto = palabras.filter(x => x !== p).join(" ");
+              if (resto) {
+                const maq = resto.includes("liugong") ? "Cargadora LiuGong" : resto;
+                obsExtra = obsExtra ? `${obsExtra} | ${maq}` : maq;
+              }
+              break;
             }
-            break;
           }
         }
       }
@@ -2361,7 +2491,7 @@ async function executeActualizarGasto(args: {
     if (args.fecha) {
       updates.fecha = args.fecha.toLowerCase().includes("hoy") ? getArgentinaTodayISO() : args.fecha;
     }
-    if (centroCostosResuelto) updates.centro_costos = centroCostosResuelto;
+    if (args.centro_costos !== undefined) updates.centro_costos = centroCostosResuelto;
     if (obsExtra) {
       updates.observaciones = egreso.observaciones 
         ? `${egreso.observaciones} | ${obsExtra}`

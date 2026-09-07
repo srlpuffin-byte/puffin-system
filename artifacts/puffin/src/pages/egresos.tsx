@@ -55,6 +55,7 @@ export function Egresos() {
   };
 
   const [page, setPage] = useState(1);
+  const [orden, setOrden] = useState<"carga" | "fecha">("carga");
   // Filtros (client-side para metodo_pago y proyecto; server-side para categoria y search)
   const [filterProyecto, setFilterProyecto] = useState("todos");
   const [filterCategoria, setFilterCategoria] = useState("todos");
@@ -68,6 +69,7 @@ export function Egresos() {
     ...(filterProyecto !== "todos" ? { centro_costos: filterProyecto } : {}),
     ...(filterMetodo !== "todos" ? { metodo_pago: filterMetodo } : {}),
     ...(filterSearch ? { search: filterSearch } : {}),
+    ...(orden === "fecha" ? { orden: "fecha" as any } : {}),
   }, {
     query: {
       refetchOnMount: true,
@@ -78,8 +80,8 @@ export function Egresos() {
   const paginationMeta = egresosResp?.meta;
 
   const egresosFiltrados = egresos || [];
-  const hasFilters = filterProyecto !== "todos" || filterCategoria !== "todos" || filterMetodo !== "todos" || filterSearch !== "";
-  const clearFilters = () => { setFilterProyecto("todos"); setFilterCategoria("todos"); setFilterMetodo("todos"); setFilterSearch(""); setPage(1); };
+  const hasFilters = filterProyecto !== "todos" || filterCategoria !== "todos" || filterMetodo !== "todos" || filterSearch !== "" || orden !== "carga";
+  const clearFilters = () => { setFilterProyecto("todos"); setFilterCategoria("todos"); setFilterMetodo("todos"); setFilterSearch(""); setOrden("carga"); setPage(1); };
 
   // Helper: fecha local sin conversión UTC
   const localToday = () => {
@@ -349,6 +351,13 @@ export function Egresos() {
                 <SelectItem value="Tarjeta">Tarjeta</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={orden} onValueChange={(val: "carga" | "fecha") => { setOrden(val); setPage(1); }}>
+              <SelectTrigger className="w-[195px]"><SelectValue placeholder="Orden" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="carga">📥 Por orden de carga</SelectItem>
+                <SelectItem value="fecha">📅 Por fecha comprobante</SelectItem>
+              </SelectContent>
+            </Select>
             {hasFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground h-9">
                 ✕ Limpiar filtros
@@ -366,6 +375,7 @@ export function Egresos() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-16"># Carga</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Categoría</TableHead>
                     <TableHead>Concepto</TableHead>
@@ -378,12 +388,15 @@ export function Egresos() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableSkeleton cols={8} rows={5} />
+                    <TableSkeleton cols={9} rows={5} />
                   ) : egresosFiltrados.length === 0 ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay egresos con los filtros seleccionados.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No hay egresos con los filtros seleccionados.</TableCell></TableRow>
                   ) : (
                     egresosFiltrados.map((eg: any) => (
                       <TableRow key={eg.id}>
+                        <TableCell className="font-mono text-xs font-semibold text-slate-500">
+                          #{eg.id}
+                        </TableCell>
                         <TableCell className="font-medium">
                           {(eg.fecha || "").substring(0, 10).split("-").reverse().join("/")}
                         </TableCell>
@@ -485,8 +498,13 @@ export function Egresos() {
                   <div key={eg.id} className="p-4 bg-card flex flex-col gap-3 hover:bg-slate-50 transition-colors">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-red-600">${eg.monto.toLocaleString("es-AR")}</span>
-                        <span className="text-xs text-muted-foreground">{format(new Date(eg.fecha), "dd/MM/yyyy", { locale: es })}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-[11px] font-bold text-slate-600 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                            #{eg.id}
+                          </span>
+                          <span className="text-sm font-semibold text-red-600">${eg.monto.toLocaleString("es-AR")}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground mt-0.5">{format(new Date(eg.fecha), "dd/MM/yyyy", { locale: es })}</span>
                       </div>
                       <Badge variant="outline">{eg.categoria}</Badge>
                     </div>

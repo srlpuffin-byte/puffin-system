@@ -182,7 +182,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { data: user } = useGetMe();
   const logoutMut = useLogout();
-  const { unreadWhatsAppCount } = useGlobalNotifications();
+  const { unreadWhatsAppCount, recentNotifications, totalBadges } = useGlobalNotifications();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
@@ -323,6 +323,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     return { ...item, badgeCount: unreadWhatsAppCount };
                   }
 
+                  if (item.href === "/alertas") {
+                    return { ...item, badgeCount: recentNotifications.length };
+                  }
+
                   return item;
                 }) 
               }}
@@ -386,8 +390,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 bg-background flex flex-col min-w-0" style={{overflowY: 'auto', WebkitOverflowScrolling: 'touch'}}>
         <div className="lg:hidden h-14 bg-card border-b border-border flex items-center justify-between px-3 sm:px-4 flex-shrink-0">
           <div className="flex items-center">
-            <Button variant="ghost" size="sm" onClick={() => setMobileOpen(true)} className="mr-1 sm:mr-2">
+            <Button variant="ghost" size="sm" onClick={() => setMobileOpen(true)} className="relative mr-1 sm:mr-2">
               <Menu className="h-5 w-5" />
+              {totalBadges > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-600 ring-2 ring-card animate-pulse" />
+              )}
             </Button>
             <img src={logoUrl} alt="PUFFIN SRL" className="h-7 w-auto mx-1 object-contain" />
             <span className="font-bold text-primary ml-1">PUFFIN</span>
