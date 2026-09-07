@@ -58,8 +58,8 @@ export function Proyectos() {
   };
 
   const filteredProyectos = proyectos?.filter(p => 
-    p.lugar.toLowerCase().includes(search.toLowerCase()) ||
-    p.estado.toLowerCase().includes(search.toLowerCase())
+    (p.lugar || "").toLowerCase().includes(search.toLowerCase()) ||
+    (p.estado || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const handleSyncSheets = async () => {

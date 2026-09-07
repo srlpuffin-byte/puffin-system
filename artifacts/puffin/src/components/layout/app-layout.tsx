@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   Activity,
   LogOut,
-  MapPin,
   TrendingUp,
   Bot,
   Satellite,
@@ -74,7 +73,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { icon: Map, label: "Proyectos", href: "/proyectos" },
       { icon: Compass, label: "Trazado y Calles A-B", href: "/americangis" },
-      { icon: MapPin, label: "Mapa de Flota GPS", href: "/gps" },
       { icon: Users, label: "Operarios", href: "/operarios" },
       { icon: Truck, label: "Maquinaria", href: "/maquinas" },
       { icon: Clock, label: "Jornadas", href: "/jornadas" },
@@ -360,7 +358,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           if (user?.rol?.toLowerCase() === "empleado") {
             if (group.label === "Operación") {
               filteredItems = group.items.filter(item => 
-                item.href !== "/operarios" && item.href !== "/maquinas" && item.href !== "/gps"
+                item.href !== "/operarios" && item.href !== "/maquinas"
               );
             } else if (group.label === "Mantenimiento") {
               filteredItems = group.items.filter(item =>
