@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { playNotificationSound } from "@/lib/notification-sound";
+import { getAuthToken } from "@/hooks/use-auth";
 
 export interface GlobalNotificationItem {
   id: string;
@@ -26,8 +27,14 @@ export function useGlobalNotifications() {
 
     async function checkNotifications() {
       try {
+        const token = getAuthToken();
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
         // 1. Consultar chats de WhatsApp
-        const chatsRes = await fetch("/api/whatsapp-chats");
+        const chatsRes = await fetch("/api/whatsapp-chats", { headers });
         if (chatsRes.ok) {
           const chatsData = await chatsRes.json();
           const sessions = chatsData.sessions || [];
@@ -97,7 +104,7 @@ export function useGlobalNotifications() {
         }
 
         // 2. Consultar notificaciones recientes del servidor
-        const notifsRes = await fetch("/api/push-notifications/recent");
+        const notifsRes = await fetch("/api/push-notifications/recent", { headers });
         if (notifsRes.ok && isMounted) {
           const notifsData = await notifsRes.json();
           setRecentNotifications(notifsData.notifications || []);
