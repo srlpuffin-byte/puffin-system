@@ -5,20 +5,17 @@ import {
   maquinasTable,
   alertasTable,
   usuariosTable,
-  pushSubscriptionsTable,
 } from "@workspace/db/schema";
 import { eq, and, sql, or } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
-import { sendWhatsAppMessage } from "./whatsapp.js";
 import {
   sendPushNotificationToAll,
-  PushNotificationPayload,
+  sendPushNotificationToUser,
+  addRecentNotification,
 } from "./push-notifications.js";
 import {
   getNotificacionesConfig,
-  isNotificationEnabled,
 } from "./notificaciones-config.js";
-import webpush from "web-push";
 
 // Mapa en memoria para recordar cuándo se envió el último recordatorio por jornada (evita spam cada 15 min)
 const recordatoriosEnviadosMap = new Map<number, number>();
@@ -91,78 +88,56 @@ export async function checkJornadasExcedidas(forceSend = false) {
 
         const horasFormateadas = horasTranscurridas.toFixed(1);
         const nombreMaq = maquina?.nombre || "tu equipo de trabajo";
-        const mensajeAviso = `Hola ${empleado.nombre}, tu jornada en ${nombreMaq} lleva ${horasFormateadas} horas iniciada y aún no fue finalizada. Por favor ingresá al sistema para registrar el cierre y el horómetro final.`;
+        const mensajeAviso = `Hola ${empleado.nombre}, tu jornada en ${nombreMaq} lleva ${horasFormateadas} horas iniciada y aún no fue finalizada. Por favor ingresá a registrar el cierre y el horómetro final.`;
 
         logger.info(
-          `[Jornadas Monitor] Jornada #${j.id} (${empleado.nombre} ${empleado.apellido}) excedió ${horasFormateadas}h. Despachando avisos...`
+          `[Jornadas Monitor] Jornada #${j.id} (${empleado.nombre} ${empleado.apellido}) excedió ${horasFormateadas}h. Despachando notificación a su app/usuario...`
         );
 
-        // 1. WhatsApp directo al empleado si está habilitado y tiene número
-        if (config.notificar_empleado_whatsapp) {
-          const telefonoRaw = empleado.telefono_whatsapp || empleado.telefono;
-          if (telefonoRaw) {
-            const cleanPhone = telefonoRaw.replace(/\D/g, "");
-            const formattedPhone = cleanPhone.startsWith("54")
-              ? cleanPhone
-              : cleanPhone.startsWith("9")
-              ? "54" + cleanPhone
-              : "549" + cleanPhone;
-
-            const textoWa = `⚠️ *PUFFIN SRL - Recordatorio de Jornada*\n\nHola *${empleado.nombre}*, iniciaste tu jornada hace más de *${Math.floor(horasTranscurridas)} horas* en *${nombreMaq}*.\n\nPor favor recordá ingresar a la plataforma de PUFFIN para finalizar la jornada y cargar el horómetro de cierre:\n👉 https://puffin-system.up.railway.app/jornadas\n\n_Mensaje automático del sistema de control de operaciones._`;
-
-            try {
-              await sendWhatsAppMessage(formattedPhone, textoWa);
-              logger.info(`[Jornadas Monitor] WhatsApp enviado a operario ${empleado.nombre} (${formattedPhone})`);
-            } catch (err) {
-              logger.warn({ err }, `[Jornadas Monitor] Error enviando WhatsApp a ${formattedPhone}`);
-            }
-          }
-        }
-
-        // 2. Web Push al dispositivo del empleado si está suscripto
+        // 1. Notificación a su usuario y a su app (Web Push nativo a sus dispositivos registrados)
         if (config.notificar_empleado_push) {
           try {
-            // Buscar si el empleado tiene usuario vinculado
-            const [user] = await db
+            // Buscar cuentas de usuario vinculadas al empleado
+            const matchedUsers = await db
               .select()
               .from(usuariosTable)
               .where(
                 or(
-                  eq(usuariosTable.nombre, empleado.nombre),
+                  and(
+                    sql`LOWER(${usuariosTable.nombre}) = LOWER(${empleado.nombre})`,
+                    sql`LOWER(${usuariosTable.apellido}) = LOWER(${empleado.apellido})`
+                  ),
                   sql`LOWER(${usuariosTable.nombre}) = LOWER(${empleado.nombre})`
-                )
-              )
-              .limit(1);
-
-            const subs = await db
-              .select()
-              .from(pushSubscriptionsTable)
-              .where(
-                or(
-                  eq(pushSubscriptionsTable.usuario, empleado.nombre),
-                  user ? eq(pushSubscriptionsTable.user_id, user.id) : sql`FALSE`
                 )
               );
 
-            for (const sub of subs) {
-              try {
-                await webpush.sendNotification(
-                  { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-                  JSON.stringify({
-                    title: "⏱️ Recordatorio de Jornada (+12h)",
-                    body: mensajeAviso,
-                    url: "/jornadas",
-                    tag: `jornada-${j.id}`,
-                  })
-                );
-              } catch {}
-            }
-          } catch (e) {
-            logger.warn({ e }, "[Jornadas Monitor] Error al enviar push al empleado");
+            const userIds = matchedUsers.map((u) => u.id);
+            const userNames = matchedUsers.map((u) => u.usuario);
+            userNames.push(empleado.nombre);
+
+            await sendPushNotificationToUser(
+              { userIds, usuarios: userNames },
+              {
+                title: "⏱️ Recordatorio de Fin de Jornada (+12h)",
+                body: mensajeAviso,
+                url: "/jornadas",
+                tag: `jornada-${j.id}`,
+              }
+            );
+          } catch (pushErr) {
+            logger.warn({ pushErr }, "[Jornadas Monitor] Error despachando push a la app del empleado");
           }
+        } else {
+          // Si no tiene push activo pero la regla está encendida, igual alimentar el centro de notificaciones in-app
+          addRecentNotification({
+            tipo: "alerta",
+            titulo: "⏱️ Recordatorio de Fin de Jornada",
+            mensaje: mensajeAviso,
+            url: "/jornadas",
+          });
         }
 
-        // 3. Registrar alerta en el sistema
+        // 2. Registrar alerta en el sistema
         try {
           await db.insert(alertasTable).values({
             tipo: "jornada_prolongada",
@@ -178,7 +153,7 @@ export async function checkJornadasExcedidas(forceSend = false) {
           logger.warn({ alertaErr }, "[Jornadas Monitor] Error guardando alerta en BD");
         }
 
-        // 4. Notificar a los administradores si está activo
+        // 3. Notificar a los administradores si está activo
         if (config.notificar_admin_push) {
           await sendPushNotificationToAll({
             title: `⏱️ Jornada >${limiteHoras}h: ${empleado.nombre}`,
@@ -206,7 +181,7 @@ export async function checkJornadasExcedidas(forceSend = false) {
 }
 
 export function startJornadasMonitor() {
-  logger.info("[Jornadas Monitor] Iniciando monitor automático de jornadas (+12h)...");
+  logger.info("[Jornadas Monitor] Iniciando monitor automático de jornadas (+12h a la app/usuario)...");
 
   // Ejecución inicial 15 segundos tras el arranque
   setTimeout(() => {

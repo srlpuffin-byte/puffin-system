@@ -167,7 +167,7 @@ export function AdminNotificaciones() {
                   </Badge>
                 </div>
                 <CardDescription className="mt-1 text-sm">
-                  Detecta automáticamente a operarios que hayan iniciado jornada y hayan transcurrido 12 horas sin finalizarla, enviándoles una notificación para que recuerden registrar el cierre y el horómetro final.
+                  Detecta automáticamente a operarios que hayan iniciado jornada y hayan transcurrido 12 horas sin finalizarla, enviándoles una notificación directa a su app y celular (Web Push) para que recuerden registrar el cierre y el horómetro final (sin depender de WhatsApp ni ventanas de 24hs).
                 </CardDescription>
               </div>
             </div>
@@ -218,32 +218,22 @@ export function AdminNotificaciones() {
             <div className="p-4 rounded-xl border bg-background/60 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="notif-wa-emp" className="text-sm font-medium flex items-center gap-1.5">
-                    <MessageSquare className="h-4 w-4 text-emerald-500" />
-                    WhatsApp al Operario
-                  </Label>
-                  <p className="text-xs text-muted-foreground">Envía mensaje al número del empleado</p>
-                </div>
-                <Switch
-                  id="notif-wa-emp"
-                  checked={config.notificar_empleado_whatsapp}
-                  onCheckedChange={(val) => handleToggle("notificar_empleado_whatsapp", val)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-1 border-t">
-                <div className="space-y-0.5">
-                  <Label htmlFor="notif-push-emp" className="text-sm font-medium flex items-center gap-1.5">
+                  <Label htmlFor="notif-push-emp" className="text-sm font-semibold flex items-center gap-1.5">
                     <Smartphone className="h-4 w-4 text-blue-500" />
-                    Web Push al Celular
+                    Web Push a su Celular / App
                   </Label>
-                  <p className="text-xs text-muted-foreground">Alerta al teléfono/app del operario</p>
+                  <p className="text-xs text-muted-foreground">Llega a la pantalla de bloqueo y PWA del operario</p>
                 </div>
                 <Switch
                   id="notif-push-emp"
                   checked={config.notificar_empleado_push}
                   onCheckedChange={(val) => handleToggle("notificar_empleado_push", val)}
                 />
+              </div>
+
+              <div className="pt-2 border-t text-[11px] text-muted-foreground flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                <span>Llega directo a su usuario sin depender de WhatsApp ni ventanas de 24hs.</span>
               </div>
             </div>
 
@@ -272,26 +262,27 @@ export function AdminNotificaciones() {
             </div>
           </div>
 
-          {/* Vista previa del mensaje que recibe el operario */}
-          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-2">
+          {/* Vista previa del mensaje que recibe el operario en su app */}
+          <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                <MessageSquare className="h-3.5 w-3.5" />
-                VISTA PREVIA DEL AVISO AL EMPLEADO
+              <span className="text-xs font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+                <Smartphone className="h-3.5 w-3.5" />
+                VISTA PREVIA DE LA NOTIFICACIÓN EN LA APP DEL OPERARIO
               </span>
-              <Badge variant="outline" className="text-[11px] bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
-                Automático
+              <Badge variant="outline" className="text-[11px] bg-blue-500/10 text-blue-600 border-blue-500/20">
+                Push & App Directa
               </Badge>
             </div>
-            <div className="bg-background/90 rounded-lg p-3 text-xs font-mono text-foreground/90 border shadow-xs leading-relaxed">
-              <p className="text-emerald-600 dark:text-emerald-400 font-bold mb-1">
-                ⚠️ PUFFIN SRL - Recordatorio de Jornada
+            <div className="bg-background/90 rounded-lg p-3 text-xs font-sans text-foreground/90 border shadow-xs leading-relaxed space-y-1">
+              <p className="text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1.5">
+                <span>⏱️ PUFFIN • Recordatorio de Fin de Jornada (+12h)</span>
               </p>
-              <p>Hola <strong>[Operario]</strong>, iniciaste tu jornada hace más de <strong>12 horas</strong> en <strong>[Equipo/Máquina]</strong>.</p>
-              <p className="mt-1">
-                Por favor recordá ingresar a la plataforma de PUFFIN para finalizar la jornada y cargar el horómetro de cierre:
+              <p>
+                Hola <strong>[Operario]</strong>, tu jornada en <strong>[Equipo/Máquina]</strong> lleva <strong>12 horas</strong> iniciada y aún no fue finalizada.
               </p>
-              <p className="mt-1 text-primary underline">👉 https://puffin-system.up.railway.app/jornadas</p>
+              <p className="text-muted-foreground text-[11px]">
+                Por favor ingresá a registrar el cierre de la jornada y el horómetro final.
+              </p>
             </div>
           </div>
 

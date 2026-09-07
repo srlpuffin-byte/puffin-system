@@ -1,7 +1,7 @@
 import webpush from "web-push";
 import { db } from "@workspace/db";
 import { pushSubscriptionsTable } from "@workspace/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, inArray, or } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 
 export const VAPID_PUBLIC_KEY =
@@ -253,3 +253,111 @@ export async function sendPushNotificationToAll(payload: PushNotificationPayload
     return { total: 0, sent: 0, failed: 0 };
   }
 }
+
+export async function sendPushNotificationToUser(
+  target: { userId?: number; usuario?: string; userIds?: number[]; usuarios?: string[] },
+  payload: PushNotificationPayload
+) {
+  configureWebPush();
+  await ensurePushSubscriptionsTable();
+
+  // Siempre registrar en el historial reciente para que aparezca en el centro de notificaciones (la campanita)
+  addRecentNotification({
+    tipo: "alerta",
+    titulo: payload.title,
+    mensaje: payload.body,
+    url: payload.url,
+  });
+
+  try {
+    const userIds = [
+      ...(target.userId ? [target.userId] : []),
+      ...(target.userIds || []),
+    ];
+    const rawUsernames = [
+      ...(target.usuario ? [target.usuario] : []),
+      ...(target.usuarios || []),
+    ];
+
+    const conditions: any[] = [];
+    if (userIds.length > 0) {
+      conditions.push(inArray(pushSubscriptionsTable.user_id, userIds));
+    }
+    if (rawUsernames.length > 0) {
+      conditions.push(inArray(pushSubscriptionsTable.usuario, rawUsernames));
+      for (const u of rawUsernames) {
+        conditions.push(sql`LOWER(${pushSubscriptionsTable.usuario}) = LOWER(${u})`);
+      }
+    }
+
+    if (conditions.length === 0) {
+      logger.info("[Push Notifications] No se especificó usuario para enviar push");
+      return { total: 0, sent: 0, failed: 0 };
+    }
+
+    const subscriptions = await db
+      .select()
+      .from(pushSubscriptionsTable)
+      .where(or(...conditions));
+
+    if (!subscriptions || subscriptions.length === 0) {
+      logger.info(
+        { target },
+        "[Push Notifications] El usuario no tiene dispositivos suscritos a Push actualmente"
+      );
+      return { total: 0, sent: 0, failed: 0 };
+    }
+
+    const jsonPayload = JSON.stringify({
+      title: payload.title,
+      body: payload.body,
+      icon: payload.icon || "/favicon.png",
+      badge: payload.badge || "/favicon.png",
+      tag: payload.tag || "puffin-user-alert",
+      data: {
+        url: payload.url || "/jornadas",
+        ...(payload.data || {}),
+      },
+    });
+
+    let sent = 0;
+    let failed = 0;
+
+    await Promise.all(
+      subscriptions.map(async (sub) => {
+        try {
+          await webpush.sendNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: {
+                p256dh: sub.p256dh,
+                auth: sub.auth,
+              },
+            },
+            jsonPayload,
+            {
+              TTL: 60 * 60 * 24, // 24 horas
+              urgency: "high",
+            }
+          );
+          sent++;
+        } catch (err: any) {
+          failed++;
+          const statusCode = err?.statusCode;
+          if (statusCode === 404 || statusCode === 410) {
+            await removePushSubscription(sub.endpoint);
+          }
+        }
+      })
+    );
+
+    logger.info(
+      `[Push Notifications] Push enviado al usuario: ${sent} exitosos de ${subscriptions.length} dispositivos`
+    );
+    return { total: subscriptions.length, sent, failed };
+  } catch (err) {
+    logger.error({ err }, "[Push Notifications] Error enviando push a usuario");
+    return { total: 0, sent: 0, failed: 0 };
+  }
+}
+

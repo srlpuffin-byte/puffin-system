@@ -44,6 +44,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { usePWAUpdate } from "@/hooks/use-pwa-update";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { PushNotificationBanner } from "@/components/ui/push-notification-banner";
+import { JornadaAlertaBanner } from "@/components/ui/jornada-alerta-banner";
 import { useGlobalNotifications } from "@/hooks/use-global-notifications";
 
 interface NavItem {
@@ -399,6 +400,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <PushNotificationBanner />
+        <JornadaAlertaBanner />
         <div className="flex-1 p-2 md:p-4 lg:p-8">
           {children}
         </div>

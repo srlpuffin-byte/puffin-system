@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlayCircle, Square, MapPin, Pencil, Trash2, CalendarDays } from "lucide-react";
+import { PlayCircle, Square, MapPin, Pencil, Trash2, CalendarDays, AlertTriangle, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { IniciarJornadaDialog } from "@/components/forms/iniciar-jornada-dialog";
 import { FinalizarJornadaDialog } from "@/components/forms/finalizar-jornada-dialog";
@@ -55,6 +55,25 @@ export function Jornadas() {
     { header: "Estado", key: "estado" }
   ];
 
+  // Identificar jornadas en curso que superan las 12 horas
+  const jornadasExcedidas12h = (jornadas ?? []).filter((j: any) => {
+    if (j.estado !== "en_curso") return false;
+    if (!isAdmin && user?.nombre) {
+      const matchName = String(j.empleado_nombre || "").toLowerCase().includes(user.nombre.toLowerCase());
+      if (!matchName) return false;
+    }
+    let startTime = j.createdAt ? new Date(j.createdAt).getTime() : 0;
+    if (j.fecha) {
+      const fechaStr = String(j.fecha).split("T")[0];
+      const horaStr = j.hora_inicio || "07:00";
+      const parsed = new Date(`${fechaStr}T${horaStr.length === 5 ? horaStr + ":00" : horaStr}`).getTime();
+      if (!isNaN(parsed) && parsed > 0) startTime = parsed;
+    }
+    if (!startTime) return false;
+    const hours = (Date.now() - startTime) / (1000 * 60 * 60);
+    return hours >= 12;
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -78,6 +97,52 @@ export function Jornadas() {
           </Button>
         </div>
       </div>
+
+      {/* Cartel de aviso directo en la app si hay jornadas abiertas > 12h */}
+      {jornadasExcedidas12h.length > 0 && (
+        <div className="space-y-3">
+          {jornadasExcedidas12h.map((jEx: any) => (
+            <div
+              key={jEx.id}
+              className="p-4 rounded-xl border-2 border-amber-500 bg-amber-500/10 text-amber-950 dark:text-amber-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm"
+            >
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                    ⏱️ Recordatorio de Fin de Jornada (+12h)
+                    <Badge variant="outline" className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[10px]">
+                      Abierta
+                    </Badge>
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Máquina: <strong>{jEx.maquina_nombre || "Sin especificar"}</strong> • Operario: <strong>{jEx.empleado_nombre}</strong>.
+                    Lleva más de 12 horas iniciada. Por favor finalizá la jornada y registrá el horómetro de cierre.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                size="sm"
+                className="bg-amber-600 hover:bg-amber-700 text-white font-semibold shrink-0 gap-1.5 shadow-xs w-full sm:w-auto"
+                onClick={() =>
+                  setJornadaAFinalizar({
+                    id: jEx.id,
+                    empleado_nombre: jEx.empleado_nombre,
+                    maquina_nombre: jEx.maquina_nombre,
+                    horometro_inicio: jEx.horometro_inicio,
+                  })
+                }
+              >
+                <Square className="w-3.5 h-3.5 fill-current" />
+                Finalizar Jornada Ahora
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <Card>
         <CardContent className="p-4">
