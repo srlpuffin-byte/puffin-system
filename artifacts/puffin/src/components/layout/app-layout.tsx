@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -38,7 +38,6 @@ import { Button } from "@/components/ui/button";
 import logoUrl from "@assets/logo_puffin_1782946440101.jpeg";
 import { BusquedaGlobalDialog } from "@/components/ui/busqueda-global-dialog";
 import { TutorialDialog } from "@/components/ui/tutorial-dialog";
-import { useEffect } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePWAUpdate } from "@/hooks/use-pwa-update";
@@ -252,21 +251,100 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Bloquear scroll de fondo cuando el menú lateral móvil está abierto
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    };
+  }, [mobileOpen]);
+
+  // Gestos táctiles: deslizar desde el borde izquierdo para abrir
+  useEffect(() => {
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    const handleWindowTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }
+    };
+
+    const handleWindowTouchEnd = (e: TouchEvent) => {
+      if (e.changedTouches.length === 1) {
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+
+        // Deslizar desde el borde izquierdo hacia la derecha (borde <= 35px, avance >= 50px)
+        if (touchStartX <= 35 && deltaX > 50 && Math.abs(deltaY) < 60 && !mobileOpen) {
+          setMobileOpen(true);
+        }
+      }
+    };
+
+    window.addEventListener("touchstart", handleWindowTouchStart, { passive: true });
+    window.addEventListener("touchend", handleWindowTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart", handleWindowTouchStart);
+      window.removeEventListener("touchend", handleWindowTouchEnd);
+    };
+  }, [mobileOpen]);
+
+  // Gestos táctiles: deslizar hacia la izquierda en el menú para cerrarlo
+  const sidebarTouchRef = useRef<{ startX: number; startY: number }>({ startX: 0, startY: 0 });
+
+  const handleSidebarTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      sidebarTouchRef.current = {
+        startX: e.touches[0].clientX,
+        startY: e.touches[0].clientY,
+      };
+    }
+  };
+
+  const handleSidebarTouchEnd = (e: React.TouchEvent) => {
+    if (e.changedTouches.length === 1) {
+      const deltaX = e.changedTouches[0].clientX - sidebarTouchRef.current.startX;
+      const deltaY = e.changedTouches[0].clientY - sidebarTouchRef.current.startY;
+      // Si desliza hacia la izquierda al menos 40px
+      if (deltaX < -40 && Math.abs(deltaY) < 80) {
+        setMobileOpen(false);
+      }
+    }
+  };
+
   const Sidebar = ({ onNavigate }: { onNavigate?: () => void }) => (
-    <aside className="w-60 bg-sidebar text-sidebar-foreground flex flex-col flex-shrink-0 border-r border-sidebar-border h-full">
+    <aside className="w-64 sm:w-60 bg-sidebar text-sidebar-foreground flex flex-col flex-shrink-0 border-r border-sidebar-border h-full">
       <div className="h-14 flex items-center justify-between px-4 border-b border-sidebar-border flex-shrink-0">
-        <div className="flex items-center font-bold text-lg">
-          <img src={logoUrl} alt="PUFFIN SRL" className="h-7 w-auto mr-2 object-contain" />
-          <span className="tracking-wide">PUFFIN SRL</span>
+        <div className="flex items-center font-bold text-lg min-w-0">
+          <img src={logoUrl} alt="PUFFIN SRL" className="h-7 w-auto mr-2 object-contain shrink-0" />
+          <span className="tracking-wide truncate">PUFFIN SRL</span>
         </div>
         <div className="flex items-center gap-1">
           <NotificationBell />
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setSearchOpen(true)} title="Buscar (Ctrl+K)">
             <Search className="h-4 w-4" />
           </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground lg:hidden" onClick={() => onNavigate?.()} title="Cerrar menú">
+            <X className="h-5 w-5" />
+          </Button>
         </div>
       </div>
-      <nav className="flex-1 overflow-y-auto py-3 px-2">
+      <nav
+        className="flex-1 overflow-y-auto py-3 px-2"
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', overscrollBehaviorY: 'contain' }}
+      >
         {NAV_GROUPS.filter(group => {
           if (user?.rol?.toLowerCase() === "empleado") {
             // Empleados solo ven Principal, Operación y Control
@@ -382,18 +460,41 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <Sidebar />
       </div>
 
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-60">
-            <Sidebar onNavigate={() => setMobileOpen(false)} />
-          </div>
+      {/* Drawer móvil animado con gestos táctiles */}
+      <div
+        className={`fixed inset-0 z-50 lg:hidden transition-all duration-300 ${
+          mobileOpen ? "visible pointer-events-auto" : "invisible pointer-events-none"
+        }`}
+        aria-hidden={!mobileOpen}
+      >
+        <div
+          className={`absolute inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity duration-300 ${
+            mobileOpen ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => setMobileOpen(false)}
+        />
+        <div
+          className={`absolute left-0 top-0 h-full w-64 max-w-[85vw] transform transition-transform duration-300 ease-out shadow-2xl ${
+            mobileOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+          onTouchStart={handleSidebarTouchStart}
+          onTouchEnd={handleSidebarTouchEnd}
+        >
+          <Sidebar onNavigate={() => setMobileOpen(false)} />
         </div>
-      )}
+      </div>
 
       <main
         className="flex-1 bg-background flex flex-col min-w-0 w-full max-w-full overflow-x-hidden"
-        style={{ overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', maxWidth: '100vw', width: '100%' }}
+        style={{
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehaviorY: 'contain',
+          maxWidth: '100vw',
+          width: '100%',
+        }}
       >
         <div className="lg:hidden h-14 bg-card border-b border-border flex items-center justify-between px-3 sm:px-4 flex-shrink-0 w-full max-w-full">
           <div className="flex items-center">
@@ -415,7 +516,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
         <PushNotificationBanner />
         <JornadaAlertaBanner />
-        <div className="flex-1 p-2 md:p-4 lg:p-8 w-full max-w-full min-w-0 overflow-x-hidden">
+        <div className="flex-1 p-2 md:p-4 lg:p-8 w-full max-w-full min-w-0">
           {children}
         </div>
       </main>
