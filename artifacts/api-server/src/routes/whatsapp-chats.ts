@@ -279,11 +279,7 @@ router.post("/:phone/send", async (req, res) => {
       return res.status(400).json({ error: "Número de teléfono no válido" });
     }
 
-    // 1. Enviar mensaje por WhatsApp a Meta
-    const metaRes = await sendWhatsAppMessage(cleanPhone, text.trim());
-    const wamid = (metaRes as any)?.messages?.[0]?.id || null;
-
-    // 2. Obtener o crear sesión para registrar el mensaje en el historial
+    // 1. Obtener o crear sesión para registrar el mensaje en el historial y verificar ventana de 24h
     const last10 = getLast10(cleanPhone);
     const sesiones = await db.select().from(whatsappSesionesTable);
     let sesion = sesiones.find((s) => s.phone === cleanPhone || getLast10(s.phone) === last10);
@@ -302,6 +298,42 @@ router.post("/:phone/send", async (req, res) => {
     }
 
     const historial = (sesion.messages as any[]) || [];
+
+    // Verificar si la ventana de 24 horas del usuario está activa
+    const lastUserMsg = [...historial].reverse().find((m: any) => m.role === "user");
+    let windowActive = false;
+    if (lastUserMsg && lastUserMsg.created_at) {
+      const lastUserTime = new Date(lastUserMsg.created_at).getTime();
+      if (Date.now() - lastUserTime < 24 * 60 * 60 * 1000) {
+        windowActive = true;
+      }
+    }
+
+    let wamid: string | null = null;
+    let sentViaTemplate = false;
+
+    // 2. Despacho inteligente a Meta
+    if (windowActive) {
+      // Ventana de 24h abierta: envío de texto plano estándar
+      const metaRes = await sendWhatsAppMessage(cleanPhone, text.trim());
+      wamid = (metaRes as any)?.messages?.[0]?.id || null;
+    } else {
+      // Ventana de 24h inactiva: envío automático mediante la plantilla con variable 'mensaje_puffin'
+      try {
+        console.log(`[WhatsApp Chats] Ventana inactiva para ${cleanPhone}. Enviando automáticamente vía plantilla 'mensaje_puffin'...`);
+        const metaRes = await sendWhatsAppTemplate(cleanPhone, "mensaje_puffin", "es_AR", [
+          { type: "text", text: text.trim() }
+        ]);
+        wamid = (metaRes as any)?.messages?.[0]?.id || null;
+        sentViaTemplate = true;
+        console.log(`[WhatsApp Chats] ✅ Mensaje entregado vía plantilla 'mensaje_puffin' a ${cleanPhone} (wamid: ${wamid})`);
+      } catch (tmplErr: any) {
+        console.warn(`[WhatsApp Chats] Plantilla 'mensaje_puffin' no aprobada aún (${tmplErr?.message}). Fallback a texto estándar.`);
+        const metaRes = await sendWhatsAppMessage(cleanPhone, text.trim());
+        wamid = (metaRes as any)?.messages?.[0]?.id || null;
+      }
+    }
+
     const nuevoMsg = {
       id: wamid,
       role: "assistant",
@@ -310,6 +342,7 @@ router.post("/:phone/send", async (req, res) => {
       manual: true,
       admin_user: req.user?.rol || "admin",
       delivery_status: "sent",
+      via_template: sentViaTemplate,
     };
     historial.push(nuevoMsg);
 

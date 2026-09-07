@@ -804,31 +804,30 @@ export function WhatsAppChats() {
                 <div className="bg-gradient-to-r from-blue-500/15 via-indigo-500/10 to-blue-500/5 border-b border-blue-500/25 px-3 py-2 text-xs text-blue-950 dark:text-blue-200 flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="h-6 w-6 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300 flex items-center justify-center flex-shrink-0">
-                      <HelpCircle className="h-4 w-4" />
+                      <Sparkles className="h-3.5 w-3.5" />
                     </div>
                     <div className="min-w-0">
                       <p className="font-semibold text-foreground text-[11px] sm:text-xs flex items-center gap-1.5">
-                        Ventana de 24 hs Inactiva en Meta
+                        Auto-Despacho con Plantilla 'mensaje_puffin'
                         <Badge variant="outline" className="text-[9px] border-blue-500/40 bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 py-0 font-normal">
-                          Regla de Meta API
+                          Meta Template
                         </Badge>
                       </p>
                       <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate sm:whitespace-normal">
-                        {chatActivo.hasEverReplied
-                          ? "Pasaron más de 24 hs del último mensaje del usuario. Los mensajes libres no llegan hasta que el contacto escriba o reciba una plantilla."
-                          : "Contacto nuevo: Meta exige que el contacto escriba primero al WhatsApp de Puffin o enviar una plantilla oficial para abrir el chat."}
+                        Contacto fuera de la ventana de 24 hs. Al escribirle un mensaje abajo, el sistema lo despachará automáticamente envuelto en la plantilla oficial para garantizar su entrega física en WhatsApp.
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <Button
                       size="sm"
-                      onClick={() => sendTemplateMutation.mutate({ phone: selectedPhone! })}
+                      onClick={() => sendTemplateMutation.mutate({ phone: selectedPhone!, templateName: "comunicado_accesos_bot" })}
                       disabled={sendTemplateMutation.isPending}
                       className="h-7 px-2.5 sm:px-3 text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-xs"
+                      title="Enviar comunicado oficial para iniciar conversación"
                     >
                       <FileText className="h-3 w-3" />
-                      {sendTemplateMutation.isPending ? "Enviando..." : "Enviar Plantilla Oficial"}
+                      {sendTemplateMutation.isPending ? "Enviando..." : "Enviar Comunicado Oficial"}
                     </Button>
                   </div>
                 </div>
