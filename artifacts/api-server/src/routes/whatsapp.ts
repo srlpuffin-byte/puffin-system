@@ -220,8 +220,17 @@ whatsappRouter.post("/", async (req, res) => {
       const change = body.entry?.[0]?.changes?.[0]?.value;
       if (!change) return;
 
-      // Ignorar actualizaciones de estado (delivered, read, sent) — no son mensajes entrantes
-      if (change.statuses) return;
+      // Si Meta envía actualizaciones de estado de entrega (sent, delivered, read, failed)
+      if (change.statuses) {
+        for (const s of change.statuses) {
+          if (s.status === "failed") {
+            console.error(`[Webhook WhatsApp] ❌ Mensaje ${s.id} falló al entregarse a ${s.recipient_id}:`, JSON.stringify(s.errors || []));
+          } else {
+            console.log(`[Webhook WhatsApp] Estado de mensaje ${s.id} (${s.recipient_id}): ${s.status}`);
+          }
+        }
+        return;
+      }
 
       const message = change.messages?.[0];
       if (!message) return;
