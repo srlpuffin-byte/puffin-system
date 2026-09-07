@@ -643,8 +643,64 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 ];
 
 
-// Números de administradores autorizados
-const ADMIN_PHONES = ["3472629600", "3572538350", "3572665637", "3572400877"];
+// Números de administradores autorizados base
+const BASE_ADMIN_PHONES = ["3472629600", "3572538350", "3572665637", "3572400877"];
+export const ADMIN_PHONES = BASE_ADMIN_PHONES;
+
+/**
+ * Verifica si un número de teléfono pertenece a un administrador autorizado.
+ * Cruza con la lista estática, variables de entorno y cargos jerárquicos en la base de datos.
+ */
+export async function isAuthorizedAdmin(phone: string): Promise<boolean> {
+  const cleanPhone = phone.replace(/[^0-9]/g, "");
+  if (!cleanPhone || cleanPhone.length < 7) return false;
+  const last10 = cleanPhone.slice(-10);
+
+  // 1. Números base de administración de PUFFIN SRL + variable de entorno opcional
+  const envPhones = process.env.ADMIN_PHONES
+    ? process.env.ADMIN_PHONES.split(",").map((p) => p.replace(/[^0-9]/g, "").slice(-10)).filter(Boolean)
+    : [];
+  const allAdminPhones = [...BASE_ADMIN_PHONES.map((p) => p.slice(-10)), ...envPhones];
+
+  if (allAdminPhones.some((admin) => last10 === admin || cleanPhone.endsWith(admin))) {
+    return true;
+  }
+
+  // 2. Verificar si el teléfono pertenece a un empleado con cargo administrativo o directivo
+  try {
+    const empleados = await db
+      .select({
+        telefono: empleadosTable.telefono,
+        telefono_whatsapp: empleadosTable.telefono_whatsapp,
+        cargo: empleadosTable.cargo,
+        recibir: empleadosTable.recibir_alertas_whatsapp,
+      })
+      .from(empleadosTable)
+      .where(eq(empleadosTable.estado, "activo"));
+
+    for (const emp of empleados) {
+      const tel1 = (emp.telefono_whatsapp || "").replace(/[^0-9]/g, "").slice(-10);
+      const tel2 = (emp.telefono || "").replace(/[^0-9]/g, "").slice(-10);
+      if ((tel1 && (tel1 === last10 || cleanPhone.endsWith(tel1))) || (tel2 && (tel2 === last10 || cleanPhone.endsWith(tel2)))) {
+        const cargo = (emp.cargo || "").toLowerCase();
+        if (
+          emp.recibir === true ||
+          cargo.includes("admin") ||
+          cargo.includes("geren") ||
+          cargo.includes("dueñ") ||
+          cargo.includes("socio") ||
+          cargo.includes("director")
+        ) {
+          return true;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[Asistente] Error verificando rol en BD:", (err as any)?.message);
+  }
+
+  return false;
+}
 
 // Obtener o crear sesión — con fallback si la tabla no existe aún
 async function obtenerSesion(phone: string) {
@@ -698,9 +754,34 @@ async function guardarSesion(phone: string, messages: any[], estado: string = "i
 export async function handleWhatsAppMessage(from: string, text: string, imageBase64?: string) {
   const senderPhone = from.replace(/[^0-9]/g, "");
 
-  const isAdmin = ADMIN_PHONES.some(admin =>
-    senderPhone.endsWith(admin) || admin.endsWith(senderPhone.slice(-10))
-  );
+  const isAdmin = await isAuthorizedAdmin(senderPhone);
+
+  // CRÍTICO: Si NO es administrador, bloquear el acceso al asistente inmediatamente.
+  // No procesar con IA, no consultar base de datos ni exponer información sensible de la empresa.
+  if (!isAdmin) {
+    console.log(`[WhatsApp Asistente] Acceso denegado: el número ${senderPhone} no es administrador.`);
+    try {
+      const sesion = await obtenerSesion(senderPhone);
+      const ahora = Date.now();
+      const ultimoAviso = (sesion.datos_pendientes as any)?.ultimo_aviso_no_admin || 0;
+
+      // Responder con aviso formal solo si pasaron al menos 15 minutos (anti-spam / anti-loop)
+      if (ahora - ultimoAviso > 15 * 60 * 1000) {
+        await sendWhatsAppMessage(
+          from,
+          "Hola. Este canal es de uso exclusivo para administración interna de PUFFIN SRL. Las consultas e interacciones con el asistente inteligente están reservadas únicamente para personal administrativo autorizado."
+        );
+        sesion.datos_pendientes = {
+          ...(typeof sesion.datos_pendientes === "object" ? sesion.datos_pendientes : {}),
+          ultimo_aviso_no_admin: ahora,
+        };
+        await guardarSesion(senderPhone, [], "idle", sesion.datos_pendientes);
+      }
+    } catch (e) {
+      console.warn("[WhatsApp Asistente] Error gestionando aviso no-admin:", (e as any)?.message);
+    }
+    return;
+  }
 
   if (!openai) {
     console.warn("API KEY de IA no configurada. Asistente deshabilitado.");

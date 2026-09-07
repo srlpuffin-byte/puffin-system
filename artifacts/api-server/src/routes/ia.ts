@@ -29,10 +29,11 @@ function mesActual(): string {
 }
 
 import OpenAI from "openai";
+import { requireAuth, requireAdmin } from "../middleware/auth.js";
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
-router.post("/consulta", async (req, res) => {
+router.post("/consulta", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { pregunta } = req.body;
     if (!pregunta) return res.status(400).json({ error: "pregunta es requerida" });

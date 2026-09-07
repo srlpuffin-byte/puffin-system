@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { useGetMe } from "@workspace/api-client-react";
 import { apiFetch } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +27,15 @@ const CONSULTAS_RAPIDAS = [
 ];
 
 export function Ia() {
+  const { data: user } = useGetMe();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (user && user.rol?.toLowerCase() === "empleado") {
+      setLocation("/");
+    }
+  }, [user, setLocation]);
+
   const [mensajes, setMensajes] = useState<Mensaje[]>([
     {
       tipo: "ia",
@@ -34,6 +45,10 @@ export function Ia() {
   ]);
   const [pregunta, setPregunta] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  if (user && user.rol?.toLowerCase() === "empleado") {
+    return null;
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
