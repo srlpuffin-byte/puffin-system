@@ -61,7 +61,6 @@ export function Reportes() {
               <SelectItem value="trimestre">Último Trimestre</SelectItem>
             </SelectContent>
           </Select>
-// Botón general removido, ahora está en cada tabla
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer className="h-4 w-4 mr-1" /> Imprimir
           </Button>

@@ -242,17 +242,17 @@ export function Usuarios() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <UserCog className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold tracking-tight text-primary">Gestión de Usuarios</h1>
+          <UserCog className="h-7 w-7 sm:h-8 sm:w-8 text-primary shrink-0" />
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">Gestión de Usuarios</h1>
         </div>
-        <Button onClick={() => setShowNuevo(true)}>
+        <Button onClick={() => setShowNuevo(true)} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" /> Nuevo Usuario
         </Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="text-3xl font-bold">{usuarios.length}</div>

@@ -233,7 +233,7 @@ export function OperarioFicha() {
               className="w-full"
               onClick={() => {
                 const nombre = encodeURIComponent(`${operario.nombre} ${operario.apellido}`);
-                window.location.href = `/documentos?empleado_id=${operario.id}&nombre=${nombre}`;
+                setLocation(`/documentos?empleado_id=${operario.id}&nombre=${nombre}`);
               }}
             >
               Ver Documentación

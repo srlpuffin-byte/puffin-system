@@ -32,8 +32,8 @@ export function Calendario() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight text-primary">Calendario de Operaciones</h1>
-        <div className="flex items-center gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">Calendario de Operaciones</h1>
+        <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto flex-wrap">
           {eventos && (
             <ExportButtons 
               data={eventos} 
@@ -42,17 +42,20 @@ export function Calendario() {
               title={`Eventos - ${format(currentDate, "MMMM yyyy", { locale: es })}`} 
             />
           )}
-          <Button variant="outline" onClick={prevMonth}><ChevronLeft className="h-4 w-4" /></Button>
-          <span className="text-lg font-medium w-48 text-center capitalize">
-            {format(currentDate, "MMMM yyyy", { locale: es })}
-          </span>
-          <Button variant="outline" onClick={nextMonth}><ChevronRight className="h-4 w-4" /></Button>
+          <div className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-none justify-end">
+            <Button variant="outline" size="sm" onClick={prevMonth} className="h-8 w-8 p-0"><ChevronLeft className="h-4 w-4" /></Button>
+            <span className="text-sm sm:text-base font-semibold min-w-[130px] text-center capitalize">
+              {format(currentDate, "MMMM yyyy", { locale: es })}
+            </span>
+            <Button variant="outline" size="sm" onClick={nextMonth} className="h-8 w-8 p-0"><ChevronRight className="h-4 w-4" /></Button>
+          </div>
         </div>
       </div>
 
       <Card>
-        <CardContent className="p-0">
-          <div className="grid grid-cols-7 border-b">
+        <CardContent className="p-0 overflow-x-auto">
+          <div className="min-w-[600px]">
+            <div className="grid grid-cols-7 border-b">
             {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(day => (
               <div key={day} className="py-2 text-center text-sm font-semibold text-muted-foreground border-r last:border-r-0">
                 {day}
@@ -90,6 +93,7 @@ export function Calendario() {
                 </div>
               );
             })}
+          </div>
           </div>
         </CardContent>
       </Card>

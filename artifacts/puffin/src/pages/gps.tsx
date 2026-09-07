@@ -477,7 +477,6 @@ export function Gps() {
 
           <div className="py-4">
             {linkDialog.mode === "link-unlinked" ? (
-              // Visual card grid: pick an EXISTING MACHINE (without GPS)
               <div className="space-y-3">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -551,7 +550,6 @@ export function Gps() {
                 </div>
               </div>
             ) : (
-              // Re-link: pick which SYSTEM MACHINE should own this GPS device
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   El GPS <b>{linkDialog.point?.nombre}</b> se desvinculará de la máquina actual y se asignará a la que elijas.

@@ -516,7 +516,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
         <PushNotificationBanner />
         <JornadaAlertaBanner />
-        <div className="flex-1 p-2 md:p-4 lg:p-8 w-full max-w-full min-w-0">
+        <div className="flex-1 p-2 md:p-4 lg:p-8 pb-16 md:pb-8 lg:pb-8 w-full max-w-full min-w-0">
           {children}
         </div>
       </main>

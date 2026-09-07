@@ -57,7 +57,7 @@ export function Alertas() {
               title="Reporte de Alertas" 
             />
           )}
-          <Button onClick={() => setOpenDialog(true)}>
+          <Button onClick={() => setOpenDialog(true)} className="flex-1 sm:flex-none">
             <Plus className="mr-2 h-4 w-4" />
             Nueva Alerta
           </Button>

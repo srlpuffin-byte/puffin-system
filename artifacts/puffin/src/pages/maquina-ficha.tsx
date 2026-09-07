@@ -499,7 +499,6 @@ export function MaquinaFicha() {
                   </Table>
                 </div>
               ) : (
-                // Vista Timeline Compacta con scroll
                 <div className="max-h-[380px] overflow-y-auto p-4">
                   <div className="relative pl-6 space-y-3 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
                     {historialUso.map((evento: any) => {
