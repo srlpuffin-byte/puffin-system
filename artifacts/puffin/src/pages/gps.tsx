@@ -177,7 +177,7 @@ export function Gps() {
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] gap-0 -m-2 md:-m-4 lg:-m-8">
+    <div className="flex flex-col h-[calc(100dvh-58px)] sm:h-[calc(100vh-80px)] gap-0 -m-2 md:-m-4 lg:-m-8">
       {/* Top bar */}
       <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b bg-background shrink-0">
         <div className="flex items-center gap-2 min-w-0">
@@ -227,9 +227,9 @@ export function Gps() {
         {/* Sidebar */}
         <div className={`
           ${mobileView === "lista" ? "flex" : "hidden"} sm:flex
-          w-full sm:w-72 shrink-0 border-r overflow-y-auto bg-background flex-col
+          w-full sm:w-72 shrink-0 border-r overflow-y-auto bg-background flex-col overscroll-contain
         `}>
-          <div className="p-3 border-b shrink-0">
+          <div className="p-3 border-b shrink-0 bg-background sticky top-0 z-10">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Flota ({linkedPoints.length})</p>
           </div>
 
@@ -245,7 +245,7 @@ export function Gps() {
             <div className="p-4 text-center text-sm text-muted-foreground">Cargando...</div>
           )}
 
-          <div className="divide-y overflow-y-auto">
+          <div className="divide-y">
             {linkedPoints.map(p => {
               const pointId = `maq-${p.maquina_id}`;
               const isSelected = selectedId === pointId;
@@ -372,11 +372,11 @@ export function Gps() {
           </div>
 
           {unlinkedPoints.length > 0 && (
-            <>
-              <div className="p-3 border-y bg-slate-50 shrink-0 mt-auto">
-                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">GPS Sin Asignar ({unlinkedPoints.length})</p>
+            <div className="mt-2">
+              <div className="p-3 border-y bg-amber-50/80 shrink-0 sticky top-0 z-10 backdrop-blur-xs">
+                <p className="text-xs font-semibold text-amber-800 uppercase tracking-wider">GPS Sin Asignar ({unlinkedPoints.length})</p>
               </div>
-              <div className="divide-y bg-amber-50/30 overflow-y-auto max-h-[40vh]">
+              <div className="divide-y bg-amber-50/30">
                 {unlinkedPoints.map(p => {
                   const pointId = `dev-${p.device_id}`;
                   const isSelected = selectedId === pointId;
@@ -429,8 +429,11 @@ export function Gps() {
                   );
                 })}
               </div>
-            </>
+            </div>
           )}
+
+          {/* Espacio inferior de seguridad para celulares */}
+          <div className="h-28 sm:h-12 shrink-0" aria-hidden="true" />
         </div>
 
         {/* Map */}
