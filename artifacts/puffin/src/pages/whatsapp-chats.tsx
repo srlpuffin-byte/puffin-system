@@ -35,6 +35,7 @@ import {
   Hand,
   Calendar,
   MoreVertical,
+  ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -188,12 +189,14 @@ export function WhatsAppChats() {
   });
 
   // 2. Query: Detalle del chat seleccionado
-  const { data: chatActivo, isLoading: loadingDetalle, refetch: refetchDetalle } = useQuery<ChatDetail>({
+  const { data: chatActivo, isLoading: loadingDetalle, isError: errorDetalle, refetch: refetchDetalle } = useQuery<ChatDetail>({
     queryKey: ["whatsapp-chat-detail", selectedPhone],
     queryFn: () => apiFetch<ChatDetail>(`/whatsapp-chats/${encodeURIComponent(selectedPhone!)}`),
     enabled: !!selectedPhone,
     refetchInterval: 3000,
   });
+
+  const chatHeaderFallback = chats.find((c) => c.phone === selectedPhone);
 
   // 3. Query: Contactos para nuevo chat
   const { data: contactos = [] } = useQuery<ContactoDisponible[]>({
@@ -209,7 +212,7 @@ export function WhatsAppChats() {
     prevMsgCountRef.current = chatActivo?.messages?.length || 0;
   }, [selectedPhone]);
 
-  // Scroll suave al fondo al llegar mensajes nuevos (solo si está cerca del fondo para no interrumpir lectura arriba)
+  // Scroll suave al fondo al llegar mensajes nuevos
   useEffect(() => {
     const count = chatActivo?.messages?.length || 0;
     if (count > prevMsgCountRef.current && chatContainerRef.current) {
@@ -329,27 +332,27 @@ export function WhatsAppChats() {
   });
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5.5rem)] max-w-7xl mx-auto space-y-2 overflow-hidden">
-      {/* Barra superior de título y acciones */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-1 flex-shrink-0">
+    <div className="flex flex-col h-[calc(100dvh-4.75rem)] md:h-[calc(100vh-5.5rem)] max-w-7xl mx-auto space-y-2 overflow-hidden">
+      {/* Barra superior de título y acciones (visible siempre en desktop, y en mobile solo cuando está en la lista de chats) */}
+      <div className={`flex-wrap items-center justify-between gap-2 px-1 flex-shrink-0 ${selectedPhone ? "hidden md:flex" : "flex"}`}>
         <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-xl bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-sm">
-            <MessageSquare className="h-5 w-5" />
+          <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-sm">
+            <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
               Centro de WhatsApp
-              <Badge variant="outline" className="border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium py-0">
+              <Badge variant="outline" className="border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] sm:text-[11px] font-medium py-0">
                 En vivo
               </Badge>
             </h1>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[10px] sm:text-[11px] text-muted-foreground hidden sm:block">
               Monitoreo en tiempo real, auditoría con fechas precisas e intervención manual inteligente
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -357,28 +360,28 @@ export function WhatsAppChats() {
               refetchChats();
               if (selectedPhone) refetchDetalle();
             }}
-            className="h-8 gap-1.5 text-xs"
+            className="h-8 px-2.5 sm:px-3 gap-1.5 text-xs"
             title="Refrescar lista y mensajes"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            Actualizar
+            <span className="hidden xs:inline">Actualizar</span>
           </Button>
 
           <Button
             size="sm"
             onClick={() => setModalNuevoChat(true)}
-            className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
+            className="h-8 px-2.5 sm:px-3 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
           >
             <Plus className="h-3.5 w-3.5" />
-            Nuevo Chat
+            <span>Nuevo Chat</span>
           </Button>
         </div>
       </div>
 
-      {/* Contenedor principal estilo WhatsApp Web: flex-1 + min-h-0 para garantizar scroll vertical sin saltos */}
-      <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden border shadow-sm rounded-xl bg-card">
-        {/* COLUMNA IZQUIERDA: Lista de conversaciones */}
-        <div className="w-full md:w-80 lg:w-96 flex flex-col min-h-0 border-r bg-slate-50/50 dark:bg-slate-900/30 flex-shrink-0">
+      {/* Contenedor principal responsive estilo WhatsApp Web / Móvil */}
+      <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden border-0 md:border shadow-none md:shadow-sm rounded-none md:rounded-xl bg-card">
+        {/* COLUMNA IZQUIERDA: Lista de conversaciones (en mobile se oculta si hay un chat activo) */}
+        <div className={`w-full md:w-80 lg:w-96 flex flex-col min-h-0 border-r bg-slate-50/50 dark:bg-slate-900/30 flex-shrink-0 ${selectedPhone ? "hidden md:flex" : "flex flex-1"}`}>
           {/* Buscador */}
           <div className="p-2.5 border-b space-y-2 flex-shrink-0">
             <div className="relative">
@@ -392,7 +395,7 @@ export function WhatsAppChats() {
             </div>
 
             {/* Filtros rápidos */}
-            <div className="flex gap-1 overflow-x-auto pb-0.5 text-xs">
+            <div className="flex gap-1 overflow-x-auto pb-0.5 text-xs no-scrollbar">
               {(
                 [
                   { id: "todos", label: "Todos" },
@@ -404,9 +407,9 @@ export function WhatsAppChats() {
                 <button
                   key={f.id}
                   onClick={() => setFiltroTipo(f.id)}
-                  className={`px-2 py-0.5 rounded-full font-medium transition-colors text-[11px] whitespace-nowrap ${
+                  className={`px-2.5 py-0.5 rounded-full font-medium transition-colors text-[11px] whitespace-nowrap ${
                     filtroTipo === f.id
-                      ? "bg-emerald-600 text-white"
+                      ? "bg-emerald-600 text-white shadow-2xs"
                       : "bg-background text-muted-foreground hover:bg-muted"
                   }`}
                 >
@@ -438,7 +441,7 @@ export function WhatsAppChats() {
                   <div
                     key={c.phone}
                     onClick={() => setSelectedPhone(c.phone)}
-                    className={`p-3 cursor-pointer transition-all flex items-start gap-3 select-none ${
+                    className={`p-3 cursor-pointer transition-all flex items-start gap-3 select-none active:bg-muted/70 ${
                       isSelected
                         ? "bg-emerald-50 dark:bg-emerald-950/30 border-l-4 border-l-emerald-600"
                         : "hover:bg-slate-100/70 dark:hover:bg-slate-800/40"
@@ -522,23 +525,35 @@ export function WhatsAppChats() {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: Conversación activa */}
-        <div className="flex-1 flex flex-col min-h-0 bg-background overflow-hidden">
-          {selectedPhone && chatActivo ? (
+        {/* COLUMNA DERECHA: Conversación activa (en mobile ocupa toda la pantalla si está seleccionado) */}
+        <div className={`flex-1 flex flex-col min-h-0 bg-background overflow-hidden ${!selectedPhone ? "hidden md:flex" : "flex"}`}>
+          {selectedPhone ? (
+            chatActivo ? (
             <>
-              {/* Cabecera del chat seleccionado (fija arriba) */}
-              <div className="p-3 border-b flex flex-wrap items-center justify-between gap-3 bg-slate-50/70 dark:bg-slate-900/40 flex-shrink-0">
-                <div className="flex items-center gap-3 min-w-0">
+              {/* Cabecera del chat seleccionado (adaptada para mobile con botón volver) */}
+              <div className="p-2 sm:p-3 border-b flex items-center justify-between gap-2 bg-slate-50/80 dark:bg-slate-900/60 backdrop-blur-sm flex-shrink-0">
+                <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
+                  {/* Botón Volver exclusivo para Mobile */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSelectedPhone(null)}
+                    className="md:hidden h-8 w-8 -ml-1 text-foreground hover:bg-muted/80 flex-shrink-0"
+                    title="Volver a la lista de chats"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+
                   {/* Foto de perfil o iniciales */}
                   {chatActivo.foto_perfil ? (
                     <img
                       src={chatActivo.foto_perfil}
                       alt={chatActivo.nombre}
-                      className="h-10 w-10 rounded-full object-cover shadow-sm border border-border/80 flex-shrink-0"
+                      className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover shadow-sm border border-border/80 flex-shrink-0"
                     />
                   ) : (
                     <div
-                      className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0 ${
+                      className={`h-8 w-8 sm:h-10 sm:w-10 rounded-full flex items-center justify-center font-bold text-white text-xs sm:text-sm flex-shrink-0 ${
                         chatActivo.esAdmin
                           ? "bg-gradient-to-br from-indigo-500 to-purple-600"
                           : "bg-gradient-to-br from-emerald-500 to-teal-600"
@@ -549,172 +564,179 @@ export function WhatsAppChats() {
                         .map((n) => n[0])
                         .slice(0, 2)
                         .join("")
-                        .toUpperCase() || <User className="h-5 w-5" />}
+                        .toUpperCase() || <User className="h-4 w-4" />}
                     </div>
                   )}
 
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h2 className="font-bold text-sm text-foreground truncate">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <h2 className="font-bold text-xs sm:text-sm text-foreground truncate">
                         {chatActivo.nombre}
                       </h2>
                       {chatActivo.esAdmin ? (
-                        <Badge variant="outline" className="text-[10px] border-indigo-500/40 text-indigo-600 dark:text-indigo-400 py-0">
-                          <Shield className="h-2.5 w-2.5 mr-1" />
+                        <Badge variant="outline" className="text-[9px] sm:text-[10px] border-indigo-500/40 text-indigo-600 dark:text-indigo-400 py-0 px-1">
+                          <Shield className="h-2.5 w-2.5 mr-0.5" />
                           Admin
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="text-[10px] py-0">
+                        <Badge variant="secondary" className="text-[9px] sm:text-[10px] py-0 px-1 hidden xs:inline-flex">
                           {chatActivo.cargo || "Operario"}
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-muted-foreground truncate">
                       <span>{chatActivo.phone.startsWith("54") ? `+${chatActivo.phone}` : chatActivo.phone}</span>
-                      <span>•</span>
+                      <span className="hidden sm:inline">•</span>
                       <a
                         href={`https://wa.me/${chatActivo.phone.replace(/[^0-9]/g, "")}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:underline"
+                        className="hidden sm:inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:underline"
                       >
-                        Abrir en WhatsApp <ExternalLink className="h-3 w-3" />
+                        WhatsApp <ExternalLink className="h-2.5 w-2.5" />
                       </a>
                     </div>
                   </div>
                 </div>
 
-                {/* Control original de Copiloto: Piloto Automático vs Intervención Humana */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {/* Estado Visual */}
-                  {!chatActivo.botPausado ? (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold shadow-xs">
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                      </span>
-                      <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <span className="hidden sm:inline">IA Automática Activa</span>
-                      <span className="sm:hidden">IA Activa</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/35 text-amber-800 dark:text-amber-200 text-xs font-semibold shadow-xs">
-                      <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 animate-pulse" />
-                      <span>
-                        {chatActivo.botPauseRemainingMinutes
-                          ? `Intervención Humana (~${chatActivo.botPauseRemainingMinutes}m)`
-                          : "Modo Manual"}
-                      </span>
-                    </div>
-                  )}
+                {/* Control original de Copiloto adaptable a Mobile */}
+                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                  {/* Estado Visual en pantallas medianas/grandes */}
+                  <div className="hidden sm:flex items-center">
+                    {!chatActivo.botPausado ? (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold shadow-xs">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <Sparkles className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                        <span>IA Activa</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/35 text-amber-800 dark:text-amber-200 text-xs font-semibold shadow-xs">
+                        <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400 animate-pulse" />
+                        <span>
+                          {chatActivo.botPauseRemainingMinutes
+                            ? `Manual (~${chatActivo.botPauseRemainingMinutes}m)`
+                            : "Manual"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-                  {/* Acciones para conmutar modo */}
+                  {/* Acciones principales de Copiloto */}
                   {chatActivo.botPausado ? (
                     <Button
                       size="sm"
                       onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: false })}
                       disabled={toggleBotMutation.isPending}
-                      className="h-8 gap-1.5 text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-md transition-all hover:scale-105 active:scale-95"
-                      title="Hacé clic para reactivar las respuestas automáticas de IA al instante"
+                      className="h-8 px-2.5 sm:px-3 text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-xs transition-all hover:scale-105 active:scale-95 gap-1"
+                      title="Reactivar IA al instante"
                     >
                       <Zap className="h-3.5 w-3.5 fill-current" />
-                      Reactivar IA Ahora
+                      <span>Reactivar IA</span>
                     </Button>
                   ) : (
-                    <div className="flex items-center gap-1">
-                      {/* Botón rápido de Intervención (30 min con auto-reanudación) */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 30 })}
-                        disabled={toggleBotMutation.isPending}
-                        className="h-8 gap-1.5 text-xs font-medium text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700/70 hover:bg-amber-50 dark:hover:bg-amber-950/40"
-                        title="Pausar la IA por 30 minutos para dialogar manualmente (se reactiva sola al terminar para no dejar el bot desatendido)"
-                      >
-                        <Hand className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                        Intervenir (30m)
-                      </Button>
-
-                      {/* Más opciones de temporizador en desplegable */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-8 w-8 p-0" title="Más opciones de pausa">
-                            <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56 text-xs">
-                          <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground">
-                            Duración de la Intervención
-                          </DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 15 })}
-                            className="cursor-pointer gap-2 py-2"
-                          >
-                            <Clock className="h-3.5 w-3.5 text-amber-500" />
-                            <span>Pausa corta: 15 minutos</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 60 })}
-                            className="cursor-pointer gap-2 py-2"
-                          >
-                            <Clock className="h-3.5 w-3.5 text-amber-500" />
-                            <span>Pausa media: 1 hora</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 180 })}
-                            className="cursor-pointer gap-2 py-2"
-                          >
-                            <Clock className="h-3.5 w-3.5 text-amber-500" />
-                            <span>Pausa extendida: 3 horas</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 0 })}
-                            className="cursor-pointer gap-2 py-2 text-rose-600 dark:text-rose-400"
-                          >
-                            <Pause className="h-3.5 w-3.5" />
-                            <span>Pausa permanente (manual)</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 30 })}
+                      disabled={toggleBotMutation.isPending}
+                      className="h-8 px-2 sm:px-2.5 text-xs font-medium text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700/70 hover:bg-amber-50 dark:hover:bg-amber-950/40 gap-1"
+                      title="Pausar la IA por 30m"
+                    >
+                      <Hand className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                      <span className="hidden xs:inline">Intervenir</span>
+                      <span className="text-[10px] font-mono opacity-80">(30m)</span>
+                    </Button>
                   )}
+
+                  {/* Menú de opciones (Opciones de pausa + abrir en WhatsApp en mobile) */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Más opciones">
+                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 text-xs">
+                      <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground">
+                        Control de IA y Chat
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => window.open(`https://wa.me/${chatActivo.phone.replace(/[^0-9]/g, "")}`, "_blank")}
+                        className="cursor-pointer gap-2 py-2 sm:hidden"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>Abrir chat en WhatsApp</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator className="sm:hidden" />
+                      <DropdownMenuItem
+                        onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 15 })}
+                        className="cursor-pointer gap-2 py-2"
+                      >
+                        <Clock className="h-3.5 w-3.5 text-amber-500" />
+                        <span>Pausar IA por 15 minutos</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 60 })}
+                        className="cursor-pointer gap-2 py-2"
+                      >
+                        <Clock className="h-3.5 w-3.5 text-amber-500" />
+                        <span>Pausar IA por 1 hora</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 180 })}
+                        className="cursor-pointer gap-2 py-2"
+                      >
+                        <Clock className="h-3.5 w-3.5 text-amber-500" />
+                        <span>Pausar IA por 3 horas</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 0 })}
+                        className="cursor-pointer gap-2 py-2 text-rose-600 dark:text-rose-400"
+                      >
+                        <Pause className="h-3.5 w-3.5" />
+                        <span>Pausa permanente (manual)</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
               {/* Banner informativo interactivo cuando el bot está en Modo Intervención / Pausado */}
               {chatActivo.botPausado && (
-                <div className="bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-amber-500/5 border-b border-amber-500/25 px-4 py-2 text-xs text-amber-900 dark:text-amber-200 flex flex-wrap items-center justify-between gap-2 flex-shrink-0 animate-in fade-in duration-200">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="h-7 w-7 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center flex-shrink-0">
-                      <Hand className="h-4 w-4" />
+                <div className="bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-amber-500/5 border-b border-amber-500/25 px-3 py-1.5 sm:px-4 sm:py-2 text-xs text-amber-900 dark:text-amber-200 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-6 w-6 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center flex-shrink-0">
+                      <Hand className="h-3.5 w-3.5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-foreground flex items-center gap-1.5">
-                        Modo Intervención Humana Activo
+                      <p className="font-semibold text-foreground text-[11px] sm:text-xs flex items-center gap-1.5">
+                        Intervención Humana
                         {chatActivo.botPauseRemainingMinutes && (
-                          <Badge variant="outline" className="text-[10px] border-amber-500/40 bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 py-0 font-normal">
-                            Auto-reanudación en ~{chatActivo.botPauseRemainingMinutes} min
+                          <Badge variant="outline" className="text-[9px] sm:text-[10px] border-amber-500/40 bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 py-0 font-normal">
+                            ~{chatActivo.botPauseRemainingMinutes}m
                           </Badge>
                         )}
                       </p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate hidden xs:block">
                         {chatActivo.botPauseRemainingMinutes
-                          ? `La IA está en silencio para no interrumpirte. Al terminar el tiempo o al hacer clic se reactivará automáticamente.`
-                          : `El asistente está pausado de forma indefinida para este chat. Hacé clic en Reactivar cuando desees que vuelva a responder.`}
+                          ? `La IA no responderá para no interrumpirte. Auto-reanudará al finalizar.`
+                          : `Asistente pausado de forma indefinida.`}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
                     <Button
                       size="sm"
                       onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: false })}
                       disabled={toggleBotMutation.isPending}
-                      className="h-7 px-3 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-xs gap-1.5"
+                      className="h-6 sm:h-7 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-xs gap-1"
                     >
                       <Zap className="h-3 w-3 fill-current" />
-                      Reactivar IA Ya
+                      Reactivar
                     </Button>
                   </div>
                 </div>
@@ -723,14 +745,14 @@ export function WhatsAppChats() {
               {/* Flujo de mensajes con separadores de fecha y scroll vertical garantizado */}
               <div
                 ref={chatContainerRef}
-                className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-slate-100/40 dark:bg-slate-950/40"
+                className="flex-1 min-h-0 overflow-y-auto p-2.5 sm:p-4 space-y-2.5 sm:space-y-3 bg-slate-100/40 dark:bg-slate-950/40"
               >
                 {loadingDetalle ? (
                   <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
                     <RefreshCw className="h-5 w-5 animate-spin mr-2" /> Cargando mensajes...
                   </div>
                 ) : chatActivo.messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground text-xs space-y-1">
+                  <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground text-xs space-y-1 p-4">
                     <MessageSquare className="h-8 w-8 text-muted-foreground/30 mb-2" />
                     <p className="font-medium text-foreground">No hay mensajes en esta conversación</p>
                     <p>Escribí un mensaje abajo para enviar el primer WhatsApp desde el servidor.</p>
@@ -767,8 +789,8 @@ export function WhatsAppChats() {
                         <React.Fragment key={idx}>
                           {/* Separador de Fecha estilo WhatsApp */}
                           {showDivider && (
-                            <div className="flex justify-center my-3 sticky top-1 z-10 select-none">
-                              <div className="px-3.5 py-1 rounded-full text-[11px] font-semibold bg-background/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 shadow-xs border border-border/80 backdrop-blur-md flex items-center gap-1.5">
+                            <div className="flex justify-center my-2.5 sm:my-3 sticky top-1 z-10 select-none">
+                              <div className="px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-semibold bg-background/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 shadow-xs border border-border/80 backdrop-blur-md flex items-center gap-1.5">
                                 <Calendar className="h-3 w-3 text-muted-foreground" />
                                 <span>{formatDateDivider(m.created_at)}</span>
                               </div>
@@ -793,7 +815,7 @@ export function WhatsAppChats() {
                             )}
 
                             <div
-                              className={`max-w-[85%] md:max-w-[75%] rounded-2xl p-3 text-xs leading-relaxed shadow-sm ${
+                              className={`max-w-[88%] sm:max-w-[75%] rounded-2xl p-2.5 sm:p-3 text-xs leading-relaxed shadow-sm ${
                                 isUser
                                   ? "bg-white dark:bg-slate-800 text-foreground border rounded-bl-sm"
                                   : m.manual
@@ -805,7 +827,7 @@ export function WhatsAppChats() {
                             >
                               {/* Etiqueta del remitente */}
                               <div className="flex items-center justify-between gap-2 mb-1 pb-1 border-b border-black/10 dark:border-white/10 text-[10px] font-semibold opacity-75">
-                                <span>
+                                <span className="truncate">
                                   {isUser
                                     ? chatActivo.nombre
                                     : m.manual
@@ -815,7 +837,7 @@ export function WhatsAppChats() {
                                     : "Asistente Digital (IA)"}
                                 </span>
                                 {!isUser && !m.manual && !m.is_warning && (
-                                  <span className="flex items-center gap-0.5 text-[9px] opacity-80">
+                                  <span className="flex items-center gap-0.5 text-[9px] opacity-80 flex-shrink-0">
                                     <Sparkles className="h-2.5 w-2.5" /> IA
                                   </span>
                                 )}
@@ -834,7 +856,7 @@ export function WhatsAppChats() {
 
                               {/* Fecha precisa, Hora y Tilde de entrega */}
                               <div
-                                className="flex items-center justify-end gap-1.5 mt-1 text-[10px] opacity-70 select-none"
+                                className="flex items-center justify-end gap-1 mt-1 text-[10px] opacity-70 select-none"
                                 title={full}
                               >
                                 {showDateBadge && (
@@ -856,10 +878,10 @@ export function WhatsAppChats() {
                 )}
               </div>
 
-              {/* Barra inferior para redactar y enviar (fija abajo) */}
-              <div className="p-2.5 border-t bg-background flex flex-col gap-1.5 flex-shrink-0">
+              {/* Barra inferior para redactar y enviar (optimizada para touch y teclado en móviles) */}
+              <div className="p-2 sm:p-2.5 border-t bg-background flex flex-col gap-1.5 flex-shrink-0">
                 {/* Opciones y tips inteligentes del envío */}
-                <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
+                <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-muted-foreground px-1">
                   <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -867,18 +889,19 @@ export function WhatsAppChats() {
                       onChange={(e) => setPausarAlEnviar(e.target.checked)}
                       className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
                     />
-                    <span>Pausar IA por 30 min al responder (Intervención humana)</span>
+                    <span className="hidden sm:inline">Pausar IA por 30 min al responder (Intervención temporal)</span>
+                    <span className="sm:hidden">Pausar IA 30m al enviar</span>
                   </label>
-                  <span className="text-[10px] text-muted-foreground/80 hidden sm:inline">
-                    💡 Podés reactivar el asistente en cualquier momento escribiendo <code className="bg-muted px-1 rounded font-mono font-semibold">bot</code> por WhatsApp
+                  <span className="text-[10px] text-muted-foreground/80 hidden md:inline">
+                    💡 Podés reactivar escribiendo <code className="bg-muted px-1 rounded font-mono font-semibold">bot</code> por WhatsApp
                   </span>
                 </div>
 
-                <form onSubmit={handleEnviar} className="flex items-end gap-2">
+                <form onSubmit={handleEnviar} className="flex items-end gap-1.5 sm:gap-2">
                   <div className="flex-1 relative">
                     <textarea
-                      rows={2}
-                      placeholder="Escribí un mensaje para enviar por WhatsApp... (Shift+Enter para salto de línea)"
+                      rows={1}
+                      placeholder="Escribí un mensaje..."
                       value={mensajeTexto}
                       onChange={(e) => setMensajeTexto(e.target.value)}
                       onKeyDown={(e) => {
@@ -887,52 +910,95 @@ export function WhatsAppChats() {
                           handleEnviar();
                         }
                       }}
-                      className="w-full resize-none p-2 text-xs rounded-lg border bg-slate-50/50 dark:bg-slate-900/50 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      className="w-full resize-none p-2 sm:p-2.5 text-sm sm:text-xs rounded-xl border bg-slate-50/70 dark:bg-slate-900/70 focus:outline-none focus:ring-1 focus:ring-emerald-500 max-h-28 min-h-[38px]"
                     />
                   </div>
 
                   <Button
                     type="submit"
                     disabled={!mensajeTexto.trim() || sendMutation.isPending}
-                    className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs font-semibold shadow-sm flex-shrink-0"
+                    className="h-[38px] px-3 sm:px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs font-semibold shadow-sm flex-shrink-0 rounded-xl"
                   >
                     <Send className="h-3.5 w-3.5" />
-                    {sendMutation.isPending ? "Enviando..." : "Enviar"}
+                    <span className="hidden xs:inline">{sendMutation.isPending ? "..." : "Enviar"}</span>
                   </Button>
                 </form>
               </div>
             </>
-          ) : (
-            /* Estado vacío cuando no hay conversación seleccionada */
-            <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-3">
-              <div className="h-16 w-16 rounded-2xl bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-inner">
-                <MessageSquare className="h-8 w-8" />
+          ) : errorDetalle ? (
+            /* Estado de error con botón de reintento y botón volver */
+            <div className="flex flex-col h-full">
+              <div className="p-3 border-b flex items-center gap-2 bg-slate-50/80 dark:bg-slate-900/60">
+                <Button variant="ghost" size="icon" onClick={() => setSelectedPhone(null)} className="md:hidden h-8 w-8">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <span className="font-semibold text-sm text-foreground">Error al cargar chat</span>
               </div>
-              <h3 className="font-bold text-lg text-foreground">Bandeja de Mensajes WhatsApp</h3>
-              <p className="text-xs text-muted-foreground max-w-sm">
-                Seleccioná una conversación de la columna izquierda para leer el historial completo, ver las fechas y horas exactas de los mensajes o responder directamente desde el sistema.
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setModalNuevoChat(true)}
-                className="gap-1.5 text-xs mt-2"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Iniciar nueva conversación
-              </Button>
+              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-3">
+                <p className="text-xs text-destructive font-medium">No se pudo cargar la conversación de WhatsApp</p>
+                <Button size="sm" onClick={() => refetchDetalle()} className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs">
+                  <RefreshCw className="h-3.5 w-3.5" /> Reintentar
+                </Button>
+              </div>
             </div>
-          )}
+          ) : (
+            /* Estado de carga con cabecera inmediata y spinner visible */
+            <div className="flex flex-col h-full">
+              <div className="p-2 sm:p-3 border-b flex items-center justify-between gap-2 bg-slate-50/80 dark:bg-slate-900/60 backdrop-blur-sm flex-shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Button variant="ghost" size="icon" onClick={() => setSelectedPhone(null)} className="md:hidden h-8 w-8 -ml-1">
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                  {chatHeaderFallback?.foto_perfil ? (
+                    <img src={chatHeaderFallback.foto_perfil} alt="" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover shadow-sm border" />
+                  ) : (
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center font-bold text-xs">
+                      {chatHeaderFallback?.nombre?.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase() || <User className="h-4 w-4" />}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <h2 className="font-bold text-xs sm:text-sm truncate">{chatHeaderFallback?.nombre || selectedPhone}</h2>
+                    <p className="text-[10px] text-muted-foreground">{selectedPhone.startsWith("54") ? `+${selectedPhone}` : selectedPhone}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex-1 flex flex-col items-center justify-center text-xs text-muted-foreground space-y-2 p-6">
+                <RefreshCw className="h-6 w-6 animate-spin text-emerald-600" />
+                <p className="font-medium">Abriendo mensajes de WhatsApp...</p>
+              </div>
+            </div>
+          )
+        ) : (
+          /* Estado vacío cuando no hay conversación seleccionada (solo desktop) */
+          <div className="hidden md:flex flex-col items-center justify-center h-full p-8 text-center space-y-3">
+            <div className="h-16 w-16 rounded-2xl bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-inner">
+              <MessageSquare className="h-8 w-8" />
+            </div>
+            <h3 className="font-bold text-lg text-foreground">Bandeja de Mensajes WhatsApp</h3>
+            <p className="text-xs text-muted-foreground max-w-sm">
+              Seleccioná una conversación de la columna izquierda para leer el historial completo, ver las fechas y horas exactas de los mensajes o responder directamente desde el sistema.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setModalNuevoChat(true)}
+              className="gap-1.5 text-xs mt-2"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Iniciar nueva conversación
+            </Button>
+          </div>
+        )}
         </div>
       </div>
 
-      {/* Modal: Iniciar Nuevo Chat */}
+      {/* Modal: Iniciar Nuevo Chat (responsive) */}
       <Dialog open={modalNuevoChat} onOpenChange={setModalNuevoChat}>
-        <DialogContent className="sm:max-w-[480px]">
+        <DialogContent className="w-[92vw] max-w-[480px] p-4 sm:p-6 rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-emerald-600" />
-              Iniciar Nueva Conversación de WhatsApp
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <MessageSquare className="h-5 w-5 text-emerald-600 flex-shrink-0" />
+              <span>Iniciar Conversación</span>
             </DialogTitle>
             <DialogDescription className="text-xs">
               Elegí un empleado activo o ingresá un número con código de área para abrir el chat.
@@ -946,7 +1012,7 @@ export function WhatsAppChats() {
                 Seleccionar Empleado Registrado
               </label>
               <select
-                className="w-full h-9 rounded-md border text-xs px-2 bg-background"
+                className="w-full h-10 sm:h-9 rounded-lg border text-xs px-2.5 bg-background"
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val) setNuevoChatTelefono(val);
@@ -973,7 +1039,7 @@ export function WhatsAppChats() {
                 placeholder="Ej: 3472629600 o 5493472629600"
                 value={nuevoChatTelefono}
                 onChange={(e) => setNuevoChatTelefono(e.target.value)}
-                className="h-9 text-xs"
+                className="h-10 sm:h-9 text-xs rounded-lg"
               />
             </div>
 
@@ -992,14 +1058,14 @@ export function WhatsAppChats() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
-            <Button variant="outline" size="sm" onClick={() => setModalNuevoChat(false)}>
+          <DialogFooter className="flex-row justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setModalNuevoChat(false)} className="h-9">
               Cancelar
             </Button>
             <Button
               size="sm"
               onClick={handleIniciarNuevoChat}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+              className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
             >
               Abrir Chat
             </Button>

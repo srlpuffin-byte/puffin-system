@@ -167,6 +167,8 @@ router.get("/:phone", async (req, res) => {
       return (t1 && t1 === last10) || (t2 && t2 === last10);
     });
 
+    const esAdmin = ADMIN_PHONES.some((a) => last10 === getLast10(a)) || (emp?.cargo || "").toLowerCase().includes("admin");
+
     let fotoPerfil: string | null = null;
     if (emp?.id) {
       const empFotos = await db
