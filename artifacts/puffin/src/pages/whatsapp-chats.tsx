@@ -8,6 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import {
   MessageSquare,
   Send,
   Search,
@@ -22,6 +30,11 @@ import {
   Sparkles,
   CheckCheck,
   ImageIcon,
+  Clock,
+  Zap,
+  Hand,
+  Calendar,
+  MoreVertical,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -35,6 +48,8 @@ interface ChatItem {
   ultimaFecha: string;
   totalMensajes: number;
   botPausado: boolean;
+  botPausedUntil?: string | null;
+  botPauseRemainingMinutes?: number | null;
   esAdmin: boolean;
 }
 
@@ -46,6 +61,8 @@ interface ChatDetail {
   foto_perfil?: string | null;
   messages: any[];
   botPausado: boolean;
+  botPausedUntil?: string | null;
+  botPauseRemainingMinutes?: number | null;
   esAdmin: boolean;
   updated_at: string;
 }
@@ -55,6 +72,88 @@ interface ContactoDisponible {
   nombre: string;
   cargo: string;
   telefono: string;
+}
+
+// Formatear separador de fecha entre mensajes (estilo WhatsApp)
+function formatDateDivider(dateStr?: string): string {
+  if (!dateStr) return "Fecha previa";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "Fecha previa";
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round((today.getTime() - target.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "Hoy";
+  if (diffDays === 1) return "Ayer";
+
+  const formatted = d.toLocaleDateString("es-AR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+  });
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+// Obtener clave de fecha YYYY-MM-DD para agrupar mensajes
+function getDateKey(dateStr?: string): string {
+  if (!dateStr) return "unknown";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "unknown";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Formatear hora y fecha detallada en la burbuja
+function formatBubbleTime(dateStr?: string): { time: string; full: string; showDateBadge: boolean; shortDate: string } {
+  if (!dateStr) return { time: "", full: "", showDateBadge: false, shortDate: "" };
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return { time: "", full: "", showDateBadge: false, shortDate: "" };
+
+  const now = new Date();
+  const isToday =
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear();
+
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const shortDate = d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
+  const full = d.toLocaleDateString("es-AR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+  return { time, full, showDateBadge: !isToday, shortDate };
+}
+
+// Formatear fecha para el item de la lista lateral
+function formatChatListDate(dateStr?: string): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round((today.getTime() - target.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  if (diffDays === 1) {
+    return "Ayer";
+  }
+  if (diffDays < 7) {
+    const day = d.toLocaleDateString("es-AR", { weekday: "short" }).replace(".", "");
+    return day.charAt(0).toUpperCase() + day.slice(1);
+  }
+  return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
 }
 
 export function WhatsAppChats() {
@@ -73,6 +172,7 @@ export function WhatsAppChats() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<"todos" | "operarios" | "admins" | "pausados">("todos");
   const [mensajeTexto, setMensajeTexto] = useState("");
+  const [pausarAlEnviar, setPausarAlEnviar] = useState(false);
   const [modalNuevoChat, setModalNuevoChat] = useState(false);
   const [nuevoChatTelefono, setNuevoChatTelefono] = useState("");
   const [nuevoChatMensaje, setNuevoChatMensaje] = useState("");
@@ -127,17 +227,16 @@ export function WhatsAppChats() {
 
   // Mutación: Enviar mensaje manual
   const sendMutation = useMutation({
-    mutationFn: ({ phone, text }: { phone: string; text: string }) =>
+    mutationFn: ({ phone, text, pauseDurationMinutes }: { phone: string; text: string; pauseDurationMinutes?: number }) =>
       apiFetch<{ success: boolean }>(`/whatsapp-chats/${encodeURIComponent(phone)}/send`, {
         method: "POST",
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, pauseDurationMinutes }),
       }),
     onSuccess: () => {
       setMensajeTexto("");
       queryClient.invalidateQueries({ queryKey: ["whatsapp-chat-detail", selectedPhone] });
       queryClient.invalidateQueries({ queryKey: ["whatsapp-chats"] });
       toast.success("Mensaje enviado por WhatsApp");
-      // Scroll al fondo tras enviar mensaje propio
       setTimeout(() => {
         if (chatContainerRef.current) {
           chatContainerRef.current.scrollTo({
@@ -152,23 +251,31 @@ export function WhatsAppChats() {
     },
   });
 
-  // Mutación: Alternar pausa del bot
+  // Mutación inteligente: Alternar modo manual/automático con control de duración
   const toggleBotMutation = useMutation({
-    mutationFn: (phone: string) =>
-      apiFetch<{ success: boolean; botPausado: boolean }>(`/whatsapp-chats/${encodeURIComponent(phone)}/toggle-bot`, {
-        method: "POST",
-      }),
+    mutationFn: ({ phone, bot_paused, durationMinutes }: { phone: string; bot_paused?: boolean; durationMinutes?: number }) =>
+      apiFetch<{ success: boolean; botPausado: boolean; botPausedUntil?: string | null; botPauseRemainingMinutes?: number | null }>(
+        `/whatsapp-chats/${encodeURIComponent(phone)}/toggle-bot`,
+        {
+          method: "POST",
+          body: JSON.stringify({ bot_paused, durationMinutes }),
+        }
+      ),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["whatsapp-chat-detail", selectedPhone] });
       queryClient.invalidateQueries({ queryKey: ["whatsapp-chats"] });
       if (data.botPausado) {
-        toast.info("Asistente pausado. Modo manual activado para este chat.");
+        if (data.botPauseRemainingMinutes) {
+          toast.info(`Intervención Humana activa: Asistente pausado por ${data.botPauseRemainingMinutes} minutos. Se reactivará solo.`);
+        } else {
+          toast.info("Modo manual indefinido activado para este chat.");
+        }
       } else {
-        toast.success("Asistente reanudado. Responderá automáticamente con IA.");
+        toast.success("🤖 Asistente reanudado: Responderá automáticamente con IA.");
       }
     },
     onError: (err: any) => {
-      toast.error(`Error cambiando estado: ${err?.message}`);
+      toast.error(`Error cambiando modo: ${err?.message}`);
     },
   });
 
@@ -176,7 +283,11 @@ export function WhatsAppChats() {
   const handleEnviar = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!selectedPhone || !mensajeTexto.trim() || sendMutation.isPending) return;
-    sendMutation.mutate({ phone: selectedPhone, text: mensajeTexto.trim() });
+    sendMutation.mutate({
+      phone: selectedPhone,
+      text: mensajeTexto.trim(),
+      pauseDurationMinutes: pausarAlEnviar ? 30 : undefined,
+    });
   };
 
   // Iniciar nuevo chat desde el modal
@@ -233,7 +344,7 @@ export function WhatsAppChats() {
               </Badge>
             </h1>
             <p className="text-[11px] text-muted-foreground">
-              Monitoreo en tiempo real, auditoría de mensajes y respuestas manuales desde el servidor
+              Monitoreo en tiempo real, auditoría con fechas precisas e intervención manual inteligente
             </p>
           </div>
         </div>
@@ -287,7 +398,7 @@ export function WhatsAppChats() {
                   { id: "todos", label: "Todos" },
                   { id: "operarios", label: "Operarios" },
                   { id: "admins", label: "Admins" },
-                  { id: "pausados", label: "Modo Manual" },
+                  { id: "pausados", label: "Intervención" },
                 ] as const
               ).map((f) => (
                 <button
@@ -321,10 +432,7 @@ export function WhatsAppChats() {
             ) : (
               chatsFiltrados.map((c) => {
                 const isSelected = selectedPhone === c.phone;
-                const formattedDate = new Date(c.ultimaFecha).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
+                const formattedDate = formatChatListDate(c.ultimaFecha);
 
                 return (
                   <div
@@ -363,9 +471,9 @@ export function WhatsAppChats() {
                       {c.botPausado && (
                         <div
                           className="absolute -bottom-1 -right-1 h-4 w-4 bg-amber-500 rounded-full border-2 border-background flex items-center justify-center"
-                          title="Bot pausado (Modo manual)"
+                          title={c.botPauseRemainingMinutes ? `Modo manual (${c.botPauseRemainingMinutes}m restantes)` : "Modo manual"}
                         >
-                          <Pause className="h-2 w-2 text-white" />
+                          <Hand className="h-2.5 w-2.5 text-white" />
                         </div>
                       )}
                     </div>
@@ -376,7 +484,7 @@ export function WhatsAppChats() {
                         <span className="font-semibold text-sm truncate text-foreground">
                           {c.nombre}
                         </span>
-                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">
                           {formattedDate}
                         </span>
                       </div>
@@ -391,6 +499,14 @@ export function WhatsAppChats() {
                             className="text-[9px] px-1 py-0 h-4 font-normal max-w-[120px] truncate"
                           >
                             {c.cargo}
+                          </Badge>
+                        )}
+                        {c.botPausado && (
+                          <Badge
+                            variant="outline"
+                            className="text-[9px] px-1 py-0 h-4 border-amber-500/40 text-amber-600 dark:text-amber-400"
+                          >
+                            Manual
                           </Badge>
                         )}
                       </div>
@@ -411,7 +527,7 @@ export function WhatsAppChats() {
           {selectedPhone && chatActivo ? (
             <>
               {/* Cabecera del chat seleccionado (fija arriba) */}
-              <div className="p-3 border-b flex items-center justify-between gap-3 bg-slate-50/70 dark:bg-slate-900/40 flex-shrink-0">
+              <div className="p-3 border-b flex flex-wrap items-center justify-between gap-3 bg-slate-50/70 dark:bg-slate-900/40 flex-shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
                   {/* Foto de perfil o iniciales */}
                   {chatActivo.foto_perfil ? (
@@ -468,51 +584,143 @@ export function WhatsAppChats() {
                   </div>
                 </div>
 
-                {/* Control de Modo Manual / Bot Automático */}
+                {/* Control original de Copiloto: Piloto Automático vs Intervención Humana */}
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <Button
-                    variant={chatActivo.botPausado ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => toggleBotMutation.mutate(selectedPhone)}
-                    disabled={toggleBotMutation.isPending}
-                    className={`h-8 gap-1.5 text-xs font-medium ${
-                      chatActivo.botPausado
-                        ? "bg-amber-600 hover:bg-amber-700 text-white"
-                        : "text-slate-700 dark:text-slate-200 border-slate-300"
-                    }`}
-                    title={
-                      chatActivo.botPausado
-                        ? "Hacé clic para reactivar las respuestas automáticas de IA"
-                        : "Hacé clic para pausar el bot y atender este chat manualmente"
-                    }
-                  >
-                    {chatActivo.botPausado ? (
-                      <>
-                        <Play className="h-3.5 w-3.5" />
-                        Reanudar Bot
-                      </>
-                    ) : (
-                      <>
-                        <Pause className="h-3.5 w-3.5 text-amber-500" />
-                        Pausar Bot (Modo Manual)
-                      </>
-                    )}
-                  </Button>
+                  {/* Estado Visual */}
+                  {!chatActivo.botPausado ? (
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold shadow-xs">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                      </span>
+                      <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span className="hidden sm:inline">IA Automática Activa</span>
+                      <span className="sm:hidden">IA Activa</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/35 text-amber-800 dark:text-amber-200 text-xs font-semibold shadow-xs">
+                      <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 animate-pulse" />
+                      <span>
+                        {chatActivo.botPauseRemainingMinutes
+                          ? `Intervención Humana (~${chatActivo.botPauseRemainingMinutes}m)`
+                          : "Modo Manual"}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Acciones para conmutar modo */}
+                  {chatActivo.botPausado ? (
+                    <Button
+                      size="sm"
+                      onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: false })}
+                      disabled={toggleBotMutation.isPending}
+                      className="h-8 gap-1.5 text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-md transition-all hover:scale-105 active:scale-95"
+                      title="Hacé clic para reactivar las respuestas automáticas de IA al instante"
+                    >
+                      <Zap className="h-3.5 w-3.5 fill-current" />
+                      Reactivar IA Ahora
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      {/* Botón rápido de Intervención (30 min con auto-reanudación) */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 30 })}
+                        disabled={toggleBotMutation.isPending}
+                        className="h-8 gap-1.5 text-xs font-medium text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700/70 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                        title="Pausar la IA por 30 minutos para dialogar manualmente (se reactiva sola al terminar para no dejar el bot desatendido)"
+                      >
+                        <Hand className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                        Intervenir (30m)
+                      </Button>
+
+                      {/* Más opciones de temporizador en desplegable */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-8 w-8 p-0" title="Más opciones de pausa">
+                            <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56 text-xs">
+                          <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground">
+                            Duración de la Intervención
+                          </DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 15 })}
+                            className="cursor-pointer gap-2 py-2"
+                          >
+                            <Clock className="h-3.5 w-3.5 text-amber-500" />
+                            <span>Pausa corta: 15 minutos</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 60 })}
+                            className="cursor-pointer gap-2 py-2"
+                          >
+                            <Clock className="h-3.5 w-3.5 text-amber-500" />
+                            <span>Pausa media: 1 hora</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 180 })}
+                            className="cursor-pointer gap-2 py-2"
+                          >
+                            <Clock className="h-3.5 w-3.5 text-amber-500" />
+                            <span>Pausa extendida: 3 horas</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: true, durationMinutes: 0 })}
+                            className="cursor-pointer gap-2 py-2 text-rose-600 dark:text-rose-400"
+                          >
+                            <Pause className="h-3.5 w-3.5" />
+                            <span>Pausa permanente (manual)</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Banner informativo si el bot está pausado */}
+              {/* Banner informativo interactivo cuando el bot está en Modo Intervención / Pausado */}
               {chatActivo.botPausado && (
-                <div className="bg-amber-500/10 border-b border-amber-500/20 px-3.5 py-1.5 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between flex-shrink-0">
-                  <span className="flex items-center gap-1.5">
-                    <Pause className="h-3.5 w-3.5 text-amber-500" />
-                    <strong>Modo Manual Activo:</strong> El asistente de IA no responderá automáticamente en este chat.
-                  </span>
-                  <span className="text-[11px] opacity-80">Tus respuestas desde la web van directo al WhatsApp del destinatario.</span>
+                <div className="bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-amber-500/5 border-b border-amber-500/25 px-4 py-2 text-xs text-amber-900 dark:text-amber-200 flex flex-wrap items-center justify-between gap-2 flex-shrink-0 animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="h-7 w-7 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center flex-shrink-0">
+                      <Hand className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground flex items-center gap-1.5">
+                        Modo Intervención Humana Activo
+                        {chatActivo.botPauseRemainingMinutes && (
+                          <Badge variant="outline" className="text-[10px] border-amber-500/40 bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 py-0 font-normal">
+                            Auto-reanudación en ~{chatActivo.botPauseRemainingMinutes} min
+                          </Badge>
+                        )}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {chatActivo.botPauseRemainingMinutes
+                          ? `La IA está en silencio para no interrumpirte. Al terminar el tiempo o al hacer clic se reactivará automáticamente.`
+                          : `El asistente está pausado de forma indefinida para este chat. Hacé clic en Reactivar cuando desees que vuelva a responder.`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      onClick={() => toggleBotMutation.mutate({ phone: selectedPhone!, bot_paused: false })}
+                      disabled={toggleBotMutation.isPending}
+                      className="h-7 px-3 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-xs gap-1.5"
+                    >
+                      <Zap className="h-3 w-3 fill-current" />
+                      Reactivar IA Ya
+                    </Button>
+                  </div>
                 </div>
               )}
 
-              {/* Flujo de mensajes con scroll vertical garantizado */}
+              {/* Flujo de mensajes con separadores de fecha y scroll vertical garantizado */}
               <div
                 ref={chatContainerRef}
                 className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-slate-100/40 dark:bg-slate-950/40"
@@ -528,125 +736,171 @@ export function WhatsAppChats() {
                     <p>Escribí un mensaje abajo para enviar el primer WhatsApp desde el servidor.</p>
                   </div>
                 ) : (
-                  chatActivo.messages.map((m: any, idx: number) => {
-                    const isUser = m.role === "user";
-                    const isTool = m.role === "tool";
-                    if (isTool) return null; // Omitir tool_results internos
+                  (() => {
+                    let prevDateKey = "";
+                    return chatActivo.messages.map((m: any, idx: number) => {
+                      const isUser = m.role === "user";
+                      const isTool = m.role === "tool";
+                      if (isTool) return null; // Omitir tool_results internos
 
-                    let textContent = "";
-                    let hasImage = false;
+                      const dateKey = getDateKey(m.created_at);
+                      const showDivider = dateKey !== prevDateKey && dateKey !== "unknown";
+                      if (showDivider) {
+                        prevDateKey = dateKey;
+                      }
 
-                    if (typeof m.content === "string") {
-                      textContent = m.content;
-                    } else if (Array.isArray(m.content)) {
-                      const textObj = m.content.find((c: any) => c.type === "text");
-                      const imgObj = m.content.find((c: any) => c.type === "image_url");
-                      textContent = textObj?.text || "";
-                      hasImage = !!imgObj;
-                    }
+                      let textContent = "";
+                      let hasImage = false;
 
-                    const timeStr = m.created_at
-                      ? new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                      : "";
+                      if (typeof m.content === "string") {
+                        textContent = m.content;
+                      } else if (Array.isArray(m.content)) {
+                        const textObj = m.content.find((c: any) => c.type === "text");
+                        const imgObj = m.content.find((c: any) => c.type === "image_url");
+                        textContent = textObj?.text || "";
+                        hasImage = !!imgObj;
+                      }
 
-                    return (
-                      <div
-                        key={idx}
-                        className={`flex ${isUser ? "justify-start" : "justify-end"} items-end gap-1.5`}
-                      >
-                        {isUser && (
-                          chatActivo.foto_perfil ? (
-                            <img
-                              src={chatActivo.foto_perfil}
-                              alt={chatActivo.nombre}
-                              className="h-6 w-6 rounded-full object-cover mb-1 border border-border/60 flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="h-6 w-6 rounded-full bg-slate-300 dark:bg-slate-700 flex items-center justify-center text-[10px] text-foreground flex-shrink-0 mb-1">
-                              <User className="h-3 w-3" />
-                            </div>
-                          )
-                        )}
+                      const { time, full, showDateBadge, shortDate } = formatBubbleTime(m.created_at);
 
-                        <div
-                          className={`max-w-[85%] md:max-w-[75%] rounded-2xl p-3 text-xs leading-relaxed shadow-sm ${
-                            isUser
-                              ? "bg-white dark:bg-slate-800 text-foreground border rounded-bl-sm"
-                              : m.manual
-                              ? "bg-emerald-600 text-white rounded-br-sm shadow-emerald-600/10"
-                              : m.is_warning
-                              ? "bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-300/40 rounded-br-sm"
-                              : "bg-slate-800 dark:bg-slate-700 text-white rounded-br-sm"
-                          }`}
-                        >
-                          {/* Etiqueta del remitente */}
-                          <div className="flex items-center justify-between gap-2 mb-1 pb-1 border-b border-black/10 dark:border-white/10 text-[10px] font-semibold opacity-75">
-                            <span>
-                              {isUser
-                                ? chatActivo.nombre
-                                : m.manual
-                                ? `Admin Web (${m.admin_user || "Carlos"})`
-                                : m.is_warning
-                                ? "Aviso Automático (No Admin)"
-                                : "Asistente Digital (IA)"}
-                            </span>
-                            {!isUser && !m.manual && !m.is_warning && (
-                              <span className="flex items-center gap-0.5 text-[9px] opacity-80">
-                                <Sparkles className="h-2.5 w-2.5" /> IA
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Imagen adjunta si existe */}
-                          {hasImage && (
-                            <div className="mb-2 p-1.5 bg-black/10 rounded-lg flex items-center gap-2">
-                              <ImageIcon className="h-4 w-4" />
-                              <span className="text-[11px] font-medium">Comprobante / Foto adjunto</span>
+                      return (
+                        <React.Fragment key={idx}>
+                          {/* Separador de Fecha estilo WhatsApp */}
+                          {showDivider && (
+                            <div className="flex justify-center my-3 sticky top-1 z-10 select-none">
+                              <div className="px-3.5 py-1 rounded-full text-[11px] font-semibold bg-background/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 shadow-xs border border-border/80 backdrop-blur-md flex items-center gap-1.5">
+                                <Calendar className="h-3 w-3 text-muted-foreground" />
+                                <span>{formatDateDivider(m.created_at)}</span>
+                              </div>
                             </div>
                           )}
 
-                          {/* Contenido del texto */}
-                          <p className="whitespace-pre-wrap select-text font-normal">{textContent}</p>
+                          <div
+                            className={`flex ${isUser ? "justify-start" : "justify-end"} items-end gap-1.5`}
+                          >
+                            {isUser && (
+                              chatActivo.foto_perfil ? (
+                                <img
+                                  src={chatActivo.foto_perfil}
+                                  alt={chatActivo.nombre}
+                                  className="h-6 w-6 rounded-full object-cover mb-1 border border-border/60 flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="h-6 w-6 rounded-full bg-slate-300 dark:bg-slate-700 flex items-center justify-center text-[10px] text-foreground flex-shrink-0 mb-1">
+                                  <User className="h-3 w-3" />
+                                </div>
+                              )
+                            )}
 
-                          {/* Hora y tilde */}
-                          <div className="flex items-center justify-end gap-1 mt-1 text-[10px] opacity-60">
-                            {timeStr && <span>{timeStr}</span>}
-                            {!isUser && <CheckCheck className="h-3 w-3 inline" />}
+                            <div
+                              className={`max-w-[85%] md:max-w-[75%] rounded-2xl p-3 text-xs leading-relaxed shadow-sm ${
+                                isUser
+                                  ? "bg-white dark:bg-slate-800 text-foreground border rounded-bl-sm"
+                                  : m.manual
+                                  ? "bg-emerald-600 text-white rounded-br-sm shadow-emerald-600/10"
+                                  : m.is_warning
+                                  ? "bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-300/40 rounded-br-sm"
+                                  : "bg-slate-800 dark:bg-slate-700 text-white rounded-br-sm"
+                              }`}
+                            >
+                              {/* Etiqueta del remitente */}
+                              <div className="flex items-center justify-between gap-2 mb-1 pb-1 border-b border-black/10 dark:border-white/10 text-[10px] font-semibold opacity-75">
+                                <span>
+                                  {isUser
+                                    ? chatActivo.nombre
+                                    : m.manual
+                                    ? `Admin Web (${m.admin_user || "Carlos"})`
+                                    : m.is_warning
+                                    ? "Aviso Automático (No Admin)"
+                                    : "Asistente Digital (IA)"}
+                                </span>
+                                {!isUser && !m.manual && !m.is_warning && (
+                                  <span className="flex items-center gap-0.5 text-[9px] opacity-80">
+                                    <Sparkles className="h-2.5 w-2.5" /> IA
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Imagen adjunta si existe */}
+                              {hasImage && (
+                                <div className="mb-2 p-1.5 bg-black/10 rounded-lg flex items-center gap-2">
+                                  <ImageIcon className="h-4 w-4" />
+                                  <span className="text-[11px] font-medium">Comprobante / Foto adjunto</span>
+                                </div>
+                              )}
+
+                              {/* Contenido del texto */}
+                              <p className="whitespace-pre-wrap select-text font-normal">{textContent}</p>
+
+                              {/* Fecha precisa, Hora y Tilde de entrega */}
+                              <div
+                                className="flex items-center justify-end gap-1.5 mt-1 text-[10px] opacity-70 select-none"
+                                title={full}
+                              >
+                                {showDateBadge && (
+                                  <span className="font-mono text-[9px] bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded-xs">
+                                    {shortDate}
+                                  </span>
+                                )}
+                                <span className="font-mono">{time}</span>
+                                {!isUser && (
+                                  <CheckCheck className={`h-3.5 w-3.5 inline ${m.manual ? "text-emerald-200" : "text-slate-400"}`} />
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })
+                        </React.Fragment>
+                      );
+                    });
+                  })()
                 )}
               </div>
 
               {/* Barra inferior para redactar y enviar (fija abajo) */}
-              <form onSubmit={handleEnviar} className="p-2.5 border-t bg-background flex items-end gap-2 flex-shrink-0">
-                <div className="flex-1 relative">
-                  <textarea
-                    rows={2}
-                    placeholder="Escribí un mensaje para enviar por WhatsApp... (Shift+Enter para salto de línea)"
-                    value={mensajeTexto}
-                    onChange={(e) => setMensajeTexto(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleEnviar();
-                      }
-                    }}
-                    className="w-full resize-none p-2 text-xs rounded-lg border bg-slate-50/50 dark:bg-slate-900/50 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
+              <div className="p-2.5 border-t bg-background flex flex-col gap-1.5 flex-shrink-0">
+                {/* Opciones y tips inteligentes del envío */}
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={pausarAlEnviar}
+                      onChange={(e) => setPausarAlEnviar(e.target.checked)}
+                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+                    />
+                    <span>Pausar IA por 30 min al responder (Intervención humana)</span>
+                  </label>
+                  <span className="text-[10px] text-muted-foreground/80 hidden sm:inline">
+                    💡 Podés reactivar el asistente en cualquier momento escribiendo <code className="bg-muted px-1 rounded font-mono font-semibold">bot</code> por WhatsApp
+                  </span>
                 </div>
 
-                <Button
-                  type="submit"
-                  disabled={!mensajeTexto.trim() || sendMutation.isPending}
-                  className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs font-semibold shadow-sm flex-shrink-0"
-                >
-                  <Send className="h-3.5 w-3.5" />
-                  {sendMutation.isPending ? "Enviando..." : "Enviar"}
-                </Button>
-              </form>
+                <form onSubmit={handleEnviar} className="flex items-end gap-2">
+                  <div className="flex-1 relative">
+                    <textarea
+                      rows={2}
+                      placeholder="Escribí un mensaje para enviar por WhatsApp... (Shift+Enter para salto de línea)"
+                      value={mensajeTexto}
+                      onChange={(e) => setMensajeTexto(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleEnviar();
+                        }
+                      }}
+                      className="w-full resize-none p-2 text-xs rounded-lg border bg-slate-50/50 dark:bg-slate-900/50 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={!mensajeTexto.trim() || sendMutation.isPending}
+                    className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs font-semibold shadow-sm flex-shrink-0"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    {sendMutation.isPending ? "Enviando..." : "Enviar"}
+                  </Button>
+                </form>
+              </div>
             </>
           ) : (
             /* Estado vacío cuando no hay conversación seleccionada */
@@ -656,7 +910,7 @@ export function WhatsAppChats() {
               </div>
               <h3 className="font-bold text-lg text-foreground">Bandeja de Mensajes WhatsApp</h3>
               <p className="text-xs text-muted-foreground max-w-sm">
-                Seleccioná una conversación de la columna izquierda para leer el historial completo, ver lo que el asistente responde o enviar un mensaje manual directamente desde el sistema.
+                Seleccioná una conversación de la columna izquierda para leer el historial completo, ver las fechas y horas exactas de los mensajes o responder directamente desde el sistema.
               </p>
               <Button
                 size="sm"

@@ -77,7 +77,17 @@ router.get("/", async (req, res) => {
       }
 
       const datosPendientes = (typeof s.datos_pendientes === "object" && s.datos_pendientes) ? s.datos_pendientes : {};
-      const botPaused = Boolean((datosPendientes as any).bot_paused);
+      let botPaused = Boolean((datosPendientes as any).bot_paused);
+      const pausedUntil = (datosPendientes as any).bot_paused_until || null;
+      let remainingMinutes: number | null = null;
+      if (botPaused && pausedUntil) {
+        const msLeft = new Date(pausedUntil).getTime() - Date.now();
+        if (msLeft <= 0) {
+          botPaused = false;
+        } else {
+          remainingMinutes = Math.ceil(msLeft / 60000);
+        }
+      }
       const esAdmin = ADMIN_PHONES.some((a) => last10 === getLast10(a)) || (emp?.cargo || "").toLowerCase().includes("admin");
 
       return {
@@ -90,6 +100,8 @@ router.get("/", async (req, res) => {
         ultimaFecha: s.updated_at || new Date(),
         totalMensajes: messages.length,
         botPausado: botPaused,
+        botPausedUntil: pausedUntil,
+        botPauseRemainingMinutes: remainingMinutes,
         esAdmin,
       };
     });
@@ -172,14 +184,34 @@ router.get("/:phone", async (req, res) => {
       }
     }
 
+    const datosPendientes = (typeof sesion?.datos_pendientes === "object" && sesion?.datos_pendientes) ? sesion.datos_pendientes : {};
+    let botPaused = Boolean((datosPendientes as any).bot_paused);
+    const pausedUntil = (datosPendientes as any).bot_paused_until || null;
+    let remainingMinutes: number | null = null;
+    if (botPaused && pausedUntil) {
+      const msLeft = new Date(pausedUntil).getTime() - Date.now();
+      if (msLeft <= 0) {
+        botPaused = false;
+      } else {
+        remainingMinutes = Math.ceil(msLeft / 60000);
+      }
+    }
+
+    const messages = ((sesion?.messages as any[]) || []).map((m: any) => ({
+      ...m,
+      created_at: m.created_at || sesion?.updated_at || new Date().toISOString(),
+    }));
+
     return res.json({
       phone: sesion?.phone || rawPhone,
       nombre: emp ? `${emp.nombre} ${emp.apellido}`.trim() : rawPhone,
       cargo: emp?.cargo || (esAdmin ? "Administrador" : "Contacto externo"),
       empleado_id: emp?.id || null,
       foto_perfil: fotoPerfil,
-      messages: (sesion?.messages as any[]) || [],
+      messages,
       botPausado: botPaused,
+      botPausedUntil: pausedUntil,
+      botPauseRemainingMinutes: remainingMinutes,
       esAdmin,
       updated_at: sesion?.updated_at || new Date(),
     });
@@ -192,7 +224,7 @@ router.get("/:phone", async (req, res) => {
 router.post("/:phone/send", async (req, res) => {
   try {
     const rawPhone = req.params.phone;
-    const { text } = req.body;
+    const { text, pauseDurationMinutes } = req.body;
 
     if (!text || typeof text !== "string" || !text.trim()) {
       return res.status(400).json({ error: "El mensaje no puede estar vacío" });
@@ -236,10 +268,20 @@ router.post("/:phone/send", async (req, res) => {
     };
     historial.push(nuevoMsg);
 
+    const datosPendientes = sesion.datos_pendientes && typeof sesion.datos_pendientes === "object" ? { ...sesion.datos_pendientes } : {};
+    (datosPendientes as any).last_manual_reply_at = new Date().toISOString();
+
+    // Si se especificó pausar temporalmente al enviar (ej: 30 min)
+    if (pauseDurationMinutes !== undefined && Number(pauseDurationMinutes) > 0) {
+      (datosPendientes as any).bot_paused = true;
+      (datosPendientes as any).bot_paused_until = new Date(Date.now() + Number(pauseDurationMinutes) * 60 * 1000).toISOString();
+    }
+
     await db
       .update(whatsappSesionesTable)
       .set({
         messages: historial,
+        datos_pendientes: datosPendientes,
         updated_at: new Date(),
       })
       .where(eq(whatsappSesionesTable.phone, sesion.phone));
@@ -285,6 +327,18 @@ router.post("/:phone/toggle-bot", async (req, res) => {
 
     (datosPendientes as any).bot_paused = newState;
 
+    if (newState) {
+      const durationMinutes = req.body.durationMinutes !== undefined ? Number(req.body.durationMinutes) : 30;
+      if (durationMinutes > 0) {
+        (datosPendientes as any).bot_paused_until = new Date(Date.now() + durationMinutes * 60 * 1000).toISOString();
+      } else {
+        (datosPendientes as any).bot_paused_until = null; // Permanente
+      }
+      (datosPendientes as any).last_manual_reply_at = new Date().toISOString();
+    } else {
+      (datosPendientes as any).bot_paused_until = null;
+    }
+
     await db
       .update(whatsappSesionesTable)
       .set({
@@ -293,9 +347,15 @@ router.post("/:phone/toggle-bot", async (req, res) => {
       })
       .where(eq(whatsappSesionesTable.phone, sesion.phone));
 
+    const remaining = (datosPendientes as any).bot_paused_until
+      ? Math.max(1, Math.ceil((new Date((datosPendientes as any).bot_paused_until).getTime() - Date.now()) / 60000))
+      : null;
+
     return res.json({
       success: true,
       botPausado: newState,
+      botPausedUntil: (datosPendientes as any).bot_paused_until || null,
+      botPauseRemainingMinutes: remaining,
       phone: sesion.phone,
     });
   } catch (err: any) {

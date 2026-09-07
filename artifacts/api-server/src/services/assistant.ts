@@ -719,15 +719,20 @@ async function obtenerSesion(phone: string) {
       return nueva;
     }
 
-    // Limpiar sesión si lleva más de 2 horas inactiva
+    // Limpiar estado transitorio de sesión si lleva más de 2 horas inactiva (sin borrar el historial de auditoría de mensajes)
     const ahora = Date.now();
     const ultimaActividad = sesion.updated_at ? new Date(sesion.updated_at).getTime() : 0;
     if (ahora - ultimaActividad > SESSION_TIMEOUT_MS) {
+      const datos = typeof sesion.datos_pendientes === "object" && sesion.datos_pendientes ? { ...sesion.datos_pendientes } : {};
+      if (datos.bot_paused_until && new Date(datos.bot_paused_until).getTime() <= ahora) {
+        datos.bot_paused = false;
+        datos.bot_paused_until = null;
+      }
       await db
         .update(whatsappSesionesTable)
-        .set({ messages: [], estado: "idle", datos_pendientes: null, updated_at: new Date() })
+        .set({ estado: "idle", datos_pendientes: datos, updated_at: new Date() })
         .where(eq(whatsappSesionesTable.phone, phone));
-      return { ...sesion, messages: [], estado: "idle", datos_pendientes: null };
+      return { ...sesion, estado: "idle", datos_pendientes: datos };
     }
 
     return sesion;
@@ -741,7 +746,8 @@ async function obtenerSesion(phone: string) {
 // Guardar sesión — con fallback si la tabla no existe
 async function guardarSesion(phone: string, messages: any[], estado: string = "idle", datos_pendientes: any = null) {
   try {
-    const historial = messages.slice(-MAX_HISTORY);
+    // Guardar hasta 300 mensajes en la base de datos para historial completo de auditoría en la web
+    const historial = messages.slice(-300);
     await db
       .update(whatsappSesionesTable)
       .set({ messages: historial, estado, datos_pendientes, updated_at: new Date() })
@@ -799,8 +805,77 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
     return;
   }
 
-  // Si el bot fue pausado manualmente desde la web por un administrador para este chat:
-  if ((sesion.datos_pendientes as any)?.bot_paused) {
+  // Gestión inteligente de Modo Manual vs Modo Automático (evita que el asistente quede colgado por olvido)
+  const datosPendientes = typeof sesion.datos_pendientes === "object" && sesion.datos_pendientes ? { ...sesion.datos_pendientes } : {};
+  let isBotPaused = Boolean((datosPendientes as any).bot_paused);
+  const rawText = (text || "").trim();
+  const cleanText = rawText.toLowerCase();
+
+  // 1. Auto-reanudación: Verificar si la pausa temporal programada ya expiró
+  if (isBotPaused && (datosPendientes as any).bot_paused_until) {
+    const expireTime = new Date((datosPendientes as any).bot_paused_until).getTime();
+    if (Date.now() >= expireTime) {
+      console.log(`[WhatsApp Asistente] Pausa temporal finalizada para ${senderPhone}. Auto-reactivando bot a modo automático.`);
+      isBotPaused = false;
+      (datosPendientes as any).bot_paused = false;
+      (datosPendientes as any).bot_paused_until = null;
+    }
+  }
+
+  // 2. Auto-reanudación de seguridad: Si pasaron más de 60 minutos del último mensaje manual del admin, reactivar bot
+  if (isBotPaused && (datosPendientes as any).last_manual_reply_at) {
+    const lastManualTime = new Date((datosPendientes as any).last_manual_reply_at).getTime();
+    if (Date.now() - lastManualTime > 60 * 60 * 1000) {
+      console.log(`[WhatsApp Asistente] Sin actividad manual en 60m para ${senderPhone}. Auto-reactivando bot para evitar asistente desatendido.`);
+      isBotPaused = false;
+      (datosPendientes as any).bot_paused = false;
+      (datosPendientes as any).bot_paused_until = null;
+    }
+  }
+
+  // 3. Rescate / Reactivación directa por WhatsApp: comandos especiales para despertar al bot
+  const esComandoReactivacion =
+    cleanText === "bot" ||
+    cleanText === "@bot" ||
+    cleanText === "#bot" ||
+    cleanText === "activar" ||
+    cleanText === "reanudar" ||
+    cleanText === "activar bot" ||
+    cleanText === "despertar" ||
+    cleanText === "asistente" ||
+    cleanText === "hola bot" ||
+    cleanText.startsWith("@bot ") ||
+    cleanText.startsWith("#bot ") ||
+    cleanText.startsWith("bot ");
+
+  if (isBotPaused && esComandoReactivacion) {
+    console.log(`[WhatsApp Asistente] Comando de reactivación recibido de ${senderPhone} ("${text}"). Reactivando bot.`);
+    isBotPaused = false;
+    (datosPendientes as any).bot_paused = false;
+    (datosPendientes as any).bot_paused_until = null;
+    sesion.datos_pendientes = datosPendientes;
+
+    // Si el mensaje era únicamente el comando de reactivación (ej: "bot", "activar", "asistente"):
+    const esSoloComando = [
+      "bot", "@bot", "#bot", "activar", "reanudar", "activar bot", "despertar", "asistente", "hola bot"
+    ].includes(cleanText);
+
+    if (esSoloComando) {
+      const respActivacion = "🤖 *Asistente reactivado con éxito.*\n\nEl modo automático está encendido y listo para responder consultas, registrar gastos y gestionar jornadas. ¿En qué te puedo ayudar hoy?";
+      await sendWhatsAppMessage(from, respActivacion);
+      const hist = (sesion.messages as any[]) || [];
+      hist.push({ role: "user", content: text, created_at: new Date().toISOString() });
+      hist.push({ role: "assistant", content: respActivacion, created_at: new Date().toISOString() });
+      await guardarSesion(senderPhone, hist, "idle", datosPendientes);
+      return;
+    }
+
+    // Si el mensaje contenía una consulta (ej: "@bot cuánto combustible cargamos hoy"):
+    text = text.replace(/^[@#]?bot\s+/i, "").trim();
+  }
+
+  // Si el bot continúa pausado (modo manual activo):
+  if (isBotPaused) {
     console.log(`[WhatsApp Asistente] Chat con ${senderPhone} en MODO MANUAL (bot pausado). Guardando mensaje sin respuesta de IA.`);
     const historialManual = (sesion.messages as any[]) || [];
     historialManual.push({
@@ -809,7 +884,7 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
       created_at: new Date().toISOString(),
       has_media: !!imageBase64,
     });
-    await guardarSesion(senderPhone, historialManual, "manual", sesion.datos_pendientes);
+    await guardarSesion(senderPhone, historialManual, "manual", datosPendientes);
     return;
   }
 
@@ -887,13 +962,14 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
         content: [
           { type: "text", text: text },
           { type: "image_url", image_url: { url: imageBase64 } }
-        ] 
+        ],
+        created_at: new Date().toISOString()
       });
     } else {
-      historialFiltrado.push({ role: "user", content: text });
+      historialFiltrado.push({ role: "user", content: text, created_at: new Date().toISOString() });
     }
   } else {
-    historialFiltrado.push({ role: "user", content: text });
+    historialFiltrado.push({ role: "user", content: text, created_at: new Date().toISOString() });
   }
 
   const today = getArgentinaTodayDisplay();
@@ -1059,9 +1135,17 @@ NO podés registrar ni modificar datos. Si te piden eso, informá que solo los a
 Nunca inventés datos. Usá siempre las herramientas disponibles.
 CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maquinaria?", "y los equipos?"), inferí el tema del mensaje anterior para responder correctamente.`;
 
+  // Sanitizar mensajes para el modelo LLM (solo campos estándar soportados por la API)
+  const contextForModel = historialFiltrado.slice(-MAX_HISTORY).map((m: any) => {
+    const item: any = { role: m.role, content: m.content };
+    if (m.tool_calls) item.tool_calls = m.tool_calls;
+    if (m.tool_call_id) item.tool_call_id = m.tool_call_id;
+    return item;
+  });
+
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
-    ...historialFiltrado.slice(-MAX_HISTORY) as any[],
+    ...contextForModel as any[],
   ];
 
   try {
@@ -1224,11 +1308,11 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
       const finalContent = secondResponse.choices[0].message.content;
       if (finalContent) {
         await sendWhatsAppMessage(from, finalContent);
-        historialFiltrado.push({ role: "assistant", content: finalContent });
+        historialFiltrado.push({ role: "assistant", content: finalContent, created_at: new Date().toISOString() });
       }
     } else if (responseMessage.content) {
       await sendWhatsAppMessage(from, responseMessage.content);
-      historialFiltrado.push({ role: "assistant", content: responseMessage.content });
+      historialFiltrado.push({ role: "assistant", content: responseMessage.content, created_at: new Date().toISOString() });
     }
 
     // Guardar historial actualizado manteniendo los datos pendientes
