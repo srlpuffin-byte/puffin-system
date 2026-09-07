@@ -21,17 +21,60 @@ export function usePushNotifications() {
   const [isLoading, setIsLoading] = useState(false);
   const [isIosStandalone, setIsIosStandalone] = useState(false);
 
+  // Sincronizar suscripción existente con el backend
+  const syncSubscriptionToBackend = useCallback(async (sub: PushSubscription) => {
+    try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      await fetch("/api/push-notifications/subscribe", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          subscription: sub.toJSON(),
+          userAgent: navigator.userAgent,
+        }),
+      });
+    } catch (e) {
+      console.warn("[Push Hook] Error sincronizando suscripción:", e);
+    }
+  }, []);
+
+  const checkExistingSubscription = useCallback(async () => {
+    try {
+      if (!("serviceWorker" in navigator)) return;
+      const reg = await navigator.serviceWorker.ready;
+      if (!reg || !reg.pushManager) return;
+      const sub = await reg.pushManager.getSubscription();
+
+      if (sub) {
+        setIsSubscribed(true);
+        // Garantizar que la base de datos siempre tenga el endpoint registrado
+        await syncSubscriptionToBackend(sub);
+      } else {
+        setIsSubscribed(false);
+      }
+    } catch (err) {
+      console.warn("[Push Hook] Error verificando suscripción existente:", err);
+    }
+  }, [syncSubscriptionToBackend]);
+
   useEffect(() => {
-    // Detectar si está en iOS (iPhone / iPad) y si está en modo standalone (PWA en pantalla de inicio)
-    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const isStandalone = 
-      (window.navigator as any).standalone === true || 
-      window.matchMedia('(display-mode: standalone)').matches;
+    const isIos =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const isStandalone =
+      (window.navigator as any).standalone === true ||
+      window.matchMedia("(display-mode: standalone)").matches;
 
     setIsIosStandalone(isIos && isStandalone);
 
-    const supported = 
+    const supported =
       typeof window !== "undefined" &&
       "serviceWorker" in navigator &&
       "Notification" in window;
@@ -42,19 +85,7 @@ export function usePushNotifications() {
       setPermission(Notification.permission);
       checkExistingSubscription();
     }
-  }, []);
-
-  const checkExistingSubscription = useCallback(async () => {
-    try {
-      if (!("serviceWorker" in navigator)) return;
-      const reg = await navigator.serviceWorker.ready;
-      if (!reg || !reg.pushManager) return;
-      const sub = await reg.pushManager.getSubscription();
-      setIsSubscribed(!!sub);
-    } catch (err) {
-      console.warn("[Push Hook] Error verificando suscripción existente:", err);
-    }
-  }, []);
+  }, [checkExistingSubscription]);
 
   const subscribeToPush = useCallback(async () => {
     if (!("Notification" in window)) {
@@ -65,7 +96,7 @@ export function usePushNotifications() {
     setIsLoading(true);
 
     try {
-      // 1. Solicitar permiso al usuario (en iOS Safari debe ejecutarse en respuesta directa a un clic)
+      // 1. Solicitar permiso al usuario en iOS
       let permResult = Notification.permission;
       if (permResult !== "granted") {
         try {
@@ -87,13 +118,13 @@ export function usePushNotifications() {
         return false;
       }
 
-      // 2. Obtener clave pública VAPID del servidor
+      // 2. Obtener clave pública VAPID
       const keyRes = await fetch("/api/push-notifications/public-key");
-      if (!keyRes.ok) throw new Error("No se pudo conectar con el servidor para obtener la clave.");
+      if (!keyRes.ok) throw new Error("No se pudo conectar con el servidor.");
       const { publicKey } = await keyRes.json();
       if (!publicKey) throw new Error("Clave pública no disponible.");
 
-      // 3. Asegurar que el Service Worker esté registrado y activo
+      // 3. Service Worker
       if (!("serviceWorker" in navigator)) {
         throw new Error("Service Worker no soportado.");
       }
@@ -105,10 +136,10 @@ export function usePushNotifications() {
       await navigator.serviceWorker.ready;
 
       if (!registration.pushManager) {
-        throw new Error("PushManager no disponible en este navegador o modo.");
+        throw new Error("PushManager no disponible en este dispositivo.");
       }
 
-      // 4. Suscribir a PushManager
+      // 4. Suscribir o renovar suscripción en PushManager
       const convertedVapidKey = urlBase64ToUint8Array(publicKey);
       let subscription = await registration.pushManager.getSubscription();
 
@@ -119,10 +150,7 @@ export function usePushNotifications() {
         });
       }
 
-      // Serializar a formato plano JSON compatible con backend
-      const subJson = subscription.toJSON();
-
-      // 5. Enviar suscripción al backend incluyendo token si existe
+      // 5. Guardar en backend
       const token = getAuthToken();
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -135,7 +163,7 @@ export function usePushNotifications() {
         method: "POST",
         headers,
         body: JSON.stringify({
-          subscription: subJson,
+          subscription: subscription.toJSON(),
           userAgent: navigator.userAgent,
         }),
       });
@@ -148,16 +176,13 @@ export function usePushNotifications() {
       setIsSubscribed(true);
       playNotificationSound("message");
       toast.success("¡Notificaciones activadas!", {
-        description: "Recibirás avisos de WhatsApp y del sistema directamente en este dispositivo.",
+        description: "Recibirás avisos de WhatsApp y del sistema directamente en tu teléfono.",
         duration: 5000,
       });
 
-      // 6. Enviar notificación de prueba para confirmar recepción en iOS
+      // 6. Enviar prueba automática
       try {
-        await fetch("/api/push-notifications/test", {
-          method: "POST",
-          headers,
-        });
+        await fetch("/api/push-notifications/test", { method: "POST", headers });
       } catch {}
 
       return true;
@@ -174,19 +199,38 @@ export function usePushNotifications() {
 
   const sendTestNotification = useCallback(async () => {
     try {
-      toast.info("Enviando notificación de prueba...");
+      toast.info("Enviando notificación al teléfono...", { duration: 2500 });
       const token = getAuthToken();
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      // Primero asegurar sincronización de la suscripción
+      if ("serviceWorker" in navigator) {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager?.getSubscription();
+        if (sub) {
+          await fetch("/api/push-notifications/subscribe", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              subscription: sub.toJSON(),
+              userAgent: navigator.userAgent,
+            }),
+          }).catch(() => {});
+        }
       }
 
       const res = await fetch("/api/push-notifications/test", { method: "POST", headers });
       const data = await res.json();
       if (res.ok) {
         playNotificationSound("message");
-        toast.success("Notificación de prueba enviada", {
-          description: data.message || "Revisá las notificaciones de tu dispositivo.",
+        toast.success("Notificación enviada a tu iPhone", {
+          description: "Si estás con la app abierta, bloqueá tu iPhone o salí al inicio para ver el cartel.",
+          duration: 7000,
         });
       } else {
         toast.error(data.error || "No se pudo enviar la prueba.");

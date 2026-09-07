@@ -2,42 +2,53 @@
 // PUFFIN SRL - Push Notification Worker (Compatible con iOS PWA Standalone, Android y Desktop)
 
 self.addEventListener('push', (event) => {
-  let data = {
+  let payload = {
     title: 'PUFFIN SRL',
-    body: 'Tenés una nueva notificación en el sistema.',
-    icon: '/pwa-192x192.png',
-    badge: '/pwa-192x192.png',
-    tag: 'puffin-notification',
-    url: '/panel',
+    body: 'Nuevo mensaje recibido en el sistema.',
+    url: '/whatsapp',
   };
 
   if (event.data) {
     try {
       const parsed = event.data.json();
-      data = { ...data, ...parsed };
+      payload = { ...payload, ...parsed };
     } catch (e) {
-      data.body = event.data.text();
+      try {
+        payload.body = event.data.text();
+      } catch {}
     }
   }
 
-  const title = data.title || 'PUFFIN SRL';
-  const targetUrl = data.data?.url || data.url || '/whatsapp';
+  const title = payload.title || 'PUFFIN SRL';
+  const body = payload.body || 'Tenés una nueva notificación.';
+  const targetUrl = payload.data?.url || payload.url || '/whatsapp';
 
+  // Opciones ultra-compatibles con iOS Safari
   const options = {
-    body: data.body || 'Nuevo aviso en Puffin.',
-    icon: data.icon || '/pwa-192x192.png',
-    badge: data.badge || '/pwa-192x192.png',
-    tag: data.tag || 'puffin-' + Date.now(),
+    body: body,
+    tag: payload.tag || 'puffin-' + Date.now(),
     data: {
       url: targetUrl,
       timestamp: Date.now(),
     },
-    vibrate: [200, 100, 200],
-    requireInteraction: true,
   };
 
+  // En Android y Chrome de escritorio podemos adjuntar iconos y vibración
+  const isApple = /iPhone|iPad|iPod/.test(navigator.userAgent || '');
+  if (!isApple) {
+    options.icon = '/pwa-192x192.png';
+    options.badge = '/pwa-192x192.png';
+    options.vibrate = [200, 100, 200];
+  }
+
   event.waitUntil(
-    self.registration.showNotification(title, options)
+    self.registration.showNotification(title, options).catch((err) => {
+      console.warn('[SW Push] Fallback a notificación mínima:', err);
+      return self.registration.showNotification(title, {
+        body: body,
+        data: { url: targetUrl },
+      });
+    })
   );
 });
 
