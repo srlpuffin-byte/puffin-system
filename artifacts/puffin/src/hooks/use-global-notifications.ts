@@ -127,8 +127,61 @@ export function useGlobalNotifications() {
     };
   }, [location, setLocation]);
 
+  const deleteNotification = async (id: string) => {
+    // Actualización optimista inmediata
+    setRecentNotifications((prev) => prev.filter((n) => n.id !== id));
+    try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      await fetch(`/api/push-notifications/recent/${id}`, {
+        method: "DELETE",
+        headers,
+      });
+    } catch (e) {
+      console.warn("Error borrando notificación:", e);
+    }
+  };
+
+  const clearAllNotifications = async () => {
+    // Limpieza optimista inmediata
+    setRecentNotifications([]);
+    if ("clearAppBadge" in navigator) {
+      try { navigator.clearAppBadge(); } catch {}
+    }
+    try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      await fetch("/api/push-notifications/recent", {
+        method: "DELETE",
+        headers,
+      });
+    } catch (e) {
+      console.warn("Error vaciando notificaciones:", e);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      await fetch("/api/push-notifications/recent/read-all", {
+        method: "POST",
+        headers,
+      });
+      if ("clearAppBadge" in navigator) {
+        try { navigator.clearAppBadge(); } catch {}
+      }
+    } catch {}
+  };
+
   return {
     unreadWhatsAppCount,
     recentNotifications,
+    deleteNotification,
+    clearAllNotifications,
+    markAllAsRead,
   };
 }

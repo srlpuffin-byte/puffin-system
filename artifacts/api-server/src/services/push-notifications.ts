@@ -90,6 +90,27 @@ export function getRecentNotifications() {
   return recentNotifications;
 }
 
+export function deleteRecentNotification(id: string) {
+  const index = recentNotifications.findIndex((n) => n.id === id);
+  if (index !== -1) {
+    recentNotifications.splice(index, 1);
+    return true;
+  }
+  return false;
+}
+
+export function clearRecentNotifications() {
+  recentNotifications.length = 0;
+  return true;
+}
+
+export function markAllNotificationsAsRead() {
+  recentNotifications.forEach((n) => {
+    n.leido = true;
+  });
+  return true;
+}
+
 export async function savePushSubscription(params: {
   endpoint: string;
   p256dh: string;

@@ -6,6 +6,9 @@ import {
   removePushSubscription,
   sendPushNotificationToAll,
   getRecentNotifications,
+  deleteRecentNotification,
+  clearRecentNotifications,
+  markAllNotificationsAsRead,
 } from "../services/push-notifications.js";
 import { logger } from "../lib/logger.js";
 
@@ -120,6 +123,25 @@ router.post("/test", async (req: any, res) => {
 router.get("/recent", (req, res) => {
   const notifs = getRecentNotifications();
   return res.json({ notifications: notifs });
+});
+
+// Eliminar una notificación individual
+router.delete("/recent/:id", (req, res) => {
+  const { id } = req.params;
+  const deleted = deleteRecentNotification(id);
+  return res.json({ success: deleted });
+});
+
+// Vaciar todas las notificaciones
+router.delete("/recent", (req, res) => {
+  clearRecentNotifications();
+  return res.json({ success: true });
+});
+
+// Marcar todas las notificaciones como leídas
+router.post("/recent/read-all", (req, res) => {
+  markAllNotificationsAsRead();
+  return res.json({ success: true });
 });
 
 export default router;
