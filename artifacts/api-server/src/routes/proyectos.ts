@@ -49,13 +49,16 @@ router.get("/", async (req, res) => {
     
     if (req.user?.rol?.toLowerCase() === "empleado") {
       const [user] = await db.select().from(usuariosTable).where(eq(usuariosTable.id, req.user.id)).limit(1);
-      const [emp] = await db.select().from(empleadosTable)
-        .where(or(
-          eq(empleadosTable.dni, user.usuario),
-          and(eq(empleadosTable.nombre, user.nombre), eq(empleadosTable.apellido, user.apellido))
-        )).limit(1);
-      
-      const empId = emp?.id;
+      let empId: number | undefined;
+      if (user) {
+        const conds = [];
+        if (user.usuario) conds.push(eq(empleadosTable.dni, user.usuario));
+        if (user.nombre && user.apellido) conds.push(and(eq(empleadosTable.nombre, user.nombre), eq(empleadosTable.apellido, user.apellido)));
+        if (conds.length > 0) {
+          const [emp] = await db.select().from(empleadosTable).where(or(...conds)).limit(1);
+          empId = emp?.id;
+        }
+      }
       
       proyectos = proyectos.filter(p => {
         const asignados = p.empleados_asignados as number[] | null;
@@ -71,7 +74,8 @@ router.get("/", async (req, res) => {
     
     return res.json(proyectos);
   } catch (err: any) {
-    req.log.error(err);
+    if (req.log) req.log.error(err);
+    else console.error("[proyectos GET /] Error:", err);
     return res.status(500).json({ error: "Error al obtener proyectos" });
   }
 });
@@ -131,13 +135,17 @@ router.get("/:id", async (req, res) => {
 
     if (req.user?.rol?.toLowerCase() === "empleado") {
       const [user] = await db.select().from(usuariosTable).where(eq(usuariosTable.id, req.user.id)).limit(1);
-      const [emp] = await db.select().from(empleadosTable)
-        .where(or(
-          eq(empleadosTable.dni, user.usuario),
-          and(eq(empleadosTable.nombre, user.nombre), eq(empleadosTable.apellido, user.apellido))
-        )).limit(1);
+      let empId: number | undefined;
+      if (user) {
+        const conds = [];
+        if (user.usuario) conds.push(eq(empleadosTable.dni, user.usuario));
+        if (user.nombre && user.apellido) conds.push(and(eq(empleadosTable.nombre, user.nombre), eq(empleadosTable.apellido, user.apellido)));
+        if (conds.length > 0) {
+          const [emp] = await db.select().from(empleadosTable).where(or(...conds)).limit(1);
+          empId = emp?.id;
+        }
+      }
       
-      const empId = emp?.id;
       const asignados = proyecto.empleados_asignados as number[] | null;
       if (!asignados || !empId || !asignados.includes(empId)) {
         return res.status(403).json({ error: "No tienes permiso para ver este proyecto" });
@@ -154,7 +162,8 @@ router.get("/:id", async (req, res) => {
 
     return res.json(proyecto);
   } catch (err: any) {
-    req.log.error(err);
+    if (req.log) req.log.error(err);
+    else console.error("[proyectos GET /:id] Error:", err);
     return res.status(500).json({ error: "Error al obtener proyecto" });
   }
 });
