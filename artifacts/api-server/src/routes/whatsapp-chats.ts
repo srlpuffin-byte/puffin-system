@@ -333,20 +333,15 @@ router.post("/:phone/send", async (req, res) => {
       const metaRes = await sendWhatsAppMessage(cleanPhone, text.trim());
       wamid = (metaRes as any)?.messages?.[0]?.id || null;
     } else {
-      // Ventana de 24h inactiva: envío automático mediante la plantilla con variable 'mensaje_puffin'
-      try {
-        console.log(`[WhatsApp Chats] Ventana inactiva para ${cleanPhone}. Enviando automáticamente vía plantilla 'mensaje_puffin'...`);
-        const metaRes = await sendWhatsAppTemplate(cleanPhone, "mensaje_puffin", "es_AR", [
-          { type: "text", text: text.trim() }
-        ]);
-        wamid = (metaRes as any)?.messages?.[0]?.id || null;
-        sentViaTemplate = true;
-        console.log(`[WhatsApp Chats] ✅ Mensaje entregado vía plantilla 'mensaje_puffin' a ${cleanPhone} (wamid: ${wamid})`);
-      } catch (tmplErr: any) {
-        console.warn(`[WhatsApp Chats] Plantilla 'mensaje_puffin' no aprobada aún (${tmplErr?.message}). Fallback a texto estándar.`);
-        const metaRes = await sendWhatsAppMessage(cleanPhone, text.trim());
-        wamid = (metaRes as any)?.messages?.[0]?.id || null;
-      }
+      // Ventana de 24h inactiva: OBLIGATORIO usar plantilla aprobada 'mensaje_puffin'
+      // Nota: comunicado_accesos_bot fue eliminada de Meta — NO usar como fallback
+      console.log(`[WhatsApp Chats] Ventana inactiva para ${cleanPhone}. Enviando vía plantilla 'mensaje_puffin'...`);
+      const metaRes = await sendWhatsAppTemplate(cleanPhone, "mensaje_puffin", "es_AR", [
+        { type: "text", text: text.trim() }
+      ]);
+      wamid = (metaRes as any)?.messages?.[0]?.id || null;
+      sentViaTemplate = true;
+      console.log(`[WhatsApp Chats] ✅ Mensaje entregado vía plantilla 'mensaje_puffin' a ${cleanPhone} (wamid: ${wamid})`);
     }
 
     const nuevoMsg = {
