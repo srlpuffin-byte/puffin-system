@@ -286,11 +286,11 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "actualizar_gasto",
-      description: "Actualiza un egreso PREVIAMENTE REGISTRADO únicamente cuando el usuario pide explícitamente modificar un gasto anterior existente en el sistema indicando su ID (ej: 'en el gasto #15 cambiá el proyecto a Lipsa', 'corregí el monto del gasto #12 a 5000'). PROHIBIDO ABSOLUTAMENTE usar esta función si el usuario está enviando una factura, comprobante o los datos de un gasto nuevo.",
+      description: "Actualiza un egreso PREVIAMENTE REGISTRADO en la base de datos indicando OBLIGATORIAMENTE su ID numérico (ej: id=15). PROHIBIDO ABSOLUTAMENTE usar esta función si el usuario está estructurando, corrigiendo o confirmando un gasto nuevo que aún no fue guardado.",
       parameters: {
         type: "object",
         properties: {
-          id: { type: "number", description: "ID numérico del egreso a actualizar (ej: 15). Obligatorio para modificar un gasto del sistema, salvo que el usuario esté modificando inmediatamente el gasto recién creado en esta conversación." },
+          id: { type: "number", description: "ID numérico OBLIGATORIO del egreso a actualizar (ej: 15). Debe especificarse siempre. Nunca inventar un ID ni usar el de un gasto previo si el usuario está modificando un gasto que aún no se guardó." },
           fecha: { type: "string", description: "Nueva fecha en formato YYYY-MM-DD si se desea corregir o cambiar la fecha" },
           centro_costos: { type: "string", description: "Proyecto u obra a asignar (ej: 'Lipsa')" },
           observaciones: { type: "string", description: "Observaciones o máquina asignada (ej: 'Cargadora LiuGong')" },
@@ -301,7 +301,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           monto: { type: "number", description: "Nuevo monto si se desea cambiar" },
           proveedor: { type: "string", description: "Nuevo proveedor si se desea cambiar" },
         },
-        required: [],
+        required: ["id"],
       },
     },
   },
@@ -1174,8 +1174,22 @@ PASO 2 - CONFIRMACIÓN Y REGISTRO DEFINITIVO:
      💳 *Método de pago:* ...
      🧾 *Facturado:* ...
      📎 *Comprobante:* Adjuntado (si aplica)
-- Si el usuario indica un cambio (ej: "el monto era 50000", "es para Broglia", "la fecha es de ayer"):
-  -> Actualizá la estructura armada y presentásela nuevamente para confirmación.
+⚡⚡ REGLA CRÍTICA - CORRECCIONES A LA ESTRUCTURA PENDIENTE (ej: "Concepto: Repuestos ferreteria", "el monto es 50000", "es para Broglia", "en efectivo"):
+- EL GASTO TODAVÍA NO ESTÁ GUARDADO EN LA BASE DE DATOS. ES SOLO UNA ESTRUCTURA PENDIENTE.
+- PROHIBIDO TERMINANTEMENTE LLAMAR A 'actualizar_gasto'. 'actualizar_gasto' es ÚNICAMENTE para modificar un gasto viejo ya guardado cuando el usuario proporciona explícitamente su ID (ej: "modificar gasto #45"). NUNCA toques gastos viejos ni modifiques el último ID.
+- Si el usuario solo envía una corrección o dato adicional (ej: "Concepto: Repuestos ferreteria") y NO dice palabras de guardado explícito ("guardalo", "confirmá", "dale"):
+  -> NO llames a 'registrar_gasto' todavía ni llames a 'actualizar_gasto'.
+  -> Actualizá la estructura del gasto con el dato modificado (ej: Concepto: Repuestos ferreteria, Categoría: Repuestos).
+  -> Presentale la estructura completa actualizada y volvé a preguntar si confirma que lo guarde:
+     📋 *Preparé la estructura del egreso:*
+     📅 *Fecha:* ...
+     💰 *Monto:* ...
+     📝 *Concepto:* Repuestos ferreteria
+     🏷️ *Categoría:* Repuestos
+     ...
+     ¿Confirmás que lo guarde?
+- Si el usuario envía la corrección Y ADEMÁS confirma en el mismo mensaje (ej: "Concepto: Repuestos ferreteria, guardalo" o "por transferencia y facturado dale"):
+  -> Ejecutá DIRECTAMENTE 'registrar_gasto' con el concepto y datos YA corregidos (NUNCA llames a 'actualizar_gasto').
 
 LO QUE PUEDO HACER (acciones de escritura):
 REGLA DE ORO 1 - DOBLE VALIDACIÓN: Para CUALQUIER registro o modificación (cargar combustible, guardar gastos, registrar jornadas, nuevos empleados, mantenimientos o mandar mensajes), SIEMPRE armá un resumen claro con los datos que entendiste y pedí confirmación expresa ANTES de invocar la herramienta de guardado. NUNCA guardes nada en el sistema a la primera pasada.
@@ -1320,11 +1334,14 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
             (sesion.datos_pendientes as any).ultima_imagen_url = null;
           }
         } else if (functionName === "actualizar_gasto") {
-          const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
-          const ultimoId = (sesion.datos_pendientes as any)?.ultimo_egreso_id || null;
-          toolResult = await executeActualizarGasto(functionArgs, imgUrl, ultimoId);
-          if (imgUrl && sesion.datos_pendientes) {
-            (sesion.datos_pendientes as any).ultima_imagen_url = null;
+          if (sesion.datos_pendientes?.gasto_pendiente && !functionArgs.id) {
+            toolResult = "❌ Hay un gasto pendiente de confirmación. Para corregir datos (concepto, monto, etc.) NO debes llamar a 'actualizar_gasto', sino actualizar la estructura pendiente y presentársela al usuario para confirmar.";
+          } else {
+            const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
+            toolResult = await executeActualizarGasto(functionArgs, imgUrl);
+            if (imgUrl && sesion.datos_pendientes) {
+              (sesion.datos_pendientes as any).ultima_imagen_url = null;
+            }
           }
         } else if (functionName === "consultar_combustible") {
           toolResult = await executeConsultarCombustible(functionArgs);
@@ -2462,17 +2479,16 @@ async function executeActualizarGasto(args: {
   concepto?: string;
   monto?: number;
   proveedor?: string;
-}, imgUrl?: string | null, ultimoEgresoId?: number | null) {
+}, imgUrl?: string | null) {
   try {
-    let egreso: typeof egresosTable.$inferSelect | undefined;
-    const targetId = args.id || ultimoEgresoId;
-    if (targetId) {
-      const [found] = await db.select().from(egresosTable).where(eq(egresosTable.id, targetId)).limit(1);
-      egreso = found;
+    if (!args.id) {
+      return "❌ Para actualizar un gasto existente es OBLIGATORIO indicar su número de ID (ej: 'actualizar egreso #12'). Si estás corrigiendo un dato de un gasto que todavía no se guardó, NO uses actualizar_gasto: simplemente presentá la estructura actualizada y pedí confirmación.";
     }
 
+    const [egreso] = await db.select().from(egresosTable).where(eq(egresosTable.id, args.id)).limit(1);
+
     if (!egreso) {
-      return "❌ Para actualizar un gasto existente es necesario indicar el número de ID (ej: 'actualizar egreso #12'). Si lo que deseás es registrar un gasto nuevo, confirmame para registrarlo.";
+      return `❌ No se encontró ningún egreso con el ID #${args.id} en el sistema.`;
     }
 
     let centroCostosResuelto = egreso.centro_costos;

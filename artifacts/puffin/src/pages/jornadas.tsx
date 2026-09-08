@@ -20,7 +20,7 @@ import { toast } from "sonner";
 export function Jornadas() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
-  const { data: jornadasResp, isLoading } = useGetJornadas({ page, limit: 50 });
+  const { data: jornadasResp, isLoading } = useGetJornadas({ page, limit: 50 }, { query: { refetchInterval: 15000 } as any });
   const jornadas = jornadasResp?.data;
   const paginationMeta = jornadasResp?.meta;
   const { data: user } = useGetMe();

@@ -5,6 +5,7 @@ import {
   maquinasTable,
   alertasTable,
   usuariosTable,
+  whatsappSesionesTable,
 } from "@workspace/db/schema";
 import { eq, and, sql, or } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
@@ -167,44 +168,71 @@ export async function checkJornadasExcedidas(forceSend = false) {
         recordatoriosEnviadosMap.set(j.id, now);
         enviadas++;
 
-        // 4. Enviar WhatsApp al operario con plantilla mensaje_puffin y cerrar la jornada automáticamente
-        const telefonoWa = empleado.telefono_whatsapp || empleado.telefono;
-        if (telefonoWa) {
-          const mensajeWa = `Tu jornada en ${nombreMaq} lleva ${horasFormateadas} horas abierta y fue cerrada automáticamente por el sistema. Si hay algún dato pendiente (horómetro final, observaciones), podés completarlo desde la app en /jornadas.`;
+        // 4. Enviar WhatsApp al operario con plantilla oficial mensaje_puffin para abrir la ventana de 24 hs
+        const telefonoRaw = empleado.telefono_whatsapp || empleado.telefono;
+        if (telefonoRaw) {
+          const cleanPhone = formatArgentinaPhone(telefonoRaw);
+          const mensajeWa = `Hola ${empleado.nombre}, tu jornada en ${nombreMaq} lleva ${horasFormateadas} horas iniciada y aún no fue finalizada. Por favor ingresá a https://puffinsrl.site/jornadas o respondé a este mensaje para registrar el horómetro de cierre.`;
+          // Sanitizar para Meta (error #132018: sin \n, \r, \t ni >4 espacios consecutivos)
+          const sanitizedWa = mensajeWa.trim().replace(/[\r\n\t]+/g, " ").replace(/ {5,}/g, "    ");
+
           try {
             await sendWhatsAppTemplate(
-              telefonoWa,
+              cleanPhone,
               "mensaje_puffin",
               "es_AR",
-              [{ type: "text", text: mensajeWa }]
+              [{ type: "text", text: sanitizedWa }]
             );
-            logger.info(`[Jornadas Monitor] ✅ WhatsApp enviado a ${empleado.nombre} (${telefonoWa}) por jornada #${j.id} cerrada automáticamente.`);
-          } catch (waErr: any) {
-            logger.warn(`[Jornadas Monitor] Error enviando WhatsApp a ${telefonoWa}: ${waErr?.message}. Intentando texto libre...`);
+            logger.info(`[Jornadas Monitor] ✅ WhatsApp enviado a ${empleado.nombre} (${cleanPhone}) vía plantilla mensaje_puffin por jornada #${j.id}.`);
+
+            // Registrar en el historial de chat de WhatsApp del sistema
             try {
-              await sendWhatsAppMessage(telefonoWa, `PUFFIN SRL:\n${mensajeWa}\nSaludos estimado/a`);
+              const [sesion] = await db.select().from(whatsappSesionesTable).where(eq(whatsappSesionesTable.phone, cleanPhone)).limit(1);
+              const historial = (sesion?.messages as any[]) || [];
+              historial.push({
+                role: "assistant",
+                content: `📢 [Recordatorio Jornada +12h Enviado vía Plantilla mensaje_puffin]\n\n"${mensajeWa}"`,
+                created_at: new Date().toISOString(),
+                is_template: true,
+              });
+              if (sesion) {
+                await db.update(whatsappSesionesTable).set({ messages: historial, updated_at: new Date() }).where(eq(whatsappSesionesTable.phone, cleanPhone));
+              } else {
+                await db.insert(whatsappSesionesTable).values({ phone: cleanPhone, messages: historial, estado: "idle" });
+              }
+            } catch (histErr) {
+              logger.warn({ histErr }, "[Jornadas Monitor] Error registrando mensaje en historial de whatsappSesiones");
+            }
+          } catch (waErr: any) {
+            logger.warn(`[Jornadas Monitor] Error enviando plantilla a ${cleanPhone}: ${waErr?.message}. Intentando texto libre...`);
+            try {
+              await sendWhatsAppMessage(cleanPhone, `PUFFIN SRL:\n${mensajeWa}\nSaludos estimado/a`);
             } catch (waErr2: any) {
               logger.warn(`[Jornadas Monitor] Fallback WhatsApp también falló: ${waErr2?.message}`);
             }
           }
         } else {
-          logger.warn(`[Jornadas Monitor] Jornada #${j.id}: empleado ${empleado.nombre} no tiene teléfono WhatsApp registrado. No se envió mensaje.`);
+          logger.warn(`[Jornadas Monitor] Jornada #${j.id}: empleado ${empleado.nombre} no tiene teléfono registrado. No se envió WhatsApp.`);
         }
 
-        // 5. Cerrar la jornada automáticamente
+        // 5. Cerrar la jornada automáticamente con hora exacta de Argentina (UTC-3)
         try {
-          const horaFinAuto = new Date().toTimeString().slice(0, 5); // "HH:MM"
+          const dNow = new Date();
+          const utcMs = dNow.getTime() + (dNow.getTimezoneOffset() * 60000);
+          const arDate = new Date(utcMs - (3 * 3600000));
+          const horaFinAuto = `${String(arDate.getHours()).padStart(2, "0")}:${String(arDate.getMinutes()).padStart(2, "0")}`;
+
           await db
             .update(jornadasTable)
             .set({
               estado: "finalizada",
               hora_fin: horaFinAuto,
               observaciones: (j.observaciones ? j.observaciones + "\n" : "") +
-                `[AUTO-CIERRE] Jornada cerrada automáticamente por el sistema tras ${horasFormateadas} hs sin registrar fin. (${new Date().toLocaleString("es-AR")})`,
+                `[AUTO-CIERRE] Jornada cerrada automáticamente por el sistema tras ${horasFormateadas} hs sin registrar fin. (${arDate.toLocaleString("es-AR")})`,
               updatedAt: new Date(),
             })
             .where(eq(jornadasTable.id, j.id));
-          logger.info(`[Jornadas Monitor] ✅ Jornada #${j.id} cerrada automáticamente (hora_fin: ${horaFinAuto}).`);
+          logger.info(`[Jornadas Monitor] ✅ Jornada #${j.id} cerrada automáticamente (hora_fin: ${horaFinAuto} Argentina).`);
         } catch (closeErr: any) {
           logger.error(`[Jornadas Monitor] Error cerrando jornada #${j.id} automáticamente: ${closeErr?.message}`);
         }

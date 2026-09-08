@@ -351,11 +351,27 @@ router.post("/:id/finalizar", async (req, res) => {
       }
     }
 
-    const horaFin = new Date().toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hour12: false });
+    // Calcular hora de Argentina (UTC-3) de manera exacta e independiente del TZ del servidor
+    const dNow = new Date();
+    const utcMs = dNow.getTime() + (dNow.getTimezoneOffset() * 60000);
+    const arDate = new Date(utcMs - (3 * 3600000));
+    const horaFin = `${String(arDate.getHours()).padStart(2, "0")}:${String(arDate.getMinutes()).padStart(2, "0")}`;
 
     const [jornada] = await db
       .update(jornadasTable)
-      .set({ horometro_fin: horometro_fin.toString(), km_fin: km_fin?.toString(), problemas, estado_equipo_fin, foto_tablero_fin, combustible_nivel, aceite_estado, danos_choques, hora_fin: horaFin, estado: "finalizada" })
+      .set({ 
+        horometro_fin: horometro_fin.toString(), 
+        km_fin: km_fin?.toString(), 
+        problemas, 
+        estado_equipo_fin, 
+        foto_tablero_fin, 
+        combustible_nivel, 
+        aceite_estado, 
+        danos_choques, 
+        hora_fin: horaFin, 
+        estado: "finalizada",
+        updatedAt: new Date()
+      })
       .where(eq(jornadasTable.id, id))
       .returning();
 
