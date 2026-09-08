@@ -845,8 +845,16 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
       has_media: !!imageBase64,
     });
 
-    // 2. Intentar enviar aviso formal solo si pasaron al menos 15 minutos (anti-spam)
-    if (ahora - ultimoAviso > 15 * 60 * 1000) {
+    // 2. Verificar si el bot está en modo manual para este chat — si es así, NO responder automáticamente
+    const datosSesion = (typeof sesion.datos_pendientes === "object" && sesion.datos_pendientes) ? sesion.datos_pendientes : {};
+    const botPausadoParaEsteChat = Boolean((datosSesion as any).bot_paused);
+
+    if (contactName) {
+      sesion.datos_pendientes = { ...(datosSesion as any), nombre_whatsapp: contactName };
+    }
+
+    // 3. Enviar aviso formal SOLO si el bot NO está pausado (modo automático) y pasaron al menos 15 minutos
+    if (!botPausadoParaEsteChat && ahora - ultimoAviso > 15 * 60 * 1000) {
       const textoAviso = "Hola. Este canal es de uso exclusivo para administración interna de PUFFIN SRL. Las consultas e interacciones con el asistente inteligente están reservadas únicamente para personal administrativo autorizado.";
       try {
         await sendWhatsAppMessage(from, textoAviso);
@@ -862,21 +870,16 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
           ...(contactName ? { nombre_whatsapp: contactName } : {}),
         };
       } catch (sendErr: any) {
-        // El aviso no pudo enviarse (ventana 24h cerrada u otro error), pero el mensaje YA está en el historial
         console.warn(`[WhatsApp Asistente] No se pudo enviar aviso no-admin a ${senderPhone}: ${sendErr?.message}`);
-        // Guardamos igualmente el nombre aunque el aviso no se enviara
         sesion.datos_pendientes = {
           ...(typeof sesion.datos_pendientes === "object" ? sesion.datos_pendientes : {}),
           ...(contactName ? { nombre_whatsapp: contactName } : {}),
         };
       }
-    } else if (contactName) {
-      // Actualizar nombre aunque no sea momento de enviar aviso
-      sesion.datos_pendientes = {
-        ...(typeof sesion.datos_pendientes === "object" ? sesion.datos_pendientes : {}),
-        nombre_whatsapp: contactName,
-      };
+    } else if (botPausadoParaEsteChat) {
+      console.log(`[WhatsApp Asistente] Bot pausado (modo manual) para ${senderPhone} — guardando mensaje de contacto sin respuesta automática.`);
     }
+
 
     // 3. Guardar siempre la sesión con el mensaje del contacto, independientemente del resultado del aviso
     try {
