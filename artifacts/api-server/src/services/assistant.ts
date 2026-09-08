@@ -829,22 +829,23 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
   // Guardamos el mensaje en el historial de sesión para que la administración pueda auditarlo desde la Web.
   if (!isAdmin) {
     console.log(`[WhatsApp Asistente] Acceso denegado: el número ${senderPhone} no es administrador.`);
-    try {
-      const ahora = Date.now();
-      const ultimoAviso = (sesion.datos_pendientes as any)?.ultimo_aviso_no_admin || 0;
-      const historialNoAdmin = (sesion.messages as any[]) || [];
+    const ahora = Date.now();
+    const ultimoAviso = (sesion.datos_pendientes as any)?.ultimo_aviso_no_admin || 0;
+    const historialNoAdmin = (sesion.messages as any[]) || [];
 
-      // Guardar el mensaje entrante del operario/contacto en el historial para auditoría web
-      historialNoAdmin.push({
-        role: "user",
-        content: text,
-        created_at: new Date().toISOString(),
-        has_media: !!imageBase64,
-      });
+    // 1. Guardar PRIMERO el mensaje entrante en el historial para garantizar auditoría web
+    // (incluso si el envío del aviso falla después)
+    historialNoAdmin.push({
+      role: "user",
+      content: text,
+      created_at: new Date().toISOString(),
+      has_media: !!imageBase64,
+    });
 
-      // Responder con aviso formal solo si pasaron al menos 15 minutos (anti-spam / anti-loop)
-      if (ahora - ultimoAviso > 15 * 60 * 1000) {
-        const textoAviso = "Hola. Este canal es de uso exclusivo para administración interna de PUFFIN SRL. Las consultas e interacciones con el asistente inteligente están reservadas únicamente para personal administrativo autorizado.";
+    // 2. Intentar enviar aviso formal solo si pasaron al menos 15 minutos (anti-spam)
+    if (ahora - ultimoAviso > 15 * 60 * 1000) {
+      const textoAviso = "Hola. Este canal es de uso exclusivo para administración interna de PUFFIN SRL. Las consultas e interacciones con el asistente inteligente están reservadas únicamente para personal administrativo autorizado.";
+      try {
         await sendWhatsAppMessage(from, textoAviso);
         historialNoAdmin.push({
           role: "assistant",
@@ -852,16 +853,21 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
           created_at: new Date().toISOString(),
           is_warning: true,
         });
-
         sesion.datos_pendientes = {
           ...(typeof sesion.datos_pendientes === "object" ? sesion.datos_pendientes : {}),
           ultimo_aviso_no_admin: ahora,
         };
+      } catch (sendErr: any) {
+        // El aviso no pudo enviarse (ventana 24h cerrada u otro error), pero el mensaje YA está en el historial
+        console.warn(`[WhatsApp Asistente] No se pudo enviar aviso no-admin a ${senderPhone}: ${sendErr?.message}`);
       }
+    }
 
+    // 3. Guardar siempre la sesión con el mensaje del contacto, independientemente del resultado del aviso
+    try {
       await guardarSesion(senderPhone, historialNoAdmin, "idle", sesion.datos_pendientes);
-    } catch (e) {
-      console.warn("[WhatsApp Asistente] Error gestionando aviso no-admin:", (e as any)?.message);
+    } catch (saveErr: any) {
+      console.warn(`[WhatsApp Asistente] Error guardando sesión de contacto no-admin ${senderPhone}:`, saveErr?.message);
     }
     return;
   }
