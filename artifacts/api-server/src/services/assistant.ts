@@ -818,7 +818,7 @@ export function parseEstructuraEgreso(text: string) {
   };
 }
 
-export async function handleWhatsAppMessage(from: string, text: string, imageBase64?: string) {
+export async function handleWhatsAppMessage(from: string, text: string, imageBase64?: string, contactName?: string) {
   const senderPhone = from.replace(/[^0-9]/g, "");
 
   const isAdmin = await isAuthorizedAdmin(senderPhone);
@@ -856,11 +856,23 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
         sesion.datos_pendientes = {
           ...(typeof sesion.datos_pendientes === "object" ? sesion.datos_pendientes : {}),
           ultimo_aviso_no_admin: ahora,
+          ...(contactName ? { nombre_whatsapp: contactName } : {}),
         };
       } catch (sendErr: any) {
         // El aviso no pudo enviarse (ventana 24h cerrada u otro error), pero el mensaje YA está en el historial
         console.warn(`[WhatsApp Asistente] No se pudo enviar aviso no-admin a ${senderPhone}: ${sendErr?.message}`);
+        // Guardamos igualmente el nombre aunque el aviso no se enviara
+        sesion.datos_pendientes = {
+          ...(typeof sesion.datos_pendientes === "object" ? sesion.datos_pendientes : {}),
+          ...(contactName ? { nombre_whatsapp: contactName } : {}),
+        };
       }
+    } else if (contactName) {
+      // Actualizar nombre aunque no sea momento de enviar aviso
+      sesion.datos_pendientes = {
+        ...(typeof sesion.datos_pendientes === "object" ? sesion.datos_pendientes : {}),
+        nombre_whatsapp: contactName,
+      };
     }
 
     // 3. Guardar siempre la sesión con el mensaje del contacto, independientemente del resultado del aviso

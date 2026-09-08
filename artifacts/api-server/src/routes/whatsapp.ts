@@ -142,6 +142,7 @@ interface PendingBatch {
   mediaBase64?: string;
   activeDownloads: number;
   timer?: NodeJS.Timeout;
+  contactName?: string;
 }
 
 const pendingBatches = new Map<string, PendingBatch>();
@@ -188,7 +189,7 @@ function scheduleBatch(from: string) {
     const combinedText = batch.texts.filter(Boolean).join("\n\n");
     console.log(`[Webhook] Procesando lote combinado de ${from} (${batch.texts.length} partes, media adjunto: ${!!batch.mediaBase64}):\n${combinedText}`);
     try {
-      await handleWhatsAppMessage(from, combinedText, batch.mediaBase64);
+      await handleWhatsAppMessage(from, combinedText, batch.mediaBase64, batch.contactName);
     } catch (err) {
       console.error(`[Webhook] Error procesando lote de ${from}:`, err);
     }
@@ -331,6 +332,7 @@ whatsappRouter.post("/", async (req, res) => {
       }).catch((err) => console.warn("[Webhook] Error enviando push notification:", err));
 
       const batch = getOrCreateBatch(from);
+      if (contactProfileName && !batch.contactName) batch.contactName = contactProfileName;
 
       // 1. Manejo de mensajes de texto normales
       if (msgType === "text" && message.text?.body) {

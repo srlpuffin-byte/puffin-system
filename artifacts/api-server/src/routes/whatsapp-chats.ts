@@ -116,10 +116,13 @@ router.get("/", async (req, res) => {
           break;
         }
       }
+      const nombreWhatsapp = (datosPendientes as any).nombre_whatsapp || null;
 
       return {
         phone: s.phone,
-        nombre: emp ? `${emp.nombre} ${emp.apellido}`.trim() : (s.phone.length > 10 ? `+${s.phone}` : s.phone),
+        nombre: emp
+          ? `${emp.nombre} ${emp.apellido}`.trim()
+          : (nombreWhatsapp || (s.phone.length > 10 ? `+${s.phone}` : s.phone)),
         cargo: emp?.cargo || (esAdmin ? "Administrador" : "Contacto externo"),
         empleado_id: emp?.id || null,
         foto_perfil: getFotoPerfil(emp?.id),
