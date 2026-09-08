@@ -16,6 +16,7 @@ import {
 import {
   getNotificacionesConfig,
 } from "./notificaciones-config.js";
+import { sendWhatsAppTemplate, sendWhatsAppMessage, formatArgentinaPhone } from "./whatsapp.js";
 
 // Mapa en memoria para recordar cuándo se envió el último recordatorio por jornada (evita spam cada 15 min)
 const recordatoriosEnviadosMap = new Map<number, number>();
@@ -165,6 +166,48 @@ export async function checkJornadasExcedidas(forceSend = false) {
 
         recordatoriosEnviadosMap.set(j.id, now);
         enviadas++;
+
+        // 4. Enviar WhatsApp al operario con plantilla mensaje_puffin y cerrar la jornada automáticamente
+        const telefonoWa = empleado.telefono_whatsapp || empleado.telefono;
+        if (telefonoWa) {
+          const mensajeWa = `Tu jornada en ${nombreMaq} lleva ${horasFormateadas} horas abierta y fue cerrada automáticamente por el sistema. Si hay algún dato pendiente (horómetro final, observaciones), podés completarlo desde la app en /jornadas.`;
+          try {
+            await sendWhatsAppTemplate(
+              telefonoWa,
+              "mensaje_puffin",
+              "es_AR",
+              [{ type: "text", text: mensajeWa }]
+            );
+            logger.info(`[Jornadas Monitor] ✅ WhatsApp enviado a ${empleado.nombre} (${telefonoWa}) por jornada #${j.id} cerrada automáticamente.`);
+          } catch (waErr: any) {
+            logger.warn(`[Jornadas Monitor] Error enviando WhatsApp a ${telefonoWa}: ${waErr?.message}. Intentando texto libre...`);
+            try {
+              await sendWhatsAppMessage(telefonoWa, `PUFFIN SRL:\n${mensajeWa}\nSaludos estimado/a`);
+            } catch (waErr2: any) {
+              logger.warn(`[Jornadas Monitor] Fallback WhatsApp también falló: ${waErr2?.message}`);
+            }
+          }
+        } else {
+          logger.warn(`[Jornadas Monitor] Jornada #${j.id}: empleado ${empleado.nombre} no tiene teléfono WhatsApp registrado. No se envió mensaje.`);
+        }
+
+        // 5. Cerrar la jornada automáticamente
+        try {
+          const horaFinAuto = new Date().toTimeString().slice(0, 5); // "HH:MM"
+          await db
+            .update(jornadasTable)
+            .set({
+              estado: "finalizada",
+              hora_fin: horaFinAuto,
+              observaciones: (j.observaciones ? j.observaciones + "\n" : "") +
+                `[AUTO-CIERRE] Jornada cerrada automáticamente por el sistema tras ${horasFormateadas} hs sin registrar fin. (${new Date().toLocaleString("es-AR")})`,
+              updatedAt: new Date(),
+            })
+            .where(eq(jornadasTable.id, j.id));
+          logger.info(`[Jornadas Monitor] ✅ Jornada #${j.id} cerrada automáticamente (hora_fin: ${horaFinAuto}).`);
+        } catch (closeErr: any) {
+          logger.error(`[Jornadas Monitor] Error cerrando jornada #${j.id} automáticamente: ${closeErr?.message}`);
+        }
       }
     }
 
