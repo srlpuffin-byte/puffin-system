@@ -391,7 +391,10 @@ router.post("/:phone/send-template", async (req, res) => {
   try {
     const rawPhone = req.params.phone;
     const cleanPhone = formatArgentinaPhone(rawPhone);
-    const templateName = req.body?.templateName || "comunicado_accesos_bot";
+
+    // Siempre usamos mensaje_puffin con texto personalizado (o predeterminado de apertura).
+    // Ignoramos "comunicado_accesos_bot" incluso si el cliente viejo lo pide.
+    const textoBody = req.body?.text?.trim() || "Le escribimos desde PUFFIN SRL para iniciar la comunicación. Por favor respondé este mensaje para continuar.";
 
     const last10 = getLast10(cleanPhone);
     const sesiones = await db.select().from(whatsappSesionesTable);
@@ -410,14 +413,16 @@ router.post("/:phone/send-template", async (req, res) => {
       sesion = nueva;
     }
 
-    const metaRes = await sendWhatsAppTemplate(cleanPhone, templateName, "es_AR");
+    const metaRes = await sendWhatsAppTemplate(cleanPhone, "mensaje_puffin", "es_AR", [
+      { type: "text", text: textoBody }
+    ]);
     const wamid = (metaRes as any)?.messages?.[0]?.id || null;
 
     const historial = (sesion.messages as any[]) || [];
     const nuevoMsg = {
       id: wamid,
       role: "assistant",
-      content: `📢 [Plantilla Oficial Meta Enviada] Se envió la plantilla oficial "${templateName}" para abrir la ventana de conversación. Una vez que el contacto responda, se podrán enviar mensajes libres.`,
+      content: `📢 [Plantilla Oficial Meta Enviada] Se envió el mensaje vía plantilla mensaje_puffin para abrir la ventana de conversación.\n\n"${textoBody}"`,
       created_at: new Date().toISOString(),
       manual: true,
       admin_user: req.user?.rol || "admin",
@@ -443,6 +448,7 @@ router.post("/:phone/send-template", async (req, res) => {
     return res.status(500).json({ error: "Error enviando plantilla oficial", details: err.message });
   }
 });
+
 
 // 6. Conmutar pausa del bot para un chat específico (Modo Manual vs Modo Automático)
 router.post("/:phone/toggle-bot", async (req, res) => {
