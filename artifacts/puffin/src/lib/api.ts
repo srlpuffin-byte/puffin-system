@@ -18,7 +18,9 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ error: `Error ${resp.status}` }));
-    throw new Error(err.error || `Error ${resp.status}`);
+    const msg = err.error || `Error ${resp.status}`;
+    const detail = err.details ? ` — ${err.details}` : "";
+    throw new Error(`${msg}${detail}`);
   }
   return resp.json();
 }

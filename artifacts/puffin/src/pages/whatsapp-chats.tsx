@@ -273,10 +273,10 @@ export function WhatsAppChats() {
 
   // Mutación: Enviar plantilla oficial aprobada por Meta
   const sendTemplateMutation = useMutation({
-    mutationFn: ({ phone, templateName }: { phone: string; templateName?: string }) =>
+    mutationFn: ({ phone, text }: { phone: string; text?: string }) =>
       apiFetch<{ success: boolean }>(`/whatsapp-chats/${encodeURIComponent(phone)}/send-template`, {
         method: "POST",
-        body: JSON.stringify({ templateName: templateName || "comunicado_accesos_bot" }),
+        body: JSON.stringify({ text }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["whatsapp-chat-detail", selectedPhone] });
@@ -1290,12 +1290,8 @@ export function WhatsAppChats() {
 
           {/* Vista previa de la plantilla */}
           <div className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs text-slate-700 dark:text-slate-300 font-mono leading-relaxed">
-            <p className="font-semibold text-slate-500 dark:text-slate-400 mb-1 text-[10px] uppercase tracking-wider">Vista previa</p>
-            <p>PUFFIN SRL:</p>
-            <p className={textoPlantilla.trim() ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-slate-400 italic"}>
-              {textoPlantilla.trim() || "← tu mensaje irá aquí"}
-            </p>
-            <p>Saludos estimado/a</p>
+            <p className="font-semibold text-slate-500 dark:text-slate-400 mb-1 text-[10px] uppercase tracking-wider">Vista previa (plantilla oficial Meta)</p>
+            <p className="font-bold">PUFFIN SRL. <span className={textoPlantilla.trim() ? "text-blue-600 dark:text-blue-400" : "text-slate-400 italic"}>{textoPlantilla.trim() || "← tu mensaje irá aquí"}</span></p>
           </div>
 
           {/* Textarea para escribir el cuerpo */}
