@@ -335,9 +335,13 @@ router.post("/:phone/send", async (req, res) => {
     } else {
       // Ventana de 24h inactiva: OBLIGATORIO usar plantilla aprobada 'mensaje_puffin'
       // Nota: comunicado_accesos_bot fue eliminada de Meta — NO usar como fallback
+      // Meta error #132018: la plantilla NO permite saltos de línea, tabs ni más de 4 espacios consecutivos
+      const sanitizedText = text.trim()
+        .replace(/[\r\n\t]+/g, " ")   // reemplazar saltos de línea/tabs por espacio
+        .replace(/ {5,}/g, "    ");    // colapsar >4 espacios consecutivos
       console.log(`[WhatsApp Chats] Ventana inactiva para ${cleanPhone}. Enviando vía plantilla 'mensaje_puffin'...`);
       const metaRes = await sendWhatsAppTemplate(cleanPhone, "mensaje_puffin", "es_AR", [
-        { type: "text", text: text.trim() }
+        { type: "text", text: sanitizedText }
       ]);
       wamid = (metaRes as any)?.messages?.[0]?.id || null;
       sentViaTemplate = true;
@@ -411,8 +415,13 @@ router.post("/:phone/send-template", async (req, res) => {
       sesion = nueva;
     }
 
+    // Meta error #132018: la plantilla NO permite saltos de línea, tabs ni más de 4 espacios consecutivos
+    const sanitizedBody = textoBody
+      .replace(/[\r\n\t]+/g, " ")
+      .replace(/ {5,}/g, "    ");
+
     const metaRes = await sendWhatsAppTemplate(cleanPhone, "mensaje_puffin", "es_AR", [
-      { type: "text", text: textoBody }
+      { type: "text", text: sanitizedBody }
     ]);
     const wamid = (metaRes as any)?.messages?.[0]?.id || null;
 
