@@ -702,19 +702,22 @@ export async function isAuthorizedAdmin(phone: string): Promise<boolean> {
   return false;
 }
 
-// Obtener o crear sesión — con fallback si la tabla no existe aún
+// Obtener o crear sesión — busca por últimos 10 dígitos para evitar duplicados por formato de número
 async function obtenerSesion(phone: string) {
+  const cleanPhone = phone.replace(/[^0-9]/g, "");
+  const last10 = cleanPhone.slice(-10);
   try {
-    const [sesion] = await db
-      .select()
-      .from(whatsappSesionesTable)
-      .where(eq(whatsappSesionesTable.phone, phone))
-      .limit(1);
+    // Buscar por últimos 10 dígitos para tolerar diferencias de formato (ej: 3572400877 vs 5493572400877)
+    const todasSesiones = await db.select().from(whatsappSesionesTable);
+    const sesion = todasSesiones.find((s) =>
+      s.phone === cleanPhone ||
+      s.phone.replace(/[^0-9]/g, "").slice(-10) === last10
+    );
 
     if (!sesion) {
       const [nueva] = await db
         .insert(whatsappSesionesTable)
-        .values({ phone, messages: [], estado: "idle", datos_pendientes: null })
+        .values({ phone: cleanPhone, messages: [], estado: "idle", datos_pendientes: null })
         .returning();
       return nueva;
     }
@@ -731,7 +734,7 @@ async function obtenerSesion(phone: string) {
       await db
         .update(whatsappSesionesTable)
         .set({ estado: "idle", datos_pendientes: datos, updated_at: new Date() })
-        .where(eq(whatsappSesionesTable.phone, phone));
+        .where(eq(whatsappSesionesTable.phone, sesion.phone));
       return { ...sesion, estado: "idle", datos_pendientes: datos };
     }
 
@@ -739,19 +742,19 @@ async function obtenerSesion(phone: string) {
   } catch (e) {
     // Si la tabla no existe todavía, devolver sesión vacía en memoria
     console.warn("[Sesion] Tabla whatsapp_sesiones no disponible, usando sesion en memoria:", (e as any).message);
-    return { phone, messages: [], estado: "idle", datos_pendientes: null, updated_at: new Date() };
+    return { phone: cleanPhone, messages: [], estado: "idle", datos_pendientes: null, updated_at: new Date() };
   }
 }
 
-// Guardar sesión — con fallback si la tabla no existe
-async function guardarSesion(phone: string, messages: any[], estado: string = "idle", datos_pendientes: any = null) {
+// Guardar sesión — usa el phone almacenado en la sesión (no el del webhook) para evitar mismatches
+async function guardarSesion(storedPhone: string, messages: any[], estado: string = "idle", datos_pendientes: any = null) {
   try {
     // Guardar hasta 300 mensajes en la base de datos para historial completo de auditoría en la web
     const historial = messages.slice(-300);
     await db
       .update(whatsappSesionesTable)
       .set({ messages: historial, estado, datos_pendientes, updated_at: new Date() })
-      .where(eq(whatsappSesionesTable.phone, phone));
+      .where(eq(whatsappSesionesTable.phone, storedPhone));
   } catch (e) {
     console.warn("[Sesion] No se pudo guardar la sesion:", (e as any).message);
   }
@@ -877,7 +880,7 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
 
     // 3. Guardar siempre la sesión con el mensaje del contacto, independientemente del resultado del aviso
     try {
-      await guardarSesion(senderPhone, historialNoAdmin, "idle", sesion.datos_pendientes);
+      await guardarSesion(sesion.phone, historialNoAdmin, "idle", sesion.datos_pendientes);
     } catch (saveErr: any) {
       console.warn(`[WhatsApp Asistente] Error guardando sesión de contacto no-admin ${senderPhone}:`, saveErr?.message);
     }
@@ -945,7 +948,7 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
       const hist = (sesion.messages as any[]) || [];
       hist.push({ role: "user", content: text, created_at: new Date().toISOString() });
       hist.push({ role: "assistant", content: respActivacion, created_at: new Date().toISOString() });
-      await guardarSesion(senderPhone, hist, "idle", datosPendientes);
+      await guardarSesion(sesion.phone, hist, "idle", datosPendientes);
       return;
     }
 
@@ -963,7 +966,7 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
       created_at: new Date().toISOString(),
       has_media: !!imageBase64,
     });
-    await guardarSesion(senderPhone, historialManual, "manual", datosPendientes);
+    await guardarSesion(sesion.phone, historialManual, "manual", datosPendientes);
     return;
   }
 
@@ -1419,7 +1422,8 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
     }
 
     // Guardar historial actualizado manteniendo los datos pendientes
-    await guardarSesion(senderPhone, historialFiltrado, "idle", sesion.datos_pendientes);
+    await guardarSesion(sesion.phone, historialFiltrado, "idle", sesion.datos_pendientes);
+
 
   } catch (error) {
     console.error("Error en asistente PUFFIN:", error);
