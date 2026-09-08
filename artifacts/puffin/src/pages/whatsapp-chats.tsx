@@ -192,6 +192,8 @@ export function WhatsAppChats() {
   const [nuevoChatMensaje, setNuevoChatMensaje] = useState("");
   const [modalEliminarChat, setModalEliminarChat] = useState(false);
   const [chatToDelete, setChatToDelete] = useState<{ phone: string; nombre: string } | null>(null);
+  const [modalPlantilla, setModalPlantilla] = useState(false);
+  const [textoPlantilla, setTextoPlantilla] = useState("");
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const prevMsgCountRef = useRef(0);
@@ -871,13 +873,12 @@ export function WhatsAppChats() {
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <Button
                       size="sm"
-                      onClick={() => sendTemplateMutation.mutate({ phone: selectedPhone!, templateName: "comunicado_accesos_bot" })}
-                      disabled={sendTemplateMutation.isPending}
+                      onClick={() => { setTextoPlantilla(""); setModalPlantilla(true); }}
                       className="h-7 px-2.5 sm:px-3 text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-xs"
-                      title="Enviar comunicado oficial para iniciar conversación"
+                      title="Escribir y enviar mensaje usando la plantilla oficial mensaje_puffin"
                     >
                       <FileText className="h-3 w-3" />
-                      {sendTemplateMutation.isPending ? "Enviando..." : "Enviar Comunicado Oficial"}
+                      Enviar con Plantilla
                     </Button>
                   </div>
                 </div>
@@ -1269,6 +1270,86 @@ export function WhatsAppChats() {
               className="gap-1.5 font-medium"
             >
               {deleteChatMutation.isPending ? "Eliminando..." : "Eliminar Conversación"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Redactar mensaje para enviar con plantilla mensaje_puffin */}
+      <Dialog open={modalPlantilla} onOpenChange={(open) => { if (!sendMutation.isPending) setModalPlantilla(open); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+              <FileText className="h-5 w-5" />
+              Enviar mensaje con plantilla oficial
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm text-muted-foreground pt-1">
+              El mensaje se enviará usando la plantilla aprobada por Meta. El destinatario recibirá:
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Vista previa de la plantilla */}
+          <div className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs text-slate-700 dark:text-slate-300 font-mono leading-relaxed">
+            <p className="font-semibold text-slate-500 dark:text-slate-400 mb-1 text-[10px] uppercase tracking-wider">Vista previa</p>
+            <p>PUFFIN SRL:</p>
+            <p className={textoPlantilla.trim() ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-slate-400 italic"}>
+              {textoPlantilla.trim() || "← tu mensaje irá aquí"}
+            </p>
+            <p>Saludos estimado/a</p>
+          </div>
+
+          {/* Textarea para escribir el cuerpo */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-foreground">Tu mensaje <span className="text-rose-500">*</span></label>
+            <textarea
+              rows={4}
+              autoFocus
+              placeholder="Escribí el cuerpo del mensaje que se insertará en la plantilla..."
+              value={textoPlantilla}
+              onChange={(e) => setTextoPlantilla(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  if (textoPlantilla.trim() && selectedPhone && !sendMutation.isPending) {
+                    sendMutation.mutate({
+                      phone: selectedPhone,
+                      text: textoPlantilla.trim(),
+                    });
+                    setModalPlantilla(false);
+                    setTextoPlantilla("");
+                  }
+                }
+              }}
+              className="w-full resize-none p-2.5 text-sm rounded-xl border bg-slate-50/70 dark:bg-slate-900/70 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[90px]"
+            />
+            <p className="text-[10px] text-muted-foreground">Presioná <kbd className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">Ctrl+Enter</kbd> para enviar rápido</p>
+          </div>
+
+          <DialogFooter className="flex-row justify-end gap-2 pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setModalPlantilla(false)}
+              disabled={sendMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              disabled={!textoPlantilla.trim() || sendMutation.isPending}
+              onClick={() => {
+                if (!selectedPhone || !textoPlantilla.trim()) return;
+                sendMutation.mutate({
+                  phone: selectedPhone,
+                  text: textoPlantilla.trim(),
+                });
+                setModalPlantilla(false);
+                setTextoPlantilla("");
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5 font-semibold"
+            >
+              <Send className="h-3.5 w-3.5" />
+              {sendMutation.isPending ? "Enviando..." : "Enviar con plantilla"}
             </Button>
           </DialogFooter>
         </DialogContent>
