@@ -832,6 +832,12 @@ export async function resolverProyectoConTolerancia(busqueda?: string | null): P
     const bNorm = normalizeString(raw);
     const bPhon = phoneticNormalize(raw);
 
+    // 0. Caso especial de contexto operativo: "vicentin" -> imputado a "Chaco Las Acheras 280 litros"
+    if (/vicentin/i.test(bNorm)) {
+      const pAcheras = proyectos.find(p => /acheras/i.test(normalizeString(p.lugar)));
+      if (pAcheras) return pAcheras.lugar;
+    }
+
     // 1. Coincidencia exacta o inclusión directa
     for (const p of proyectos) {
       const pNorm = normalizeString(p.lugar);
@@ -1202,6 +1208,10 @@ OBRAS Y PROYECTOS ACTIVOS DE PUFFIN SRL: ${listaNombresProyectos}
   * "hacheras", "las acheras", "acheras", "chaco acheras" -> se refiere SIEMPRE y SIN DUDAR a "Chaco Las Acheras 280 litros". La gente mayor suele poner 'H' a 'acheras' o abreviar el nombre.
   * "lipsa", "esperanza", "nueva esperanza" -> se refiere a "Lipsa Santiago del Estero - Nva Esperanza".
   * "broglia", "campo broglia" -> se refiere a "Campo Broglia".
+  * "vicentin", "proyecto vicentin" -> ¡CASO CRÍTICO DE CONTEXTO OPERATIVO! En PUFFIN SRL NO existe un proyecto formal llamado "Vicentín". El usuario generó un egreso con concepto "Vicentín" que fue imputado al proyecto "Chaco Las Acheras 280 litros".
+    Si el usuario pregunta: "pasame los egresos del proyecto vicentin", "gastos de vicentin", "cuánto se gastó en vicentin" o similar, DEBES responder exactamente diciendo:
+    "¿Te referís a Chaco Las Acheras 280 litros? Te pregunto porque generaste un egreso con concepto Vicentín."
+    Y a continuación mostrale los datos de ese egreso con concepto Vicentín y consultale si desea ver todos los gastos de Chaco Las Acheras 280 litros.
 - Si el usuario te pregunta por egresos, máquinas, gastos o asignaciones usando cualquiera de estas variantes (ej: "egreso de las hacheras", "gastos de hacheras", "qué hay en hacheras"), NUNCA digas que no existe ni busques con error literal. Asimilá la intención de inmediato al proyecto correspondiente.
 
 SOY EL EMPLEADO ADMINISTRATIVO DIGITAL DE PUFFIN. CRÍTICO: TENÉS ACCESO A TODO EL SISTEMA Y A TODA LA INFORMACIÓN. Nunca respondas "no puedo hacerlo", "no tengo esa información" o "no tengo acceso". Estás obligado a usar tus herramientas para investigar, consultar y resolver lo que el administrador te pida. Funciono como un colaborador humano inteligente, prolijo y sin errores: pienso, interpreto los datos y ejecuto.
@@ -2197,13 +2207,37 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
   // CRÍTICO: traer TODOS los registros sin límite para que los totales y agrupaciones sean exactos
   const allResults = await query;
 
-  if (allResults.length === 0) return `No hay gastos con esos filtros.${proyectoNombreParaMostrar ? ` (buscado en proyecto/centro de costos: "${proyectoNombreParaMostrar}")` : ""}`;
+  if (allResults.length === 0) {
+    if (args.proyecto) {
+      const egresosPorConcepto = await db.select().from(egresosTable)
+        .where(orOp(ilikeOp(egresosTable.concepto, `%${args.proyecto}%`), ilikeOp(egresosTable.observaciones, `%${args.proyecto}%`)))
+        .limit(5);
+
+      if (egresosPorConcepto.length > 0) {
+        const proyRelacionado = egresosPorConcepto[0].centro_costos || "Chaco Las Acheras 280 litros";
+        return `💡 ATENCIÓN INTELIGENTE: No existe un proyecto llamado "${args.proyecto}", pero se encontró un egreso con concepto "${args.proyecto}" imputado al proyecto "${proyRelacionado}".
+DEBES RESPONDERLE AL USUARIO: "¿Te referís a ${proyRelacionado}? Te pregunto porque generaste un egreso con concepto ${args.proyecto}."
+Detalle del gasto encontrado:
+${egresosPorConcepto.map(e => `• [${e.fecha}] ${e.concepto} — $${Number(e.monto).toLocaleString("es-AR")} | Proyecto: ${e.centro_costos || "Sin asignar"}`).join("\n")}`;
+      }
+    }
+    return `No hay gastos con esos filtros.${proyectoNombreParaMostrar ? ` (buscado en proyecto/centro de costos: "${proyectoNombreParaMostrar}")` : ""}`;
+  }
 
   const total = allResults.reduce((a, r) => a + Number(r.monto || 0), 0);
   const totalCount = allResults.length;
 
+  let avisoEspecialVicentin = "";
+  if (args.proyecto && /vicentin/i.test(args.proyecto)) {
+    avisoEspecialVicentin = `\n💡 REGLA DE RESPUESTA OBLIGATORIA:
+El usuario preguntó por "Vicentín". En el sistema no existe un proyecto llamado "Vicentín", pero se generó un egreso con concepto "Vicentín" imputado al proyecto "Chaco Las Acheras 280 litros".
+DEBES PREGUNTARLE EXACTAMENTE:
+"¿Te referís a Chaco Las Acheras 280 litros? Te pregunto porque generaste un egreso con concepto Vicentín."
+Y a continuación mostrarle los datos correspondientes.\n`;
+  }
+
   // Cabecera siempre incluye el total real para que el bot no subestime
-  const cabecera = `📊 TOTAL REAL EN EL SISTEMA: ${totalCount} gasto(s) | Suma: $${total.toLocaleString("es-AR")}${proyectoNombreParaMostrar ? ` (Proyecto: ${proyectoNombreParaMostrar})` : ""}\n`;
+  const cabecera = `${avisoEspecialVicentin}📊 TOTAL REAL EN EL SISTEMA: ${totalCount} gasto(s) | Suma: $${total.toLocaleString("es-AR")}${proyectoNombreParaMostrar ? ` (Proyecto: ${proyectoNombreParaMostrar})` : ""}\n`;
 
   // Agrupar si se pide
   if (args.agrupar_por === "categoria") {
