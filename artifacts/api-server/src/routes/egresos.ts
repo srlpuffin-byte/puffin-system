@@ -18,7 +18,7 @@ router.get("/sync-sheet", async (req, res) => {
 router.get("/", async (req, res) => {
   const { categoria, centro_costos, proveedor, search, metodo_pago, orden } = req.query as Record<string, string>;
   const page  = Math.max(1, parseInt((req.query.page  as string) || "1"));
-  const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || "50")));
+  const limit = Math.min(1000, Math.max(1, parseInt((req.query.limit as string) || "50")));
   const offset = (page - 1) * limit;
 
   let baseQuery = db.select().from(egresosTable).$dynamic();
@@ -27,11 +27,20 @@ router.get("/", async (req, res) => {
   if (categoria) conditions.push(eq(egresosTable.categoria, categoria));
   if (centro_costos) {
     // "General" significa sin proyecto asignado → centro_costos IS NULL en la BD
-    conditions.push(
-      centro_costos === "General"
-        ? isNull(egresosTable.centro_costos)
-        : eq(egresosTable.centro_costos, centro_costos)
-    );
+    if (centro_costos === "General") {
+      conditions.push(isNull(egresosTable.centro_costos));
+    } else {
+      const cc = centro_costos.trim();
+      const tokens = cc.split(/\s+/).filter(t => t.length >= 4 && !/chaco|campo|obra|lote|km|litros/i.test(t));
+      const orClauses = [
+        eq(egresosTable.centro_costos, cc),
+        ilike(egresosTable.centro_costos, `%${cc}%`)
+      ];
+      for (const tok of tokens) {
+        orClauses.push(ilike(egresosTable.centro_costos, `%${tok}%`));
+      }
+      conditions.push(or(...orClauses));
+    }
   }
   if (proveedor) conditions.push(eq(egresosTable.proveedor, proveedor));
   if (metodo_pago) conditions.push(eq(egresosTable.metodo_pago, metodo_pago));

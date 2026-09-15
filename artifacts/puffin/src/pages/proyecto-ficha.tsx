@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useParams, useRoute, useLocation, Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useGetProyecto, useDeletePago } from "@/hooks/use-proyectos";
-import { useGetEmpleados, useGetMaquinas, useGetEgresos, useGetMe } from "@workspace/api-client-react";
+import { useGetEmpleados, useGetMaquinas, useGetMe } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,10 +40,23 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
   const { data: proyecto, isLoading, isError, refetch } = useGetProyecto(proyectoId);
   const { data: empleados } = useGetEmpleados();
   const { data: maquinas } = useGetMaquinas();
-  const { data: todosLosEgresos } = useGetEgresos();
   const { data: me } = useGetMe();
   const isEmpleado = me?.rol?.toLowerCase() === "empleado";
   const deletePagoMut = useDeletePago();
+
+  // Consulta directa de TODOS los egresos de este proyecto al servidor (sin recorte de 50)
+  const { data: egresosProyectoResp } = useQuery<{ data: any[]; meta?: { total: number; total_suma: number } }>({
+    queryKey: ["/api/proyectos", proyectoId, "egresos"],
+    queryFn: async () => {
+      const token = localStorage.getItem("puffin_token");
+      const res = await fetch(`/api/proyectos/${proyectoId}/egresos`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error("Error al obtener egresos del proyecto");
+      return res.json();
+    },
+    enabled: !!proyectoId && !isEmpleado,
+  });
 
   const handleDeletePago = async (pagoId: string) => {
     if (!confirm("¿Estás seguro de eliminar este cobro/pago?")) return;
@@ -96,16 +110,11 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
   const assignedMaquinas = maquinas?.filter(m => proyecto.maquinas_asignadas?.includes(m.id) && m.categoria !== "inventario") || [];
   const assignedInventario = maquinas?.filter(m => proyecto.maquinas_asignadas?.includes(m.id) && m.categoria === "inventario") || [];
 
-  // Filtrar egresos de este proyecto (por nombre de lugar en centro_costos)
-  const egresosProyecto = todosLosEgresos?.data?.filter((eg: any) => {
-    const cc = (eg.centro_costos || "").trim().toLowerCase();
-    if (!cc) return false;
-    const lugar = (proyecto.lugar || "").toLowerCase();
-    return cc.includes(lugar) || lugar.includes(cc);
-  }) || [];
+  // Egresos del proyecto obtenidos de la base de datos
+  const egresosProyecto = egresosProyectoResp?.data || [];
 
-  // Totales
-  const totalGastosARS = egresosProyecto.reduce((sum: number, eg: any) => sum + parseFloat(eg.monto?.toString() || "0"), 0);
+  // Totales reales del proyecto
+  const totalGastosARS = egresosProyectoResp?.meta?.total_suma ?? egresosProyecto.reduce((sum: number, eg: any) => sum + parseFloat(eg.monto?.toString() || "0"), 0);
   const tc = parseFloat(tipoCambio) || 1;
   const gananciaUSD = parseFloat(proyecto.ganancia_estimada || "0");
   const gananciaARS = gananciaUSD * tc;

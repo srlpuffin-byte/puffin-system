@@ -70,11 +70,6 @@ export function Egresos() {
     ...(filterMetodo !== "todos" ? { metodo_pago: filterMetodo } : {}),
     ...(filterSearch ? { search: filterSearch } : {}),
     ...(orden === "fecha" ? { orden: "fecha" as any } : {}),
-  }, {
-    query: {
-      refetchOnMount: true,
-      staleTime: 0,
-    } as any
   });
   const egresos = egresosResp?.data;
   const paginationMeta = egresosResp?.meta;
@@ -328,7 +323,7 @@ export function Egresos() {
               />
             </div>
             <Select value={filterProyecto} onValueChange={setFilterProyecto}>
-              <SelectTrigger className="w-[200px]"><SelectValue placeholder="Proyecto" /></SelectTrigger>
+              <SelectTrigger className="w-[230px] max-w-full"><SelectValue placeholder="Proyecto" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos los proyectos</SelectItem>
                 <SelectItem value="General">General (sin proyecto)</SelectItem>

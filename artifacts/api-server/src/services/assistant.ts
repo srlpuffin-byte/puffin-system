@@ -117,7 +117,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         type: "object",
         properties: {
           categoria: { type: "string", description: "Filtrar por categoría (opcional)" },
-          proyecto: { type: "string", description: "Filtrar por proyecto/obra (usar solo la palabra clave más distintiva, ej: 'Broglia' en vez de 'Campo Broglia') (opcional)" },
+          proyecto: { type: "string", description: "Filtrar por proyecto/obra (ej: 'acheras' o 'hacheras' para Chaco Las Acheras, 'lipsa', 'broglia'). Tolerante a faltas de ortografía y tipeos. (opcional)" },
           desde: { type: "string", description: "Fecha inicio YYYY-MM-DD (opcional)" },
           hasta: { type: "string", description: "Fecha fin YYYY-MM-DD (opcional)" },
           agrupar_por: { type: "string", description: "Agrupar por: categoria, proyecto, mes (opcional)" },
@@ -767,6 +767,123 @@ export function isNingunProyecto(val?: string | null): boolean {
   return /^(ningun[oa]|sin\s+asignar|no\s+asignad[ao]|sin\s+proyecto.*|sin\s+centro.*|a\s+definir|pendiente.*|n\/?a|none|null|-)$/i.test(v);
 }
 
+// Normalización básica de cadenas (sin tildes, minúsculas, espacios colapsados)
+export function normalizeString(str: string): string {
+  return (str || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // quitar tildes
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Normalización fonética para errores comunes en español ('h' muda, b/v, c/s/z, y/ll)
+export function phoneticNormalize(str: string): string {
+  let s = normalizeString(str);
+  // Eliminar 'h' inicial o entre vocales (ej: "hacheras" -> "acheras")
+  s = s.replace(/\bh+/g, "").replace(/([aeiou])h+/g, "$1");
+  // Unificar v a b
+  s = s.replace(/v/g, "b");
+  // Unificar c ante e,i a s; z a s
+  s = s.replace(/c(?=[ei])/g, "s").replace(/z/g, "s");
+  // Unificar ll e y
+  s = s.replace(/ll/g, "y");
+  // Unificar qu y c a k
+  s = s.replace(/qu/g, "k").replace(/c(?=[aou])/g, "k");
+  return s.trim();
+}
+
+// Distancia Levenshtein para tolerancia a errores tipográficos
+export function levenshteinDist(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix: number[][] = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+// Resolver proyecto oficial de la BD con tolerancia fonética, ortográfica y por palabras clave
+export async function resolverProyectoConTolerancia(busqueda?: string | null): Promise<string | null> {
+  if (!busqueda) return null;
+  const raw = busqueda.trim();
+  if (isNingunProyecto(raw)) return null;
+
+  try {
+    const proyectos = await db.select({ id: proyectosTable.id, lugar: proyectosTable.lugar })
+      .from(proyectosTable);
+
+    if (!proyectos.length) return raw;
+
+    const bNorm = normalizeString(raw);
+    const bPhon = phoneticNormalize(raw);
+
+    // 1. Coincidencia exacta o inclusión directa
+    for (const p of proyectos) {
+      const pNorm = normalizeString(p.lugar);
+      if (pNorm === bNorm || pNorm.includes(bNorm) || bNorm.includes(pNorm)) {
+        return p.lugar;
+      }
+    }
+
+    // 2. Coincidencia fonética (ej: "hacheras" -> phon: "aseras" coincide con "Chaco Las Acheras 280 litros" -> "aseras")
+    for (const p of proyectos) {
+      const pPhon = phoneticNormalize(p.lugar);
+      if (pPhon === bPhon || pPhon.includes(bPhon) || bPhon.includes(pPhon)) {
+        return p.lugar;
+      }
+    }
+
+    // 3. Tokens distintivos (palabras >= 4 letras ignorando palabras vacías)
+    const STOPWORDS = new Set(["chaco", "campo", "obra", "proyecto", "lote", "litros", "norte", "sur", "este", "oeste", "para", "las", "los", "del", "una", "uno"]);
+    const bTokens = bNorm.split(/\s+/).filter(t => t.length >= 4 && !STOPWORDS.has(t));
+    const bPhonTokens = bPhon.split(/\s+/).filter(t => t.length >= 3 && !STOPWORDS.has(t));
+
+    for (const p of proyectos) {
+      const pNorm = normalizeString(p.lugar);
+      const pPhon = phoneticNormalize(p.lugar);
+
+      for (const t of bTokens) {
+        if (pNorm.includes(t)) return p.lugar;
+      }
+      for (const t of bPhonTokens) {
+        if (pPhon.includes(t)) return p.lugar;
+      }
+    }
+
+    // 4. Distancia Levenshtein básica para errores de tipeo
+    for (const p of proyectos) {
+      const pTokens = normalizeString(p.lugar).split(/\s+/).filter(t => t.length >= 4 && !STOPWORDS.has(t));
+      for (const bt of bTokens) {
+        for (const pt of pTokens) {
+          if (levenshteinDist(bt, pt) <= 2) {
+            return p.lugar;
+          }
+        }
+      }
+    }
+
+    return raw;
+  } catch (err) {
+    console.error("[resolverProyectoConTolerancia] Error:", err);
+    return raw;
+  }
+}
+
 // Parser para detectar y extraer la estructura de egreso presentada al usuario
 export function parseEstructuraEgreso(text: string) {
   if (!text) return null;
@@ -1066,11 +1183,26 @@ export async function handleWhatsAppMessage(from: string, text: string, imageBas
     (t: any) => !WRITE_TOOLS.includes(t.function.name)
   );
 
+  const proyectosActivosBD = await db.select({ lugar: proyectosTable.lugar })
+    .from(proyectosTable)
+    .where(eq(proyectosTable.estado, "activo"))
+    .catch(() => []);
+  const listaNombresProyectos = proyectosActivosBD.map(p => p.lugar).join(", ") || "Chaco Las Acheras 280 litros, Lipsa Santiago del Estero - Nva Esperanza, Campo Broglia, RMG e hijas";
+
   const systemPrompt = isAdmin
     ? `Sos el Asistente Administrativo Digital de PUFFIN SRL, empresa de maquinaria vial.
 Hablás en español rioplatense, de forma profesional, clara y concisa.
 Rol: *ADMINISTRADOR* — acceso y control total del sistema.
 Fecha de hoy: ${today} (${todayISO}).
+
+OBRAS Y PROYECTOS ACTIVOS DE PUFFIN SRL: ${listaNombresProyectos}
+
+⚡ TOLERANCIA ABSOLUTA A ERRORES ORTOGRÁFICOS Y DE TIPEO EN PROYECTOS:
+- La gente de campo o administradores frecuentemente escriben con faltas de ortografía o nombres acortados:
+  * "hacheras", "las acheras", "acheras", "chaco acheras" -> se refiere SIEMPRE y SIN DUDAR a "Chaco Las Acheras 280 litros". La gente mayor suele poner 'H' a 'acheras' o abreviar el nombre.
+  * "lipsa", "esperanza", "nueva esperanza" -> se refiere a "Lipsa Santiago del Estero - Nva Esperanza".
+  * "broglia", "campo broglia" -> se refiere a "Campo Broglia".
+- Si el usuario te pregunta por egresos, máquinas, gastos o asignaciones usando cualquiera de estas variantes (ej: "egreso de las hacheras", "gastos de hacheras", "qué hay en hacheras"), NUNCA digas que no existe ni busques con error literal. Asimilá la intención de inmediato al proyecto correspondiente.
 
 SOY EL EMPLEADO ADMINISTRATIVO DIGITAL DE PUFFIN. CRÍTICO: TENÉS ACCESO A TODO EL SISTEMA Y A TODA LA INFORMACIÓN. Nunca respondas "no puedo hacerlo", "no tengo esa información" o "no tengo acceso". Estás obligado a usar tus herramientas para investigar, consultar y resolver lo que el administrador te pida. Funciono como un colaborador humano inteligente, prolijo y sin errores: pienso, interpreto los datos y ejecuto.
 
@@ -1089,7 +1221,7 @@ Cuando el usuario te envíe un mensaje con un gasto (texto, foto, comprobante PD
      - Extraé ÚNICAMENTE las entidades operativas reales:
        * El repuesto, pieza o insumo (ej: "alternador", "filtro de gasoil", "micro relay", "aceite").
        * La máquina o equipo (ej: "motocompresor", "cargadora liugong", "excavadora", "camión").
-       * El proyecto u obra (ej: "Lipsa", "Broglia", "Campo").
+       * El proyecto u obra (ej: "Lipsa", "Broglia", "Campo", "Hacheras", "Acheras").
        * El monto si lo indica.
 
   1. CONCEPTO Y MONTO (FACTURAS, COMPROBANTES Y AUDIOS):
@@ -1595,7 +1727,14 @@ async function executeConsultarProyectos(estado?: string, nombre?: string, orden
   let query = db.select().from(proyectosTable).$dynamic();
   const conditions: any[] = [];
   if (estado) conditions.push(eq(proyectosTable.estado, estado));
-  if (nombre) conditions.push(ilike(proyectosTable.lugar, `%${nombre}%`));
+  if (nombre) {
+    const pResuelto = await resolverProyectoConTolerancia(nombre);
+    if (pResuelto) {
+      conditions.push(or(ilike(proyectosTable.lugar, `%${pResuelto}%`), ilike(proyectosTable.lugar, `%${nombre}%`)));
+    } else {
+      conditions.push(ilike(proyectosTable.lugar, `%${nombre}%`));
+    }
+  }
   if (conditions.length) query = query.where(and(...conditions));
 
   const { asc } = await import("drizzle-orm");
@@ -2010,18 +2149,33 @@ async function executeConsultarAlquileres(args: { nombre_maquina?: string; clien
 
 
 async function executeAnalizarGastos(args: { categoria?: string; proyecto?: string; desde?: string; hasta?: string; agrupar_por?: string; orden?: string; limite?: number; fecha_registro?: string; }) {
-  const { gte, lte, between, ilike: ilikeOp } = await import("drizzle-orm");
+  const { gte, lte, between, ilike: ilikeOp, or: orOp } = await import("drizzle-orm");
   // Límite generoso: la IA siempre ve TODOS los registros para calcular totales correctos.
   // Solo se trunca el listado de líneas individuales que se le muestran al usuario.
   const limiteDisplay = Number(args.limite) || 500;
 
   let query = db.select().from(egresosTable).$dynamic();
   const conditions: any[] = [];
+  let proyectoNombreParaMostrar = args.proyecto;
 
   if (args.categoria) conditions.push(ilikeOp(egresosTable.categoria, `%${args.categoria}%`));
   if (args.proyecto) {
-    // Buscar en centro_costos con tolerancia a variantes del nombre
-    conditions.push(ilikeOp(egresosTable.centro_costos, `%${args.proyecto}%`));
+    const proyectoResuelto = await resolverProyectoConTolerancia(args.proyecto);
+    const target = proyectoResuelto || args.proyecto;
+    proyectoNombreParaMostrar = target;
+
+    const tokens = target.split(/\s+/).filter(t => t.length >= 4 && !/chaco|campo|obra|lote|litros|norte|sur/i.test(t));
+    const orClauses: any[] = [
+      ilikeOp(egresosTable.centro_costos, `%${target}%`),
+      ilikeOp(egresosTable.centro_costos, `%${args.proyecto}%`)
+    ];
+    for (const tok of tokens) {
+      orClauses.push(ilikeOp(egresosTable.centro_costos, `%${tok}%`));
+    }
+    if (/^h/i.test(args.proyecto)) {
+      orClauses.push(ilikeOp(egresosTable.centro_costos, `%${args.proyecto.replace(/^h/i, "")}%`));
+    }
+    conditions.push(orOp(...orClauses));
   }
   if (args.desde && args.hasta) conditions.push(between(egresosTable.fecha, args.desde, args.hasta));
   else if (args.desde) conditions.push(gte(egresosTable.fecha, args.desde));
@@ -2043,13 +2197,13 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
   // CRÍTICO: traer TODOS los registros sin límite para que los totales y agrupaciones sean exactos
   const allResults = await query;
 
-  if (allResults.length === 0) return `No hay gastos con esos filtros.${args.proyecto ? ` (buscado en proyecto/centro de costos: "${args.proyecto}")` : ""}`;
+  if (allResults.length === 0) return `No hay gastos con esos filtros.${proyectoNombreParaMostrar ? ` (buscado en proyecto/centro de costos: "${proyectoNombreParaMostrar}")` : ""}`;
 
   const total = allResults.reduce((a, r) => a + Number(r.monto || 0), 0);
   const totalCount = allResults.length;
 
   // Cabecera siempre incluye el total real para que el bot no subestime
-  const cabecera = `📊 TOTAL REAL EN EL SISTEMA: ${totalCount} gasto(s) | Suma: $${total.toLocaleString("es-AR")}${args.proyecto ? ` (Proyecto: ${args.proyecto})` : ""}\n`;
+  const cabecera = `📊 TOTAL REAL EN EL SISTEMA: ${totalCount} gasto(s) | Suma: $${total.toLocaleString("es-AR")}${proyectoNombreParaMostrar ? ` (Proyecto: ${proyectoNombreParaMostrar})` : ""}\n`;
 
   // Agrupar si se pide
   if (args.agrupar_por === "categoria") {
@@ -2371,30 +2525,35 @@ async function executeRegistrarGasto(args: {
     }
 
     if (centroCostosResuelto) {
-      const ccLower = centroCostosResuelto.toLowerCase();
-      const [proyecto] = await db.select({ lugar: proyectosTable.lugar })
-        .from(proyectosTable)
-        .where(ilike(proyectosTable.lugar, `%${ccLower}%`))
-        .limit(1);
-
-      if (proyecto) {
-        centroCostosResuelto = proyecto.lugar;
+      const pResuelto = await resolverProyectoConTolerancia(centroCostosResuelto);
+      if (pResuelto) {
+        centroCostosResuelto = pResuelto;
       } else {
-        // Si el usuario puso múltiples palabras (ej: "Lipsa liugong"), buscar palabra por palabra
-        const palabras = ccLower.split(/\s+/);
-        for (const p of palabras) {
-          if (p.length < 3) continue;
-          const [pMatch] = await db.select({ lugar: proyectosTable.lugar })
-            .from(proyectosTable)
-            .where(ilike(proyectosTable.lugar, `%${p}%`))
-            .limit(1);
-          if (pMatch) {
-            centroCostosResuelto = pMatch.lugar;
-            const resto = palabras.filter(x => x !== p).join(" ");
-            if (resto && !obsExtra) {
-              obsExtra = resto.includes("liugong") ? "Cargadora LiuGong" : resto;
+        const ccLower = centroCostosResuelto.toLowerCase();
+        const [proyecto] = await db.select({ lugar: proyectosTable.lugar })
+          .from(proyectosTable)
+          .where(ilike(proyectosTable.lugar, `%${ccLower}%`))
+          .limit(1);
+
+        if (proyecto) {
+          centroCostosResuelto = proyecto.lugar;
+        } else {
+          // Si el usuario puso múltiples palabras (ej: "Lipsa liugong"), buscar palabra por palabra
+          const palabras = ccLower.split(/\s+/);
+          for (const p of palabras) {
+            if (p.length < 3) continue;
+            const [pMatch] = await db.select({ lugar: proyectosTable.lugar })
+              .from(proyectosTable)
+              .where(ilike(proyectosTable.lugar, `%${p}%`))
+              .limit(1);
+            if (pMatch) {
+              centroCostosResuelto = pMatch.lugar;
+              const resto = palabras.filter(x => x !== p).join(" ");
+              if (resto && !obsExtra) {
+                obsExtra = resto.includes("liugong") ? "Cargadora LiuGong" : resto;
+              }
+              break;
             }
-            break;
           }
         }
       }
@@ -2498,30 +2657,35 @@ async function executeActualizarGasto(args: {
       if (isNingunProyecto(args.centro_costos)) {
         centroCostosResuelto = null;
       } else {
-        const ccLower = args.centro_costos.toLowerCase();
-        const [proyecto] = await db.select({ lugar: proyectosTable.lugar })
-          .from(proyectosTable)
-          .where(ilike(proyectosTable.lugar, `%${ccLower}%`))
-          .limit(1);
-
-        if (proyecto) {
-          centroCostosResuelto = proyecto.lugar;
+        const pResuelto = await resolverProyectoConTolerancia(args.centro_costos);
+        if (pResuelto) {
+          centroCostosResuelto = pResuelto;
         } else {
-          const palabras = ccLower.split(/\s+/);
-          for (const p of palabras) {
-            if (p.length < 3) continue;
-            const [pMatch] = await db.select({ lugar: proyectosTable.lugar })
-              .from(proyectosTable)
-              .where(ilike(proyectosTable.lugar, `%${p}%`))
-              .limit(1);
-            if (pMatch) {
-              centroCostosResuelto = pMatch.lugar;
-              const resto = palabras.filter(x => x !== p).join(" ");
-              if (resto) {
-                const maq = resto.includes("liugong") ? "Cargadora LiuGong" : resto;
-                obsExtra = obsExtra ? `${obsExtra} | ${maq}` : maq;
+          const ccLower = args.centro_costos.toLowerCase();
+          const [proyecto] = await db.select({ lugar: proyectosTable.lugar })
+            .from(proyectosTable)
+            .where(ilike(proyectosTable.lugar, `%${ccLower}%`))
+            .limit(1);
+
+          if (proyecto) {
+            centroCostosResuelto = proyecto.lugar;
+          } else {
+            const palabras = ccLower.split(/\s+/);
+            for (const p of palabras) {
+              if (p.length < 3) continue;
+              const [pMatch] = await db.select({ lugar: proyectosTable.lugar })
+                .from(proyectosTable)
+                .where(ilike(proyectosTable.lugar, `%${p}%`))
+                .limit(1);
+              if (pMatch) {
+                centroCostosResuelto = pMatch.lugar;
+                const resto = palabras.filter(x => x !== p).join(" ");
+                if (resto) {
+                  const maq = resto.includes("liugong") ? "Cargadora LiuGong" : resto;
+                  obsExtra = obsExtra ? `${obsExtra} | ${maq}` : maq;
+                }
+                break;
               }
-              break;
             }
           }
         }
@@ -3187,13 +3351,28 @@ async function executeActualizarFotografia(tipo: string, busqueda: string, imgUr
 
 async function executeGenerarExcelGastos(from: string, args: { desde?: string, hasta?: string, proyecto?: string, categoria?: string }) {
   try {
-    const { eq, and, gte, lte, ilike } = await import("drizzle-orm");
+    const { eq, and, gte, lte, ilike, or } = await import("drizzle-orm");
     const xlsx = await import("xlsx");
     
     let conditions = [];
     if (args.desde) conditions.push(gte(egresosTable.fecha, args.desde));
     if (args.hasta) conditions.push(lte(egresosTable.fecha, args.hasta));
-    if (args.proyecto) conditions.push(ilike(egresosTable.centro_costos, `%${args.proyecto}%`));
+    if (args.proyecto) {
+      const proyectoResuelto = await resolverProyectoConTolerancia(args.proyecto);
+      const target = proyectoResuelto || args.proyecto;
+      const tokens = target.split(/\s+/).filter(t => t.length >= 4 && !/chaco|campo|obra|lote|litros|norte|sur/i.test(t));
+      const orClauses = [
+        ilike(egresosTable.centro_costos, `%${target}%`),
+        ilike(egresosTable.centro_costos, `%${args.proyecto}%`)
+      ];
+      for (const tok of tokens) {
+        orClauses.push(ilike(egresosTable.centro_costos, `%${tok}%`));
+      }
+      if (/^h/i.test(args.proyecto)) {
+        orClauses.push(ilike(egresosTable.centro_costos, `%${args.proyecto.replace(/^h/i, "")}%`));
+      }
+      conditions.push(or(...orClauses));
+    }
     if (args.categoria) conditions.push(ilike(egresosTable.categoria, `%${args.categoria}%`));
     
     const gastos = await db.select().from(egresosTable)

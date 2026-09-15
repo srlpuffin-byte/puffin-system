@@ -36,8 +36,7 @@ export function MaquinaFicha() {
   const { data: maquina, isLoading, refetch: refetchMaquina } = useGetMaquina(maquinaId, { 
     query: { 
       enabled: !!maquinaId,
-      refetchInterval: 15000,
-      staleTime: 0
+      refetchInterval: 15000
     } as any 
   });
   const { data: fotos } = useGetFotografias({ entidad_tipo: "maquina", entidad_id: maquinaId }, { query: { enabled: !!maquinaId } as any });
@@ -64,8 +63,7 @@ export function MaquinaFicha() {
       return res.json();
     },
     enabled: !!maquinaId,
-    refetchInterval: 15000,
-    staleTime: 0
+    refetchInterval: 15000
   });
 
   const alquilerActivo = alquileres?.find((a: any) => a.estado === "en_curso");
@@ -80,8 +78,7 @@ export function MaquinaFicha() {
       return res.json();
     },
     enabled: !!maquinaId,
-    refetchInterval: 15000,
-    staleTime: 0
+    refetchInterval: 15000
   });
 
   const { data: telemetriaLive } = useQuery({

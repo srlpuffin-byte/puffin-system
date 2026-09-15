@@ -26,15 +26,19 @@ async function fixCentroCostos() {
       continue;
     }
 
-    // 2. Buscar el proyecto cuyo "lugar" contiene el texto del egreso (o viceversa)
+    // 2. Buscar el proyecto cuyo "lugar" contiene el texto del egreso (o viceversa) o coincide fonéticamente/por tokens
     const match = proyectos.find(p => {
       const pLower = p.lugar.toLowerCase();
       const ccLower = cc.toLowerCase();
-      // El valor del egreso está contenido en el nombre del proyecto
-      if (pLower.includes(ccLower)) return true;
-      // Cada palabra del egreso (>= 3 letras) aparece en el nombre del proyecto
-      const palabras = ccLower.split(/\s+/).filter((w: string) => w.length >= 3);
-      return palabras.length > 0 && palabras.every((w: string) => pLower.includes(w));
+      // El valor del egreso está contenido en el nombre del proyecto o viceversa
+      if (pLower.includes(ccLower) || ccLower.includes(pLower)) return true;
+      // Normalización de 'h' inicial (ej: hacheras <-> acheras)
+      const pClean = pLower.replace(/\bh+/g, "");
+      const ccClean = ccLower.replace(/\bh+/g, "");
+      if (pClean.includes(ccClean) || ccClean.includes(pClean)) return true;
+      // Cada palabra del egreso (>= 4 letras) aparece en el nombre del proyecto
+      const palabras = ccClean.split(/\s+/).filter((w: string) => w.length >= 4 && !/chaco|campo|obra|lote|litros/i.test(w));
+      return palabras.length > 0 && palabras.some((w: string) => pClean.includes(w));
     });
 
     if (match) {

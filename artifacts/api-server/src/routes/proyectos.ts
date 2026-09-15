@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { proyectosTable, usuariosTable, empleadosTable } from "@workspace/db/schema";
-import { eq, or, and, ne } from "drizzle-orm";
+import { proyectosTable, usuariosTable, empleadosTable, egresosTable } from "@workspace/db/schema";
+import { eq, or, and, ne, ilike, desc } from "drizzle-orm";
 import { updateOrAppendToSheet } from "../services/sheets.js";
 
 const router = Router();
@@ -165,6 +165,51 @@ router.get("/:id", async (req, res) => {
     if (req.log) req.log.error(err);
     else console.error("[proyectos GET /:id] Error:", err);
     return res.status(500).json({ error: "Error al obtener proyecto" });
+  }
+});
+
+// Obtener TODOS los egresos de un proyecto (sin límite de 50 global, con total calculado)
+router.get("/:id/egresos", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "ID de proyecto inválido" });
+
+    if (req.user?.rol?.toLowerCase() === "empleado") {
+      return res.status(403).json({ error: "No tienes permiso para ver los egresos del proyecto" });
+    }
+
+    const [proyecto] = await db.select().from(proyectosTable).where(eq(proyectosTable.id, id)).limit(1);
+    if (!proyecto) return res.status(404).json({ error: "Proyecto no encontrado" });
+
+    const lugar = (proyecto.lugar || "").trim();
+    // Extraer tokens distintivos (ej: "acheras" de "Chaco Las Acheras 280 litros")
+    const tokens = lugar.split(/\s+/).filter(t => t.length >= 4 && !/chaco|campo|obra|lote|km|litros/i.test(t));
+    
+    const orClauses = [
+      eq(egresosTable.centro_costos, lugar),
+      ilike(egresosTable.centro_costos, `%${lugar}%`)
+    ];
+    for (const tok of tokens) {
+      orClauses.push(ilike(egresosTable.centro_costos, `%${tok}%`));
+    }
+
+    const egresos = await db.select().from(egresosTable)
+      .where(or(...orClauses))
+      .orderBy(desc(egresosTable.fecha), desc(egresosTable.id));
+
+    const total_suma = egresos.reduce((acc, e) => acc + Number(e.monto || 0), 0);
+
+    return res.json({
+      data: egresos.map(e => ({ ...e, monto: Number(e.monto) })),
+      meta: {
+        total: egresos.length,
+        total_suma,
+      }
+    });
+  } catch (err: any) {
+    if (req.log) req.log.error(err);
+    else console.error("[proyectos GET /:id/egresos] Error:", err);
+    return res.status(500).json({ error: "Error al obtener egresos del proyecto" });
   }
 });
 

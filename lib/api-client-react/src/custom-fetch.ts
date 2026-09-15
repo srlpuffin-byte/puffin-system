@@ -1,7 +1,7 @@
 export type CustomFetchOptions = RequestInit & {
   responseType?: "json" | "text" | "blob" | "auto";
 };
-import { enqueueRequest } from './offline-queue';
+import { enqueueRequest, cacheGetResponse, getCachedResponse } from './offline-queue';
 
 export type ErrorType<T = unknown> = ApiError<T>;
 
@@ -380,6 +380,16 @@ export async function customFetch<T = unknown>(
       // Resolve successfully with a fake JSON object to not break the app
       return {} as T;
     }
+
+    // Para peticiones GET: si no hay red / offline / timeout, recuperar de la caché local persistida
+    if (method === 'GET') {
+      const cached = await getCachedResponse(requestInfo.url);
+      if (cached !== null && cached !== undefined) {
+        console.warn(`[customFetch] Sin conexión. Sirviendo respuesta desde caché local para: ${requestInfo.url}`);
+        return cached as T;
+      }
+    }
+
     throw error;
   }
 
@@ -389,9 +399,26 @@ export async function customFetch<T = unknown>(
       localStorage.removeItem("puffin_token");
       window.location.href = "/login";
     }
+
+    // Fallback a caché local si el servidor responde con 5xx (ej: durante reinicio o caída temporal)
+    if (method === 'GET' && response.status >= 500) {
+      const cached = await getCachedResponse(requestInfo.url);
+      if (cached !== null && cached !== undefined) {
+        console.warn(`[customFetch] Error del servidor (${response.status}). Sirviendo respuesta desde caché local para: ${requestInfo.url}`);
+        return cached as T;
+      }
+    }
+
     const errorData = await parseErrorBody(response, method);
     throw new ApiError(response, errorData, requestInfo);
   }
 
-  return (await parseSuccessBody(response, responseType, requestInfo)) as T;
+  const parsed = (await parseSuccessBody(response, responseType, requestInfo)) as T;
+
+  // Guardar copia local en segundo plano para consultas GET exitosas
+  if (method === 'GET' && parsed !== null && parsed !== undefined && typeof window !== 'undefined') {
+    cacheGetResponse(requestInfo.url, parsed).catch(() => {});
+  }
+
+  return parsed;
 }

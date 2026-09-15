@@ -15,36 +15,23 @@ export function OfflineBadge() {
     try {
       const count = await getQueueCount();
       setPendingCount(count);
+      return count;
     } catch (e) {
       console.error(e);
+      return 0;
     }
   };
 
-  useEffect(() => {
-    updateCount();
-
-    const handleOnline = () => {
-      setIsOffline(false);
-      handleSync(); // Auto sync on connection restored
-    };
-    const handleOffline = () => setIsOffline(true);
-    const handleQueueUpdated = () => updateCount();
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    window.addEventListener('offline-queue-updated', handleQueueUpdated);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('offline-queue-updated', handleQueueUpdated);
-    };
-  }, []);
-
   const handleSync = async () => {
-    if (isSyncing || pendingCount === 0) return;
+    if (isSyncing) return;
     if (!navigator.onLine) {
       toast({ title: "Aún sin conexión", description: "No se puede sincronizar sin internet.", variant: "destructive" });
+      return;
+    }
+
+    const currentPending = await getQueueCount();
+    if (currentPending === 0) {
+      setPendingCount(0);
       return;
     }
 
@@ -59,9 +46,40 @@ export function OfflineBadge() {
       toast({ title: "Error", description: "Hubo un problema sincronizando algunos datos.", variant: "destructive" });
     } finally {
       setIsSyncing(false);
-      updateCount();
+      await updateCount();
     }
   };
+
+  useEffect(() => {
+    updateCount().then((count) => {
+      if (count > 0 && navigator.onLine) {
+        handleSync();
+      }
+    });
+
+    const handleOnline = () => {
+      setIsOffline(false);
+      handleSync(); // Auto sync on connection restored
+    };
+    const handleOffline = () => setIsOffline(true);
+    const handleQueueUpdated = () => {
+      updateCount().then((count) => {
+        if (count > 0 && navigator.onLine) {
+          handleSync();
+        }
+      });
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('offline-queue-updated', handleQueueUpdated);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('offline-queue-updated', handleQueueUpdated);
+    };
+  }, []);
 
   if (!isOffline && pendingCount === 0) {
     return null; // Don't show anything if everything is fine

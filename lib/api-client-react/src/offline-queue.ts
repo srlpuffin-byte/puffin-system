@@ -12,6 +12,14 @@ interface PuffinDB extends DBSchema {
       timestamp: number;
     };
   };
+  offline_get_cache: {
+    key: string;
+    value: {
+      url: string;
+      data: any;
+      timestamp: number;
+    };
+  };
 }
 
 let dbPromise: Promise<IDBPDatabase<PuffinDB>> | null = null;
@@ -20,13 +28,48 @@ function getDB() {
   if (typeof window === 'undefined') return null; // SSR safety
   
   if (!dbPromise) {
-    dbPromise = openDB<PuffinDB>('puffin-system-offline', 1, {
-      upgrade(db) {
-        db.createObjectStore('offline_queue', { keyPath: 'id', autoIncrement: true });
+    dbPromise = openDB<PuffinDB>('puffin-system-offline', 2, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          if (!db.objectStoreNames.contains('offline_queue')) {
+            db.createObjectStore('offline_queue', { keyPath: 'id', autoIncrement: true });
+          }
+        }
+        if (oldVersion < 2) {
+          if (!db.objectStoreNames.contains('offline_get_cache')) {
+            db.createObjectStore('offline_get_cache', { keyPath: 'url' });
+          }
+        }
       },
     });
   }
   return dbPromise;
+}
+
+export async function cacheGetResponse(url: string, data: any) {
+  try {
+    const db = await getDB();
+    if (!db) return;
+    await db.put('offline_get_cache', {
+      url,
+      data,
+      timestamp: Date.now()
+    });
+  } catch (err) {
+    console.warn('[cacheGetResponse] Error caching GET response:', err);
+  }
+}
+
+export async function getCachedResponse(url: string): Promise<any | null> {
+  try {
+    const db = await getDB();
+    if (!db) return null;
+    const entry = await db.get('offline_get_cache', url);
+    return entry ? entry.data : null;
+  } catch (err) {
+    console.warn('[getCachedResponse] Error reading cached GET response:', err);
+    return null;
+  }
 }
 
 export async function enqueueRequest(url: string, method: string, headers: Record<string, string>, body: string | null) {
