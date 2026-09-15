@@ -17,7 +17,7 @@ import {
   documentosTable,
   alquileresTable,
 } from "@workspace/db/schema";
-import { eq, like, or, and, desc, ilike, notInArray } from "drizzle-orm";
+import { eq, like, or, and, desc, ilike, notInArray, gte, lte, between } from "drizzle-orm";
 import crypto from "crypto";
 import { sendWhatsAppImage, sendWhatsAppMessage, sendWhatsAppDocument } from "./whatsapp.js";
 
@@ -39,29 +39,162 @@ async function auditarBot(accion: string, entidad: string, entidad_id?: number |
   }
 }
 
-const groqApiKey = process.env.GROQ_API_KEY;
-const geminiApiKey = process.env.GEMINI_API_KEY;
-const openaiApiKey = process.env.OPENAI_API_KEY;
-
-// Prioridad: Groq (gratis, rápido) → Gemini (gratis, sin límite diario) → OpenAI (pago)
-let openai: OpenAI | null = null;
-let MODEL = "llama-3.3-70b-versatile";
-
-if (groqApiKey) {
-  openai = new OpenAI({ apiKey: groqApiKey, baseURL: "https://api.groq.com/openai/v1" });
-  MODEL = "llama-3.1-8b-instant"; // 500K tokens/día gratis (vs 100K del 70b)
-  console.log("[IA] Usando Groq: llama-3.1-8b-instant");
-} else if (geminiApiKey) {
-  openai = new OpenAI({ apiKey: geminiApiKey, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/" });
-  MODEL = "gemini-1.5-flash";
-  console.log("[IA] Usando Google Gemini: gemini-1.5-flash");
-} else if (openaiApiKey) {
-  openai = new OpenAI({ apiKey: openaiApiKey });
-  MODEL = "gpt-4o-mini";
-  console.log("[IA] Usando OpenAI: gpt-4o-mini");
-} else {
-  console.error("[IA] ERROR: No hay ninguna API key configurada (GROQ_API_KEY, GEMINI_API_KEY u OPENAI_API_KEY)");
+// ─── Multi-Proveedor Resiliente de IA con Failover Automático ────────────────
+interface AIProviderConfig {
+  name: string;
+  client: OpenAI;
+  model: string;
 }
+
+export function getAvailableAIProviders(): AIProviderConfig[] {
+  const list: AIProviderConfig[] = [];
+
+  // 1. Groq (gratis y ultrarrápido)
+  if (process.env.GROQ_API_KEY) {
+    list.push({
+      name: "Groq (llama-3.3-70b)",
+      client: new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" }),
+      model: "llama-3.3-70b-versatile",
+    });
+    list.push({
+      name: "Groq (llama-3.1-8b)",
+      client: new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" }),
+      model: "llama-3.1-8b-instant",
+    });
+  }
+
+  // 2. OpenAI (máxima confiabilidad, soporte garantizado de tool_calls y visión)
+  if (process.env.OPENAI_API_KEY) {
+    list.push({
+      name: "OpenAI (gpt-4o-mini)",
+      client: new OpenAI({ apiKey: process.env.OPENAI_API_KEY }),
+      model: "gpt-4o-mini",
+    });
+  }
+
+  // 3. Gemini (alta cuota, fallback gratuito)
+  if (process.env.GEMINI_API_KEY) {
+    const rawKey = process.env.GEMINI_API_KEY.split("DATABASE_URL")[0].trim();
+    if (rawKey && !rawKey.includes("=")) {
+      list.push({
+        name: "Google Gemini (gemini-1.5-flash)",
+        client: new OpenAI({ apiKey: rawKey, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/" }),
+        model: "gemini-1.5-flash",
+      });
+    }
+  }
+
+  return list;
+}
+
+// Mantener variable de compatibilidad
+let openai: OpenAI | null = null;
+const availableProviders = getAvailableAIProviders();
+if (availableProviders.length > 0) {
+  openai = availableProviders[0].client;
+  console.log(`[IA] Proveedores disponibles: ${availableProviders.map(p => p.name).join(", ")}`);
+} else {
+  console.error("[IA] ERROR: No hay ninguna API key configurada (GROQ_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY)");
+}
+
+async function callChatCompletionWithFailover(params: {
+  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+  tools?: OpenAI.Chat.Completions.ChatCompletionTool[];
+  tool_choice?: "auto" | "none" | "required";
+}): Promise<{ response: OpenAI.Chat.Completions.ChatCompletion; providerName: string }> {
+  const providers = getAvailableAIProviders();
+  if (providers.length === 0) {
+    throw new Error("No hay ninguna API key de IA configurada (GROQ_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY)");
+  }
+
+  let lastError: any = null;
+
+  for (const p of providers) {
+    try {
+      const response = await p.client.chat.completions.create({
+        model: p.model,
+        messages: params.messages,
+        tools: params.tools,
+        tool_choice: params.tool_choice,
+      });
+      return { response, providerName: p.name };
+    } catch (err: any) {
+      lastError = err;
+      // Si falló por formato de imagen (ej: Groq llama-3.1-8b), reintentar solo con texto en el mismo proveedor
+      const hasImage = params.messages.some(
+        m => Array.isArray(m.content) && (m.content as any[]).some((c: any) => c.type === "image_url")
+      );
+      if (hasImage) {
+        try {
+          const textOnlyMessages = params.messages.map(m => {
+            if (Array.isArray(m.content)) {
+              const textPart = (m.content as any[]).find((c: any) => c.type === "text")?.text || "";
+              return {
+                ...m,
+                content: `${textPart}\n[Nota: Comprobante/foto adjunto recibido y archivado para el registro]`.trim(),
+              };
+            }
+            return m;
+          });
+          const response = await p.client.chat.completions.create({
+            model: p.model,
+            messages: textOnlyMessages as any,
+            tools: params.tools,
+            tool_choice: params.tool_choice,
+          });
+          return { response, providerName: `${p.name} (fallback texto)` };
+        } catch (innerErr: any) {
+          lastError = innerErr;
+        }
+      }
+      console.warn(`[IA Failover] Proveedor ${p.name} falló con error: "${lastError?.message || lastError}". Probando siguiente proveedor...`);
+    }
+  }
+
+  throw lastError || new Error("Todos los proveedores de IA configurados fallaron.");
+}
+
+function sanitizeContextForModel(historial: any[], maxItems: number = 8): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
+  let sliced = historial.slice(-maxItems);
+
+  // REGLA 1: La conversación NUNCA puede comenzar con un mensaje de tipo "tool"
+  // ya que OpenAI/Groq exigen que cada "tool" esté precedido por un "assistant" con tool_calls
+  while (sliced.length > 0 && sliced[0].role === "tool") {
+    sliced.shift();
+  }
+
+  // REGLA 2: Si el último mensaje es un "assistant" con tool_calls y no tiene respuesta "tool", lo removemos
+  while (sliced.length > 0 && sliced[sliced.length - 1].role === "assistant" && sliced[sliced.length - 1].tool_calls?.length) {
+    sliced.pop();
+  }
+
+  // REGLA 3: Validar que cada mensaje "tool" esté respaldado por su "assistant" previo
+  const clean: any[] = [];
+  const knownToolCallIds = new Set<string>();
+
+  for (const msg of sliced) {
+    if (msg.role === "assistant" && msg.tool_calls && Array.isArray(msg.tool_calls)) {
+      msg.tool_calls.forEach((tc: any) => knownToolCallIds.add(tc.id));
+      clean.push(msg);
+    } else if (msg.role === "tool") {
+      if (knownToolCallIds.has(msg.tool_call_id)) {
+        clean.push(msg);
+      } else {
+        console.warn("[IA] Omitiendo mensaje tool huérfano sin assistant previo:", msg.tool_call_id);
+      }
+    } else {
+      clean.push(msg);
+    }
+  }
+
+  return clean.map(m => {
+    const item: any = { role: m.role, content: m.content || "" };
+    if (m.tool_calls) item.tool_calls = m.tool_calls;
+    if (m.tool_call_id) item.tool_call_id = m.tool_call_id;
+    return item;
+  });
+}
+
 const MAX_HISTORY = 8;  // reducido para ahorrar tokens
 const SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 horas
 
@@ -1386,13 +1519,8 @@ NO podés registrar ni modificar datos. Si te piden eso, informá que solo los a
 Nunca inventés datos. Usá siempre las herramientas disponibles.
 CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maquinaria?", "y los equipos?"), inferí el tema del mensaje anterior para responder correctamente.`;
 
-  // Sanitizar mensajes para el modelo LLM (solo campos estándar soportados por la API)
-  const contextForModel = historialFiltrado.slice(-MAX_HISTORY).map((m: any) => {
-    const item: any = { role: m.role, content: m.content };
-    if (m.tool_calls) item.tool_calls = m.tool_calls;
-    if (m.tool_call_id) item.tool_call_id = m.tool_call_id;
-    return item;
-  });
+  // Sanitizar mensajes para el modelo LLM asegurando que no haya herramientas huérfanas
+  const contextForModel = sanitizeContextForModel(historialFiltrado, MAX_HISTORY);
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
@@ -1400,42 +1528,11 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
   ];
 
   try {
-    let response;
-    try {
-      response = await openai.chat.completions.create({
-        model: MODEL,
-        messages,
-        tools: toolsParaRol,
-        tool_choice: "auto",
-      });
-    } catch (apiErr: any) {
-      // Si falló por imagen no soportada en el modelo activo (ej: Groq llama-3.1-8b), reintentar solo con texto
-      const hasImageInMessages = messages.some(
-        m => Array.isArray(m.content) && (m.content as any[]).some((c: any) => c.type === "image_url")
-      );
-      if (hasImageInMessages) {
-        console.warn("[Asistente] Falló llamada con image_url en el modelo. Reintentando solo con texto plano:", apiErr?.message);
-        const textOnlyMessages = messages.map(m => {
-          if (Array.isArray(m.content)) {
-            const textPart = (m.content as any[]).find((c: any) => c.type === "text")?.text || "";
-            return {
-              ...m,
-              content: `${textPart}\n[Nota: Comprobante/foto adjunto recibido y archivado para el registro]`.trim(),
-            };
-          }
-          return m;
-        });
-        response = await openai.chat.completions.create({
-          model: MODEL,
-          messages: textOnlyMessages as any,
-          tools: toolsParaRol,
-          tool_choice: "auto",
-        });
-      } else {
-        throw apiErr;
-      }
-    }
-
+    const { response, providerName } = await callChatCompletionWithFailover({
+      messages,
+      tools: toolsParaRol,
+      tool_choice: "auto",
+    });
 
     const responseMessage = response.choices[0].message;
 
@@ -1447,115 +1544,124 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
       for (const toolCall of responseMessage.tool_calls) {
         if (toolCall.type !== "function") continue;
         const functionName = toolCall.function.name;
-        const functionArgs = JSON.parse(toolCall.function.arguments);
+        let functionArgs: any = {};
+        try {
+          functionArgs = JSON.parse(toolCall.function.arguments || "{}");
+        } catch {
+          functionArgs = {};
+        }
 
         let toolResult = "";
 
-        if (functionName === "consultar_inventario") {
-          toolResult = await executeConsultarInventario(functionArgs.termino, functionArgs.estado, functionArgs.orden, functionArgs.categoria);
-        } else if (functionName === "consultar_gastos" || functionName === "analizar_gastos") {
-          toolResult = await executeAnalizarGastos(functionArgs);
-        } else if (functionName === "auditar_egresos_sheets") {
-          toolResult = await executeAuditarEgresosSheets();
-        } else if (functionName === "consultar_empleados") {
-          toolResult = await executeConsultarEmpleados(functionArgs.termino, functionArgs.solo_activos, functionArgs.orden, functionArgs.carnet_vencido, functionArgs.sin_proyecto);
-        } else if (functionName === "consultar_proyectos") {
-          toolResult = await executeConsultarProyectos(functionArgs.estado, functionArgs.nombre, functionArgs.orden, functionArgs.incluir_asignaciones);
-        } else if (functionName === "consultar_jornadas") {
-          toolResult = await executeConsultarJornadas(functionArgs.estado, functionArgs.nombre_empleado, functionArgs.fecha, functionArgs.desde, functionArgs.hasta, functionArgs.fecha_registro);
-        } else if (functionName === "consultar_google_sheets") {
-          toolResult = await executeConsultarSheets(functionArgs.pestana, functionArgs.rango);
-        } else if (functionName === "enviar_fotografia") {
-          toolResult = await executeEnviarFotografia(from, functionArgs.tipo_entidad, functionArgs.busqueda);
-        } else if (functionName === "enviar_mensaje_whatsapp") {
-          toolResult = await executeEnviarMensaje(functionArgs.mensaje, functionArgs.numero, functionArgs.nombre_empleado, functionArgs.todos);
-        } else if (functionName === "registrar_gasto") {
-          const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
-          toolResult = await executeRegistrarGasto(functionArgs, imgUrl, sesion, text);
-          if (imgUrl && sesion.datos_pendientes) {
-            (sesion.datos_pendientes as any).ultima_imagen_url = null;
-          }
-        } else if (functionName === "actualizar_gasto") {
-          if (sesion.datos_pendientes?.gasto_pendiente && !functionArgs.id) {
-            toolResult = "❌ Hay un gasto pendiente de confirmación. Para corregir datos (concepto, monto, etc.) NO debes llamar a 'actualizar_gasto', sino actualizar la estructura pendiente y presentársela al usuario para confirmar.";
-          } else {
+        try {
+          if (functionName === "consultar_inventario") {
+            toolResult = await executeConsultarInventario(functionArgs.termino, functionArgs.estado, functionArgs.orden, functionArgs.categoria);
+          } else if (functionName === "consultar_gastos" || functionName === "analizar_gastos") {
+            toolResult = await executeAnalizarGastos(functionArgs);
+          } else if (functionName === "auditar_egresos_sheets") {
+            toolResult = await executeAuditarEgresosSheets();
+          } else if (functionName === "consultar_empleados") {
+            toolResult = await executeConsultarEmpleados(functionArgs.termino, functionArgs.solo_activos, functionArgs.orden, functionArgs.carnet_vencido, functionArgs.sin_proyecto);
+          } else if (functionName === "consultar_proyectos") {
+            toolResult = await executeConsultarProyectos(functionArgs.estado, functionArgs.nombre, functionArgs.orden, functionArgs.incluir_asignaciones);
+          } else if (functionName === "consultar_jornadas") {
+            toolResult = await executeConsultarJornadas(functionArgs.estado, functionArgs.nombre_empleado, functionArgs.fecha, functionArgs.desde, functionArgs.hasta, functionArgs.fecha_registro);
+          } else if (functionName === "consultar_google_sheets") {
+            toolResult = await executeConsultarSheets(functionArgs.pestana, functionArgs.rango);
+          } else if (functionName === "enviar_fotografia") {
+            toolResult = await executeEnviarFotografia(from, functionArgs.tipo_entidad, functionArgs.busqueda);
+          } else if (functionName === "enviar_mensaje_whatsapp") {
+            toolResult = await executeEnviarMensaje(functionArgs.mensaje, functionArgs.numero, functionArgs.nombre_empleado, functionArgs.todos);
+          } else if (functionName === "registrar_gasto") {
             const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
-            toolResult = await executeActualizarGasto(functionArgs, imgUrl);
+            toolResult = await executeRegistrarGasto(functionArgs, imgUrl, sesion, text);
             if (imgUrl && sesion.datos_pendientes) {
               (sesion.datos_pendientes as any).ultima_imagen_url = null;
             }
+          } else if (functionName === "actualizar_gasto") {
+            if (sesion.datos_pendientes?.gasto_pendiente && !functionArgs.id) {
+              toolResult = "❌ Hay un gasto pendiente de confirmación. Para corregir datos (concepto, monto, etc.) NO debes llamar a 'actualizar_gasto', sino actualizar la estructura pendiente y presentársela al usuario para confirmar.";
+            } else {
+              const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
+              toolResult = await executeActualizarGasto(functionArgs, imgUrl);
+              if (imgUrl && sesion.datos_pendientes) {
+                (sesion.datos_pendientes as any).ultima_imagen_url = null;
+              }
+            }
+          } else if (functionName === "consultar_combustible") {
+            toolResult = await executeConsultarCombustible(functionArgs);
+          } else if (functionName === "consultar_mantenimientos") {
+            toolResult = await executeConsultarMantenimientos(functionArgs);
+          } else if (functionName === "registrar_empleado") {
+            toolResult = await executeRegistrarEmpleado(functionArgs);
+          } else if (functionName === "registrar_jornada") {
+            toolResult = await executeRegistrarJornada(functionArgs);
+          } else if (functionName === "actualizar_jornada") {
+            toolResult = await executeActualizarJornada(functionArgs);
+          } else if (functionName === "registrar_combustible_bot") {
+            toolResult = await executeRegistrarCombustible(functionArgs);
+          } else if (functionName === "registrar_mantenimiento_bot") {
+            toolResult = await executeRegistrarMantenimiento(functionArgs);
+          } else if (functionName === "actualizar_proyecto") {
+            toolResult = await executeActualizarProyecto(functionArgs);
+          } else if (functionName === "mover_entidad_proyecto") {
+            toolResult = await executeMoverEntidadProyecto(functionArgs);
+          } else if (functionName === "crear_acceso_sistema") {
+            toolResult = await executeCrearAccesoSistema(functionArgs);
+          } else if (functionName === "crear_accesos_faltantes") {
+            toolResult = await executeCrearAccesosFaltantes();
+          } else if (functionName === "limpiar_operarios_duplicados") {
+            toolResult = await executeLimpiarOperariosDuplicados();
+          } else if (functionName === "resumen_operativo") {
+            toolResult = await executeResumenOperativo(functionArgs.fecha);
+          } else if (functionName === "consultar_rastreo") {
+            toolResult = await executeConsultarRastreo(functionArgs.nombre_maquina);
+          } else if (functionName === "consultar_alquileres") {
+            toolResult = await executeConsultarAlquileres(functionArgs);
+          } else if (functionName === "adjuntar_comprobante") {
+            const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
+            toolResult = await executeAdjuntarComprobante(functionArgs, imgUrl);
+            if (toolResult.includes("✅") && imgUrl && sesion.datos_pendientes) {
+              (sesion.datos_pendientes as any).ultima_imagen_url = null;
+            }
+          } else if (functionName === "actualizar_fotografia") {
+            const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
+            toolResult = await executeActualizarFotografia(functionArgs.tipo_entidad, functionArgs.busqueda, imgUrl);
+            if (imgUrl && sesion.datos_pendientes) {
+              (sesion.datos_pendientes as any).ultima_imagen_url = null;
+            }
+          } else if (functionName === "generar_excel_gastos") {
+            toolResult = await executeGenerarExcelGastos(from, functionArgs);
+          } else if (functionName === "ejecutar_consulta_sql_lectura") {
+            toolResult = await executeConsultaSQL(functionArgs.query);
+          } else if (functionName === "registrar_incidente") {
+            const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
+            toolResult = await executeRegistrarIncidente(functionArgs, imgUrl);
+            if (imgUrl && sesion.datos_pendientes) (sesion.datos_pendientes as any).ultima_imagen_url = null;
+          } else if (functionName === "registrar_alerta") {
+            toolResult = await executeRegistrarAlerta(functionArgs);
+          } else if (functionName === "registrar_documento") {
+            toolResult = await executeRegistrarDocumento(functionArgs);
           }
-        } else if (functionName === "consultar_combustible") {
-          toolResult = await executeConsultarCombustible(functionArgs);
-        } else if (functionName === "consultar_mantenimientos") {
-          toolResult = await executeConsultarMantenimientos(functionArgs);
-        } else if (functionName === "registrar_empleado") {
-          toolResult = await executeRegistrarEmpleado(functionArgs);
-        } else if (functionName === "registrar_jornada") {
-          toolResult = await executeRegistrarJornada(functionArgs);
-        } else if (functionName === "actualizar_jornada") {
-          toolResult = await executeActualizarJornada(functionArgs);
-        } else if (functionName === "registrar_combustible_bot") {
-          toolResult = await executeRegistrarCombustible(functionArgs);
-        } else if (functionName === "registrar_mantenimiento_bot") {
-          toolResult = await executeRegistrarMantenimiento(functionArgs);
-        } else if (functionName === "actualizar_proyecto") {
-          toolResult = await executeActualizarProyecto(functionArgs);
-        } else if (functionName === "mover_entidad_proyecto") {
-          toolResult = await executeMoverEntidadProyecto(functionArgs);
-        } else if (functionName === "crear_acceso_sistema") {
-          toolResult = await executeCrearAccesoSistema(functionArgs);
-        } else if (functionName === "crear_accesos_faltantes") {
-          toolResult = await executeCrearAccesosFaltantes();
-        } else if (functionName === "limpiar_operarios_duplicados") {
-          toolResult = await executeLimpiarOperariosDuplicados();
-        } else if (functionName === "resumen_operativo") {
-          toolResult = await executeResumenOperativo(functionArgs.fecha);
-        } else if (functionName === "consultar_rastreo") {
-          toolResult = await executeConsultarRastreo(functionArgs.nombre_maquina);
-        } else if (functionName === "consultar_alquileres") {
-          toolResult = await executeConsultarAlquileres(functionArgs);
-        } else if (functionName === "adjuntar_comprobante") {
-          const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
-          toolResult = await executeAdjuntarComprobante(functionArgs, imgUrl);
-          if (toolResult.includes("✅") && imgUrl && sesion.datos_pendientes) {
-            (sesion.datos_pendientes as any).ultima_imagen_url = null;
-          }
-        } else if (functionName === "actualizar_fotografia") {
-          const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
-          toolResult = await executeActualizarFotografia(functionArgs.tipo_entidad, functionArgs.busqueda, imgUrl);
-          if (imgUrl && sesion.datos_pendientes) {
-            (sesion.datos_pendientes as any).ultima_imagen_url = null;
-          }
-        } else if (functionName === "generar_excel_gastos") {
-          toolResult = await executeGenerarExcelGastos(from, functionArgs);
-        } else if (functionName === "ejecutar_consulta_sql_lectura") {
-          toolResult = await executeConsultaSQL(functionArgs.query);
-        } else if (functionName === "registrar_incidente") {
-          const imgUrl = (sesion.datos_pendientes as any)?.ultima_imagen_url || null;
-          toolResult = await executeRegistrarIncidente(functionArgs, imgUrl);
-          if (imgUrl && sesion.datos_pendientes) (sesion.datos_pendientes as any).ultima_imagen_url = null;
-        } else if (functionName === "registrar_alerta") {
-          toolResult = await executeRegistrarAlerta(functionArgs);
-        } else if (functionName === "registrar_documento") {
-          toolResult = await executeRegistrarDocumento(functionArgs);
+        } catch (toolErr: any) {
+          console.error(`[IA] Error al ejecutar función ${functionName}:`, toolErr);
+          toolResult = `⚠️ Ocurrió una advertencia al consultar ${functionName}: ${toolErr?.message || "Sin datos específicos"}. Por favor comunicá el estado actual al usuario.`;
         }
 
         messages.push({
           tool_call_id: toolCall.id,
           role: "tool",
-          content: toolResult,
+          content: toolResult || "Operación procesada.",
         });
         historialFiltrado.push({
           tool_call_id: toolCall.id,
           role: "tool",
-          content: toolResult,
+          content: toolResult || "Operación procesada.",
         });
       }
 
-      // Segunda llamada con resultado de herramientas
-      const secondResponse = await openai.chat.completions.create({
-        model: MODEL,
+      // Segunda llamada con resultado de herramientas usando failover
+      const { response: secondResponse } = await callChatCompletionWithFailover({
         messages,
       });
 
@@ -1586,11 +1692,17 @@ CONTEXTO: Si el usuario hace una pregunta de seguimiento corta (ej: "y que maqui
     // Guardar historial actualizado manteniendo los datos pendientes
     await guardarSesion(sesion.phone, historialFiltrado, "idle", sesion.datos_pendientes);
 
-
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error en asistente PUFFIN:", error);
+    // Si fue error de formato o mensajes incompatibles de la sesión, auto-reparar la sesión
+    if (error?.status === 400 || error?.message?.includes("tool") || error?.message?.includes("messages") || error?.message?.includes("role")) {
+      console.warn("[IA] Error de estructura en historial de sesión. Reseteando historial para auto-reparar chat...");
+      try {
+        await db.update(whatsappSesionesTable).set({ messages: [] }).where(eq(whatsappSesionesTable.phone, senderPhone));
+      } catch (dbErr) {}
+    }
     try {
-      await sendWhatsAppMessage(from, "Tuve un error al procesar tu consulta. Por favor intentá de nuevo.");
+      await sendWhatsAppMessage(from, "Tuve un inconveniente momentáneo al procesar tu consulta. Ya reestablecí la conexión, por favor enviámela de nuevo.");
     } catch (e) {
       console.error("Error enviando mensaje de error:", e);
     }
@@ -2159,7 +2271,6 @@ async function executeConsultarAlquileres(args: { nombre_maquina?: string; clien
 
 
 async function executeAnalizarGastos(args: { categoria?: string; proyecto?: string; desde?: string; hasta?: string; agrupar_por?: string; orden?: string; limite?: number; fecha_registro?: string; }) {
-  const { gte, lte, between, ilike: ilikeOp, or: orOp } = await import("drizzle-orm");
   // Límite generoso: la IA siempre ve TODOS los registros para calcular totales correctos.
   // Solo se trunca el listado de líneas individuales que se le muestran al usuario.
   const limiteDisplay = Number(args.limite) || 500;
@@ -2168,7 +2279,7 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
   const conditions: any[] = [];
   let proyectoNombreParaMostrar = args.proyecto;
 
-  if (args.categoria) conditions.push(ilikeOp(egresosTable.categoria, `%${args.categoria}%`));
+  if (args.categoria) conditions.push(ilike(egresosTable.categoria, `%${args.categoria}%`));
   if (args.proyecto) {
     const proyectoResuelto = await resolverProyectoConTolerancia(args.proyecto);
     const target = proyectoResuelto || args.proyecto;
@@ -2176,16 +2287,16 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
 
     const tokens = target.split(/\s+/).filter(t => t.length >= 4 && !/chaco|campo|obra|lote|litros|norte|sur/i.test(t));
     const orClauses: any[] = [
-      ilikeOp(egresosTable.centro_costos, `%${target}%`),
-      ilikeOp(egresosTable.centro_costos, `%${args.proyecto}%`)
+      ilike(egresosTable.centro_costos, `%${target}%`),
+      ilike(egresosTable.centro_costos, `%${args.proyecto}%`)
     ];
     for (const tok of tokens) {
-      orClauses.push(ilikeOp(egresosTable.centro_costos, `%${tok}%`));
+      orClauses.push(ilike(egresosTable.centro_costos, `%${tok}%`));
     }
     if (/^h/i.test(args.proyecto)) {
-      orClauses.push(ilikeOp(egresosTable.centro_costos, `%${args.proyecto.replace(/^h/i, "")}%`));
+      orClauses.push(ilike(egresosTable.centro_costos, `%${args.proyecto.replace(/^h/i, "")}%`));
     }
-    conditions.push(orOp(...orClauses));
+    conditions.push(or(...orClauses));
   }
   if (args.desde && args.hasta) conditions.push(between(egresosTable.fecha, args.desde, args.hasta));
   else if (args.desde) conditions.push(gte(egresosTable.fecha, args.desde));
@@ -2210,7 +2321,7 @@ async function executeAnalizarGastos(args: { categoria?: string; proyecto?: stri
   if (allResults.length === 0) {
     if (args.proyecto) {
       const egresosPorConcepto = await db.select().from(egresosTable)
-        .where(orOp(ilikeOp(egresosTable.concepto, `%${args.proyecto}%`), ilikeOp(egresosTable.observaciones, `%${args.proyecto}%`)))
+        .where(or(ilike(egresosTable.concepto, `%${args.proyecto}%`), ilike(egresosTable.observaciones, `%${args.proyecto}%`)))
         .limit(5);
 
       if (egresosPorConcepto.length > 0) {
@@ -2229,10 +2340,14 @@ ${egresosPorConcepto.map(e => `• [${e.fecha}] ${e.concepto} — $${Number(e.mo
 
   let avisoEspecialVicentin = "";
   if (args.proyecto && /vicentin/i.test(args.proyecto)) {
+    const egresoVicentin = allResults.find(r => /vicentin/i.test(r.concepto || "") || /vicentin/i.test(r.observaciones || ""));
+    const detalleVicentin = egresoVicentin 
+      ? `\n📌 Gasto específico encontrado: [${egresoVicentin.fecha}] ${egresoVicentin.concepto} — $${Number(egresoVicentin.monto).toLocaleString("es-AR")} (imputado a ${egresoVicentin.centro_costos || "Chaco Las Acheras 280 litros"})`
+      : "";
     avisoEspecialVicentin = `\n💡 REGLA DE RESPUESTA OBLIGATORIA:
 El usuario preguntó por "Vicentín". En el sistema no existe un proyecto llamado "Vicentín", pero se generó un egreso con concepto "Vicentín" imputado al proyecto "Chaco Las Acheras 280 litros".
 DEBES PREGUNTARLE EXACTAMENTE:
-"¿Te referís a Chaco Las Acheras 280 litros? Te pregunto porque generaste un egreso con concepto Vicentín."
+"¿Te referís a Chaco Las Acheras 280 litros? Te pregunto porque generaste un egreso con concepto Vicentín."${detalleVicentin}
 Y a continuación mostrarle los datos correspondientes.\n`;
   }
 
