@@ -47,6 +47,8 @@ export function Egresos() {
       if (!res.ok) throw new Error("Error al eliminar");
       toast.success("Egreso eliminado correctamente");
       queryClient.invalidateQueries({ queryKey: getGetEgresosQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ["/api/egresos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/proyectos"] });
     } catch (e) {
       toast.error("Error al eliminar el egreso");
     } finally {
@@ -170,6 +172,7 @@ export function Egresos() {
             }
             toast.success("Egreso actualizado");
             queryClient.invalidateQueries({ queryKey: ["/api/egresos"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/proyectos"] });
             refetch();
             setOpenDialog(false);
             resetForm();
@@ -196,6 +199,7 @@ export function Egresos() {
             }
             toast.success("Egreso registrado y sincronizado con Google Sheets");
             queryClient.invalidateQueries({ queryKey: ["/api/egresos"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/proyectos"] });
             refetch();
             setOpenDialog(false);
             resetForm();
@@ -218,6 +222,7 @@ export function Egresos() {
       if (data.success) {
         toast.success(`Google Sheets actualizado con ${data.rowsCount || ''} registros`);
         queryClient.invalidateQueries({ queryKey: ["/api/egresos"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/proyectos"] });
         refetch();
       } else {
         toast.error(data.error || "Error al sincronizar");
