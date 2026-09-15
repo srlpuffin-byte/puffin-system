@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useParams, useRoute, useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useGetProyecto, useDeletePago } from "@/hooks/use-proyectos";
-import { useGetEmpleados, useGetMaquinas, useGetMe } from "@workspace/api-client-react";
+import { useGetEmpleados, useGetMaquinas, useGetMe, useGetFotografias } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -127,8 +129,26 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
   const { data: empleados } = useGetEmpleados();
   const { data: maquinas } = useGetMaquinas();
   const { data: me } = useGetMe();
+  const { data: fotografiasMaquinas } = useGetFotografias({ entidad_tipo: "maquina" } as any);
+  const { data: fotografiasEmpleados } = useGetFotografias({ entidad_tipo: "empleado" } as any);
   const isEmpleado = me?.rol?.toLowerCase() === "empleado";
   const deletePagoMut = useDeletePago();
+
+  const [previewModal, setPreviewModal] = useState<{ url: string; title: string; subtitle?: string } | null>(null);
+
+  const getEmpleadoFoto = (e: any) => {
+    if (e?.foto_perfil) return e.foto_perfil;
+    const f = fotografiasEmpleados?.find(foto => foto.entidad_id === e?.id);
+    if (f) return f.url?.startsWith("data:") ? `/api/fotografias/${f.id}/raw` : f.url;
+    return undefined;
+  };
+
+  const getMaquinaFoto = (m: any) => {
+    if (m?.imagen_url) return m.imagen_url;
+    const f = fotografiasMaquinas?.find(foto => foto.entidad_id === m?.id);
+    if (f) return f.url?.startsWith("data:") ? `/api/fotografias/${f.id}/raw` : f.url;
+    return undefined;
+  };
 
   // Consulta directa de TODOS los egresos de este proyecto al servidor (sin recorte de 50)
   const { data: egresosProyectoResp } = useQuery<{ data: any[]; meta?: { total: number; total_suma: number } }>({
@@ -536,8 +556,32 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
                           <Link key={e.id} href={isEmpleado ? "#" : `/operarios/${e.id}`}>
                             <div className="p-3 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors cursor-pointer group">
                               <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs flex-shrink-0">
-                                  {getInitials(e.nombre, e.apellido)}
+                                <div
+                                  onClick={(evt) => {
+                                    const foto = getEmpleadoFoto(e);
+                                    if (foto) {
+                                      evt.preventDefault();
+                                      evt.stopPropagation();
+                                      setPreviewModal({
+                                        url: foto,
+                                        title: `${e.nombre} ${e.apellido}`,
+                                        subtitle: e.cargo || "Operario"
+                                      });
+                                    }
+                                  }}
+                                  className={getEmpleadoFoto(e) ? "cursor-zoom-in" : ""}
+                                  title={getEmpleadoFoto(e) ? "Click para ampliar imagen" : undefined}
+                                >
+                                  <Avatar className="w-10 h-10 rounded-full border border-slate-200 shadow-sm flex-shrink-0 bg-blue-50">
+                                    <AvatarImage 
+                                      src={getEmpleadoFoto(e)} 
+                                      alt={`${e.nombre} ${e.apellido}`} 
+                                      className="object-cover" 
+                                    />
+                                    <AvatarFallback className="bg-blue-50 text-blue-700 font-bold text-xs">
+                                      {getInitials(e.nombre, e.apellido)}
+                                    </AvatarFallback>
+                                  </Avatar>
                                 </div>
                                 <div className="min-w-0">
                                   <p className="font-semibold text-xs sm:text-sm text-slate-900 truncate capitalize">
@@ -603,8 +647,32 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
                           <Link key={m.id} href={`/maquinas/${m.id}`}>
                             <div className="p-3 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors cursor-pointer group">
                               <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-700 flex-shrink-0">
-                                  <Tractor className="h-4 w-4" />
+                                <div
+                                  onClick={(evt) => {
+                                    const foto = getMaquinaFoto(m);
+                                    if (foto) {
+                                      evt.preventDefault();
+                                      evt.stopPropagation();
+                                      setPreviewModal({
+                                        url: foto,
+                                        title: m.nombre,
+                                        subtitle: `${m.marca || ""} ${m.modelo || ""}`.trim() || m.tipo
+                                      });
+                                    }
+                                  }}
+                                  className={getMaquinaFoto(m) ? "cursor-zoom-in" : ""}
+                                  title={getMaquinaFoto(m) ? "Click para ampliar imagen" : undefined}
+                                >
+                                  <Avatar className="w-10 h-10 rounded-lg border border-slate-200 shadow-sm flex-shrink-0 bg-amber-50/70 overflow-hidden">
+                                    <AvatarImage 
+                                      src={getMaquinaFoto(m)} 
+                                      alt={m.nombre} 
+                                      className="object-cover" 
+                                    />
+                                    <AvatarFallback className="rounded-lg bg-amber-50 border border-amber-100 text-amber-700">
+                                      <Tractor className="h-5 w-5" />
+                                    </AvatarFallback>
+                                  </Avatar>
                                 </div>
                                 <div className="min-w-0">
                                   <p className="font-semibold text-xs sm:text-sm text-slate-900 truncate">
@@ -679,8 +747,32 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
                           <Link key={m.id} href={`/maquinas/${m.id}`}>
                             <div className="p-3 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors cursor-pointer group">
                               <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-200/80 flex items-center justify-center text-purple-700 flex-shrink-0">
-                                  <Package className="h-4 w-4" />
+                                <div
+                                  onClick={(evt) => {
+                                    const foto = getMaquinaFoto(m);
+                                    if (foto) {
+                                      evt.preventDefault();
+                                      evt.stopPropagation();
+                                      setPreviewModal({
+                                        url: foto,
+                                        title: m.nombre,
+                                        subtitle: `${m.marca || ""} ${m.modelo || ""}`.trim() || "Herramienta / Inventario"
+                                      });
+                                    }
+                                  }}
+                                  className={getMaquinaFoto(m) ? "cursor-zoom-in" : ""}
+                                  title={getMaquinaFoto(m) ? "Click para ampliar imagen" : undefined}
+                                >
+                                  <Avatar className="w-10 h-10 rounded-lg border border-slate-200 shadow-sm flex-shrink-0 bg-purple-50/70 overflow-hidden">
+                                    <AvatarImage 
+                                      src={getMaquinaFoto(m)} 
+                                      alt={m.nombre} 
+                                      className="object-cover" 
+                                    />
+                                    <AvatarFallback className="rounded-lg bg-purple-50 border border-purple-100 text-purple-700">
+                                      <Package className="h-5 w-5" />
+                                    </AvatarFallback>
+                                  </Avatar>
                                 </div>
                                 <div className="min-w-0">
                                   <p className="font-semibold text-xs sm:text-sm text-slate-900 truncate">
@@ -1166,6 +1258,29 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
         </div>
         )}
       </div>
+
+      {/* Modal de previsualización de imagen ampliada */}
+      <Dialog open={!!previewModal} onOpenChange={(open) => !open && setPreviewModal(null)}>
+        <DialogContent className="max-w-md p-4 overflow-hidden bg-slate-950 text-white border-slate-800 sm:rounded-2xl">
+          {previewModal && (
+            <div className="space-y-3">
+              <div className="relative rounded-xl overflow-hidden bg-black/60 border border-slate-800 flex items-center justify-center max-h-[70vh]">
+                <img 
+                  src={previewModal.url} 
+                  alt={previewModal.title} 
+                  className="w-full h-auto max-h-[65vh] object-contain" 
+                />
+              </div>
+              <div className="px-1">
+                <p className="font-semibold text-base text-white">{previewModal.title}</p>
+                {previewModal.subtitle && (
+                  <p className="text-xs text-slate-400 capitalize">{previewModal.subtitle}</p>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
