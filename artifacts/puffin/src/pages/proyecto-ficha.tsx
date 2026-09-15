@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -102,6 +103,12 @@ function getCategoriaVisual(categoria: string) {
     badge: "bg-slate-50 text-slate-700 border-slate-200",
     label: categoria || "Otros"
   };
+}
+
+function getInitials(nombre?: string, apellido?: string) {
+  const n = (nombre || "").trim().charAt(0).toUpperCase();
+  const a = (apellido || "").trim().charAt(0).toUpperCase();
+  return `${n}${a}` || "OP";
 }
 
 export function ProyectoFicha({ params: propParams }: { params?: { id?: string } } = {}) {
@@ -208,6 +215,68 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
   const [paginaGasto, setPaginaGasto] = useState(1);
   const [itemsPorPagina, setItemsPorPagina] = useState(8);
   const [gastoExpandidoId, setGastoExpandidoId] = useState<number | null>(null);
+
+  // Estados para Recursos Asignados (Personal, Maquinaria, Inventario)
+  const [busquedaRecurso, setBusquedaRecurso] = useState("");
+  const [paginaPersonal, setPaginaPersonal] = useState(1);
+  const [paginaMaquinas, setPaginaMaquinas] = useState(1);
+  const [paginaInventario, setPaginaInventario] = useState(1);
+  const itemsPorPaginaRecursos = 6;
+
+  // Filtrado de empleados asignados
+  const empleadosFiltrados = useMemo(() => {
+    if (!busquedaRecurso.trim()) return assignedEmpleados;
+    const q = busquedaRecurso.toLowerCase().trim();
+    return assignedEmpleados.filter(e => 
+      `${e.nombre} ${e.apellido}`.toLowerCase().includes(q) ||
+      (e.cargo || "").toLowerCase().includes(q) ||
+      (e.dni || "").includes(q)
+    );
+  }, [assignedEmpleados, busquedaRecurso]);
+
+  // Filtrado de máquinas asignadas
+  const maquinasFiltradas = useMemo(() => {
+    if (!busquedaRecurso.trim()) return assignedMaquinas;
+    const q = busquedaRecurso.toLowerCase().trim();
+    return assignedMaquinas.filter(m => 
+      (m.nombre || "").toLowerCase().includes(q) ||
+      (m.marca || "").toLowerCase().includes(q) ||
+      (m.modelo || "").toLowerCase().includes(q) ||
+      (m.tipo || "").toLowerCase().includes(q)
+    );
+  }, [assignedMaquinas, busquedaRecurso]);
+
+  // Filtrado de inventario asignado
+  const inventarioFiltrado = useMemo(() => {
+    if (!busquedaRecurso.trim()) return assignedInventario;
+    const q = busquedaRecurso.toLowerCase().trim();
+    return assignedInventario.filter(m => 
+      (m.nombre || "").toLowerCase().includes(q) ||
+      (m.marca || "").toLowerCase().includes(q) ||
+      (m.modelo || "").toLowerCase().includes(q)
+    );
+  }, [assignedInventario, busquedaRecurso]);
+
+  // Paginaciones de recursos
+  const totalPaginasPersonal = Math.max(1, Math.ceil(empleadosFiltrados.length / itemsPorPaginaRecursos));
+  const empleadosPaginados = useMemo(() => {
+    const i = (paginaPersonal - 1) * itemsPorPaginaRecursos;
+    return empleadosFiltrados.slice(i, i + itemsPorPaginaRecursos);
+  }, [empleadosFiltrados, paginaPersonal]);
+
+  const totalPaginasMaquinas = Math.max(1, Math.ceil(maquinasFiltradas.length / itemsPorPaginaRecursos));
+  const maquinasPaginadas = useMemo(() => {
+    const i = (paginaMaquinas - 1) * itemsPorPaginaRecursos;
+    return maquinasFiltradas.slice(i, i + itemsPorPaginaRecursos);
+  }, [maquinasFiltradas, paginaMaquinas]);
+
+  const totalPaginasInventario = Math.max(1, Math.ceil(inventarioFiltrado.length / itemsPorPaginaRecursos));
+  const inventarioPaginado = useMemo(() => {
+    const i = (paginaInventario - 1) * itemsPorPaginaRecursos;
+    return inventarioFiltrado.slice(i, i + itemsPorPaginaRecursos);
+  }, [inventarioFiltrado, paginaInventario]);
+
+  const totalRecursos = assignedEmpleados.length + assignedMaquinas.length + assignedInventario.length;
 
   // Conteo de categorías para filtros
   const categoriasDisponibles = useMemo(() => {
@@ -385,94 +454,282 @@ export function ProyectoFicha({ params: propParams }: { params?: { id?: string }
             </Card>
           )}
 
-          {/* Personal */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="h-4 w-4 text-blue-600" /> Personal Asignado
-              </CardTitle>
-            </CardHeader>
-          <CardContent>
-              {assignedEmpleados.length === 0 ? (
-                <p className="text-muted-foreground italic text-sm">Sin empleados asignados.</p>
-              ) : (
-                <div className="space-y-2">
-                  {assignedEmpleados.map(e => (
-                    isEmpleado ? (
-                      <div key={e.id} className="flex items-center gap-3 py-3 px-2 border rounded-lg text-sm">
-                        <Users className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                        <span className="font-medium">{e.nombre} {e.apellido}</span>
-                      </div>
-                    ) : (
-                      <Link key={e.id} href={`/operarios/${e.id}`}>
-                        <div className="flex items-center justify-between p-2 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group text-sm">
-                          <span className="font-medium">{e.nombre} {e.apellido}</span>
-                          <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                      </Link>
-                    )
-                  ))}
+          {/* Recursos Asignados: Personal, Maquinaria e Inventario unificados en Tabs ejecutivos */}
+          <Card className="border shadow-sm overflow-hidden">
+            <Tabs defaultValue="personal" className="w-full">
+              <CardHeader className="pb-3 border-b bg-card">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-900">
+                    <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <Users className="h-4 w-4" />
+                    </div>
+                    Recursos del Proyecto
+                  </CardTitle>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                    {totalRecursos} en total
+                  </span>
                 </div>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* Maquinaria */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Tractor className="h-4 w-4 text-amber-600" /> Maquinaria
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {assignedMaquinas.length === 0 ? (
-                <p className="text-muted-foreground italic text-sm">Sin maquinaria asignada.</p>
-              ) : (
-                <div className="space-y-2">
-                  {assignedMaquinas.map(m => (
-                    <Link key={m.id} href={`/maquinas/${m.id}`}>
-                      <div className="flex items-center justify-between p-2 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group text-sm">
-                        <div className="flex flex-col">
-                          <span className="font-medium">{m.nombre}</span>
-                          <span className="text-xs text-muted-foreground">{m.marca} {m.modelo}</span>
-                        </div>
-                        <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                {/* Switcher de Tabs compacto */}
+                <TabsList className="grid grid-cols-3 mt-3 w-full h-9 p-1 bg-slate-100/80">
+                  <TabsTrigger value="personal" className="text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-primary font-medium">
+                    <Users className="h-3.5 w-3.5" />
+                    Personal ({assignedEmpleados.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="maquinas" className="text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-primary font-medium">
+                    <Tractor className="h-3.5 w-3.5" />
+                    Equipos ({assignedMaquinas.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="inventario" className="text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-primary font-medium">
+                    <Package className="h-3.5 w-3.5" />
+                    Inventario ({assignedInventario.length})
+                  </TabsTrigger>
+                </TabsList>
+              </CardHeader>
 
-          {/* Inventario */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Package className="h-4 w-4 text-purple-600" /> Inventario
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {assignedInventario.length === 0 ? (
-                <p className="text-muted-foreground italic text-sm">Sin inventario asignado.</p>
-              ) : (
-                <div className="space-y-2">
-                  {assignedInventario.map(m => (
-                    <Link key={m.id} href={`/maquinas/${m.id}`}>
-                      <div className="flex items-center justify-between p-2 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group text-sm">
-                        <div className="flex flex-col">
-                          <span className="font-medium">{m.nombre}</span>
-                          {(m.marca || m.modelo) && (
-                            <span className="text-xs text-muted-foreground">{m.marca} {m.modelo}</span>
-                          )}
-                        </div>
-                        <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </Link>
-                  ))}
+              {/* Buscador interno rápido si hay elementos */}
+              {totalRecursos > 4 && (
+                <div className="p-2.5 bg-slate-50/50 border-b relative">
+                  <Search className="absolute left-4.5 top-4 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar en recursos..."
+                    value={busquedaRecurso}
+                    onChange={(e) => {
+                      setBusquedaRecurso(e.target.value);
+                      setPaginaPersonal(1);
+                      setPaginaMaquinas(1);
+                      setPaginaInventario(1);
+                    }}
+                    className="pl-8 h-8 text-xs bg-white"
+                  />
+                  {busquedaRecurso && (
+                    <button
+                      onClick={() => {
+                        setBusquedaRecurso("");
+                        setPaginaPersonal(1);
+                        setPaginaMaquinas(1);
+                        setPaginaInventario(1);
+                      }}
+                      className="absolute right-4.5 top-4 text-muted-foreground hover:text-slate-700"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               )}
-            </CardContent>
+
+              <CardContent className="p-0">
+                {/* TAB 1: PERSONAL ASIGNADO */}
+                <TabsContent value="personal" className="m-0 focus-visible:outline-none">
+                  {assignedEmpleados.length === 0 ? (
+                    <div className="p-6 text-center text-muted-foreground text-xs">
+                      Sin personal asignado a esta obra.
+                    </div>
+                  ) : empleadosFiltrados.length === 0 ? (
+                    <div className="p-6 text-center text-muted-foreground text-xs">
+                      No se encontraron operarios con "{busquedaRecurso}".
+                    </div>
+                  ) : (
+                    <>
+                      <div className="divide-y divide-slate-100">
+                        {empleadosPaginados.map(e => (
+                          <Link key={e.id} href={isEmpleado ? "#" : `/operarios/${e.id}`}>
+                            <div className="p-3 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors cursor-pointer group">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs flex-shrink-0">
+                                  {getInitials(e.nombre, e.apellido)}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-xs sm:text-sm text-slate-900 truncate capitalize">
+                                    {e.nombre} {e.apellido}
+                                  </p>
+                                  <p className="text-[11px] text-muted-foreground truncate">
+                                    {e.cargo || "Operario"} {e.dni ? `• DNI ${e.dni}` : ""}
+                                  </p>
+                                </div>
+                              </div>
+                              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-40 group-hover:opacity-100 group-hover:text-primary transition-all flex-shrink-0" />
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+
+                      {/* Paginador de Personal si supera 6 */}
+                      {totalPaginasPersonal > 1 && (
+                        <div className="p-2.5 bg-slate-50 border-t flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground text-[11px]">
+                            {paginaPersonal} de {totalPaginasPersonal} ({empleadosFiltrados.length} miembros)
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              disabled={paginaPersonal === 1}
+                              onClick={() => setPaginaPersonal(p => Math.max(1, p - 1))}
+                            >
+                              <ChevronLeft className="h-3 w-3 mr-0.5" /> Ant.
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              disabled={paginaPersonal === totalPaginasPersonal}
+                              onClick={() => setPaginaPersonal(p => Math.min(totalPaginasPersonal, p + 1))}
+                            >
+                              Sig. <ChevronRight className="h-3 w-3 ml-0.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </TabsContent>
+
+                {/* TAB 2: MAQUINARIA ASIGNADA */}
+                <TabsContent value="maquinas" className="m-0 focus-visible:outline-none">
+                  {assignedMaquinas.length === 0 ? (
+                    <div className="p-6 text-center text-muted-foreground text-xs">
+                      Sin maquinaria asignada a esta obra.
+                    </div>
+                  ) : maquinasFiltradas.length === 0 ? (
+                    <div className="p-6 text-center text-muted-foreground text-xs">
+                      No se encontraron equipos con "{busquedaRecurso}".
+                    </div>
+                  ) : (
+                    <>
+                      <div className="divide-y divide-slate-100">
+                        {maquinasPaginadas.map(m => (
+                          <Link key={m.id} href={`/maquinas/${m.id}`}>
+                            <div className="p-3 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors cursor-pointer group">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-700 flex-shrink-0">
+                                  <Tractor className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-xs sm:text-sm text-slate-900 truncate">
+                                    {m.nombre}
+                                  </p>
+                                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground truncate mt-0.5">
+                                    <span>{m.marca || "Maquinaria"} {m.modelo ? `• ${m.modelo}` : ""}</span>
+                                    {m.estado && (
+                                      <span className={`text-[9px] px-1 py-0 rounded font-medium ${
+                                        m.estado === "activa" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                                        m.estado === "mantenimiento" ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                                        "bg-slate-100 text-slate-600"
+                                      }`}>
+                                        {m.estado}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-40 group-hover:opacity-100 group-hover:text-primary transition-all flex-shrink-0" />
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+
+                      {/* Paginador de Maquinaria si supera 6 */}
+                      {totalPaginasMaquinas > 1 && (
+                        <div className="p-2.5 bg-slate-50 border-t flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground text-[11px]">
+                            {paginaMaquinas} de {totalPaginasMaquinas} ({maquinasFiltradas.length} equipos)
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              disabled={paginaMaquinas === 1}
+                              onClick={() => setPaginaMaquinas(p => Math.max(1, p - 1))}
+                            >
+                              <ChevronLeft className="h-3 w-3 mr-0.5" /> Ant.
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              disabled={paginaMaquinas === totalPaginasMaquinas}
+                              onClick={() => setPaginaMaquinas(p => Math.min(totalPaginasMaquinas, p + 1))}
+                            >
+                              Sig. <ChevronRight className="h-3 w-3 ml-0.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </TabsContent>
+
+                {/* TAB 3: INVENTARIO ASIGNADO */}
+                <TabsContent value="inventario" className="m-0 focus-visible:outline-none">
+                  {assignedInventario.length === 0 ? (
+                    <div className="p-6 text-center text-muted-foreground text-xs">
+                      Sin inventario asignado a esta obra.
+                    </div>
+                  ) : inventarioFiltrado.length === 0 ? (
+                    <div className="p-6 text-center text-muted-foreground text-xs">
+                      No se encontraron herramientas o inventario con "{busquedaRecurso}".
+                    </div>
+                  ) : (
+                    <>
+                      <div className="divide-y divide-slate-100">
+                        {inventarioPaginado.map(m => (
+                          <Link key={m.id} href={`/maquinas/${m.id}`}>
+                            <div className="p-3 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors cursor-pointer group">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-200/80 flex items-center justify-center text-purple-700 flex-shrink-0">
+                                  <Package className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-xs sm:text-sm text-slate-900 truncate">
+                                    {m.nombre}
+                                  </p>
+                                  <p className="text-[11px] text-muted-foreground truncate">
+                                    {m.marca || m.modelo ? `${m.marca || ""} ${m.modelo || ""}`.trim() : "Herramienta / Inventario menor"}
+                                  </p>
+                                </div>
+                              </div>
+                              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-40 group-hover:opacity-100 group-hover:text-primary transition-all flex-shrink-0" />
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+
+                      {/* Paginador de Inventario si supera 6 */}
+                      {totalPaginasInventario > 1 && (
+                        <div className="p-2.5 bg-slate-50 border-t flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground text-[11px]">
+                            {paginaInventario} de {totalPaginasInventario} ({inventarioFiltrado.length} items)
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              disabled={paginaInventario === 1}
+                              onClick={() => setPaginaInventario(p => Math.max(1, p - 1))}
+                            >
+                              <ChevronLeft className="h-3 w-3 mr-0.5" /> Ant.
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              disabled={paginaInventario === totalPaginasInventario}
+                              onClick={() => setPaginaInventario(p => Math.min(totalPaginasInventario, p + 1))}
+                            >
+                              Sig. <ChevronRight className="h-3 w-3 ml-0.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </TabsContent>
+              </CardContent>
+            </Tabs>
           </Card>
         </div>
 
